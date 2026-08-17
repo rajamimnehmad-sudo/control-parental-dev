@@ -14,6 +14,7 @@
     frameConcealed: "video-lab-frame-concealed",
     frameResult: "video-lab-frame-result",
     smoothStart: "video-lab-smooth-start",
+    safeSkipNotice: "video-lab-safe-skip-notice",
     retire: "video-lab-retire",
     reveal: "video-lab-reveal-style",
     conceal: "video-lab-conceal-style",

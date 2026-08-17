@@ -49,6 +49,7 @@
     <string name="video_lab_disable">Desactivar laboratorio de video</string>
     <string name="video_lab_disabled">Laboratorio de video desactivado</string>
     <string name="video_lab_cover_active">Video protegido por GloshIA</string>
+    <string name="video_safe_skip_notice">Se saltó una parte no permitida</string>
     <string name="video_lab_unavailable">El laboratorio de video no está disponible</string>
     <string name="video_lab_current_page">Filtrar video real de esta página</string>
     <string name="video_lab_current_page_armed">Prueba protegida activada para esta pestaña</string>

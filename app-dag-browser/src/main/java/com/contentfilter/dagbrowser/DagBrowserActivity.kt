@@ -173,6 +173,7 @@ class DagBrowserActivity : Activity() {
     private var activeVideoLabPort: WebExtension.Port? = null
     private var videoLabSmoothKey: DagVideoLabKey? = null
     private var videoLabSmoothGrant: DagVideoLabGrantAuthority? = null
+    private var pendingVideoLabSafeSkipNotice: DagVideoLabKey? = null
     private var pendingVideoLabReplay: PendingVideoLabReplayFrame? = null
     private var displayedVideoLabReplayBitmap: Bitmap? = null
     private var activeVideoLabGrantToken: String? = null
@@ -318,6 +319,8 @@ class DagBrowserActivity : Activity() {
                 handleVideoLabFrameConcealed(payload, senderTab, sourcePort)
             VideoLabSmoothStartMessage ->
                 handleVideoLabSmoothStart(payload, sender, senderTab, sourcePort)
+            VideoLabSafeSkipNoticeMessage ->
+                handleVideoLabSafeSkipNotice(payload, sender, senderTab, sourcePort)
             VideoLabRetireMessage -> handleVideoLabRetire(payload, senderTab, sourcePort)
         }
     }
@@ -379,6 +382,7 @@ class DagBrowserActivity : Activity() {
         durableVideoLabGrantRevoked = false
         videoLabSmoothKey = null
         videoLabSmoothGrant = null
+        pendingVideoLabSafeSkipNotice = null
         val previousKey = activeVideoLabKey.getAndSet(key)
         if (previousKey != key) {
             videoLabAnalysisGeneration.incrementAndGet()
@@ -515,7 +519,32 @@ class DagBrowserActivity : Activity() {
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
         videoLabOverlay.visibility = View.GONE
+        if (pendingVideoLabSafeSkipNotice == key) {
+            pendingVideoLabSafeSkipNotice = null
+            videoBlockedPlaceholder.showSafeSkipNotice(
+                key,
+                getString(R.string.video_safe_skip_notice),
+            )
+        }
         recordVideoLabEvent(senderTab, key, "smooth_started", "adaptive_two_fps")
+    }
+
+    private fun handleVideoLabSafeSkipNotice(
+        payload: JSONObject,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+    ) {
+        if (!validVideoLabContext(payload, sender, senderTab)) return
+        val key = videoLabKey(payload, senderTab) ?: return
+        if (
+            sourcePort !== activeVideoLabPort ||
+            !videoLabState.isCurrent(key, DagVideoLabState.Covered) ||
+            payload.optInt("skippedMillis", -1) !in 500..10_000
+        ) {
+            return
+        }
+        pendingVideoLabSafeSkipNotice = key
     }
 
     private fun captureVideoLabFrame(
@@ -1291,6 +1320,7 @@ class DagBrowserActivity : Activity() {
         if (!videoLabState.beginClosing(key, close.nonce)) return false
         videoLabArmedForSession = false
         videoLabSmoothKey = null
+        pendingVideoLabSafeSkipNotice = null
         videoLabCloseRequest = close
         videoLabCloseReason = reason
         clearPendingVideoLabReplay()
@@ -1413,6 +1443,7 @@ class DagBrowserActivity : Activity() {
         activeVideoLabPort = null
         videoLabSmoothKey = null
         videoLabSmoothGrant = null
+        pendingVideoLabSafeSkipNotice = null
         videoLabMode = null
         videoLabTargetTabId = null
         clearPendingVideoLabReplay()
@@ -4852,6 +4883,7 @@ class DagBrowserActivity : Activity() {
         const val VideoLabFrameConcealedMessage = "video-lab-frame-concealed"
         const val VideoLabFrameResultMessage = "video-lab-frame-result"
         const val VideoLabSmoothStartMessage = "video-lab-smooth-start"
+        const val VideoLabSafeSkipNoticeMessage = "video-lab-safe-skip-notice"
         const val VideoLabCloseMessage = "video-lab-close"
         const val VideoLabRevokedMessage = "video-lab-revoked"
         const val VideoLabRetireMessage = "video-lab-retire"

@@ -11,15 +11,28 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 ## Estado operativo
 
 - Rama `main`, 29 commits por delante de `origin/main`; sin push ni publicacion.
-- DEV 224 / 0.70.26 es la candidata integrada local. Diagnostic 103 y extension
-  2.0.58 quedan como herramientas locales; contienen el rearme de sesion,
+- DEV 225 / 0.70.27 es la candidata integrada local. Diagnostic 104 y extension
+  2.0.59 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
-- Progreso real: DAG Video premium 85%. La matriz minima superior queda cerrada;
+- Progreso real: DAG Video premium 90%. La matriz minima superior queda cerrada;
   video general sigue NO-GO para categorias aun no cubiertas.
 
-## Ultimo hito — DAG-PRIVACY-DIAGNOSTICS-01
+## Ultimo hito — DAG-VIDEO-SAFE-SKIP-STABILITY-02
+
+- El segundo video negro no era cache: al iniciar un salto seguro quedaba vivo
+  el temporizador del cuadro rechazado. Vencia 2,5 s despues y cerraba una
+  reproduccion que ya se habia recuperado.
+- El salto ahora cancela ese temporizador antes de cambiar de estado y muestra
+  dentro del rectangulo del video una nota breve: “Se salto una parte no
+  permitida”. La pagina permanece utilizable.
+- Regresion automatica exacta y gates completos verdes: JS 95/95, unitarios
+  DEV/Diagnostic, ktlint, lint de ambas variantes y assemble Diagnostic.
+- A23 con datos preservados: segundo YouTube visible, audio restaurado y muestreo
+  continuo; no reaparecio `frame_result_timeout`, crash ni ANR.
+
+## Hito — DAG-PRIVACY-DIAGNOSTICS-01
 
 - Los eventos de medios ya no heredan la privacidad de la pestaña visible. Cada
   evento se acepta solo si Android vinculo su documento superior exacto con una
@@ -48,7 +61,7 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 - DEV 224 paso unitarios DEV/Diagnostic, ktlint, lint y assemble. Validacion A23:
   inicio, pagina real, selector de pestañas, menu e incognito sin crash ni ANR.
 
-## Ultimo hito — DAG-VIDEO-SESSION-REARM-01
+## Hito — DAG-VIDEO-SESSION-REARM-01
 
 ### Correccion S22 — bloqueo localizado y salto seguro
 
@@ -110,7 +123,7 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
   Instalado sin borrar datos en A23, YouTube mostro imagen fluida y Android
   confirmo salida AAudio de medios, estereo 48 kHz. Sin crash ni ANR.
 
-## Ultimo hito — DAG-VIDEO-STRUCTURE-01
+## Hito — DAG-VIDEO-STRUCTURE-01
 
 - El protocolo, nombres de mensajes e identidad exacta de autoridad salieron a
   `video-protection-protocol.js`; `video-lab.js` bajo de 812 a 799 lineas.
@@ -123,11 +136,10 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Probar DEV 224 en S22 con el video que produjo el bloqueo seguido de
-otro video sin borrar datos. Confirmar salto seguro, audio, pagina utilizable y
-rearme. La nota visual breve del salto sigue pendiente de UX. URLs MP4 directas, iframes, Shorts,
-anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO y requieren tickets
-separados, sin excepciones por sitio.
+Construir DEV 225 desde `main` integrado y hacer una unica validacion humana en
+S22: tramo filtrado, nota breve, salto seguro y segundo video sin borrar datos.
+URLs MP4 directas, iframes, Shorts, anuncios, Instagram y TikTok siguen NO
+PROBADOS o NO-GO y requieren tickets separados, sin excepciones por sitio.
 
 ## Video normal vigente
 
@@ -148,10 +160,6 @@ reemplaza solo el GIF. WebP/AVIF animados quedan para otro ticket.
 
 ## Backlog aprobado
 
-- `DAG-VIDEO-SAFE-SKIP-01`: cuando un tramo se bloquee, mantener cobertura
-  localizada, avanzar en pasos acotados, analizar y reanudar en el primer tramo
-  seguro. Mostrar dentro del video una nota breve: “Se salto una parte no
-  permitida”. Evitar bucles, saltos infinitos y excepciones por proveedor.
 - `DAG-PARTIAL-REDACTION-01`: blur o pixelado parcial mediante segmentacion.
 - Adaptador universal para URLs directas MP4 y visor multimedia de Gecko.
 

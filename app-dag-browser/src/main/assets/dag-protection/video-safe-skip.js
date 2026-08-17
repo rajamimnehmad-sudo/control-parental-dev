@@ -74,6 +74,8 @@
         dependencies.postDiagnostic("safe_skip_end_reached");
         return false;
       }
+      dependencies.clearTimeout(record.resultTimer);
+      record.resultTimer = null;
       dependencies.resetFrameState(record);
       record.terminal = false;
       record.smoothActive = false;

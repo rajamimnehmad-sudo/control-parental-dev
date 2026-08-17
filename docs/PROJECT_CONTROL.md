@@ -8,8 +8,8 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
-- DAG local modificado: DEV 224 / 0.70.26 es candidata integrada; Diagnostic 103 / extension
-  2.0.58 son herramientas locales. El reporte S22 demostro que el segundo video
+- DAG local modificado: DEV 225 / 0.70.27 es candidata integrada; Diagnostic 104 / extension
+  2.0.59 son herramientas locales. El reporte S22 demostro que el segundo video
   fallaba por falta de rearme tras `viewport_changed`, no por cache. En A23,
   Diagnostic 101 reprodujo primer video, scroll y segundo video sin limpiar
   datos: ambos llegaron a `smooth_started`, con cierre durable entre autoridades
@@ -26,8 +26,14 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
   que `frame_blocked` dejaba terminal el documento. DEV 223 agrega salto seguro
   localizado de hasta cinco pasos de 2 s y cuarentena solo de la generacion
   rechazada; prevalidacion JS 95/95 y unitarios verdes, con prueba fisica S22
-  pendiente. GIF seguro conserva animacion. DAG Video premium queda en 85%; video general sigue NO-GO para
+  pendiente. GIF seguro conserva animacion. DAG Video premium queda en 90%; video general sigue NO-GO para
   URLs directas, iframes, Shorts, anuncios y redes sociales.
+- La causa del negro posterior al salto seguro quedo corregida: sobrevivía el
+  timeout del cuadro rechazado y cerraba 2,5 s despues la reproduccion ya
+  recuperada. Diagnostic 104 cancela ese timeout al entrar al salto y presenta
+  una nota breve dentro del video. Gates completos verdes; A23 con datos
+  preservados mantuvo visible el segundo YouTube, restauro audio y siguio
+  muestreando sin `frame_result_timeout`, crash ni ANR.
 - La auditoria DAG detecto y corrigio un riesgo de privacidad: los diagnosticos
   de medios ahora se autorizan por documento exacto y nunca por la pestaña
   visible global. Identidad desconocida o privada falla cerrada; JS 95/95,
@@ -97,7 +103,8 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Prioridad recomendada
 
-1. Prueba humana de DAG DEV 224: tramo filtrado, salto seguro y segundo video sin limpiar datos.
+1. Construir DEV 225 integrado y probar en S22: tramo filtrado, nota, salto
+   seguro y segundo video sin limpiar datos.
 2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
    dispositivo.
 3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
@@ -110,9 +117,9 @@ Idea futura registrada: `DAG-PARTIAL-REDACTION-01`, mascara visual para blur,
 pixelado o cobertura parcial en fotos/video. No forma parte de R3.1 ni del lote
 actual y necesita segmentacion espacial con validacion de fuga cero.
 
-Idea futura registrada: `DAG-VIDEO-SAFE-SKIP-01`, avanzar bajo cobertura en
-pasos acotados hasta el primer tramo permitido y mostrar una nota breve dentro
-del video. Requiere limites anti-bucle y no admite excepciones por proveedor.
+`DAG-VIDEO-SAFE-SKIP-01` quedo implementado con cobertura localizada, limites
+anti-bucle, nota breve y sin excepciones por proveedor. Falta aprobacion humana
+final del candidato DEV 225 en S22.
 
 ## Deuda estructural confirmada
 

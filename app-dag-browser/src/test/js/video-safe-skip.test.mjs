@@ -55,11 +55,15 @@ const safeSkipHarness = async ({ maximumAttempts = 5 } = {}) => {
     source: "blob:media",
     viewport: [0, 0, 640, 360],
   };
-  const record = { smoothActive: true, terminal: true, video };
+  const clearedTimers = [];
+  const record = { resultTimer: 900, smoothActive: true, terminal: true, video };
   let activeRecord = record;
   const controller = runtime.create({
     activeRecord: () => activeRecord,
-    clearTimeout: (timer) => timers.delete(timer),
+    clearTimeout: (timer) => {
+      clearedTimers.push(timer);
+      timers.delete(timer);
+    },
     endMarginSeconds: 0.25,
     maximumAttempts,
     minimumAdvanceSeconds: 0.5,
@@ -90,6 +94,7 @@ const safeSkipHarness = async ({ maximumAttempts = 5 } = {}) => {
   };
   return {
     controller,
+    clearedTimers,
     diagnostics,
     exhausted,
     record,
@@ -107,6 +112,8 @@ test("blocked frame advances under cover and resumes only after an allowed analy
   assert.equal(h.video.currentTime, 12);
   assert.equal(h.record.terminal, false);
   assert.equal(h.record.smoothActive, false);
+  assert.equal(h.record.resultTimer, null);
+  assert.ok(h.clearedTimers.includes(900), "the rejected frame timeout must not close recovered playback");
   assert.equal(h.controller.onSeeking(h.record), true);
   h.video.seeking = false;
   assert.equal(h.controller.onSeeked(h.record), true);

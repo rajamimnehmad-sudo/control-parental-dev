@@ -72,6 +72,7 @@
     frameConcealed: FRAME_CONCEALED_MESSAGE,
     frameResult: FRAME_RESULT_MESSAGE,
     smoothStart: SMOOTH_START_MESSAGE,
+    safeSkipNotice: SAFE_SKIP_NOTICE_MESSAGE,
     retire: RETIRE_MESSAGE,
     reveal: REVEAL_MESSAGE,
   } = messages;
@@ -615,9 +616,12 @@
       record.terminal = true;
       void retireRecord(record, "frame_blocked");
     },
-    onRecovered: (_record, skippedSeconds) => {
+    onRecovered: (record, skippedSeconds) => {
       postDiagnostic("safe_skip_notice");
       if (diagnosticsEnabled) postDiagnostic(skippedSeconds >= 1 ? "safe_skip_over_one_second" : "safe_skip_short");
+      postRecord(SAFE_SKIP_NOTICE_MESSAGE, record, {
+        skippedMillis: Math.round(skippedSeconds * 1_000),
+      });
     },
     postDiagnostic,
     requestFrameWhenReady,
