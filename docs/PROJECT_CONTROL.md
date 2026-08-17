@@ -8,8 +8,15 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
-- DAG local modificado: DEV 226 / 0.70.28 es candidata integrada; Diagnostic 110
-  / extension 2.0.60 son herramientas locales. El negro persistente no era
+- DAG local modificado: DEV 227 / 0.70.29 es candidata integrada; Diagnostic 111
+  / extension 2.0.61 son herramientas locales. `DAG-VIDEO-PREMIUM-CONTINUITY-03`
+  reemplaza el corte automatico por blur vivo opaco con audio continuo, exige
+  dos muestras seguras para retirarlo y ofrece salto manual despues de dos
+  segundos. Scroll del mismo video suspende solo la captura, reubica geometria
+  tras 150 ms y no pausa ni retira. Pantalla completa presenta el video exacto
+  en todo el viewport mediante handshake JS/Android. JS 103/103, unitarios
+  DEV/Diagnostic, ktlint, lint y assemble DEV verdes; falta validacion fisica.
+  El negro persistente anterior no era
   cache: un cierre apagaba globalmente el laboratorio del background conservado.
   Ahora el cierre y su acuse son por documento exacto. Pantalla completa usa un
   modo nativo de DAG sin simular controles del proveedor. Los fallos compatibles
@@ -96,8 +103,10 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
 
 ## Prioridad recomendada
 
-1. Validar DEV 226 en S22: primer/segundo video sin limpiar datos, reinicio,
-   salto seguro y pantalla completa.
+1. Validar DEV 227 en A23 o S22: reproduccion normal; bloqueo con blur animado y
+   audio; recuperacion tras dos muestras; boton de salto luego de dos segundos;
+   20 scrolls sin pausa ni control fijo; cinco entradas/salidas de pantalla
+   completa; primer y segundo video sin borrar datos.
 2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
    dispositivo.
 3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.

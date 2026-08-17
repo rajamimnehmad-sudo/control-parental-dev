@@ -10,13 +10,40 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 32 commits por delante de `origin/main`; sin push ni publicacion.
-- DEV 226 / 0.70.28 es la candidata integrada local. Diagnostic 110 y extension
-  2.0.60 quedan como herramientas locales de validacion.
+- Rama `main`, 33 commits por delante de `origin/main`; sin push ni publicacion.
+- DEV 227 / 0.70.29 es la candidata integrada local. Diagnostic 111 y extension
+  2.0.61 quedan como herramientas locales de validacion.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
-- Progreso real: DAG Video premium 92%. La matriz minima superior queda cerrada;
+- Progreso real: DAG Video premium 94%. La matriz minima superior queda cerrada;
   video general sigue NO-GO para categorias aun no cubiertas.
+
+## Ultimo hito — DAG-VIDEO-PREMIUM-CONTINUITY-03
+
+- Un cuadro filtrado durante reproduccion fluida ya no pausa, retira ni salta.
+  El mismo video sigue con audio y recibe blur vivo de origen usuario: 64 px,
+  brillo 0,16, saturacion 0,25 y contraste 0,72. Dos muestras seguras consecutivas
+  lo retiran con transicion de 160 ms.
+- Si el blur persiste dos segundos aparece un control pequeno anclado al video.
+  El salto es exclusivamente manual, avanza en pasos de dos segundos bajo el
+  mismo blur y conserva la autoridad; no produce pantalla negra intermedia.
+- Scroll normal del mismo documento/video/fuente suspende solo nuevas capturas,
+  descarta una muestra que cruce el movimiento, espera 150 ms estables, actualiza
+  geometria y continua. Fuera de pantalla no captura. Identidad, fuente o
+  capacidad insegura distintas siguen cerrando.
+- Pantalla completa usa atributos CSS de origen usuario para fijar el video
+  exacto al viewport con `object-fit: contain`. Android gira y oculta chrome solo
+  despues del acuse JS exacto. El control nativo se reposiciona cada vez que llega
+  una geometria verificada.
+- Refactor: enlace de eventos por registro salio a
+  `video-lab-record-binding.js`; experiencia premium se divide en overlay,
+  continuidad, fullscreen y runtime. `video-lab.js` queda en 799 lineas.
+- Prevalidacion: JS 103/103, unitarios DEV/Diagnostic, ktlint, lint de ambas
+  variantes y assemble DEV verdes. APK DEV 227 local, 116 MiB, SHA-256
+  `98179490cd349a98bb2109fc12e393dc38195f3a2e5f56ad32fc6e675c7d0386`.
+- No habia telefono ni emulador activo. Falta validar animacion real del blur,
+  continuidad de audio, scroll repetido, boton manual, jank/CPU/PSS y cinco
+  ciclos de pantalla completa en A23/S22.
 
 ## Ultimo hito — DAG-VIDEO-LIFECYCLE-FULLSCREEN-01
 
@@ -158,10 +185,10 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Validacion humana unica de DEV 226 en S22: primer video, segundo video sin borrar
-datos, reinicio de app, salto seguro y pantalla completa. URLs MP4 directas,
-iframes, Shorts, anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO y
-requieren tickets separados, sin excepciones por sitio.
+Validacion fisica unica de DEV 227 en A23 o S22 con la matriz del ultimo hito. No
+generar otra APK por ajustes visuales menores: primero reunir blur, audio, scroll,
+salto y pantalla completa en una sola corrida. URLs MP4 directas, iframes,
+Shorts, anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO.
 
 ## Video normal vigente
 
