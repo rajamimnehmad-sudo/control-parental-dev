@@ -136,9 +136,41 @@
     return labels;
   };
 
+  const createEmitter = (dependencies) => {
+    const startedAt = dependencies.now();
+    const timelineStages = new Set();
+    let lastStage = "";
+
+    const post = (stage) => {
+      if (!dependencies.enabled() || stage === lastStage) return;
+      lastStage = stage;
+      try {
+        dependencies.send({
+          type: dependencies.type,
+          stage,
+          elapsedMillis: Math.min(120_000, Math.max(0, Math.round(dependencies.now() - startedAt))),
+        });
+      } catch {}
+    };
+
+    const timeline = (stage) => {
+      if (timelineStages.has(stage)) return;
+      timelineStages.add(stage);
+      post(stage);
+    };
+
+    return Object.freeze({
+      labels: (stages) => { if (dependencies.enabled()) stages.forEach(post); },
+      post,
+      reset: () => { lastStage = ""; },
+      timeline,
+    });
+  };
+
   globalThis.__gloshDagVideoLabDiagnostics = Object.freeze({
     backing,
     backingScheme,
+    createEmitter,
     networkState,
     playAttempt,
     playError,

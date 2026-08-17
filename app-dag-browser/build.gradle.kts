@@ -43,8 +43,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 222
-        versionName = "0.70.24"
+        versionCode = 223
+        versionName = "0.70.25"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -78,7 +78,7 @@ android {
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 102
+            versionCode = 103
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
@@ -164,6 +164,7 @@ val testDagProtectionJs =
             "src/test/js/video-source-bootstrap.test.mjs",
             "src/test/js/video-smooth-experience.test.mjs",
             "src/test/js/video-seek-state.test.mjs",
+            "src/test/js/video-safe-skip.test.mjs",
         )
         inputs.files(
             "src/main/assets/dag-protection/ads.js",
@@ -190,12 +191,15 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/video-lab-seek.js",
             "src/main/assets/dag-protection/video-seek-state.js",
             "src/main/assets/dag-protection/video-authority-selection.js",
+            "src/main/assets/dag-protection/video-block-quarantine.js",
+            "src/main/assets/dag-protection/video-safe-skip.js",
             "src/main/assets/dag-protection/video-source-bootstrap.js",
             "src/test/js/dag-protection.test.mjs",
             "src/test/js/video-authority-selection.test.mjs",
             "src/test/js/video-source-bootstrap.test.mjs",
             "src/test/js/video-smooth-experience.test.mjs",
             "src/test/js/video-seek-state.test.mjs",
+            "src/test/js/video-safe-skip.test.mjs",
         )
     }
 

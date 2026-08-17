@@ -73,6 +73,7 @@
       const nativeAuthorityStarted =
         record.coverPending || record.covered || record.rawFrameOpen ||
         record.captures > 0 || record.smoothActive;
+      dependencies.cancelSafeSkip(record);
       dependencies.cancelSourceBootstrap(record);
       dependencies.clearRecordTimers(record);
       dependencies.safePause(record.video);
@@ -107,6 +108,7 @@
         }
         if (state.closingRecord === record) state.closingRecord = null;
         if (reason === "frame_blocked") {
+          dependencies.quarantineBlockedAuthority(record);
           state.isolationLocked = true;
           state.isolationLockedRecord = record;
         }

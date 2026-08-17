@@ -9,6 +9,7 @@ internal object DagVideoDocumentRearmPolicy {
             "viewport_changed",
             "source_changed",
             "active_video_mutated",
+            "frame_blocked",
         )
 
     fun supports(reason: String): Boolean = reason in FreshAuthorityReasons

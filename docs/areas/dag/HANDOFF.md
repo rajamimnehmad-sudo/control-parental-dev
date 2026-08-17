@@ -10,16 +10,32 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 24 commits por delante de `origin/main`; sin push ni publicacion.
-- DEV 222 / 0.70.24 es la candidata integrada local. Diagnostic 102 y extension
-  2.0.56 quedan como herramientas locales; contienen el rearme de sesion,
+- Rama `main`, 25 commits por delante de `origin/main`; sin push ni publicacion.
+- DEV 223 / 0.70.25 es la candidata integrada local. Diagnostic 103 y extension
+  2.0.57 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
-- Progreso real: DAG Video premium 84%. La matriz minima superior queda cerrada;
+- Progreso real: DAG Video premium 85%. La matriz minima superior queda cerrada;
   video general sigue NO-GO para categorias aun no cubiertas.
 
 ## Ultimo hito — DAG-VIDEO-SESSION-REARM-01
+
+### Correccion S22 — bloqueo localizado y salto seguro
+
+- El reporte `DAG-HY6MNGK2` demostro 10/10 arranques fluidos, pero despues de un
+  `frame_blocked` la generacion quedaba terminal y los videos posteriores del
+  mismo documento no volvian a seleccionarse. Borrar cache solo forzaba un
+  documento nuevo; no era la causa.
+- DEV 223 mantiene cubierta solo la region del video y, ante un cuadro filtrado,
+  avanza 2 s bajo cobertura, espera 150 ms estables y analiza de nuevo. Repite
+  como maximo cinco veces; nunca revela un punto rechazado.
+- Si no hay tiempo seekable, cambia la autoridad o se agota el limite, queda en
+  cuarentena solo esa generacion. Una fuente, generacion o elemento nuevo puede
+  rearmarse despues del cierre durable; el resto de la pagina no queda condenado.
+- Contrato universal, sin excepciones por pagina, proveedor ni formato.
+- Prevalidacion final: JS 95/95, unitarios DEV/Diagnostic, ktlint, lint DEV y
+  assemble DEV verdes. APK DEV 223 reconstruida; falta prueba humana del caso S22.
 
 Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
@@ -78,8 +94,9 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Prueba humana de DEV 222 en A23/S22: dos videos consecutivos, pausa/reanudacion,
-adelantar/retroceder y navegacion normal. URLs MP4 directas, iframes, Shorts,
+Probar DEV 223 en S22 con el video que produjo el bloqueo seguido de
+otro video sin borrar datos. Confirmar salto seguro, audio, pagina utilizable y
+rearme. La nota visual breve del salto sigue pendiente de UX. URLs MP4 directas, iframes, Shorts,
 anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO y requieren tickets
 separados, sin excepciones por sitio.
 
@@ -115,8 +132,10 @@ reemplaza solo el GIF. WebP/AVIF animados quedan para otro ticket.
   por cuadro, video todavia no.
 - `DagBrowserActivity.kt` supera 4.800 lineas: no agregar responsabilidades;
   usar politicas/componentes nuevos.
-- `video-lab.js` tiene 799 lineas tras extraer el protocolo. Sigue siendo un
-  coordinador grande: no agregarle otra responsabilidad.
+- `video-lab.js` tiene 832 lineas: salto y cuarentena viven en modulos separados,
+  pero su cableado llevo al coordinador sobre el limite. Queda abierto
+  `DAG-STRUCTURE-02` para extraer eventos/configuracion sin cambiar conducta; no
+  agregarle otra responsabilidad antes de esa division.
 - Tras tres intentos sin cambiar hito o decision, auditoria enfocada antes de
   otra edicion, build o APK.
 - Automatizar ADB, agrupar pruebas y pedir intervencion solo si es inevitable.

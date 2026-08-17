@@ -30,6 +30,8 @@
   const seekStateRuntime = globalThis.__gloshDagVideoSeekState;
   const sourceBootstrapRuntime = globalThis.__gloshDagVideoSourceBootstrap;
   const authoritySelectionRuntime = globalThis.__gloshDagVideoAuthoritySelection;
+  const blockQuarantineRuntime = globalThis.__gloshDagVideoBlockQuarantine;
+  const safeSkipRuntime = globalThis.__gloshDagVideoSafeSkip;
   if (
     protocol === undefined ||
     diagnosticLabels === undefined ||
@@ -46,7 +48,9 @@
     seekRuntime === undefined ||
     seekStateRuntime === undefined ||
     sourceBootstrapRuntime === undefined ||
-    authoritySelectionRuntime === undefined
+    authoritySelectionRuntime === undefined ||
+    blockQuarantineRuntime === undefined ||
+    safeSkipRuntime === undefined
   ) return;
   const {
     fixtureAttribute: INTERNAL_FIXTURE_ATTRIBUTE,
@@ -96,14 +100,13 @@
   let pendingConfiguration = null;
   let diagnosticsEnabled = false;
   let fixtureEnabled = false;
-  let lastDiagnosticStage = "";
   let unsafePresentationBlocked = false;
   let seekController = null;
+  let safeSkipController = null;
   let lastViewportChangeAt = performance.now();
   let viewportStabilityRequired = false;
-  const diagnosticStartedAt = performance.now();
-  const timelineStages = new Set();
   const records = new WeakMap();
+  const blockQuarantine = blockQuarantineRuntime.create(sourceSignature);
   const randomToken = (wordCount) => protocol.randomToken(crypto, wordCount);
   const grantIdentity = protocol.grantIdentity;
   const recordMatchesMessage = (record, message) =>
@@ -126,26 +129,15 @@
     });
     return true;
   };
-  const postDiagnostic = (stage) => {
-    if (!diagnosticsEnabled || postToAndroid === null || stage === lastDiagnosticStage) return;
-    lastDiagnosticStage = stage;
-    try {
-      postToAndroid({
-        type: messages.diagnostic,
-        stage,
-        elapsedMillis: Math.min(120_000, Math.max(0, Math.round(performance.now() - diagnosticStartedAt))),
-      });
-    } catch {}
-  };
-  const postTimeline = (stage) => {
-    if (timelineStages.has(stage)) return;
-    timelineStages.add(stage);
-    postDiagnostic(stage);
-  };
-  const postDiagnosticLabels = (labels) => {
-    if (!diagnosticsEnabled) return;
-    labels.forEach(postDiagnostic);
-  };
+  const diagnosticEmitter = diagnosticLabels.createEmitter({
+    enabled: () => diagnosticsEnabled && postToAndroid !== null,
+    now: () => performance.now(),
+    send: (message) => postToAndroid(message),
+    type: messages.diagnostic,
+  });
+  const postDiagnostic = diagnosticEmitter.post;
+  const postTimeline = diagnosticEmitter.timeline;
+  const postDiagnosticLabels = diagnosticEmitter.labels;
   const postPlayAttemptDiagnostics = (record) => {
     postDiagnosticLabels(
       diagnosticLabels.playAttempt(
@@ -268,8 +260,12 @@
       video.addEventListener(type, reportBackingEvent);
     }
     video.addEventListener("volumechange", keepMuted);
-    video.addEventListener("seeking", () => seekController?.onSeeking(record));
-    video.addEventListener("seeked", () => seekController?.onSeeked(record));
+    video.addEventListener("seeking", () => {
+      if (safeSkipController?.onSeeking(record) !== true) seekController?.onSeeking(record);
+    });
+    video.addEventListener("seeked", () => {
+      if (safeSkipController?.onSeeked(record) !== true) seekController?.onSeeked(record);
+    });
     video.addEventListener("enterpictureinpicture", closeUnsafePresentation);
     video.addEventListener("leavepictureinpicture", closeUnsafePresentation);
     video.addEventListener("webkitbeginfullscreen", closeUnsafePresentation);
@@ -279,6 +275,7 @@
       "webkitcurrentplaybacktargetiswirelesschanged",
       closeUnsafePresentation,
     );
+    video.addEventListener("emptied", () => blockQuarantine.noteGeneration(video));
     video.addEventListener("emptied", closeUnsafePresentation);
     video.addEventListener("error", closeUnsafePresentation);
     if (typeof remote?.addEventListener === "function") {
@@ -367,6 +364,7 @@
   };
   const lifecycle = lifecycleRuntime.create({
     browser,
+    cancelSafeSkip: () => safeSkipController?.cancel(),
     cancelSourceBootstrap: (record) => sourceBootstrap?.cancel(record),
     clearRecordTimers,
     concealMessage: messages.conceal,
@@ -376,6 +374,7 @@
     postDiagnostic,
     postToAndroid: () => postToAndroid,
     protocolVersion: () => protocolVersion,
+    quarantineBlockedAuthority: (record) => blockQuarantine.block(record),
     resetFrameState,
     retireMessage: RETIRE_MESSAGE,
     safePause,
@@ -455,7 +454,9 @@
     scanScheduled = false;
     if (!enabled || unsafePresentationBlocked || window.top !== window || closingRecord !== null) return;
     enforceMediaIsolation();
-    authoritySelection.scan([...document.querySelectorAll("video")]);
+    authoritySelection.scan(
+      [...document.querySelectorAll("video")].filter((video) => blockQuarantine.allows(video)),
+    );
   };
 
   const scheduleScanNow = () => {
@@ -593,6 +594,8 @@
     grantIdentity,
     lastViewportChangeAt: () => lastViewportChangeAt,
     now: () => performance.now(),
+    onFrameAllowed: (record) => safeSkipController?.onFrameAllowed(record),
+    onFrameBlocked: (record) => safeSkipController?.onFrameBlocked(record) === true,
     postDiagnostic,
     postFrameRecord,
     postPlayAttemptDiagnostics,
@@ -616,6 +619,33 @@
   const handleFrameCaptured = capture.handleFrameCaptured;
   const handleFrameResult = capture.handleFrameResult;
   const requestFrameWhenReady = capture.requestFrameWhenReady;
+
+  safeSkipController = safeSkipRuntime.create({
+    activeRecord: () => activeRecord,
+    clearTimeout: (timer) => clearTimeout(timer),
+    endMarginSeconds: 0.25,
+    maximumAttempts: 5,
+    minimumAdvanceSeconds: 0.5,
+    onExhausted: (record) => {
+      record.terminal = true;
+      void retireRecord(record, "frame_blocked");
+    },
+    onRecovered: (_record, skippedSeconds) => {
+      postDiagnostic("safe_skip_notice");
+      if (diagnosticsEnabled) postDiagnostic(skippedSeconds >= 1 ? "safe_skip_over_one_second" : "safe_skip_short");
+    },
+    postDiagnostic,
+    requestFrameWhenReady,
+    resetFrameState,
+    safePause,
+    setTimeout: (callback, millis) => setTimeout(callback, millis),
+    settleMillis: VIEWPORT_SETTLE_MS,
+    sourceSignature,
+    stepSeconds: 2,
+    timeToleranceSeconds: 0.25,
+    timeoutMillis: FRAME_READY_TIMEOUT_MS,
+    viewportSignature,
+  });
 
   const viewportController = viewportRuntime.create({
     beginBootstrapViewportTransition,
@@ -715,7 +745,10 @@
         document.addEventListener(type, scheduleScan, true);
         document.addEventListener(type, (event) => {
           postTimeline(`timeline_event_${type}`);
-          if (event.target instanceof HTMLVideoElement) reportBackingTransition(event.target);
+          if (event.target instanceof HTMLVideoElement) {
+            if (type === "loadstart") blockQuarantine.noteGeneration(event.target);
+            reportBackingTransition(event.target);
+          }
         }, true);
       }
       addEventListener("scroll", invalidateForViewport, { passive: true });
@@ -773,7 +806,7 @@
         } else if (configuration.enabled) {
           enabled = true;
           unsafePresentationBlocked = false;
-          lastDiagnosticStage = "";
+          diagnosticEmitter.reset();
           postDiagnostic("config_enabled");
           enforceMediaIsolation();
           if (seekController?.onNativeRearm() !== true) scheduleScan();

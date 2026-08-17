@@ -270,13 +270,18 @@
             }
             record.smoothActive = false;
             record.frameConcealed = true;
-            void dependencies.retireRecord(record, "frame_blocked");
+            if (!dependencies.onFrameBlocked(record)) {
+              void dependencies.retireRecord(record, "frame_blocked");
+            }
           });
         } else {
-          void dependencies.retireRecord(record, "frame_blocked");
+          if (!dependencies.onFrameBlocked(record)) {
+            void dependencies.retireRecord(record, "frame_blocked");
+          }
         }
         return;
       }
+      dependencies.onFrameAllowed(record);
       dependencies.finishFrameIfReady(record);
     };
 

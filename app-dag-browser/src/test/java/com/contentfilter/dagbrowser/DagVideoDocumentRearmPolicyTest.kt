@@ -12,11 +12,11 @@ class DagVideoDocumentRearmPolicyTest {
         assertTrue(DagVideoDocumentRearmPolicy.supports("viewport_changed"))
         assertTrue(DagVideoDocumentRearmPolicy.supports("source_changed"))
         assertTrue(DagVideoDocumentRearmPolicy.supports("active_video_mutated"))
+        assertTrue(DagVideoDocumentRearmPolicy.supports("frame_blocked"))
     }
 
     @Test
     fun `security and terminal failures never rearm automatically`() {
-        assertFalse(DagVideoDocumentRearmPolicy.supports("frame_blocked"))
         assertFalse(DagVideoDocumentRearmPolicy.supports("unsafe_presentation"))
         assertFalse(DagVideoDocumentRearmPolicy.supports("frame_ready_timeout"))
         assertFalse(DagVideoDocumentRearmPolicy.supports("capture_limit"))
