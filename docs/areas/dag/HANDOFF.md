@@ -10,8 +10,8 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 33 commits por delante de `origin/main`; sin push ni publicacion.
-- DEV 227 / 0.70.29 es la candidata integrada local. Diagnostic 111 y extension
+- Rama `main`, adelantada respecto de `origin/main`; sin push ni publicacion.
+- DEV 228 / 0.70.30 es la candidata integrada local. Diagnostic 112 y extension
   2.0.61 quedan como herramientas locales de validacion.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
@@ -39,11 +39,13 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
   `video-lab-record-binding.js`; experiencia premium se divide en overlay,
   continuidad, fullscreen y runtime. `video-lab.js` queda en 799 lineas.
 - Prevalidacion: JS 103/103, unitarios DEV/Diagnostic, ktlint, lint de ambas
-  variantes y assemble DEV verdes. APK DEV 227 local, 116 MiB, SHA-256
-  `98179490cd349a98bb2109fc12e393dc38195f3a2e5f56ad32fc6e675c7d0386`.
-- No habia telefono ni emulador activo. Falta validar animacion real del blur,
-  continuidad de audio, scroll repetido, boton manual, jank/CPU/PSS y cinco
-  ciclos de pantalla completa en A23/S22.
+  variantes y assemble DEV verdes. APK DEV 228 local, 116 MiB, SHA-256
+  `720c5c87205a9369ebee2751d562125b646b7896cc248488501f4b2ef0496f25`.
+- A23: instalacion preservando datos, YouTube real visible y diez scrolls sin
+  pagina bloqueada; el control siguio el reproductor sticky. DEV 227 demostro que
+  forzar paisaje reemplazaba el video dinamico. DEV 228 ya no rota por programa
+  y conserva la autoridad. Falta una comprobacion manual de entrada/salida del
+  modo completo, blur real, audio y boton de salto.
 
 ## Ultimo hito — DAG-VIDEO-LIFECYCLE-FULLSCREEN-01
 
@@ -185,7 +187,7 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Validacion fisica unica de DEV 227 en A23 o S22 con la matriz del ultimo hito. No
+Validacion fisica unica de DEV 228 en A23 o S22 con la matriz del ultimo hito. No
 generar otra APK por ajustes visuales menores: primero reunir blur, audio, scroll,
 salto y pantalla completa en una sola corrida. URLs MP4 directas, iframes,
 Shorts, anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO.
