@@ -733,10 +733,11 @@
           void retireRecord(activeRecord, "document_retired");
         },
         onFullscreen: () => {
-          if (document.fullscreenElement !== null) {
-            void document.exitFullscreen?.().catch(() => {});
-            void retireRecord(activeRecord, "fullscreen_requested");
-          }
+          const reason = document.fullscreenElement !== null
+            ? "fullscreen_transition"
+            : "fullscreen_exit_transition";
+          if (activeRecord !== null) void retireRecord(activeRecord, reason);
+          else scheduleScan();
         },
         onFullscreenError: () => void retireRecord(activeRecord, "fullscreen_error"),
       });

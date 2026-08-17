@@ -1,6 +1,6 @@
 # DAG BROWSER — HANDOFF
 
-Actualizado: 2026-08-16. Responsable: Jefe.
+Actualizado: 2026-08-17. Responsable: Jefe.
 
 ## Mision
 
@@ -10,14 +10,34 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 31 commits por delante de `origin/main`; sin push ni publicacion.
-- DEV 225 / 0.70.27 es la candidata integrada local. Diagnostic 104 y extension
-  2.0.59 quedan como herramientas locales; contienen el rearme de sesion,
-  viewport estable y espera acotada de superficie Gecko vigentes.
+- Rama `main`, 32 commits por delante de `origin/main`; sin push ni publicacion.
+- DEV 226 / 0.70.28 es la candidata integrada local. Diagnostic 110 y extension
+  2.0.60 quedan como herramientas locales de validacion.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
-- Progreso real: DAG Video premium 90%. La matriz minima superior queda cerrada;
+- Progreso real: DAG Video premium 92%. La matriz minima superior queda cerrada;
   video general sigue NO-GO para categorias aun no cubiertas.
+
+## Ultimo hito — DAG-VIDEO-LIFECYCLE-FULLSCREEN-01
+
+- Causa raiz del negro persistente: el cierre exacto de un video apagaba el
+  laboratorio global del background. Al conservar Gecko/background entre
+  pestañas o reinicios, los siguientes documentos quedaban cerrados hasta que
+  borrar datos destruia ese proceso. El cierre ahora afecta solo al documento
+  exacto y se libera despues del acuse durable.
+- DAG ofrece un control nativo de pantalla completa protegido. Oculta el chrome,
+  usa paisaje y conserva la cobertura/muestreo sin simular controles del sitio;
+  salir rearma el mismo video sin cerrar la pestaña.
+- Si vence cobertura, primer cuadro o revocacion, DAG envia automaticamente el
+  diagnostico sanitizado existente. Nunca lo hace en privado, exige uploader
+  configurado y aplica un cooldown persistente de 15 minutos.
+- Gate final: JS 95/95, unitarios DEV/Diagnostic, ktlint, lint de ambas variantes
+  y assemble DEV verdes.
+- A23 con todos los datos preservados: primer video, entrada/salida de pantalla
+  completa, segundo video distinto y reapertura completa de la app reprodujeron
+  imagen, audio y muestreo continuo sin pantalla negra, crash ni ANR.
+- La prueba fisica detecto correctamente un `revoke_timeout` de una iteracion
+  descartada y envio `DAG-3QBATWD5`; el diseño final no reprodujo ese cierre.
 
 ## Ultimo hito — DAG-VIDEO-SAFE-SKIP-STABILITY-02
 
@@ -138,10 +158,10 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Construir DEV 225 desde `main` integrado y hacer una unica validacion humana en
-S22: tramo filtrado, nota breve, salto seguro y segundo video sin borrar datos.
-URLs MP4 directas, iframes, Shorts, anuncios, Instagram y TikTok siguen NO
-PROBADOS o NO-GO y requieren tickets separados, sin excepciones por sitio.
+Validacion humana unica de DEV 226 en S22: primer video, segundo video sin borrar
+datos, reinicio de app, salto seguro y pantalla completa. URLs MP4 directas,
+iframes, Shorts, anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO y
+requieren tickets separados, sin excepciones por sitio.
 
 ## Video normal vigente
 

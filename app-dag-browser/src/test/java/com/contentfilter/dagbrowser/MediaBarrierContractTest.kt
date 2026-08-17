@@ -30,7 +30,11 @@ class MediaBarrierContractTest {
     private val blockedPlaceholder by lazy {
         File("src/main/java/com/contentfilter/dagbrowser/DagVideoBlockedPlaceholderPresenter.kt").readText()
     }
+    private val fullscreenChrome by lazy {
+        File("src/main/java/com/contentfilter/dagbrowser/DagFullscreenChromeController.kt").readText()
+    }
     private val browserLayout by lazy { File("src/main/res/layout/activity_dag_browser.xml").readText() }
+    private val androidManifest by lazy { File("src/main/AndroidManifest.xml").readText() }
 
     @Test
     fun `extension starts before content and updates in place`() {
@@ -38,7 +42,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"css_origin\": \"user\"")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.59\"")
+        assertContains(manifest, "\"version\": \"2.0.60\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(manifest, "\"presentation-guard.js\"")
@@ -53,12 +57,22 @@ class MediaBarrierContractTest {
     @Test
     fun `native fullscreen authority preserves cover and closes the exact video grant`() {
         assertContains(activity, "override fun onFullScreen(")
-        assertContains(activity, "if (!fullScreen || !isVideoLabCovered(tab)) return")
-        assertContains(activity, "showVideoLabCover()")
-        assertContains(activity, "beginVideoLabClose(\"fullscreen_requested\")")
+        assertContains(activity, "handleBrowserFullscreenChange(tab, fullScreen)")
         assertContains(activity, "override fun onFullscreen(")
-        assertContains(activity, "beginVideoLabClose(\"media_fullscreen_requested\")")
+        assertContains(activity, "handleBrowserFullscreenChange(tab, enabled)")
+        assertContains(activity, "DagFullscreenTransitionPolicy.rearmReason(fullscreen)")
+        assertContains(activity, "videoBlockedPlaceholder.showFullscreenTransition(key)")
+        assertContains(activity, "fullscreenChrome.setFullscreen(fullscreen)")
         assertContains(activity, "session.exitFullScreen()")
+        assertContains(activity, "enterProtectedFallbackFullscreen(key)")
+        assertContains(activity, "protectedFallbackFullscreen")
+        assertContains(activity, "SCREEN_ORIENTATION_SENSOR_LANDSCAPE")
+        assertContains(activity, "exitProtectedFallbackFullscreen()")
+        assertFalse(activity.contains("postProtectedVideoTap"))
+        assertContains(androidManifest, "orientation|screenSize|smallestScreenSize|screenLayout")
+        assertContains(blockedPlaceholder, "fun showFullscreenTransition(")
+        assertContains(fullscreenChrome, "WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE")
+        assertContains(fullscreenChrome, "toolbar.visibility = if (fullscreen) View.GONE else View.VISIBLE")
         assertContains(presentationGuard, "requestPictureInPicture")
         assertContains(presentationGuard, "documentPictureInPicture")
         assertContains(presentationGuard, "webkitSetPresentationMode")
@@ -237,12 +251,18 @@ class MediaBarrierContractTest {
         assertContains(activity, "videoBlockedPlaceholder.showProtection(key)")
         assertContains(activity, "VideoLabSafeSkipNoticeMessage")
         assertContains(activity, "videoBlockedPlaceholder.showSafeSkipNotice(")
+        assertContains(activity, "videoBlockedPlaceholder.enableReplayInteraction(")
+        assertContains(activity, "tab.session.panZoomController.onTouchEvent(forwarded)")
+        assertContains(activity, "toggleProtectedVideoFullscreen(key)")
         assertContains(activity, "videoBlockedPlaceholder.clearForTab(tab.id)")
         assertContains(blockedPlaceholder, "overlay.setBackgroundColor(Color.TRANSPARENT)")
         assertContains(blockedPlaceholder, "showLocalized(key, blockedColor, clearOutside = true)")
         assertContains(blockedPlaceholder, "frame.setBackgroundColor(color)")
         assertContains(blockedPlaceholder, "showLocalized(key, fullCoverColor, clearOutside = false)")
         assertContains(blockedPlaceholder, "fun showSafeSkipNotice(")
+        assertContains(blockedPlaceholder, "fun enableReplayInteraction(")
+        assertContains(blockedPlaceholder, "R.drawable.ic_dag_fullscreen_exit")
+        assertContains(browserLayout, "@+id/video_lab_fullscreen_button")
         assertContains(blockedPlaceholder, "overlay.isClickable = false")
         assertContains(blockedPlaceholder, "frame.setOnTouchListener { _, _ -> true }")
         assertContains(blockedPlaceholder, "event.actionMasked == MotionEvent.ACTION_DOWN")

@@ -1189,6 +1189,15 @@ test("native video close denies media until its exact CSS revocation is acknowle
     documentToken: "document_a1",
     token: "fedcba9876543210fedcba9876543210",
   }, sender)).inserted, false, "a closing grant cannot be replaced");
+  assert.equal(
+    (await harness.sendRuntime({
+      type: "video-lab-status",
+      version: 2,
+      documentToken: "document_a1",
+    }, sender)).enabled,
+    false,
+    "the exact closing document remains denied until revocation is proven",
+  );
   assert.equal(harness.postedNative.some((message) => message.type === "video-lab-revoked"), false);
 
   resolveRemoval();
@@ -1198,6 +1207,15 @@ test("native video close denies media until its exact CSS revocation is acknowle
   assert.equal(acknowledgement.tabId, 1);
   assert.equal(acknowledgement.documentToken, "document_a1");
   assert.equal(acknowledgement.closeNonce, closeNonce);
+  assert.equal(
+    (await harness.sendRuntime({
+      type: "video-lab-status",
+      version: 2,
+      documentToken: "document_a1",
+    }, sender)).enabled,
+    true,
+    "closing one exact grant must not disable future video authorities in the document",
+  );
 });
 
 test("unknown native video close never acknowledges after background state loss", async () => {

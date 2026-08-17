@@ -10,6 +10,10 @@ internal object DagVideoDocumentRearmPolicy {
             "source_changed",
             "active_video_mutated",
             "frame_blocked",
+            "cover_timeout",
+            "fullscreen_transition",
+            "fullscreen_exit_transition",
+            "fullscreen_error",
         )
 
     fun supports(reason: String): Boolean = reason in FreshAuthorityReasons

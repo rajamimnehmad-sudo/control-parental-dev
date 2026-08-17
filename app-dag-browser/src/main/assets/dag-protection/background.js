@@ -451,10 +451,9 @@ const closeVideoLabFromNative = async (message) => {
     token: message.token,
     closeNonce: message.closeNonce,
   };
-  // Native keeps its opaque cover until it sees this exact acknowledgement.
-  // Deny first so no concurrent reveal can race CSS removal, including after
-  // navigation has already advanced the current document state.
-  videoLabEnabled = false;
+  // Deny only this exact document while its grant is being removed. A close in
+  // one tab must never disable every later video authority in the background.
+  videoLabCloseRequestsByTab.set(message.tabId, request);
   const grant = videoLabGrantsByTab.get(message.tabId);
   if (grant === undefined) {
     // GeckoView can briefly keep two background contexts during native-port
@@ -477,8 +476,8 @@ const closeVideoLabFromNative = async (message) => {
     return;
   }
   // Never let an old close request revoke or acknowledge a newer document's
-  // grant. It remains denied by videoLabEnabled=false and its CSS is still
-  // removed immediately; only the stale acknowledgement is withheld.
+  // grant. Its CSS is still removed immediately and only the stale
+  // acknowledgement is withheld.
   if (!sameVideoLabGrantIdentity(grant, request)) {
     postVideoLabDiagnostic("revoke_document_mismatch");
     void removeVideoLabGrant(message.tabId, grant.token);
@@ -1461,6 +1460,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
       isVideoLabEligibleSender(sender) &&
       isCurrentDocument(state) &&
       state.documentToken === message.documentToken &&
+      videoLabCloseRequestsByTab.get(sender.tab.id)?.documentToken !== message.documentToken &&
       videoLabGrantsByTab.get(sender.tab.id)?.closing !== true;
     postVideoLabDiagnostic(enabled ? "background_status_enabled" : "background_status_rejected");
     return Promise.resolve({

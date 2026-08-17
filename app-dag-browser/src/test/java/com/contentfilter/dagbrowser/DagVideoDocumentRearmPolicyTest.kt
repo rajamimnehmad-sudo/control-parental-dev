@@ -13,6 +13,10 @@ class DagVideoDocumentRearmPolicyTest {
         assertTrue(DagVideoDocumentRearmPolicy.supports("source_changed"))
         assertTrue(DagVideoDocumentRearmPolicy.supports("active_video_mutated"))
         assertTrue(DagVideoDocumentRearmPolicy.supports("frame_blocked"))
+        assertTrue(DagVideoDocumentRearmPolicy.supports("cover_timeout"))
+        assertTrue(DagVideoDocumentRearmPolicy.supports("fullscreen_transition"))
+        assertTrue(DagVideoDocumentRearmPolicy.supports("fullscreen_exit_transition"))
+        assertTrue(DagVideoDocumentRearmPolicy.supports("fullscreen_error"))
     }
 
     @Test

@@ -1,33 +1,23 @@
 # CONTROL CENTRAL DEL PROYECTO
 
-Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
+Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- Rama: `main`, 31 commits locales por delante de `origin/main`.
+- Rama: `main`, 32 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
-- DAG local modificado: DEV 225 / 0.70.27 es candidata integrada; Diagnostic 104 / extension
-  2.0.59 son herramientas locales. El reporte S22 demostro que el segundo video
-  fallaba por falta de rearme tras `viewport_changed`, no por cache. En A23,
-  Diagnostic 101 reprodujo primer video, scroll y segundo video sin limpiar
-  datos: ambos llegaron a `smooth_started`, con cierre durable entre autoridades
-  y sin el bucle de scroll previo. Diagnostic 102 corrigio la carrera de
-  superficie inicial: HTML5 alcanzo `cover_armed` y YouTube volvio a
-  `smooth_started` con imagen visible y muestreo continuo. La fuente HTML5
-  externa elegida no entrego cuadros, por lo que esa fila sigue pendiente. JS
-  88/88. La auditoria de cierre acepta la evidencia HTML5 fisica anterior de
-  120/120 cuadros mas el replay actual; DEV 221 paso todos los gates y en A23
-  mostro YouTube fluido con salida AAudio estereo 48 kHz. El protocolo de video
-  quedo separado del coordinador (799 lineas), con JS 89/89, unitarios 211/211
-  por variante, lint completo y nueva comprobacion A23 de imagen en movimiento,
-  audio estereo 48 kHz y cero crash/ANR. El reporte `DAG-HY6MNGK2` aislo ademas
-  que `frame_blocked` dejaba terminal el documento. DEV 223 agrega salto seguro
-  localizado de hasta cinco pasos de 2 s y cuarentena solo de la generacion
-  rechazada; prevalidacion JS 95/95 y unitarios verdes, con prueba fisica S22
-  pendiente. GIF seguro conserva animacion. DAG Video premium queda en 90%; video general sigue NO-GO para
-  URLs directas, iframes, Shorts, anuncios y redes sociales.
+- DAG local modificado: DEV 226 / 0.70.28 es candidata integrada; Diagnostic 110
+  / extension 2.0.60 son herramientas locales. El negro persistente no era
+  cache: un cierre apagaba globalmente el laboratorio del background conservado.
+  Ahora el cierre y su acuse son por documento exacto. Pantalla completa usa un
+  modo nativo de DAG sin simular controles del proveedor. Los fallos compatibles
+  con video negro envian diagnostico sanitizado automatico, nunca en privado y
+  con cooldown de 15 minutos. Gate completo verde. A23 con datos preservados
+  paso primer video, pantalla completa, segundo video y reinicio de app con
+  imagen, audio y muestreo continuo. DAG Video premium queda en 92%; video
+  general sigue NO-GO para URLs directas, iframes, Shorts, anuncios y redes.
 - La causa del negro posterior al salto seguro quedo corregida: sobrevivía el
   timeout del cuadro rechazado y cerraba 2,5 s despues la reproduccion ya
   recuperada. Diagnostic 104 cancela ese timeout al entrar al salto y presenta
@@ -106,8 +96,8 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Prioridad recomendada
 
-1. Construir DEV 225 integrado y probar en S22: tramo filtrado, nota, salto
-   seguro y segundo video sin limpiar datos.
+1. Validar DEV 226 en S22: primer/segundo video sin limpiar datos, reinicio,
+   salto seguro y pantalla completa.
 2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
    dispositivo.
 3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
@@ -122,7 +112,7 @@ actual y necesita segmentacion espacial con validacion de fuga cero.
 
 `DAG-VIDEO-SAFE-SKIP-01` quedo implementado con cobertura localizada, limites
 anti-bucle, nota breve y sin excepciones por proveedor. Falta aprobacion humana
-final del candidato DEV 225 en S22.
+final del candidato DEV 226 en S22.
 
 ## Deuda estructural confirmada
 

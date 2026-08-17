@@ -13,6 +13,7 @@
         android:theme="@style/Theme.DagBrowser">
         <activity
             android:name=".DagBrowserActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout"
             android:enableOnBackInvokedCallback="true"
             android:exported="true"
             android:launchMode="singleTask"
