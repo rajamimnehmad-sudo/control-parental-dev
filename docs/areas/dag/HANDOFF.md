@@ -10,7 +10,7 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 29 commits por delante de `origin/main`; sin push ni publicacion.
+- Rama `main`, 31 commits por delante de `origin/main`; sin push ni publicacion.
 - DEV 225 / 0.70.27 es la candidata integrada local. Diagnostic 104 y extension
   2.0.59 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
@@ -31,6 +31,8 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
   DEV/Diagnostic, ktlint, lint de ambas variantes y assemble Diagnostic.
 - A23 con datos preservados: segundo YouTube visible, audio restaurado y muestreo
   continuo; no reaparecio `frame_result_timeout`, crash ni ANR.
+- El workflow de DAG quedo alineado con `scripts/dag_gradle.sh` y ahora cubre JS,
+  unitarios DEV/Diagnostic, ktlint, lint de ambas variantes y assemble DEV.
 
 ## Hito — DAG-PRIVACY-DIAGNOSTICS-01
 
@@ -169,9 +171,13 @@ reemplaza solo el GIF. WebP/AVIF animados quedan para otro ticket.
   por cuadro, video todavia no.
 - `DagBrowserActivity.kt` supera 4.800 lineas: no agregar responsabilidades;
   usar politicas/componentes nuevos.
-- `video-lab.js` tiene 799 lineas tras separar eventos y configuracion. No sumar
+- `video-lab.js` tiene 803 lineas tras separar eventos y configuracion. No sumar
   responsabilidades nuevas al coordinador; las nuevas politicas deben vivir en
   componentes propios.
+- `DAG-STRUCTURE-03` queda abierto: `video-lab.js` alcanzo 803 lineas por el
+  cableado de la nota, Activity supera 4.900 y `background.js` 1.500. El siguiente
+  cambio funcional de video debe esperar un refactor neutro de coordinacion y
+  diario durable; no mezclarlo con esta candidata estable.
 - Tras tres intentos sin cambiar hito o decision, auditoria enfocada antes de
   otra edicion, build o APK.
 - Automatizar ADB, agrupar pruebas y pedir intervencion solo si es inevitable.

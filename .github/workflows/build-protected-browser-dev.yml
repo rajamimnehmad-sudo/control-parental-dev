@@ -5,7 +5,7 @@ on:
     paths:
       - ".github/workflows/build-protected-browser-dev.yml"
       - "app-dag-browser/**"
-      - "settings.gradle.kts"
+      - "scripts/dag_gradle.sh"
   workflow_dispatch:
     inputs:
       confirm_build:
@@ -40,8 +40,16 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Pruebas y compilación
-        working-directory: app-dag-browser
-        run: ./gradlew testDevDebugUnitTest assembleDevDebug --no-daemon
+        run: >-
+          scripts/dag_gradle.sh
+          testDagProtectionJs
+          testDevDebugUnitTest
+          testDiagnosticDebugUnitTest
+          ktlintCheck
+          lintDevDebug
+          lintDiagnosticDebug
+          assembleDevDebug
+          --no-daemon
 
   build-signed:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_build }}
@@ -86,9 +94,16 @@ jobs:
           ANDROID_DEV_KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          cd app-dag-browser
-          ./gradlew testDevDebugUnitTest assembleDevDebug --no-daemon
-          APK="build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk"
+          scripts/dag_gradle.sh \
+            testDagProtectionJs \
+            testDevDebugUnitTest \
+            testDiagnosticDebugUnitTest \
+            ktlintCheck \
+            lintDevDebug \
+            lintDiagnosticDebug \
+            assembleDevDebug \
+            --no-daemon
+          APK="app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk"
           test -f "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$APK"
           sha256sum "$APK" > "$APK.sha256"

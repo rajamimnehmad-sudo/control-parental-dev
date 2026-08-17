@@ -4,7 +4,7 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- Rama: `main`, 29 commits locales por delante de `origin/main`.
+- Rama: `main`, 31 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
@@ -44,6 +44,9 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 - `DAG-UI-PREMIUM-01` modernizo chrome, inicio, incognito, pestañas y listas sin
   tocar filtrado. DEV 224 paso gates y validacion visual A23 sin crash ni ANR;
   la cobertura de video mantiene color y alcance de seguridad propios.
+- El CI de DAG usa el mismo punto de entrada aislado que el trabajo local y
+  verifica JS, unitarios DEV/Diagnostic, ktlint, lint de ambas variantes y APK
+  DEV. Production sigue deliberadamente sin flavor hasta cerrar la matriz real.
 - Super Admin compila y pasa typecheck/lint; queda un warning de imagen y no hay
   cobertura automatica suficiente.
 - Supabase DEV esta operativo y las migraciones locales/remotas estan alineadas.
@@ -129,10 +132,14 @@ final del candidato DEV 225 en S22.
   separo diagnostico, geometria, presentacion, estado, mutaciones, aislamiento,
   ciclo de vida, reproduccion, captura, viewport y bootstrap. El cableado del
   salto seguro dejo `video-lab.js` en 832 lineas; DAG-STRUCTURE-02 extrajo
-  eventos/configuracion y lo redujo a 799 sin cambio funcional.
+  eventos/configuracion y lo redujo a 799 sin cambio funcional. El cableado de
+  la nota lo deja en 803 y obliga a `DAG-STRUCTURE-03` antes de otra funcion.
 - `docs/BACKLOG_PRODUCTO.md` y `docs/HANDOFF_ACTUAL.md` mezclan presente e historia.
 - Existe un worktree DAG historico, limpio y sin commits unicos, muy atrasado.
 - Falta CI web y pruebas sistematicas de funciones Supabase.
+- Ticket abierto `DAG-STRUCTURE-03`: antes de sumar otra responsabilidad de
+  video, extraer de Activity el coordinador nativo y separar en `background.js`
+  el diario durable. Debe ser un refactor neutro, con los gates actuales.
 
 ## Prohibido interpretar como autorizado
 
