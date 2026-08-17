@@ -10,7 +10,7 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 25 commits por delante de `origin/main`; sin push ni publicacion.
+- Rama `main`, 26 commits por delante de `origin/main`; sin push ni publicacion.
 - DEV 223 / 0.70.25 es la candidata integrada local. Diagnostic 103 y extension
   2.0.57 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
@@ -18,6 +18,16 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
   video general y reproductores con DOM dinamico siguen NO-GO.
 - Progreso real: DAG Video premium 85%. La matriz minima superior queda cerrada;
   video general sigue NO-GO para categorias aun no cubiertas.
+
+## Ultimo hito — DAG-PRIVACY-DIAGNOSTICS-01
+
+- Los eventos de medios ya no heredan la privacidad de la pestaña visible. Cada
+  evento se acepta solo si Android vinculo su documento superior exacto con una
+  pestaña no privada; identidad desconocida o privada se descarta.
+- Una finalizacion tardia de una pestaña privada no puede registrarse aunque el
+  usuario haya cambiado a una pestaña normal.
+- Prevalidacion: JS 95/95, unitarios DEV/Diagnostic y ktlint verdes. No requirio
+  APK, cambio de version ni prueba fisica.
 
 ## Ultimo hito — DAG-VIDEO-SESSION-REARM-01
 

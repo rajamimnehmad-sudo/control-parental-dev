@@ -139,7 +139,6 @@ class DagBrowserActivity : Activity() {
     private val mediaAnalysisThreadSequence = AtomicLong(0L)
     private val mediaAnalysisLifecycleGeneration = AtomicLong(0L)
     private val mediaAnalysisAccepting = AtomicBoolean(true)
-    private val flightRecordingAllowed = AtomicBoolean(true)
     private val mediaAnalysisQueue = DagBoundedMediaTaskQueue(MediaAnalysisQueueCapacity)
     private val mediaDocumentRegistry = DagMediaDocumentRegistry()
     private val videoLabState = DagVideoLabStateMachine()
@@ -1592,6 +1591,9 @@ class DagBrowserActivity : Activity() {
         senderTab.previewDocumentToken =
             payload.optString("documentToken")
                 .takeIf(PreviewDocumentTokenPattern::matches)
+        senderTab.previewDocumentToken?.let { documentToken ->
+            mediaDocumentRegistry.bindPrivacy(documentToken, senderTab.isPrivate)
+        }
         if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(
                 TabPreviewLogTag,
@@ -1820,26 +1822,26 @@ class DagBrowserActivity : Activity() {
             buildList {
                 for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
                     val event = events.optJSONObject(index) ?: continue
+                    if (!mediaDiagnosticsAllowed(event)) continue
                     val carrier = event.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
                     val reason = event.optString("reason").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
                     val count = event.optInt("count", 0).coerceIn(1, MaxMediaDiagnosticCount)
                     add("$carrier:$reason=$count")
                 }
             }
-        if (flightRecordingAllowed.get()) {
-            for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
-                val event = events.optJSONObject(index) ?: continue
-                val carrier = event.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
-                val reason = event.optString("reason").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
-                val count = event.optInt("count", 0).coerceIn(1, MaxMediaDiagnosticCount)
-                flightRecorder.record(
-                    diagnosticMediaEvent(DagFlightEventType.MediaDrop, event, carrier, reason, count),
-                )
-            }
-            recordDiagnosticEventArray(payload.optJSONArray("resources"), DagFlightEventType.MediaResource)
-            recordDiagnosticEventArray(payload.optJSONArray("elements"), DagFlightEventType.MediaElement)
-            recordDiagnosticEventArray(payload.optJSONArray("decisions"), DagFlightEventType.MediaDecision)
+        for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
+            val event = events.optJSONObject(index) ?: continue
+            if (!mediaDiagnosticsAllowed(event)) continue
+            val carrier = event.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
+            val reason = event.optString("reason").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
+            val count = event.optInt("count", 0).coerceIn(1, MaxMediaDiagnosticCount)
+            flightRecorder.record(
+                diagnosticMediaEvent(DagFlightEventType.MediaDrop, event, carrier, reason, count),
+            )
         }
+        recordDiagnosticEventArray(payload.optJSONArray("resources"), DagFlightEventType.MediaResource)
+        recordDiagnosticEventArray(payload.optJSONArray("elements"), DagFlightEventType.MediaElement)
+        recordDiagnosticEventArray(payload.optJSONArray("decisions"), DagFlightEventType.MediaDecision)
         if (!BuildConfig.DAG_DIAGNOSTICS || summaries.isEmpty()) return
         Log.i(
             MediaTransportLogTag,
@@ -1857,6 +1859,7 @@ class DagBrowserActivity : Activity() {
         if (events == null) return
         for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
             val event = events.optJSONObject(index) ?: continue
+            if (!mediaDiagnosticsAllowed(event)) continue
             flightRecorder.record(diagnosticMediaEvent(type, event))
         }
     }
@@ -1901,7 +1904,18 @@ class DagBrowserActivity : Activity() {
 
     private fun handleMediaDocumentCurrent(payload: JSONObject) {
         val identity = mediaDocumentIdentity(payload) ?: return
-        mediaDocumentRegistry.markCurrent(identity.tabId, identity.documentToken)
+        val topLevelDocumentToken =
+            payload.optString("documentToken").takeIf(PreviewDocumentTokenPattern::matches)
+        mediaDocumentRegistry.markCurrent(
+            identity.tabId,
+            identity.documentToken,
+            topLevelDocumentToken,
+        )
+        topLevelDocumentToken?.let { documentToken ->
+            tabs.firstOrNull { it.previewDocumentToken == documentToken }?.let { tab ->
+                mediaDocumentRegistry.bindPrivacy(documentToken, tab.isPrivate)
+            }
+        }
         mediaAnalysisQueue.discardMatching { task ->
             task.documentIdentity?.let {
                 it.tabId == identity.tabId && it != identity
@@ -1934,6 +1948,9 @@ class DagBrowserActivity : Activity() {
         if (tabId < 0 || !PreviewDocumentTokenPattern.matches(documentKey)) return null
         return DagMediaDocumentIdentity(tabId, documentKey)
     }
+
+    private fun mediaDiagnosticsAllowed(payload: JSONObject): Boolean =
+        mediaDocumentIdentity(payload)?.let(mediaDocumentRegistry::allowsDiagnostics) == true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -2900,21 +2917,19 @@ class DagBrowserActivity : Activity() {
         val documentIdentity = mediaDocumentIdentity(payload)
         if (documentIdentity == null) {
             val decision = expiredMediaDecision(candidateId)
-            if (flightRecordingAllowed.get()) {
-                recordMediaDecision(
-                    payload = payload,
-                    decision = decision,
-                    priority = priority,
-                    queueWaitMillis = 0L,
-                    nativeMillis = (SystemClock.elapsedRealtime() - receivedAt).coerceAtLeast(0L),
-                )
-            }
+            recordMediaDecision(
+                payload = payload,
+                decision = decision,
+                priority = priority,
+                queueWaitMillis = 0L,
+                nativeMillis = (SystemClock.elapsedRealtime() - receivedAt).coerceAtLeast(0L),
+            )
             runCatching { port.postMessage(decisionPayload(decision)) }
             return
         }
         val generation = mediaAnalysisLifecycleGeneration.get()
         val completeDecision: (DagMediaDecision) -> Unit = completeDecision@{ decision ->
-            if (terminalRecorded.compareAndSet(false, true) && flightRecordingAllowed.get()) {
+            if (terminalRecorded.compareAndSet(false, true)) {
                 recordMediaDecision(
                     payload = payload,
                     decision = decision,
@@ -3083,6 +3098,7 @@ class DagBrowserActivity : Activity() {
         queueWaitMillis: Long,
         nativeMillis: Long,
     ) {
+        if (!mediaDiagnosticsAllowed(payload)) return
         flightRecorder.record(
             DagFlightEvent(
                 type = DagFlightEventType.MediaDecision,
@@ -3328,7 +3344,6 @@ class DagBrowserActivity : Activity() {
     private fun switchTo(tab: BrowserTab) {
         if (!tabs.contains(tab)) return
         if (tab === activeTab) {
-            flightRecordingAllowed.set(!tab.isPrivate)
             restoreTabIfNeeded(tab)
             renderActiveTab()
             return
@@ -3353,7 +3368,6 @@ class DagBrowserActivity : Activity() {
         activeTab?.let { setTabActivity(it, active = false) }
         if (activeTab != null) runCatching { geckoView.releaseSession() }
         activeTab = tab
-        flightRecordingAllowed.set(!tab.isPrivate)
         tab.lastActivatedSequence = nextTabActivationSequence++
         ensureSessionOpen(tab)
         geckoView.setSession(tab.session)

@@ -211,26 +211,74 @@ internal object AlwaysCurrentDagMediaWork : DagMediaWorkGuard {
 
 /** Tracks the exact top-level document currently owned by each WebExtension tab. */
 internal class DagMediaDocumentRegistry {
-    private val currentDocuments = ConcurrentHashMap<Int, String>()
+    private data class Record(
+        val identity: DagMediaDocumentIdentity,
+        val topLevelDocumentToken: String?,
+        val privateDocument: Boolean?,
+    )
+
+    private val currentDocuments = ConcurrentHashMap<Int, Record>()
 
     fun markCurrent(
         tabId: Int,
         documentToken: String,
+        topLevelDocumentToken: String? = null,
     ) {
         require(tabId >= 0)
         require(documentToken.isNotEmpty())
-        currentDocuments[tabId] = documentToken
+        val identity = DagMediaDocumentIdentity(tabId, documentToken)
+        currentDocuments.compute(tabId) { _, existing ->
+            if (existing?.identity == identity) {
+                existing.copy(
+                    topLevelDocumentToken = topLevelDocumentToken ?: existing.topLevelDocumentToken,
+                )
+            } else {
+                Record(
+                    identity = identity,
+                    topLevelDocumentToken = topLevelDocumentToken,
+                    privateDocument = null,
+                )
+            }
+        }
     }
+
+    fun bindPrivacy(
+        topLevelDocumentToken: String,
+        privateDocument: Boolean,
+    ) {
+        require(topLevelDocumentToken.isNotEmpty())
+        currentDocuments.forEach { (tabId, record) ->
+            if (record.topLevelDocumentToken != topLevelDocumentToken) return@forEach
+            currentDocuments.computeIfPresent(tabId) { _, current ->
+                if (
+                    current.identity == record.identity &&
+                    current.topLevelDocumentToken == topLevelDocumentToken
+                ) {
+                    current.copy(privateDocument = privateDocument)
+                } else {
+                    current
+                }
+            }
+        }
+    }
+
+    fun allowsDiagnostics(identity: DagMediaDocumentIdentity): Boolean =
+        currentDocuments[identity.tabId]?.let { record ->
+            record.identity == identity && record.privateDocument == false
+        } == true
 
     fun retire(
         tabId: Int,
         documentToken: String,
-    ): Boolean = currentDocuments.remove(tabId, documentToken)
+    ): Boolean {
+        val current = currentDocuments[tabId] ?: return false
+        return current.identity.documentToken == documentToken && currentDocuments.remove(tabId, current)
+    }
 
     fun isCurrent(
         tabId: Int,
         documentToken: String,
-    ): Boolean = currentDocuments[tabId] == documentToken
+    ): Boolean = currentDocuments[tabId]?.identity?.documentToken == documentToken
 
     fun clear() = currentDocuments.clear()
 }

@@ -128,6 +128,8 @@ class MediaBarrierContractTest {
         assertContains(background, "documentStatesByTab")
         assertContains(background, "frameTokens")
         assertContains(background, "media-document-current")
+        assertContains(background, "documentKey: typeof state?.documentKey")
+        assertContains(background, "postDocumentLifecycle(\"media-document-current\", state)")
         assertContains(background, "media-document-retired")
         assertContains(background, "documentKey: documentState.documentKey")
         assertContains(background, "media-bytes")
@@ -140,6 +142,10 @@ class MediaBarrierContractTest {
         assertFalse(background.contains("safe_ui_sprite"))
         assertFalse(background.contains("model_partial_redaction"))
         assertFalse(File("src/main/java/com/contentfilter/dagbrowser/DagSafeUiSpritePolicy.kt").exists())
+        assertContains(
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText(),
+            "mediaDocumentRegistry::allowsDiagnostics",
+        )
     }
 
     @Test

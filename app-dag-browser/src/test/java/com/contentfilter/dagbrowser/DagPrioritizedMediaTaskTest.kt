@@ -248,6 +248,43 @@ class DagPrioritizedMediaTaskTest {
     }
 
     @Test
+    fun `document diagnostics require an exact confirmed non private owner`() {
+        val registry = DagMediaDocumentRegistry()
+        val normal = DagMediaDocumentIdentity(17, "document_normal")
+        val private = DagMediaDocumentIdentity(23, "document_private")
+        registry.markCurrent(normal.tabId, normal.documentToken, "preview_normal")
+        registry.markCurrent(private.tabId, private.documentToken, "preview_private")
+
+        assertFalse(registry.allowsDiagnostics(normal))
+        assertFalse(registry.allowsDiagnostics(private))
+
+        registry.bindPrivacy("preview_normal", privateDocument = false)
+        registry.bindPrivacy("preview_private", privateDocument = true)
+
+        assertTrue(registry.allowsDiagnostics(normal))
+        assertFalse(registry.allowsDiagnostics(private))
+    }
+
+    @Test
+    fun `late private completion cannot inherit the active normal tab permission`() {
+        val registry = DagMediaDocumentRegistry()
+        val private = DagMediaDocumentIdentity(17, "document_private")
+        val normal = DagMediaDocumentIdentity(23, "document_normal")
+        registry.markCurrent(private.tabId, private.documentToken, "preview_private")
+        registry.bindPrivacy("preview_private", privateDocument = true)
+        registry.markCurrent(normal.tabId, normal.documentToken, "preview_normal")
+        registry.bindPrivacy("preview_normal", privateDocument = false)
+
+        assertFalse(registry.allowsDiagnostics(private))
+        assertTrue(registry.allowsDiagnostics(normal))
+
+        val replacement = DagMediaDocumentIdentity(17, "document_private_next")
+        registry.markCurrent(replacement.tabId, replacement.documentToken, "preview_private_next")
+        assertFalse(registry.allowsDiagnostics(private))
+        assertFalse(registry.allowsDiagnostics(replacement))
+    }
+
+    @Test
     fun `lease expires as soon as its browser document changes`() {
         var currentDocument = true
         val lease =

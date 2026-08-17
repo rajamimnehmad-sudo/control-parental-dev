@@ -98,13 +98,15 @@ const isCurrentDocument = (state) =>
 const postDocumentLifecycle = (type, state) => {
   if (nativePort === null || !state) return;
   try {
-    nativePort.postMessage({
+    const message = {
       type,
       version: PROTOCOL_VERSION,
       tabId: state.tabId,
       documentKey: state.documentKey,
       pageUrl: state.pageUrl || "",
-    });
+    };
+    if (validDocumentToken(state.documentToken)) message.documentToken = state.documentToken;
+    nativePort.postMessage(message);
   } catch {}
 };
 
@@ -581,6 +583,7 @@ const scheduleDiagnosticFlush = () => {
 
 const diagnosticContext = (details, state) => ({
   tabId: validTabId(details?.tabId) ? details.tabId : state?.tabId,
+  documentKey: typeof state?.documentKey === "string" ? state.documentKey : "",
   pageUrl: boundedDiagnosticUrl(details?.documentUrl || details?.originUrl || state?.pageUrl),
   sourceUrl: boundedDiagnosticUrl(details?.url),
   requestId: typeof details?.requestId === "string" ? details.requestId : "",
@@ -1481,6 +1484,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
         }
         state.documentToken = message.documentToken;
         state.pageUrl = boundedDiagnosticUrl(sender?.url);
+        postDocumentLifecycle("media-document-current", state);
         scheduleDocumentQuiet(state);
       } else if (isCurrentDocument(state)) {
         state.frameTokens.set(frameId, message.documentToken);

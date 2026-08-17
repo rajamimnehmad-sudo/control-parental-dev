@@ -4,7 +4,7 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- Rama: `main`, 25 commits locales por delante de `origin/main`.
+- Rama: `main`, 26 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
@@ -28,6 +28,10 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
   rechazada; prevalidacion JS 95/95 y unitarios verdes, con prueba fisica S22
   pendiente. GIF seguro conserva animacion. DAG Video premium queda en 85%; video general sigue NO-GO para
   URLs directas, iframes, Shorts, anuncios y redes sociales.
+- La auditoria DAG detecto y corrigio un riesgo de privacidad: los diagnosticos
+  de medios ahora se autorizan por documento exacto y nunca por la pestaña
+  visible global. Identidad desconocida o privada falla cerrada; JS 95/95,
+  unitarios DEV/Diagnostic y ktlint verdes.
 - Super Admin compila y pasa typecheck/lint; queda un warning de imagen y no hay
   cobertura automatica suficiente.
 - Supabase DEV esta operativo y las migraciones locales/remotas estan alineadas.

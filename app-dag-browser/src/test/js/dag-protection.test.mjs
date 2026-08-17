@@ -288,6 +288,11 @@ test("background flushes Gecko memory cache after installing response filters", 
 
 test("visible image hints reach the native queue with priority", async () => {
   const harness = await createHarness();
+  harness.startDocument(1, "document_c3", "https://shop.example.test/current");
+  const lifecycle = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-document-current" && message.documentToken === "document_c3"),
+  "document privacy identity bridge");
+  assert.match(lifecycle.documentKey, /^document_[a-f0-9]{1,16}$/u);
   const details = imageDetails("priority");
   harness.setImagePriority({
     type: "image-priority",
