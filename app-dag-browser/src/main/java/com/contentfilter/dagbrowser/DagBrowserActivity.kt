@@ -1049,12 +1049,6 @@ class DagBrowserActivity : Activity() {
 
     private fun applyProtectedFallbackFullscreen(active: Boolean) {
         protectedFallbackFullscreen = active
-        requestedOrientation =
-            if (active) {
-                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            } else {
-                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            }
         fullscreenChrome.setFullscreen(active)
         videoLabState.currentKey?.let { key ->
             videoBlockedPlaceholder.showSmoothFullscreenControl(
@@ -1067,7 +1061,6 @@ class DagBrowserActivity : Activity() {
 
     private fun forceExitProtectedFallbackFullscreen() {
         protectedFallbackFullscreen = false
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         fullscreenChrome.setFullscreen(false)
     }
 

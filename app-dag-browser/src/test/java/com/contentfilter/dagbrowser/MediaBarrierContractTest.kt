@@ -66,7 +66,7 @@ class MediaBarrierContractTest {
         assertContains(activity, "session.exitFullScreen()")
         assertContains(activity, "enterProtectedFallbackFullscreen(key)")
         assertContains(activity, "protectedFallbackFullscreen")
-        assertContains(activity, "SCREEN_ORIENTATION_SENSOR_LANDSCAPE")
+        assertFalse(activity.contains("SCREEN_ORIENTATION_SENSOR_LANDSCAPE"))
         assertContains(activity, "exitProtectedFallbackFullscreen()")
         assertContains(activity, "VideoLabFullscreenStateMessage")
         assertContains(activity, "VideoLabFullscreenReadyMessage")
