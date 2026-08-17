@@ -34,10 +34,10 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
   exacta y rearma el mismo documento. PiP y reproduccion remota siguen cerrados.
 - Gates: JS 102/102, unitarios DEV/Diagnostic (219 por variante), ktlint y
   assemble Diagnostic verdes. `git diff --check` limpio.
-- A23 con datos preservados: YouTube normal reprodujo con UI original; fullscreen
+- A23 con datos preservados: dos YouTube distintos reprodujeron con UI original
+  sin limpiar datos; fullscreen
   original cerro con `revoke_ack`, creo revision 2, volvio a `smooth_started` y
-  aplico blur vivo sin pantalla negra. Falta una corrida final de varios videos
-  y seek repetido antes de promover DEV 229.
+  aplico blur vivo sin pantalla negra. Falta validar seek repetido en DEV 229.
 
 ## Ultimo hito — DAG-VIDEO-PREMIUM-CONTINUITY-03
 

@@ -15,10 +15,11 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
   estables y coalesce el gesto completo. Se eliminaron boton, CSS, mensajes y
   modulo de fullscreen artificial: YouTube conserva controles y fullscreen web
   originales; Gecko/Android cubren, revocan y rearman la transicion exacta. A23
-  confirmo `fullscreen_transition -> revoke_ack -> revision 2 -> smooth_started`
-  con imagen/blur vivo y sin negro. JS 102/102, unitarios DEV/Diagnostic, ktlint
-  y assemble Diagnostic verdes. Falta una corrida final multi-video/seek antes
-  de promover DEV 229.
+  confirmo dos YouTube consecutivos sin limpiar datos y
+  `fullscreen_transition -> revoke_ack -> revision 2 -> smooth_started`, con
+  imagen/blur vivo y sin negro. JS 102/102, unitarios DEV/Diagnostic, ktlint y
+  builds DEV/Diagnostic verdes. Falta validar seek repetido antes de promover
+  DEV 229.
 - `DAG-VIDEO-PREMIUM-CONTINUITY-03`
   reemplaza el corte automatico por blur vivo opaco con audio continuo, exige
   dos muestras seguras para retirarlo y ofrece salto manual despues de dos
