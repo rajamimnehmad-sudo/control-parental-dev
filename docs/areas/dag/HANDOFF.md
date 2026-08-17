@@ -16,7 +16,7 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
 - Progreso real: DAG Video premium 94%. La matriz minima superior queda abierta
-  hasta validar cambio de video y seek repetido en DEV 229;
+  hasta la comprobacion humana de DEV 229 en S22;
   video general sigue NO-GO para categorias aun no cubiertas.
 
 ## Ultimo hito — DAG-VIDEO-NATIVE-EXPERIENCE-01
@@ -35,9 +35,10 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 - Gates: JS 102/102, unitarios DEV/Diagnostic (219 por variante), ktlint y
   assemble Diagnostic verdes. `git diff --check` limpio.
 - A23 con datos preservados: dos YouTube distintos reprodujeron con UI original
-  sin limpiar datos; fullscreen
-  original cerro con `revoke_ack`, creo revision 2, volvio a `smooth_started` y
-  aplico blur vivo sin pantalla negra. Falta validar seek repetido en DEV 229.
+  sin limpiar datos; fullscreen original cerro con `revoke_ack`, creo revision
+  2, volvio a `smooth_started` y aplico blur vivo sin pantalla negra. Dos gestos
+  rapidos sobre la barra original generaron cierres confirmados por `revoke_ack`,
+  nunca `revoke_timeout`, y la revision final volvio a `smooth_started`.
 
 ## Ultimo hito — DAG-VIDEO-PREMIUM-CONTINUITY-03
 
@@ -208,9 +209,10 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Validar DEV 229 en una sola corrida A23/S22: primer y segundo video, seek repetido,
-scroll, blur/audio y entrada/salida del fullscreen original. No generar otra APK
-por ajustes visuales menores. URLs MP4 directas, iframes, Shorts, anuncios,
+Validar humanamente DEV 229 en una sola corrida S22: primer y segundo video,
+seek, scroll, blur/audio y entrada/salida del fullscreen original. A23 ya paso
+automaticamente dos videos, fullscreen y seek repetido. No generar otra APK por
+ajustes visuales menores. URLs MP4 directas, iframes, Shorts, anuncios,
 Instagram y TikTok siguen NO PROBADOS o NO-GO.
 
 ## Video normal vigente

@@ -17,9 +17,11 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
   originales; Gecko/Android cubren, revocan y rearman la transicion exacta. A23
   confirmo dos YouTube consecutivos sin limpiar datos y
   `fullscreen_transition -> revoke_ack -> revision 2 -> smooth_started`, con
-  imagen/blur vivo y sin negro. JS 102/102, unitarios DEV/Diagnostic, ktlint y
-  builds DEV/Diagnostic verdes. Falta validar seek repetido antes de promover
-  DEV 229.
+  imagen/blur vivo y sin negro. En A23, dos gestos rapidos sobre la barra original
+  de YouTube produjeron cierres con `revoke_ack`, nunca `revoke_timeout`, y la
+  revision final volvio a `smooth_started`. JS 102/102, unitarios
+  DEV/Diagnostic, ktlint y builds DEV/Diagnostic verdes. DEV 229 queda como
+  candidato para validacion humana, no como version general aprobada.
 - `DAG-VIDEO-PREMIUM-CONTINUITY-03`
   reemplaza el corte automatico por blur vivo opaco con audio continuo, exige
   dos muestras seguras para retirarlo y ofrece salto manual despues de dos
@@ -115,10 +117,10 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
 
 ## Prioridad recomendada
 
-1. Validar DEV 228 en A23 o S22: reproduccion normal; bloqueo con blur animado y
-   audio; recuperacion tras dos muestras; boton de salto luego de dos segundos;
-   20 scrolls sin pausa ni control fijo; cinco entradas/salidas de pantalla
-   completa; primer y segundo video sin borrar datos.
+1. Validar humanamente DEV 229 en S22: primer y segundo video sin borrar datos,
+   seek y scroll con controles originales, blur/audio y entrada/salida del
+   fullscreen original. La automatizacion A23 de dos videos, fullscreen y seek
+   repetido ya paso sin negro ni `revoke_timeout`.
 2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
    dispositivo.
 3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
