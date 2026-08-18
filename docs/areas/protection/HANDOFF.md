@@ -7,6 +7,14 @@ antimanipulacion.
 
 ## Estado
 
+- `CHROME-VISUAL-03-VIDEO` tiene nucleo reactivo universal y gates automaticos
+  verdes: muestreo visual a 500 ms, identidad estricta, cobertura regional y dos
+  muestras seguras para recuperar, sin tocar audio ni guardar frames. La sesion
+  A23 probo bloqueo/recuperacion, pero fallo el gate de experiencia porque una
+  tormenta de eventos repetia la cobertura completa. La causa se corrigio con
+  baseline unico y verificacion incremental; falta validarla fisicamente. Sigue
+  DEV-only/NO-GO y no habilita `CHROME-VISUAL-04`. Evidencia:
+  `EVIDENCE_2026-08-18_CHROME-VISUAL-03-VIDEO.md`.
 - `CHROME-VISUAL-02-REAL-WEB` es GO controlado en A23: geometria de ventana,
   scroll/lazy, cambios visuales, teclado, rotacion y salida de Chrome invalidan
   resultados viejos y mantienen cobertura regional. El fallback es visual,
@@ -36,8 +44,8 @@ antimanipulacion.
 
 ## Siguientes tickets
 
-1. Crear maquina Android independiente para video reactivo, con muestreo acotado,
-   identidad estricta y dos muestras seguras para recuperar
-   (`CHROME-VISUAL-03-VIDEO`).
-2. Definir capacidad y fallback seguro hacia DAG (`CHROME-VISUAL-04`).
+1. Confirmar fisicamente que la correccion de tormenta de eventos elimina la
+   cobertura completa repetida, incluido segundo video, seek y fullscreen.
+2. Solo si ese gate pasa, definir capacidad y fallback seguro hacia DAG
+   (`CHROME-VISUAL-04`).
 3. Comparar objetivamente DAG y Chrome Visual (`CHROME-VISUAL-05`).

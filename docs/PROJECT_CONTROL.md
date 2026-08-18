@@ -4,6 +4,15 @@ Actualizado: 2026-08-18. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
+- `CHROME-VISUAL-03-VIDEO` implemento un nucleo Android universal sobre regiones
+  visibles: muestreo a 500 ms cuando hay dinamismo, identidad estricta, audio
+  intacto y recuperacion solo tras dos muestras seguras. La fixture A23 demostro
+  bloqueo y recuperacion, pero YouTube hizo fallar el gate de experiencia: una
+  tormenta de Accessibility repetia la cobertura de toda la ventana. La causa
+  se corrigio despues con un baseline unico y verificaciones incrementales; los
+  gates automaticos estan verdes, pero falta confirmar esa correccion en
+  hardware. Chrome Visual Video sigue DEV-only/NO-GO y no se inicia el fallback
+  hasta pasar ese gate.
 - Chrome Visual inicio en `work/chrome-visual` desde el snapshot local
   `833d5ad8`. `CHROME-VISUAL-00-PROBE` es GO en A23/API 34: screenshot de Chrome
   1080 x 2408, overlay excluido correctamente en 3/3 comparaciones, frecuencia
