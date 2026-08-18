@@ -7,8 +7,10 @@ Actualizado: 2026-08-18. Responsable: Direccion General Tecnica.
 - Chrome Visual inicio en `work/chrome-visual` desde el snapshot local
   `833d5ad8`. `CHROME-VISUAL-00-PROBE` es GO en A23/API 34: screenshot de Chrome
   1080 x 2408, overlay excluido correctamente en 3/3 comparaciones, frecuencia
-  estable 2,02–2,09 capturas/s y sin crash/ANR. Sigue extraccion compartida de
-  GloshIA R3.1; DAG permanece intacto como fallback.
+  estable 2,02–2,09 capturas/s y sin crash/ANR. `GLOSHIA-SHARED-CORE-01` tambien
+  esta verde: un unico modulo AAR contiene modelo, preprocessing y politica R3.1;
+  DAG y App Usuario lo consumen con paridad bit a bit y score fisico A23. Chrome
+  Visual es ARM64-only de forma explicita; DAG permanece intacto como fallback.
 - Rama: `main`, 32 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.

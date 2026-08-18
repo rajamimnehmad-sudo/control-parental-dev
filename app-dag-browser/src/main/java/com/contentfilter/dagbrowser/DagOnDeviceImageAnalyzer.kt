@@ -1,41 +1,29 @@
 package com.contentfilter.dagbrowser
 
-import ai.onnxruntime.OnnxTensor
-import ai.onnxruntime.OrtEnvironment
-import ai.onnxruntime.OrtSession
 import android.content.Context
+import com.glosh.visual.GloshiaVisualPolicyContract
+import com.glosh.visual.OnDeviceGloshiaVisualAnalyzer
 import java.io.Closeable
-import java.nio.FloatBuffer
 
 internal fun interface DagImageAnalyzer {
     fun analyze(image: DagPreparedImage): DagImageAnalysisResult
 }
 
 internal sealed interface DagImageAnalysisResult {
-    data class Classified(
-        val filterProbability: Float,
-    ) : DagImageAnalysisResult
+    data class Classified(val filterProbability: Float) : DagImageAnalysisResult
 
-    data class Unavailable(
-        val reason: String,
-    ) : DagImageAnalysisResult
+    data class Unavailable(val reason: String) : DagImageAnalysisResult
 }
 
 internal object UnavailableDagImageAnalyzer : DagImageAnalyzer {
-    override fun analyze(image: DagPreparedImage): DagImageAnalysisResult =
-        DagImageAnalysisResult.Unavailable(AnalyzerUnavailableReason)
+    override fun analyze(image: DagPreparedImage) = DagImageAnalysisResult.Unavailable(AnalyzerUnavailableReason)
 
-    const val AnalyzerUnavailableReason = "analyzer_unavailable"
+    const val AnalyzerUnavailableReason = GloshiaVisualPolicyContract.AnalyzerUnavailableReason
 }
 
-/**
- * Prevents the ONNX session from closing while a worker is inside inference. Closing is
- * non-blocking for the Activity: the final in-flight analysis closes the delegate exactly once.
- */
 internal class DagLifecycleImageAnalyzer(
     private val delegate: DagImageAnalyzer,
-) : DagImageAnalyzer,
-    Closeable {
+) : DagImageAnalyzer, Closeable {
     private val lock = Any()
     private var activeAnalyses = 0
     private var closeRequested = false
@@ -44,34 +32,28 @@ internal class DagLifecycleImageAnalyzer(
     override fun analyze(image: DagPreparedImage): DagImageAnalysisResult {
         val accepted =
             synchronized(lock) {
-                if (closeRequested) {
-                    false
-                } else {
-                    activeAnalyses += 1
-                    true
-                }
+                if (closeRequested) false else true.also { activeAnalyses += 1 }
             }
         if (!accepted) return DagImageAnalysisResult.Unavailable(AnalyzerClosedReason)
-
         return try {
             delegate.analyze(image)
         } finally {
-            val closeable =
+            closeDelegate(
                 synchronized(lock) {
                     activeAnalyses -= 1
                     closeableIfReady()
-                }
-            closeDelegate(closeable)
+                },
+            )
         }
     }
 
     override fun close() {
-        val closeable =
+        closeDelegate(
             synchronized(lock) {
                 closeRequested = true
                 closeableIfReady()
-            }
-        closeDelegate(closeable)
+            },
+        )
     }
 
     private fun closeableIfReady(): Closeable? {
@@ -85,117 +67,41 @@ internal class DagLifecycleImageAnalyzer(
     }
 
     internal companion object {
-        const val AnalyzerClosedReason = "analyzer_closed"
+        const val AnalyzerClosedReason = GloshiaVisualPolicyContract.AnalyzerClosedReason
     }
 }
 
-/**
- * Runs the single TinyCLIP image encoder and binary policy head entirely on device.
- *
- * The model never receives URLs, text, or persisted media. Its input is the bounded 224x224 RGB
- * buffer produced by [AndroidDagImagePreprocessor].
- */
-internal class DagOnDeviceImageAnalyzer private constructor(
-    private val environment: OrtEnvironment,
-    private val session: OrtSession,
-) : DagImageAnalyzer,
-    Closeable {
-    private val normalizedBuffers =
-        ThreadLocal.withInitial {
-            FloatArray(DagImageDecodeContract.PreparedByteCount)
-        }
-
-    override fun analyze(image: DagPreparedImage): DagImageAnalysisResult {
-        if (!DagImageDecodeContract.isValid(image)) {
-            return DagImageAnalysisResult.Unavailable(InvalidModelInputReason)
-        }
-        val normalized = requireNotNull(normalizedBuffers.get())
-        normalizeNchw(image.rgb888, normalized)
-        return try {
-            OnnxTensor
-                .createTensor(
-                    environment,
-                    FloatBuffer.wrap(normalized),
-                    ModelInputShape,
-                ).use { tensor ->
-                    session.run(mapOf(ModelInputName to tensor)).use { output ->
-                        val probability = output.filterProbability()
-                        if (probability.isFinite() && probability in 0f..1f) {
-                            DagImageAnalysisResult.Classified(probability)
-                        } else {
-                            DagImageAnalysisResult.Unavailable(InvalidModelOutputReason)
-                        }
-                    }
+internal object DagOnDeviceImageAnalyzer {
+    fun create(context: Context): DagImageAnalyzer {
+        val shared = OnDeviceGloshiaVisualAnalyzer.create(context)
+        return object : DagImageAnalyzer, Closeable {
+            override fun analyze(image: DagPreparedImage): DagImageAnalysisResult =
+                when (val result = shared.analyze(image)) {
+                    is com.glosh.visual.GloshiaVisualAnalysisResult.Classified ->
+                        DagImageAnalysisResult.Classified(result.filterProbability)
+                    is com.glosh.visual.GloshiaVisualAnalysisResult.Unavailable ->
+                        DagImageAnalysisResult.Unavailable(result.reason)
                 }
-        } catch (_: Exception) {
-            DagImageAnalysisResult.Unavailable(ModelExecutionFailedReason)
-        } finally {
-            normalized.fill(0f)
-        }
-    }
 
-    override fun close() {
-        session.close()
-    }
-
-    private fun normalizeNchw(
-        rgb: ByteArray,
-        output: FloatArray,
-    ) {
-        val pixelCount = DagImageDecodeContract.TargetSize * DagImageDecodeContract.TargetSize
-        for (pixelIndex in 0 until pixelCount) {
-            val sourceIndex = pixelIndex * DagImageDecodeContract.RgbChannelCount
-            for (channel in 0 until DagImageDecodeContract.RgbChannelCount) {
-                val value = (rgb[sourceIndex + channel].toInt() and 0xFF) / 255f
-                output[channel * pixelCount + pixelIndex] =
-                    (value - ImageMean[channel]) / ImageStandardDeviation[channel]
+            override fun close() {
+                (shared as? Closeable)?.close()
             }
         }
     }
 
-    private fun OrtSession.Result.filterProbability(): Float {
-        val rows = this[0].value as? Array<*> ?: return Float.NaN
-        val row = rows.firstOrNull() as? FloatArray ?: return Float.NaN
-        return row.firstOrNull() ?: Float.NaN
-    }
-
-    internal companion object {
-        fun create(context: Context): DagImageAnalyzer {
-            val environment = OrtEnvironment.getEnvironment()
-            var modelBytes: ByteArray? = null
-            return try {
-                modelBytes = context.assets.open(ModelAssetPath).use { it.readBytes() }
-                val session =
-                    OrtSession.SessionOptions().use { options ->
-                        options.setIntraOpNumThreads(2)
-                        options.setInterOpNumThreads(1)
-                        environment.createSession(requireNotNull(modelBytes), options)
-                    }
-                DagOnDeviceImageAnalyzer(environment, session)
-            } catch (_: Exception) {
-                UnavailableDagImageAnalyzer
-            } finally {
-                modelBytes?.fill(0)
-            }
-        }
-
-        const val ModelAssetPath = DagVisualModelInfo.ModelAssetPath
-        const val ModelInputName = "pixel_values"
-        const val FilterThreshold = 0.4f
-        const val FullStrongFilterThreshold = 0.95f
-        const val UncertainRegionalReviewFloor = 0.3f
-        const val UncertainRegionalFilterThreshold = 0.45f
-        const val RegionalFilterThreshold = 0.5f
-        const val RegionalStrongFilterThreshold = 0.7f
-        const val RegionalConsensusMinimum = 2
-        const val ModelAllowReason = "model_allow"
-        const val ModelFilterReason = "model_filter"
-        const val InvalidModelInputReason = "invalid_model_input"
-        const val InvalidModelOutputReason = "invalid_model_output"
-        const val ModelExecutionFailedReason = "model_execution_failed"
-        private val ModelInputShape = longArrayOf(1, 3, 224, 224)
-        private val ImageMean = floatArrayOf(0.48145466f, 0.4578275f, 0.40821073f)
-        private val ImageStandardDeviation =
-            floatArrayOf(0.26862954f, 0.26130258f, 0.27577711f)
-    }
+    const val ModelAssetPath = DagVisualModelInfo.ModelAssetPath
+    const val ModelInputName = OnDeviceGloshiaVisualAnalyzer.ModelInputName
+    const val FilterThreshold = GloshiaVisualPolicyContract.FilterThreshold
+    const val FullStrongFilterThreshold = GloshiaVisualPolicyContract.FullStrongFilterThreshold
+    const val UncertainRegionalReviewFloor = GloshiaVisualPolicyContract.UncertainRegionalReviewFloor
+    const val UncertainRegionalFilterThreshold =
+        GloshiaVisualPolicyContract.UncertainRegionalFilterThreshold
+    const val RegionalFilterThreshold = GloshiaVisualPolicyContract.RegionalFilterThreshold
+    const val RegionalStrongFilterThreshold = GloshiaVisualPolicyContract.RegionalStrongFilterThreshold
+    const val RegionalConsensusMinimum = GloshiaVisualPolicyContract.RegionalConsensusMinimum
+    const val ModelAllowReason = GloshiaVisualPolicyContract.ModelAllowReason
+    const val ModelFilterReason = GloshiaVisualPolicyContract.ModelFilterReason
+    const val InvalidModelInputReason = GloshiaVisualPolicyContract.InvalidModelInputReason
+    const val InvalidModelOutputReason = GloshiaVisualPolicyContract.InvalidModelOutputReason
+    const val ModelExecutionFailedReason = GloshiaVisualPolicyContract.ModelExecutionFailedReason
 }

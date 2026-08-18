@@ -1,6 +1,6 @@
 # DAG BROWSER — HANDOFF
 
-Actualizado: 2026-08-17. Responsable: Jefe.
+Actualizado: 2026-08-18. Responsable: Jefe.
 
 ## Mision
 
@@ -10,7 +10,10 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, adelantada respecto de `origin/main`; sin push ni publicacion.
+- Rama local `work/chrome-visual`; sin push ni publicacion.
+- GloshIA Visual R3.1 fue extraido a `gloshia-visual-core`. DAG consume el mismo
+  modelo y politica mediante adaptadores finos. Paridad automatica y score real
+  A23 pasaron; no cambio ninguna decision ni experiencia DAG.
 - DEV 230 / 0.70.32 es el siguiente candidato local. Diagnostic 115 y extension
   2.0.64 contienen el lote; no hubo publicacion.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;

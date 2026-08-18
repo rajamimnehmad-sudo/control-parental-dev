@@ -9,7 +9,7 @@ import kotlin.test.assertTrue
 class DagOnDeviceModelContractTest {
     @Test
     fun `single embedded production model matches its frozen artifact`() {
-        val model = File("src/main/assets/${DagOnDeviceImageAnalyzer.ModelAssetPath}")
+        val model = File("../gloshia-visual-core/src/main/assets/${DagOnDeviceImageAnalyzer.ModelAssetPath}")
 
         assertTrue(model.isFile)
         assertEquals("GloshIA Visual", DagVisualModelInfo.PublicName)
