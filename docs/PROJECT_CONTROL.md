@@ -11,6 +11,12 @@ Actualizado: 2026-08-18. Responsable: Direccion General Tecnica.
   esta verde: un unico modulo AAR contiene modelo, preprocessing y politica R3.1;
   DAG y App Usuario lo consumen con paridad bit a bit y score fisico A23. Chrome
   Visual es ARM64-only de forma explicita; DAG permanece intacto como fallback.
+- `CHROME-VISUAL-01-IMAGES` es GO controlado: R3.1 bloqueo una imagen completa
+  dentro de Chrome original en A23 y la identidad evita resultados viejos. La
+  sesion demostro que sitios reales no ofrecen nodos de imagen de manera
+  confiable; la auditoria enfocada dejo un fallback universal de ocho mosaicos,
+  cobertura inmediata, cache efimero y espera maxima acotada. Sigue DEV-only,
+  opaco y no apto para usuarios hasta cerrar la matriz web dinamica.
 - Rama: `main`, 32 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.

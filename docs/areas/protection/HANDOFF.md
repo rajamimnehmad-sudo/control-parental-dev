@@ -7,6 +7,12 @@ antimanipulacion.
 
 ## Estado
 
+- `CHROME-VISUAL-01-IMAGES` es GO controlado: App Usuario capturo Chrome y R3.1
+  bloqueo fisicamente una sonda completa sin guardar pixeles. Chrome real no
+  expone siempre nodos de imagen; una auditoria reemplazo el fallback inicial
+  por ocho mosaicos acotados, cobertura inmediata, cache efimero e identidad
+  estricta, sin reglas por sitio. Sigue DEV-only y no es candidato de producto.
+  Evidencia: `EVIDENCE_2026-08-18_CHROME-VISUAL-01-IMAGES.md`.
 - `GLOSHIA-SHARED-CORE-01` esta verde: R3.1 ahora tiene un unico modulo AAR
   compartido por DAG y App Usuario, con paridad bit a bit de tensor, decisiones
   doradas y score fisico A23. ARM32 conserva App Usuario pero Chrome Visual queda
@@ -23,6 +29,8 @@ antimanipulacion.
 
 ## Siguientes tickets
 
-1. Crear `ChromeVisualController` y filtrar imagenes de una fixture controlada.
-2. Endurecer scroll, identidad y regiones dinamicas sin reglas por sitio.
+1. Endurecer scroll, lazy load, SPA, canvas, iframes y cambios de ventana sin
+   reglas por sitio (`CHROME-VISUAL-02-REAL-WEB`).
+2. Validar fisicamente la matriz final de mosaicos y reducir cobertura amplia
+   solo con evidencia de fuga cero.
 3. Construir matriz de fallos cerrados y recuperacion por OEM.
