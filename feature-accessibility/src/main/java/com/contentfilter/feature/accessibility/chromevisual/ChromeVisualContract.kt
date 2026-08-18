@@ -12,6 +12,17 @@ internal data class ChromeVisualRegion(
     val area: Long get() = width.toLong() * height.toLong()
 }
 
+internal data class ChromeVisualViewport(
+    val left: Int,
+    val top: Int,
+    val right: Int,
+    val bottom: Int,
+) {
+    val width: Int get() = right - left
+    val height: Int get() = bottom - top
+    val area: Long get() = width.toLong() * height.toLong()
+}
+
 internal data class ChromeVisualIdentity(
     val windowId: Int,
     val contentEpoch: Long,
@@ -64,8 +75,7 @@ internal data class ChromeVisualNodeCandidate(
 internal object ChromeVisualRegionPlanner {
     fun fromNodes(
         candidates: List<ChromeVisualNodeCandidate>,
-        windowWidth: Int,
-        windowHeight: Int,
+        viewport: ChromeVisualViewport,
         minimumEdge: Int,
     ): List<ChromeVisualRegion> =
         candidates
@@ -78,10 +88,10 @@ internal object ChromeVisualRegionPlanner {
                 (imageRole || describedLeaf) &&
                     candidate.region.width >= minimumEdge &&
                     candidate.region.height >= minimumEdge &&
-                    candidate.region.top >= windowHeight / 12 &&
-                    candidate.region.area <= windowWidth.toLong() * windowHeight * maximumAreaRatio
+                    candidate.region.top >= viewport.top + viewport.height / 12 &&
+                    candidate.region.area <= viewport.area * maximumAreaRatio
             }
-            .mapNotNull { clamp(it.region, windowWidth, windowHeight) }
+            .mapNotNull { clamp(it.region, viewport) }
             .sortedByDescending(ChromeVisualRegion::area)
             .fold(mutableListOf<ChromeVisualRegion>()) { accepted, region ->
                 if (accepted.none { overlapRatio(it, region) >= MaximumDuplicateOverlap }) {
@@ -93,34 +103,33 @@ internal object ChromeVisualRegionPlanner {
             .toList()
 
     fun changedFallbackTiles(
-        windowWidth: Int,
-        windowHeight: Int,
+        viewport: ChromeVisualViewport,
         topInset: Int,
         previousSignatures: Map<String, Long>,
         currentSignatures: Map<String, Long>,
     ): List<ChromeVisualRegion> {
-        if (previousSignatures.isEmpty()) return fallbackTiles(windowWidth, windowHeight, topInset)
-        return fallbackTiles(windowWidth, windowHeight, topInset)
+        if (previousSignatures.isEmpty()) return fallbackTiles(viewport, topInset)
+        return fallbackTiles(viewport, topInset)
             .filter { previousSignatures[it.id] != currentSignatures[it.id] }
             .take(MaxChangedFallbackRegions)
     }
 
     fun fallbackTiles(
-        windowWidth: Int,
-        windowHeight: Int,
+        viewport: ChromeVisualViewport,
         topInset: Int,
     ): List<ChromeVisualRegion> {
-        if (windowWidth <= 0 || windowHeight <= topInset) return emptyList()
-        val contentHeight = windowHeight - topInset
+        if (viewport.width <= 0 || viewport.height <= topInset) return emptyList()
+        val contentTop = viewport.top + topInset
+        val contentHeight = viewport.bottom - contentTop
         val tileHeight = (contentHeight / FallbackRows).coerceAtLeast(1)
-        val tileWidth = (windowWidth / FallbackColumns).coerceAtLeast(1)
+        val tileWidth = (viewport.width / FallbackColumns).coerceAtLeast(1)
         return buildList {
             repeat(FallbackRows) { row ->
-                val top = topInset + row * tileHeight
-                val bottom = if (row == FallbackRows - 1) windowHeight else top + tileHeight
+                val top = contentTop + row * tileHeight
+                val bottom = if (row == FallbackRows - 1) viewport.bottom else top + tileHeight
                 repeat(FallbackColumns) { column ->
-                    val left = column * tileWidth
-                    val right = if (column == FallbackColumns - 1) windowWidth else left + tileWidth
+                    val left = viewport.left + column * tileWidth
+                    val right = if (column == FallbackColumns - 1) viewport.right else left + tileWidth
                     add(ChromeVisualRegion("tile_${row}_$column", left, top, right, bottom))
                 }
             }
@@ -129,15 +138,14 @@ internal object ChromeVisualRegionPlanner {
 
     private fun clamp(
         region: ChromeVisualRegion,
-        width: Int,
-        height: Int,
+        viewport: ChromeVisualViewport,
     ): ChromeVisualRegion? {
         val clamped =
             region.copy(
-                left = region.left.coerceIn(0, width),
-                top = region.top.coerceIn(0, height),
-                right = region.right.coerceIn(0, width),
-                bottom = region.bottom.coerceIn(0, height),
+                left = region.left.coerceIn(viewport.left, viewport.right),
+                top = region.top.coerceIn(viewport.top, viewport.bottom),
+                right = region.right.coerceIn(viewport.left, viewport.right),
+                bottom = region.bottom.coerceIn(viewport.top, viewport.bottom),
             )
         return clamped.takeIf { it.width > 0 && it.height > 0 }
     }
@@ -159,4 +167,47 @@ internal object ChromeVisualRegionPlanner {
     private const val MaximumDuplicateOverlap = 0.85
     private const val MaximumImageAreaRatio = 0.80
     private const val MaximumLeafAreaRatio = 0.35
+}
+
+internal object ChromeVisualGeometryMapper {
+    fun toFrame(
+        region: ChromeVisualRegion,
+        viewport: ChromeVisualViewport,
+        frameWidth: Int,
+        frameHeight: Int,
+    ): ChromeVisualRegion? {
+        if (viewport.width <= 0 || viewport.height <= 0 || frameWidth <= 0 || frameHeight <= 0) return null
+        val left = scale(region.left - viewport.left, viewport.width, frameWidth)
+        val top = scale(region.top - viewport.top, viewport.height, frameHeight)
+        val right = scale(region.right - viewport.left, viewport.width, frameWidth)
+        val bottom = scale(region.bottom - viewport.top, viewport.height, frameHeight)
+        return ChromeVisualRegion(
+            id = region.id,
+            left = left.coerceIn(0, frameWidth),
+            top = top.coerceIn(0, frameHeight),
+            right = right.coerceIn(0, frameWidth),
+            bottom = bottom.coerceIn(0, frameHeight),
+        ).takeIf { it.width > 0 && it.height > 0 }
+    }
+
+    private fun scale(
+        value: Int,
+        sourceSize: Int,
+        targetSize: Int,
+    ): Int = (value.toLong() * targetSize / sourceSize).toInt()
+}
+
+internal object ChromeVisualSignatureLedger {
+    fun advance(
+        previous: Map<String, Long>,
+        current: Map<String, Long>,
+        processedRegionIds: Set<String>,
+    ): Map<String, Long> =
+        current.mapValues { (regionId, signature) ->
+            when {
+                previous[regionId] == signature -> signature
+                regionId in processedRegionIds -> signature
+                else -> previous[regionId] ?: signature
+            }
+        }
 }

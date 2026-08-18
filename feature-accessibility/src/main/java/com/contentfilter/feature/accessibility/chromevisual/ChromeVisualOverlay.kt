@@ -35,6 +35,16 @@ internal class ChromeVisualOverlay(
         entries.keys.filterNot(regionIds::contains).toList().forEach(::remove)
     }
 
+    fun clipBottom(maximumBottom: Int) {
+        entries.values.toList().forEach { entry ->
+            when {
+                entry.region.top >= maximumBottom -> remove(entry.region.id)
+                entry.region.bottom > maximumBottom ->
+                    show(entry.region.copy(bottom = maximumBottom), entry.state)
+            }
+        }
+    }
+
     override fun close() {
         entries.keys.toList().forEach(::remove)
     }

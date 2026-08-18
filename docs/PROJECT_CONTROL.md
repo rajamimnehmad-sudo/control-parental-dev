@@ -17,6 +17,11 @@ Actualizado: 2026-08-18. Responsable: Direccion General Tecnica.
   confiable; la auditoria enfocada dejo un fallback universal de ocho mosaicos,
   cobertura inmediata, cache efimero y espera maxima acotada. Sigue DEV-only,
   opaco y no apto para usuarios hasta cerrar la matriz web dinamica.
+- `CHROME-VISUAL-02-REAL-WEB` cerro la matriz dinamica inicial en A23: scroll,
+  lazy load, cambio visual, teclado, rotacion y salida de Chrome mantienen
+  identidad y cobertura regional sin reglas por sitio. La captura dinamica usa
+  mosaicos bounded y cache solo efimero. Sigue DEV-only: la carga inicial tarda
+  1,6–2,9 s y un cambio sin evento puede exponerse hasta ~1 s mas decision.
 - Rama: `main`, 32 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.

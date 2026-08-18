@@ -7,6 +7,13 @@ antimanipulacion.
 
 ## Estado
 
+- `CHROME-VISUAL-02-REAL-WEB` es GO controlado en A23: geometria de ventana,
+  scroll/lazy, cambios visuales, teclado, rotacion y salida de Chrome invalidan
+  resultados viejos y mantienen cobertura regional. El fallback es visual,
+  bounded y universal; no usa reglas por sitio. Una carga inicial tarda
+  1,6–2,9 s y los cambios sin evento pueden exponerse hasta ~1 s mas decision,
+  por lo que sigue DEV-only. Evidencia:
+  `EVIDENCE_2026-08-18_CHROME-VISUAL-02-REAL-WEB.md`.
 - `CHROME-VISUAL-01-IMAGES` es GO controlado: App Usuario capturo Chrome y R3.1
   bloqueo fisicamente una sonda completa sin guardar pixeles. Chrome real no
   expone siempre nodos de imagen; una auditoria reemplazo el fallback inicial
@@ -29,8 +36,8 @@ antimanipulacion.
 
 ## Siguientes tickets
 
-1. Endurecer scroll, lazy load, SPA, canvas, iframes y cambios de ventana sin
-   reglas por sitio (`CHROME-VISUAL-02-REAL-WEB`).
-2. Validar fisicamente la matriz final de mosaicos y reducir cobertura amplia
-   solo con evidencia de fuga cero.
-3. Construir matriz de fallos cerrados y recuperacion por OEM.
+1. Crear maquina Android independiente para video reactivo, con muestreo acotado,
+   identidad estricta y dos muestras seguras para recuperar
+   (`CHROME-VISUAL-03-VIDEO`).
+2. Definir capacidad y fallback seguro hacia DAG (`CHROME-VISUAL-04`).
+3. Comparar objetivamente DAG y Chrome Visual (`CHROME-VISUAL-05`).

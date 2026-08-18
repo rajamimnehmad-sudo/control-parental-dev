@@ -19,14 +19,12 @@ import com.glosh.visual.LifecycleGloshiaVisualAnalyzer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.Closeable
-import java.util.LinkedHashMap
 
 internal class ChromeVisualController(
     private val service: AccessibilityService,
@@ -40,21 +38,43 @@ internal class ChromeVisualController(
     private val overlay = ChromeVisualOverlay(service)
     private val lock = Any()
     private val identityGate = ChromeVisualIdentityGate()
-    private val decisionCache = VisualDecisionCache(MaxDecisionCacheEntries)
+    private val decisionCache = ChromeVisualDecisionCache(MaxDecisionCacheEntries)
+    private val pageBlockLedger = ChromeVisualPageBlockLedger()
     private val inferenceMutex = Mutex()
     private var analyzer: GloshiaVisualAnalyzer? = null
     private var activeJob: Job? = null
+    private var verificationJob: Job? = null
     private var pendingSinceMillis = 0L
+    private var lastTileSignatures = emptyMap<String, Long>()
+
+    @Volatile
+    private var stableVerificationCount = 0
 
     fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (!enabled || event.packageName?.toString() != ChromePackageName) return
+        if (!enabled) return
+        if (event.packageName?.toString() != ChromePackageName) {
+            val inputMethodTop = inputMethodTop()
+            if (inputMethodTop != null && findChromeWindow(AnyWindowId, allowBehindInputMethod = true) != null) {
+                overlay.clipBottom(inputMethodTop)
+            } else if (findChromeWindow(AnyWindowId) == null) {
+                deactivate()
+            }
+            return
+        }
         val windowId = event.windowId.takeIf { it >= 0 } ?: return
+        val window = findChromeWindow(windowId) ?: return
+        val viewport = viewport(window) ?: return
+        beginPage(pageIdentity(window))
+        stableVerificationCount = 0
         val eventAt = SystemClock.elapsedRealtime()
-        val coverageTiles = fallbackTilesForDisplay()
+        val coverageTiles = fallbackTiles(viewport)
         coverageTiles.forEach { overlay.show(it, ChromeVisualOverlayState.Pending) }
         overlay.retain(coverageTiles.mapTo(mutableSetOf(), ChromeVisualRegion::id))
+        clipForInputMethod()
         var startsBurst = false
         synchronized(lock) {
+            verificationJob?.cancel()
+            verificationJob = null
             identityGate.invalidate(windowId)
             if (pendingSinceMillis == 0L) {
                 pendingSinceMillis = eventAt
@@ -75,17 +95,28 @@ internal class ChromeVisualController(
     }
 
     override fun close() {
-        synchronized(lock) {
-            activeJob?.cancel()
-            activeJob = null
-            pendingSinceMillis = 0L
-        }
-        scope.launch(NonCancellable + Dispatchers.Main.immediate) { overlay.close() }
+        deactivate()
         synchronized(lock) {
             (analyzer as? Closeable)?.close()
             analyzer = null
         }
         decisionCache.clear()
+    }
+
+    private fun deactivate() {
+        synchronized(lock) {
+            activeJob?.cancel()
+            activeJob = null
+            verificationJob?.cancel()
+            verificationJob = null
+            pendingSinceMillis = 0L
+            identityGate.invalidate(AnyWindowId)
+        }
+        overlay.close()
+        decisionCache.clear()
+        pageBlockLedger.clear()
+        lastTileSignatures = emptyMap()
+        stableVerificationCount = 0
     }
 
     private suspend fun analyzeAfterSettle(
@@ -94,21 +125,24 @@ internal class ChromeVisualController(
         settleMillis: Long,
     ) {
         delay(settleMillis)
-        synchronized(lock) { pendingSinceMillis = 0L }
         val window = withContext(Dispatchers.Main.immediate) { findChromeWindow(windowId) } ?: return
+        val viewport = withContext(Dispatchers.Main.immediate) { viewport(window) } ?: return
+        val pageIdentity = pageIdentity(window)
+        beginPage(pageIdentity)
         val candidates = withContext(Dispatchers.Main.immediate) { collectCandidates(window) }
         val metrics = service.resources.displayMetrics
         val minimumEdge = (MinimumRegionDp * metrics.density).toInt().coerceAtLeast(1)
         val provisional =
             ChromeVisualRegionPlanner.fromNodes(
                 candidates = candidates,
-                windowWidth = metrics.widthPixels,
-                windowHeight = metrics.heightPixels,
+                viewport = viewport,
                 minimumEdge = minimumEdge,
             )
         withContext(Dispatchers.Main.immediate) {
+            val initialCoverage = fallbackTiles(viewport)
             provisional.forEach { overlay.show(it, ChromeVisualOverlayState.Pending) }
-            overlay.retain(provisional.mapTo(mutableSetOf(), ChromeVisualRegion::id))
+            overlay.retain((provisional + initialCoverage).mapTo(mutableSetOf(), ChromeVisualRegion::id))
+            clipForInputMethod()
         }
         Log.i(
             LogTag,
@@ -119,52 +153,135 @@ internal class ChromeVisualController(
         val frame =
             capture.capture(window.id) ?: run {
                 Log.i(LogTag, "windowId=${window.id} phase=capture result=failed")
+                markEventAnalysisComplete()
+                scheduleVerification(window.id)
                 return
             }
         try {
             val topInset = (FallbackTopInsetDp * metrics.density).toInt()
-            val fallback = ChromeVisualRegionPlanner.fallbackTiles(frame.width, frame.height, topInset)
+            val fallback = ChromeVisualRegionPlanner.fallbackTiles(viewport, topInset)
+            lastTileSignatures = signatures(frame.bitmap, viewport, fallback)
             val regions = (provisional + fallback).distinctBy(ChromeVisualRegion::id)
             if (regions.isEmpty()) {
                 withContext(Dispatchers.Main.immediate) { overlay.retain(emptySet()) }
                 log(window.id, frame, startedAt, 0, 0, "no_region")
+                markEventAnalysisComplete()
+                scheduleVerification(window.id)
                 return
             }
             withContext(Dispatchers.Main.immediate) {
                 fallback.forEach { overlay.show(it, ChromeVisualOverlayState.Pending) }
                 overlay.retain(regions.mapTo(mutableSetOf(), ChromeVisualRegion::id))
+                clipForInputMethod()
             }
-            val captureIdentity = synchronized(lock) { identityGate.nextCapture() }
-            var blocked = 0
-            var allowed = 0
-            for (region in regions) {
-                val signature = signature(frame.bitmap, region) ?: continue
-                val identity =
-                    ChromeVisualIdentity(
-                        windowId = window.id,
-                        contentEpoch = captureIdentity.first,
-                        captureSequence = captureIdentity.second,
-                        regionId = region.id,
-                        visualSignature = signature,
-                    )
-                val action =
-                    decisionCache[signature] ?: analyze(frame.bitmap, region).also {
-                        decisionCache[signature] = it
-                    }
-                if (!synchronized(lock) { identityGate.isCurrent(identity) }) return
-                withContext(Dispatchers.Main.immediate) {
-                    when (action) {
-                        GloshiaVisualAction.Allow -> overlay.remove(region.id)
-                        GloshiaVisualAction.Block ->
-                            overlay.show(region, ChromeVisualOverlayState.Blocked)
-                    }
-                }
-                if (action == GloshiaVisualAction.Block) blocked++ else allowed++
-            }
-            log(window.id, frame, startedAt, allowed, blocked, "success")
+            val counts = evaluateRegions(window.id, pageIdentity, frame, viewport, regions)
+            log(window.id, frame, startedAt, counts.allowed, counts.blocked, "success")
+            markEventAnalysisComplete()
+            scheduleVerification(window.id)
         } finally {
             frame.close()
         }
+    }
+
+    private suspend fun verifyVisualChanges(windowId: Int) {
+        val window = withContext(Dispatchers.Main.immediate) { findChromeWindow(windowId) } ?: return
+        val viewport = withContext(Dispatchers.Main.immediate) { viewport(window) } ?: return
+        val pageIdentity = pageIdentity(window)
+        beginPage(pageIdentity)
+        val frame =
+            capture.capture(window.id) ?: run {
+                scheduleVerification(window.id)
+                return
+            }
+        try {
+            val tiles = fallbackTiles(viewport)
+            val current = signatures(frame.bitmap, viewport, tiles)
+            val previous = lastTileSignatures
+            val changed =
+                ChromeVisualRegionPlanner.changedFallbackTiles(
+                    viewport,
+                    (FallbackTopInsetDp * service.resources.displayMetrics.density).toInt(),
+                    previous,
+                    current,
+                )
+            if (changed.isEmpty()) {
+                lastTileSignatures = current
+                stableVerificationCount += 1
+                Log.i(
+                    LogTag,
+                    "windowId=${window.id} phase=verify captureMs=${frame.latencyMillis} changed=0 result=stable",
+                )
+                scheduleVerification(window.id)
+                return
+            }
+            stableVerificationCount = 0
+            synchronized(lock) { identityGate.invalidate(window.id) }
+            withContext(Dispatchers.Main.immediate) {
+                changed.forEach { overlay.show(it, ChromeVisualOverlayState.Pending) }
+            }
+            val counts = evaluateRegions(window.id, pageIdentity, frame, viewport, changed)
+            lastTileSignatures =
+                ChromeVisualSignatureLedger.advance(
+                    previous,
+                    current,
+                    changed.mapTo(mutableSetOf(), ChromeVisualRegion::id),
+                )
+            Log.i(
+                LogTag,
+                "windowId=${window.id} phase=verify captureMs=${frame.latencyMillis} changed=${changed.size} " +
+                    "allowed=${counts.allowed} blocked=${counts.blocked} result=updated",
+            )
+            scheduleVerification(window.id)
+        } finally {
+            frame.close()
+        }
+    }
+
+    private suspend fun evaluateRegions(
+        windowId: Int,
+        pageIdentity: Long,
+        frame: ChromeWindowFrame,
+        viewport: ChromeVisualViewport,
+        regions: List<ChromeVisualRegion>,
+    ): RegionCounts {
+        val captureIdentity = synchronized(lock) { identityGate.nextCapture() }
+        var blocked = 0
+        var allowed = 0
+        val fallbackTiles = fallbackTiles(viewport)
+        for (region in regions) {
+            val frameRegion = ChromeVisualGeometryMapper.toFrame(region, viewport, frame.width, frame.height) ?: continue
+            val signature = signature(frame.bitmap, frameRegion, region) ?: continue
+            val identity =
+                ChromeVisualIdentity(
+                    windowId = windowId,
+                    contentEpoch = captureIdentity.first,
+                    captureSequence = captureIdentity.second,
+                    regionId = region.id,
+                    visualSignature = signature,
+                )
+            val action =
+                decisionCache[signature] ?: analyze(frame.bitmap, frameRegion).also {
+                    decisionCache[signature] = it
+                }
+            if (!synchronized(lock) { identityGate.isCurrent(identity) }) return RegionCounts(allowed, blocked)
+            withContext(Dispatchers.Main.immediate) {
+                when (action) {
+                    GloshiaVisualAction.Allow ->
+                        if (pageBlockLedger.mustRemainBlocked(pageIdentity, region.id)) {
+                            overlay.show(region, ChromeVisualOverlayState.Blocked)
+                        } else {
+                            overlay.remove(region.id)
+                        }
+                    GloshiaVisualAction.Block -> {
+                        pageBlockLedger.recordBlocked(pageIdentity, region, fallbackTiles)
+                        overlay.show(region, ChromeVisualOverlayState.Blocked)
+                    }
+                }
+                clipForInputMethod()
+            }
+            if (action == GloshiaVisualAction.Block) blocked++ else allowed++
+        }
+        return RegionCounts(allowed, blocked)
     }
 
     private suspend fun analyze(
@@ -235,44 +352,114 @@ internal class ChromeVisualController(
         return result
     }
 
-    private fun findChromeWindow(requestedWindowId: Int): AccessibilityWindowInfo? {
+    private fun findChromeWindow(
+        requestedWindowId: Int,
+        allowBehindInputMethod: Boolean = false,
+    ): AccessibilityWindowInfo? {
         val candidates =
             service.windows.filter { window ->
                 window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
                     window.root?.packageName?.toString() == ChromePackageName
             }
-        return candidates.firstOrNull { it.id == requestedWindowId }
+        return candidates.firstOrNull { requestedWindowId != AnyWindowId && it.id == requestedWindowId }
             ?: candidates.firstOrNull { it.isActive }
             ?: candidates.firstOrNull { it.isFocused }
+            ?: candidates.firstOrNull().takeIf { allowBehindInputMethod }
+    }
+
+    private fun inputMethodTop(): Int? =
+        service.windows
+            .asSequence()
+            .filter { it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD }
+            .mapNotNull { window ->
+                val bounds = Rect()
+                window.root?.getBoundsInScreen(bounds)
+                bounds.top.takeIf { !bounds.isEmpty }
+            }
+            .minOrNull()
+
+    private fun clipForInputMethod() {
+        inputMethodTop()?.let(overlay::clipBottom)
+    }
+
+    private fun pageIdentity(window: AccessibilityWindowInfo): Long {
+        var hash = FnvOffsetBasis
+        val value = window.title?.toString().orEmpty().ifBlank { "window:${window.id}" }
+        value.forEach { character -> hash = (hash xor character.code.toLong()) * FnvPrime }
+        return hash
+    }
+
+    private fun beginPage(identity: Long) {
+        if (pageBlockLedger.beginPage(identity)) {
+            decisionCache.clear()
+            lastTileSignatures = emptyMap()
+            stableVerificationCount = 0
+        }
+    }
+
+    private fun viewport(window: AccessibilityWindowInfo): ChromeVisualViewport? {
+        val root = window.root ?: return null
+        val bounds = Rect()
+        root.getBoundsInScreen(bounds)
+        return ChromeVisualViewport(bounds.left, bounds.top, bounds.right, bounds.bottom)
+            .takeIf { it.width > 0 && it.height > 0 }
     }
 
     private fun signature(
         bitmap: Bitmap,
-        region: ChromeVisualRegion,
+        frameRegion: ChromeVisualRegion,
+        screenRegion: ChromeVisualRegion,
     ): Long? {
-        if (region.width <= 0 || region.height <= 0) return null
+        if (frameRegion.width <= 0 || frameRegion.height <= 0) return null
         var hash = FnvOffsetBasis
-        hash = (hash xor region.left.toLong()) * FnvPrime
-        hash = (hash xor region.top.toLong()) * FnvPrime
-        hash = (hash xor region.width.toLong()) * FnvPrime
-        hash = (hash xor region.height.toLong()) * FnvPrime
+        hash = (hash xor screenRegion.left.toLong()) * FnvPrime
+        hash = (hash xor screenRegion.top.toLong()) * FnvPrime
+        hash = (hash xor screenRegion.width.toLong()) * FnvPrime
+        hash = (hash xor screenRegion.height.toLong()) * FnvPrime
         repeat(SignatureRows) { row ->
-            val y = region.top + ((row + 0.5) * region.height / SignatureRows).toInt()
+            val y = frameRegion.top + ((row + 0.5) * frameRegion.height / SignatureRows).toInt()
             repeat(SignatureColumns) { column ->
-                val x = region.left + ((column + 0.5) * region.width / SignatureColumns).toInt()
+                val x = frameRegion.left + ((column + 0.5) * frameRegion.width / SignatureColumns).toInt()
                 hash = (hash xor bitmap.getPixel(x, y).toLong()) * FnvPrime
             }
         }
         return hash
     }
 
-    private fun fallbackTilesForDisplay(): List<ChromeVisualRegion> {
+    private fun signatures(
+        bitmap: Bitmap,
+        viewport: ChromeVisualViewport,
+        regions: List<ChromeVisualRegion>,
+    ): Map<String, Long> =
+        regions.mapNotNull { region ->
+            val frameRegion =
+                ChromeVisualGeometryMapper.toFrame(region, viewport, bitmap.width, bitmap.height)
+                    ?: return@mapNotNull null
+            signature(bitmap, frameRegion, region)?.let { region.id to it }
+        }.toMap()
+
+    private fun fallbackTiles(viewport: ChromeVisualViewport): List<ChromeVisualRegion> {
         val metrics = service.resources.displayMetrics
         return ChromeVisualRegionPlanner.fallbackTiles(
-            metrics.widthPixels,
-            metrics.heightPixels,
+            viewport,
             (FallbackTopInsetDp * metrics.density).toInt(),
         )
+    }
+
+    private fun scheduleVerification(windowId: Int) {
+        val job =
+            scope.launch {
+                delay(ChromeVisualVerificationSchedule.delayMillis(stableVerificationCount))
+                verifyVisualChanges(windowId)
+            }
+        synchronized(lock) {
+            verificationJob?.cancel()
+            verificationJob = job
+        }
+    }
+
+    private fun markEventAnalysisComplete() {
+        synchronized(lock) { pendingSinceMillis = 0L }
     }
 
     private fun log(
@@ -291,37 +478,17 @@ internal class ChromeVisualController(
         )
     }
 
-    private class VisualDecisionCache(
-        private val maximumSize: Int,
-    ) {
-        private val entries =
-            object : LinkedHashMap<Long, GloshiaVisualAction>(maximumSize, 0.75f, true) {
-                override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, GloshiaVisualAction>?): Boolean =
-                    size > maximumSize
-            }
-
-        operator fun get(signature: Long): GloshiaVisualAction? = synchronized(entries) { entries[signature] }
-
-        operator fun set(
-            signature: Long,
-            action: GloshiaVisualAction,
-        ) {
-            synchronized(entries) { entries[signature] = action }
-        }
-
-        fun clear() = synchronized(entries) { entries.clear() }
-    }
-
     private companion object {
         const val ChromePackageName = "com.android.chrome"
+        const val AnyWindowId = -1
         const val ContentSettleMillis = 150L
         const val MaximumSettleMillis = 500L
         const val MinimumRegionDp = 48
         const val FallbackTopInsetDp = 96
         const val MaxAccessibilityNodes = 400
         const val MaxDecisionCacheEntries = 128
-        const val SignatureColumns = 12
-        const val SignatureRows = 8
+        const val SignatureColumns = 24
+        const val SignatureRows = 16
         const val FnvOffsetBasis = -3750763034362895579L
         const val FnvPrime = 1099511628211L
         const val LogTag = "ChromeVisual"

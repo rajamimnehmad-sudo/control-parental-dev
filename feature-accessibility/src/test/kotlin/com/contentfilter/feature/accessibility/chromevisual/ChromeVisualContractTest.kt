@@ -17,8 +17,7 @@ class ChromeVisualContractTest {
                         candidate("android.widget.Button", "button", 20, 100, 100, 160),
                         candidate("android.widget.Image", "small", 10, 300, 30, 320),
                     ),
-                windowWidth = 1_080,
-                windowHeight = 2_400,
+                viewport = ChromeVisualViewport(0, 0, 1_080, 2_400),
                 minimumEdge = 48,
             )
 
@@ -27,14 +26,14 @@ class ChromeVisualContractTest {
 
     @Test
     fun `fallback covers unknown baseline and later stays bounded to changed tiles`() {
-        val tiles = ChromeVisualRegionPlanner.fallbackTiles(1_000, 2_000, 200)
+        val viewport = ChromeVisualViewport(100, 300, 1_100, 2_300)
+        val tiles = ChromeVisualRegionPlanner.fallbackTiles(viewport, 200)
         val current = tiles.associate { it.id to it.id.hashCode().toLong() }
 
         assertEquals(
             tiles,
             ChromeVisualRegionPlanner.changedFallbackTiles(
-                1_000,
-                2_000,
+                viewport,
                 200,
                 emptyMap(),
                 current,
@@ -47,8 +46,7 @@ class ChromeVisualContractTest {
             }
         val changed =
             ChromeVisualRegionPlanner.changedFallbackTiles(
-                1_000,
-                2_000,
+                viewport,
                 200,
                 previous,
                 current,
@@ -58,6 +56,41 @@ class ChromeVisualContractTest {
         assertTrue(changed.size <= 4)
         assertEquals(8, tiles.size)
         assertEquals(1_000L * 1_800L, tiles.sumOf(ChromeVisualRegion::area))
+        assertEquals(100, tiles.first().left)
+        assertEquals(500, tiles.first().top)
+    }
+
+    @Test
+    fun `screen region maps to screenshot coordinates for multi window`() {
+        val mapped =
+            ChromeVisualGeometryMapper.toFrame(
+                region = ChromeVisualRegion("image", 300, 600, 700, 1_000),
+                viewport = ChromeVisualViewport(100, 200, 900, 1_400),
+                frameWidth = 400,
+                frameHeight = 600,
+            )
+
+        assertEquals(ChromeVisualRegion("image", 100, 200, 300, 400), mapped)
+    }
+
+    @Test
+    fun `bounded visual updates keep unprocessed changes pending`() {
+        val viewport = ChromeVisualViewport(0, 0, 1_000, 2_000)
+        val tiles = ChromeVisualRegionPlanner.fallbackTiles(viewport, 200)
+        val previous = tiles.associate { it.id to 1L }
+        val current = tiles.associate { it.id to 2L }
+        val changed = ChromeVisualRegionPlanner.changedFallbackTiles(viewport, 200, previous, current)
+
+        assertEquals(4, changed.size)
+        val advanced =
+            ChromeVisualSignatureLedger.advance(
+                previous,
+                current,
+                changed.mapTo(mutableSetOf(), ChromeVisualRegion::id),
+            )
+
+        assertTrue(changed.all { advanced[it.id] == 2L })
+        assertTrue(tiles.minus(changed.toSet()).all { advanced[it.id] == 1L })
     }
 
     @Test
