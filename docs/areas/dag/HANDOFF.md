@@ -11,12 +11,12 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 ## Estado operativo
 
 - Rama `main`, adelantada respecto de `origin/main`; sin push ni publicacion.
-- DEV 229 / 0.70.31 es el siguiente candidato local. Diagnostic 114 y extension
-  2.0.63 validan el lote en A23; no hubo publicacion.
+- DEV 230 / 0.70.32 es el siguiente candidato local. Diagnostic 115 y extension
+  2.0.64 contienen el lote; no hubo publicacion.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
 - Progreso real: DAG Video premium 94%. La matriz minima superior queda abierta
-  hasta la comprobacion humana de DEV 229 en S22;
+  hasta la comprobacion humana de DEV 230 en S22;
   video general sigue NO-GO para categorias aun no cubiertas.
 
 ## Ultimo hito — DAG-VIDEO-NATIVE-EXPERIENCE-01
@@ -39,6 +39,12 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
   2, volvio a `smooth_started` y aplico blur vivo sin pantalla negra. Dos gestos
   rapidos sobre la barra original generaron cierres confirmados por `revoke_ack`,
   nunca `revoke_timeout`, y la revision final volvio a `smooth_started`.
+- El diagnostico S22 `DAG-4ZJH2LP5` contradijo esa muestra: DEV 229 rearmo a los
+  399 ms y una segunda señal de seek termino en `revoke_timeout`. La causa era
+  de cableado: 750 ms estaban en seleccion general y seek seguia en 150 ms.
+  DEV 230 conecta cada tiempo a su controlador correcto y agrega una regresion
+  contractual. Gates: JS 102/102, unitarios DEV/Diagnostic, ktlint, lint DEV y
+  assemble DEV verdes. Falta una confirmacion fisica S22.
 
 ## Ultimo hito — DAG-VIDEO-PREMIUM-CONTINUITY-03
 
@@ -209,7 +215,7 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Validar humanamente DEV 229 en una sola corrida S22: primer y segundo video,
+Validar humanamente DEV 230 en una sola corrida S22: primer y segundo video,
 seek, scroll, blur/audio y entrada/salida del fullscreen original. A23 ya paso
 automaticamente dos videos, fullscreen y seek repetido. No generar otra APK por
 ajustes visuales menores. URLs MP4 directas, iframes, Shorts, anuncios,

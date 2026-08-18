@@ -1,4 +1,7 @@
-# BACKLOG DE PRODUCTO
+# BACKLOG DE PRODUCTO — LEGADO EN CLASIFICACION
+
+> No cargar este archivo completo por defecto. Conserva ideas, cierres y evidencia
+> mientras se extraen los pendientes vigentes a los handoffs por area.
 
 Ultima sincronizacion: 2026-08-10
 
@@ -1510,6 +1513,7 @@ Flujo de una entrada:
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
 | DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Reconstruccion cerrada localmente con compuerta unica DAG 67 y primer pintado estable | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
+| DAG-VIDEO-PREMIUM-CONTINUITY-03 | Candidato DEV 228 prevalidado; pendiente cierre fisico | P0 | Blur vivo opaco sin microcortes, scroll estable y pantalla completa real | L | Alto |
 | DAG-V3-FIRST-PAINT-21 | Resuelto localmente y validado fisicamente en DAG 67 | P0 | Evitar que una resolucion provisoria aparezca antes de la decision sobre la fuente definitiva | M | Alto |
 | DAG-V3-ZERO-DELAY-REFRESH-22 | Resuelto localmente y validado fisicamente en DAG 68 | P0 | Mostrar raster ya decidido sin espera y refrescar el mismo documento sin apagar la pagina protegida | M | Alto |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
@@ -2394,6 +2398,57 @@ Flujo de una entrada:
 - Correccion publicada DEV 275: se elimina por completo el atajo y DAG vuelve a exigir `pageAnalysisReady && viewportImagesReady` antes de revelar la pagina, igual que antes de DEV 274. La optimizacion futura de fotos debe actuar sobre descarga/decodificacion/inferencia/cache y demostrar tiempo real hasta imagen visible, sin usar una revelacion temprana como sustituto.
 - Reemplazo seguro DEV 277: la categoria deja de ser un atajo visual independiente y pasa a integrar una decision monotona de pagina. Dominio, URL, titulo y texto compacto aportan señales; las categorias explicitas de riesgo siempre bloquean y la evaluacion neuronal se ejecuta solo cuando puede elevar el riesgo. La pagina no espera una cola global de imagenes, pero cada raster individual sigue cerrado hasta su decision nativa. Las pruebas fisicas anteriores y la inyeccion dinamica bloqueada confirman que velocidad y compatibilidad no sustituyen las barreras.
 - Resultado posterior: el reemplazo de DEV 277 fue retirado junto con el resto del lote en DEV 278 por regresion de experiencia percibida. Permanece vigente el comportamiento de DEV 276 y no se conserva ninguna parte del atajo.
+
+#### DAG-VIDEO-PREMIUM-CONTINUITY-03 - Continuidad premium de video
+
+- Estado: `Candidato DEV 228 prevalidado; pendiente cierre fisico`. Tipo:
+  arquitectura de video, UX y seguridad visual. Prioridad: P0. Esfuerzo: L.
+  Riesgo: alto.
+- Evidencia S22 DEV 226: el reporte automatico `DAG-GGB6CRCE` y el reporte
+  ampliado `DAG-5QLJRJQE` no muestran crash, ANR ni presion de memoria. En el
+  segundo hubo 159 cuadros capturados, 145 permitidos, 14 filtrados, 17 reinicios
+  fluidos, 8 cierres por salto, 2 cierres por viewport y 2 timeouts de
+  revocacion. La politica actual interrumpe demasiado ante cuadros aislados.
+- Causa del scroll: el listener global trata el desplazamiento ordinario, que
+  cambia el rectangulo del mismo video, como `viewport_changed`; retira la
+  autoridad, pausa y rearma. El presentador Android conserva ademas un rectangulo
+  inicial para controles, por lo que estos pueden quedar visualmente fijos.
+- Causa de pantalla completa tosca: el modo vigente oculta el chrome y fuerza
+  paisaje, pero no presenta el video exacto en un viewport de pantalla completa.
+  No se volveran a simular pulsaciones sobre controles de YouTube u otro sitio.
+- Comportamiento objetivo universal, sin excepciones por proveedor o formato:
+  ante el primer cuadro filtrado, dudoso o fallido, mantener el video y el audio
+  en marcha y aplicar al elemento exacto un blur vivo muy fuerte, oscurecido y
+  levemente ampliado para tapar bordes. Seguir analizando a 2 fps. Dos muestras
+  seguras consecutivas retiran el blur con una transicion breve.
+- Si el blur persiste dos segundos, mostrar dentro del video un control pequeno
+  `Saltar a parte segura`. Solo una accion del usuario adelanta bajo blur en
+  pasos acotados hasta encontrar dos muestras seguras. Nunca bloquear, cerrar ni
+  inmovilizar toda la pagina por un video.
+- Scroll: si identidad, documento y fuente siguen siendo los mismos, suspender
+  capturas durante el movimiento, actualizar geometria y reanudar tras 120-150
+  ms estables, sin pausa, retiro ni rearmado. Fuera de pantalla se suspende el
+  muestreo; un cambio real de video/fuente conserva el cierre seguro.
+- Pantalla completa: crear una presentacion generica del video exacto que llene
+  el viewport, con salida propia de DAG y restauracion exacta de estilos/scroll.
+  Blur, audio y muestreo deben continuar dentro de ese modo. No usar reglas por
+  YouTube, Shorts, Instagram, TikTok ni controles sinteticos del proveedor.
+- Fase 0 obligatoria: ejecutar primero `DAG-STRUCTURE-03` de forma neutra y
+  extraer coordinacion/presentacion a componentes nuevos. Activity supera 4.900
+  lineas y `video-lab.js` 803; el lote no agregara responsabilidades alli.
+- Prevalidacion antes de APK: replay de scroll, bloqueo, recuperacion, cambio de
+  fuente y pantalla completa; unitarios; JS; ktlint/lint/build; varias corridas
+  automatizadas. Maximo dos corridas fisicas por hito y una APK por hito.
+- Aceptacion A23/S22: cero pausas causadas por entrar/salir del blur; cero cierres
+  `viewport_changed` por scroll normal; blur animado en menos de 100 ms, audio
+  continuo y pagina utilizable; control de salto luego de dos segundos; 20
+  scrolls sin overlay fijo; cinco ciclos de pantalla completa; primer y segundo
+  video mas reinicio sin negro persistente. Medir jank, CPU/GPU y PSS frente a
+  DEV 226: el blur reduce transiciones, pero su costo grafico debe demostrarse.
+- Riesgo de producto aceptado: el blur vivo puede conservar movimiento y color
+  generales. Debe ser suficientemente opaco para impedir reconocimiento, pero
+  no se presentara como garantia de cero pixel visible. El audio queda sin filtrar
+  en esta fase por decision vigente.
 
 #### DAG-ULTRA-KOSHER-01 - Modos de imagenes administrables
 

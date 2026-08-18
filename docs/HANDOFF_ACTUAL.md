@@ -1,4 +1,10 @@
-# HANDOFF ACTUAL - Glosh y DAG Browser
+# HANDOFF ACTUAL — LEGADO
+
+> Fuente historica congelada. No cargarla completa al iniciar tareas ni agregarle
+> cierres. El presente vive en `docs/PROJECT_CONTROL.md` y
+> `docs/areas/*/HANDOFF.md`. Se archivara al confirmar la transferencia.
+
+## Corte historico: Glosh y DAG Browser
 
 Fecha de corte: 2026-08-11
 

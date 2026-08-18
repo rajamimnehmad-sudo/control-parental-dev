@@ -1,49 +1,56 @@
-# START HERE
+# GLOSH — EMPEZAR AQUI
 
-Antes de cualquier tarea leer:
+Este archivo es la entrada obligatoria para cualquier chat o agente.
 
-- `docs/CODEX_RULES.md`
-- `docs/CODEX_MAP.md`
-- `docs/AREAS.md`
-- `docs/DEV_FLOW.md`
-- `docs/HANDOFF_ACTUAL.md`
-- `docs/BACKLOG_PRODUCTO.md`
-- `docs/compatibility/README.md` cuando el ticket afecte compatibilidad, configuración o pruebas Android.
+## Lectura minima
 
-Reglas de trabajo:
+1. `AGENTS.md`: reglas no negociables.
+2. `docs/PROJECT_CONTROL.md`: estado presente, prioridades y bloqueos.
+3. `docs/AREAS.md`: elegir una sola area responsable.
+4. `docs/areas/<area>/HANDOFF.md`: contexto operativo de esa area.
 
-- No reanalizar arquitectura.
-- Trabajar solo por tickets pequenos.
+Abrir `docs/BACKLOG_PRODUCTO.md` solo para buscar ideas o historia de producto.
+Abrir `docs/HANDOFF_ACTUAL.md` solo como legado historico hasta archivarlo.
+No cargar esos dos archivos completos en cada tarea.
 
-Antes de cualquier ticket:
+## Higiene de contexto
 
-1. Leer `START_HERE.md`.
-2. Usar `docs/AREAS.md` para identificar el area exacta afectada.
-3. Abrir solo los archivos necesarios de esa area.
-4. No revisar todo el repo salvo que el ticket diga explicitamente: "revisar todo el repo".
-5. No tocar areas no relacionadas.
-6. Trabajar siempre en tickets chicos.
-7. Primero diagnosticar la causa raiz.
-8. Recien despues escribir codigo.
-9. Modificar la menor cantidad posible de archivos.
-10. Prioridad permanente:
-    - ahorrar tokens;
-    - reducir contexto;
-    - evitar cambios innecesarios;
-    - hacer fixes faciles de revisar;
-    - mantener el repo limpio y escalable.
+- Si un chat se vuelve tan largo que reduce precision, velocidad o eficiencia,
+  consolidar primero el estado vigente en `docs/PROJECT_CONTROL.md` y en el
+  `HANDOFF.md` del area.
+- Despues solicitar o permitir la compactacion del contexto. Continuar desde los
+  documentos, sin reconstruir toda la historia ni repetir auditorias terminadas.
+- Conservar solo decisiones, evidencia, cambios, riesgos y pendientes vigentes;
+  descartar del contexto conversacion repetida y razonamientos ya resueltos.
+- La compactacion nunca reemplaza actualizar los documentos antes de perder
+  contexto importante.
 
-Regla permanente de DAG Browser:
+## Flujo de un ticket
 
-- `app-dag-browser` usa un Gradle aislado. Ejecutar sus tareas exclusivamente
-  mediante `scripts/dag_gradle.sh <tareas>` desde la raiz del repositorio.
-- Nunca intentar `./gradlew :app-dag-browser:...`: ese proyecto no esta incluido
-  en `settings.gradle.kts` de la raiz.
+1. Confirmar area, alcance y criterio de terminado.
+2. Revisar Git de forma liviana y proteger cambios ajenos.
+3. Diagnosticar la causa raiz antes de editar.
+4. Trabajar con la menor cantidad posible de archivos.
+5. Validar de forma dirigida y proporcional.
+6. Actualizar el `HANDOFF.md` del area y, si cambia una prioridad global,
+   `docs/PROJECT_CONTROL.md`.
+7. Cerrar con resultado, pruebas reales y pendiente exacto. Sin diario narrativo.
 
-Regla de build/publicacion:
+## Reporte a Direccion
 
-- Si solo cambian docs, no compilar.
-- No incrementar `versionCode`.
-- No publicar APK.
-- No tocar Android.
-- No tocar Supabase.
+- Al necesitar una decision, quedar bloqueado, cambiar un riesgo global o terminar
+  una fase/ticket, actualizar primero el handoff del area.
+- Si el chat dispone de coordinacion saliente, enviar un resumen a `Jefe`. No
+  asumir que todos los chats pueden iniciar mensajes hacia `Jefe`.
+- Si no dispone de ella, pedir al usuario solamente: `Decile a Jefe que revise
+  <AREA>`. El usuario no debe copiar reportes ni conversaciones.
+- `Jefe` inspecciona el chat y el repositorio, y puede responder directamente.
+
+## Limites
+
+- Un chat especializado mantiene una sola area y un ticket activo por vez.
+- Direccion Tecnica decide prioridades, cruces entre areas y orden de trabajo.
+- Ningun ticket propuesto autoriza codigo hasta el OK explicito del usuario.
+- Docs solamente: no compilar, versionar ni publicar.
+- DAG usa exclusivamente `scripts/dag_gradle.sh <tareas>`.
+- No push, PR, publicacion, Production ni borrado sin OK explicito.

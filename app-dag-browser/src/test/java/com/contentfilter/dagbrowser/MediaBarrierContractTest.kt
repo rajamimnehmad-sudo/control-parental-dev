@@ -42,7 +42,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"css_origin\": \"user\"")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.63\"")
+        assertContains(manifest, "\"version\": \"2.0.64\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(manifest, "\"presentation-guard.js\"")
@@ -52,6 +52,18 @@ class MediaBarrierContractTest {
         assertFalse(manifest.contains("\"video-fluid-capability.js\""))
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
         assertFalse(activity.contains(".installBuiltIn(ExtensionLocation)"))
+    }
+
+    @Test
+    fun `seek controller uses the complete player gesture quiet window`() {
+        assertContains(videoLab, "const SEEK_SETTLE_MS = 750")
+        assertContains(
+            videoLab,
+            "seekController = seekRuntime.create({",
+        )
+        val seekWiring = videoLab.substringAfter("seekController = seekRuntime.create({").substringBefore("});")
+        assertContains(seekWiring, "settleMillis: SEEK_SETTLE_MS")
+        assertFalse(seekWiring.contains("settleMillis: VIEWPORT_SETTLE_MS"))
     }
 
     @Test

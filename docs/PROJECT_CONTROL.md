@@ -8,8 +8,8 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
-- DAG local modificado: DEV 229 / 0.70.31 es el siguiente candidato; Diagnostic
-  114 / extension 2.0.63 validan el lote local. Los reportes S22 de DEV 228
+- DAG local modificado: DEV 230 / 0.70.32 es el siguiente candidato; Diagnostic
+  115 / extension 2.0.64 contienen el lote local. Los reportes S22 de DEV 228
   demostraron que una reapertura a 150 ms dividia un mismo seek en dos cierres y
   el segundo podia terminar en `revoke_timeout`. El seek ahora espera 750 ms
   estables y coalesce el gesto completo. Se eliminaron boton, CSS, mensajes y
@@ -17,11 +17,12 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
   originales; Gecko/Android cubren, revocan y rearman la transicion exacta. A23
   confirmo dos YouTube consecutivos sin limpiar datos y
   `fullscreen_transition -> revoke_ack -> revision 2 -> smooth_started`, con
-  imagen/blur vivo y sin negro. En A23, dos gestos rapidos sobre la barra original
-  de YouTube produjeron cierres con `revoke_ack`, nunca `revoke_timeout`, y la
-  revision final volvio a `smooth_started`. JS 102/102, unitarios
-  DEV/Diagnostic, ktlint y builds DEV/Diagnostic verdes. DEV 229 queda como
-  candidato para validacion humana, no como version general aprobada.
+  imagen/blur vivo y sin negro. El diagnostico S22 `DAG-4ZJH2LP5` descubrio que
+  DEV 229 habia conectado por error los 750 ms a la seleccion general, mientras
+  seek conservaba 150 ms: el segundo evento del gesto podia cerrar en
+  `revoke_timeout`. DEV 230 conecta 750 ms al controlador de seek y devuelve la
+  seleccion normal a 150 ms, con regresion contractual. JS 102/102, unitarios
+  DEV/Diagnostic, ktlint, lint DEV y assemble DEV verdes; falta confirmacion S22.
 - `DAG-VIDEO-PREMIUM-CONTINUITY-03`
   reemplaza el corte automatico por blur vivo opaco con audio continuo, exige
   dos muestras seguras para retirarlo y ofrece salto manual despues de dos
@@ -117,7 +118,7 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
 
 ## Prioridad recomendada
 
-1. Validar humanamente DEV 229 en S22: primer y segundo video sin borrar datos,
+1. Validar humanamente DEV 230 en S22: primer y segundo video sin borrar datos,
    seek y scroll con controles originales, blur/audio y entrada/salida del
    fullscreen original. La automatizacion A23 de dos videos, fullscreen y seek
    repetido ya paso sin negro ni `revoke_timeout`.
