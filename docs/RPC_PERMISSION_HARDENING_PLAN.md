@@ -14,8 +14,9 @@ Reducir la superficie de `SECURITY DEFINER` expuesta por la Data API sin romper 
 - La mayoría de las RPC de dispositivo validan `x-device-token` mediante `request_device_token()` / `device_token_matches_device(...)` y necesitan seguir siendo invocables desde el cliente que usa la publishable/anon key.
 - Los flujos de pairing por código también necesitan `anon` como bootstrap antes de disponer de sesión o device-token.
 - Cuatro RPC `super_admin_*` tienen `EXECUTE` explícito para `anon`, pero internamente exigen Super Admin mediante `is_super_admin()` o `is_current_user_super_admin()`. El permiso `anon` es innecesario.
-- `activate_device(...)` exige `auth.uid()` y por diseño actual no puede funcionar desde `anon`; su permiso `anon` parece legacy/innecesario. Antes de retirarlo se debe confirmar que ningún cliente actual depende de ese RPC antiguo.
+- `activate_device(...)` exige `auth.uid()` y por diseño actual no puede funcionar desde `anon`, pero `pg_stat_statements` registra **27 llamadas históricas** al RPC. Por seguridad de compatibilidad, queda fuera del primer hardening hasta identificar el cliente legacy.
 - Los `DEFAULT PRIVILEGES` actuales para funciones nuevas en `public` conceden `EXECUTE` automáticamente a `anon`, `authenticated` y `service_role` para objetos creados por `postgres` (y existen defaults equivalentes de plataforma para `supabase_admin`). Esto explica la exposición accidental de RPC nuevas.
+- El pairing actual sí muestra uso real: `pair_device_with_code(...)` acumula decenas de llamadas y `pair_admin_device_with_password(...)` también aparece en estadísticas; `anon` se conserva en esos flujos.
 - El pairing de Admin mantiene una deuda P1 independiente: `pair_admin_device_with_password_new_internal(...)` inserta directamente en `auth.users` / `auth.identities`. No se modifica en este hardening de permisos.
 
 ## Matriz de permisos propuesta
@@ -80,17 +81,14 @@ revoke execute on function public.super_admin_list_device_metadata(uuid) from an
 
 Conservar `authenticated` porque el Super Admin web usa sesión autenticada y cada función verifica `is_super_admin()` / `is_current_user_super_admin()` / `require_super_admin()`.
 
-### C — Retirar `anon` después de confirmar uso legacy
+### C — `activate_device` legacy: no tocar todavía
 
-`activate_device(text, text, integer, text)` exige que la cuenta pertenezca a `auth.uid()`. Por eso `anon` no aporta capacidad válida y parece un endpoint legacy previo al pairing actual.
+`activate_device(text, text, integer, text)` exige que la cuenta pertenezca a `auth.uid()`, así que `anon` no aporta capacidad válida. Sin embargo, `pg_stat_statements` registra **27 llamadas históricas** a este endpoint. Eso es suficiente para no revocarlo a ciegas.
 
-Cambio propuesto tras confirmar que no existe cliente activo que lo invoque:
-
-```sql
-revoke execute on function public.activate_device(text, text, integer, text) from anon;
-```
-
-No eliminar la función en este lote.
+Acción posterior:
+- localizar el cliente/versión que todavía lo invoca;
+- migrarlo al pairing actual si corresponde;
+- recién después retirar `anon` y eventualmente deprecar/eliminar el RPC en un lote separado.
 
 ### D — No tocar por ahora
 
@@ -114,7 +112,7 @@ Después, cada nueva RPC pública debe recibir grants explícitos según su mode
 ```sql
 grant execute on function public.<rpc>(...) to anon;
 -- o
- grant execute on function public.<rpc>(...) to authenticated;
+grant execute on function public.<rpc>(...) to authenticated;
 ```
 
 No modificar defaults de `supabase_admin` sin necesidad explícita; son parte de la plataforma y deben tratarse por separado.
@@ -147,4 +145,4 @@ Además:
 
 ## Siguiente decisión
 
-Aplicar cambios reales a Production requiere autorización explícita del owner. La primera aplicación recomendada es mínima: **solo los 4 `REVOKE ... FROM anon` de Super Admin**, seguida por verificación inmediata. El hardening de default privileges puede ir en un segundo cambio separado para reducir blast radius.
+Aplicar cambios reales a Production requiere autorización explícita del owner. La primera aplicación recomendada es mínima: **solo los 4 `REVOKE ... FROM anon` de Super Admin**, seguida por verificación inmediata. `activate_device` queda fuera del cambio. El hardening de default privileges debe ir en un segundo cambio separado para reducir blast radius.
