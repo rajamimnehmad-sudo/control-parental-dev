@@ -34,6 +34,26 @@ El autorun local queda fuera del flujo normal. No se debe depender de `launchd`,
 - Fuente compartida de verdad para código, ramas, PRs y handoffs.
 - `main` representa estado aprobado/integrado; no trabajar directamente allí sin autorización.
 
+## Regla permanente — Glosh Central / Control Center
+
+Glosh Central es el tablero vivo y visible de la ruta del proyecto. **Todo cambio material de ruta debe reflejarse en Glosh Central en el mismo ciclo de trabajo.**
+
+Esto incluye como mínimo:
+- tareas nuevas o eliminadas;
+- cambio de prioridad;
+- cambio de estado (`pending`, `in_progress`, `blocked`, `done`);
+- bloqueos y desbloqueos;
+- cierres/aprobaciones;
+- cambio del frente activo o del siguiente lote;
+- cambios del workflow que alteren cómo se trabaja.
+
+Reglas:
+1. ChatGPT actualiza el tracker/Control Center directamente cuando tenga acceso por GitHub; no abrir una sesión Codex solo para mantener el tablero.
+2. La actualización debe ocurrir en el mismo ciclo en que ChatGPT decide o audita el cambio, no quedar como tarea futura por costumbre.
+3. Glosh Central es de solo lectura para el usuario: refleja la ruta decidida, no ejecuta acciones de producto.
+4. El detalle debe mantenerse compacto: título + contexto breve + estado/prioridad; evidencia larga queda en PR/handoff/documentación correspondiente.
+5. Si por una limitación técnica no puede actualizarse el tablero en ese momento, ChatGPT debe decirlo explícitamente y corregirlo en cuanto vuelva a estar disponible.
+
 ## Formato de ticket
 
 Cada ticket entregado por ChatGPT debe ser autocontenido y listo para copiar en Codex. Debe incluir, cuando corresponda:
