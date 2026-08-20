@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 19:25",
+  "updatedAt": "20 ago 2026 · 20:30",
   "sections": [
     {
       "id": "coordination",
@@ -43,8 +43,9 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "Lote funcional preparado; se ejecutará después del hardening backend crítico",
+      "context": "Auditoría UX/UI integral de App Usuario y App Admin activa en paralelo; el lote funcional permanece detrás del hardening backend crítico",
       "tasks": [
+        {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"Auditoría de producto activa en ChatGPT: mapa de flujos, fricciones, lenguaje y sistema visual. Sin tocar APK; al cerrar sigue wireframe y maquetado.","status":"in_progress","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
         {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote.","status":"pending","priority":"normal"},
