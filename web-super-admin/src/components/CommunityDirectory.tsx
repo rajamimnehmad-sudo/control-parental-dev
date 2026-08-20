@@ -5,7 +5,7 @@ import { ArrowRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LicenseBadge } from "@/components/Badge";
 import type { CommunitySummary, LicenseStatus } from "@/lib/types";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatShortDate } from "@/lib/utils";
 
 const filters: Array<{ value: "all" | LicenseStatus; label: string }> = [
   { value: "all", label: "Todas" },
@@ -52,9 +52,9 @@ export function CommunityDirectory({ communities }: { communities: CommunitySumm
               <tr key={community.community_id}>
                 <td className="table-cell"><Link href={`/communities/${community.community_id}`} className="block"><span className="block font-semibold text-ink">{community.name}</span><span className="mt-0.5 block text-xs text-slate-500">{community.guide_label} · {community.plan_name}</span></Link></td>
                 <td className="table-cell"><LicenseBadge status={community.license_status} /></td>
-                <td className="table-cell"><strong className="text-ink">{community.user_device_count}</strong><span className="text-slate-400"> / {community.max_user_devices ?? "—"}</span></td>
-                <td className="table-cell"><strong className="text-ink">{community.admin_count}</strong><span className="text-slate-400"> / {community.max_admins ?? "—"}</span></td>
-                <td className="table-cell text-slate-600">{community.expires_at ? new Date(community.expires_at).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "Sin fecha"}</td>
+                <td className="table-cell"><strong className="text-ink">{community.user_device_count}</strong><span className="text-slate-400"> / {community.max_user_devices ?? "Sin límite"}</span></td>
+                <td className="table-cell"><strong className="text-ink">{community.admin_count}</strong><span className="text-slate-400"> / {community.max_admins ?? "Sin límite"}</span></td>
+                <td className="table-cell text-slate-600">{formatShortDate(community.expires_at, "Sin vencimiento")}</td>
                 <td className="table-cell text-right"><Link href={`/communities/${community.community_id}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-accent" aria-label={`Abrir ${community.name}`}><ArrowRight className="h-4 w-4" /></Link></td>
               </tr>
             ))}
@@ -67,8 +67,8 @@ export function CommunityDirectory({ communities }: { communities: CommunitySumm
         {visible.map((community) => (
           <Link className="subtle-card" href={`/communities/${community.community_id}`} key={community.community_id}>
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-bold text-ink">{community.name}</p><p className="mt-1 text-xs text-slate-500">{community.guide_label}</p></div><LicenseBadge status={community.license_status} /></div>
-            <div className="mt-4 grid grid-cols-2 gap-2"><SmallMetric label="Usuarios" value={`${community.user_device_count} / ${community.max_user_devices ?? "—"}`} /><SmallMetric label="Admins" value={`${community.admin_count} / ${community.max_admins ?? "—"}`} /></div>
-            <p className="mt-3 text-xs text-slate-500">Actualizada {formatDate(community.updated_at)}</p>
+            <div className="mt-4 grid grid-cols-2 gap-2"><SmallMetric label="Usuarios" value={`${community.user_device_count} / ${community.max_user_devices ?? "Sin límite"}`} /><SmallMetric label="Admins" value={`${community.admin_count} / ${community.max_admins ?? "Sin límite"}`} /></div>
+            <p className="mt-3 text-xs text-slate-500">Actualizada {formatDate(community.updated_at, "sin fecha informada")}</p>
           </Link>
         ))}
         {!visible.length ? <p className="rounded-2xl border border-dashed border-line bg-white px-4 py-10 text-center text-sm text-slate-500">No hay resultados.</p> : null}
