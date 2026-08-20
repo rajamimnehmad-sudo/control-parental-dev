@@ -1,12 +1,12 @@
 package com.contentfilter.dagbrowser
 
-/**
- * Single visual authority for an already prepared raster.
- *
- * Network images and covered video frames enter here only after producing the exact same bounded
- * 224x224 RGB contract. The caller owns and clears [preparedImages]; temporary regional views are
- * cleared here before returning. Every stale, uncertain-invalid or unavailable result fails closed.
- */
+import com.glosh.visual.GloshiaPreparedRasterPolicy
+import com.glosh.visual.GloshiaVisualAction
+import com.glosh.visual.GloshiaVisualAnalysisResult
+import com.glosh.visual.GloshiaVisualAnalyzer
+import com.glosh.visual.GloshiaVisualDecisionBasis
+
+/** DAG adapter; all thresholds and decision policy live in the shared R3.1 engine. */
 internal object DagPreparedRasterPolicy {
     fun decide(
         candidateId: String,
@@ -15,134 +15,49 @@ internal object DagPreparedRasterPolicy {
         trace: DagMediaPipelineTrace? = null,
         workGuard: DagMediaWorkGuard = AlwaysCurrentDagMediaWork,
     ): DagMediaDecision {
-        if (preparedImages.isEmpty() || preparedImages.any { !DagImageDecodeContract.isValid(it) }) {
-            return blocked(candidateId, AndroidDagImagePreprocessor.DecodeFailedReason)
-        }
-        if (!workGuard.canContinue()) {
-            return blocked(candidateId, DagMediaBytesPolicy.AnalysisExpiredReason)
-        }
-        val fullProbability =
-            when (
-                val analysis =
-                    trace.measureInference { analyzer.analyze(preparedImages.first()) }
-            ) {
-                is DagImageAnalysisResult.Classified ->
-                    analysis.filterProbability.takeIf(::isValidProbability)
-                        ?: return blocked(
-                            candidateId,
-                            DagOnDeviceImageAnalyzer.InvalidModelOutputReason,
-                        )
-                is DagImageAnalysisResult.Unavailable ->
-                    return blocked(candidateId, analysis.reason)
-            }
-        if (!workGuard.canContinue()) {
-            return blocked(candidateId, DagMediaBytesPolicy.AnalysisExpiredReason)
-        }
-        trace?.fullImageProbability = fullProbability
-        if (fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold) {
-            trace?.decisionBasis =
-                if (fullProbability >= DagOnDeviceImageAnalyzer.FullStrongFilterThreshold) {
-                    DagMediaDecisionBasis.FullStrong
-                } else {
-                    DagMediaDecisionBasis.FullThreshold
-                }
-            return blocked(
-                candidateId,
-                DagOnDeviceImageAnalyzer.ModelFilterReason,
-                fullProbability,
-            )
-        }
-
-        val preparedRegionalImages = preparedImages.drop(1)
-        val generatedUncertainRegions =
-            if (
-                preparedRegionalImages.isEmpty() &&
-                fullProbability >= DagOnDeviceImageAnalyzer.UncertainRegionalReviewFloor
-            ) {
-                DagUncertainRegionalCropper.quadrantViews(preparedImages.first())
-            } else {
-                emptyList()
-            }
-        val regionalImages = preparedRegionalImages.ifEmpty { generatedUncertainRegions }
-        if (generatedUncertainRegions.isNotEmpty()) {
-            trace?.regionalImageCount = generatedUncertainRegions.size
-            trace?.preparedImageCount = 1 + generatedUncertainRegions.size
-        }
-        return try {
-            var maximumProbability = fullProbability
-            var regionalFilterVotes = 0
-            for (regionalImage in regionalImages) {
-                if (!workGuard.canContinue()) {
-                    return blocked(candidateId, DagMediaBytesPolicy.AnalysisExpiredReason)
-                }
-                val regionalProbability =
-                    when (val analysis = trace.measureInference { analyzer.analyze(regionalImage) }) {
-                        is DagImageAnalysisResult.Classified ->
-                            analysis.filterProbability.takeIf(::isValidProbability)
-                                ?: return blocked(
-                                    candidateId,
-                                    DagOnDeviceImageAnalyzer.InvalidModelOutputReason,
-                                )
-                        is DagImageAnalysisResult.Unavailable ->
-                            return blocked(candidateId, analysis.reason)
-                    }
-                maximumProbability = maxOf(maximumProbability, regionalProbability)
-                if (regionalProbability >= DagOnDeviceImageAnalyzer.RegionalFilterThreshold) {
-                    regionalFilterVotes += 1
-                }
-                val uncertainRegionIsUnsafe =
-                    generatedUncertainRegions.isNotEmpty() &&
-                        regionalProbability >=
-                        DagOnDeviceImageAnalyzer.UncertainRegionalFilterThreshold
-                if (
-                    uncertainRegionIsUnsafe ||
-                    regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ||
-                    regionalFilterVotes >= DagOnDeviceImageAnalyzer.RegionalConsensusMinimum
+        val sharedAnalyzer =
+            GloshiaVisualAnalyzer { image ->
+                when (
+                    val result =
+                        trace?.measureInference { analyzer.analyze(image) }
+                            ?: analyzer.analyze(image)
                 ) {
-                    trace?.decisionBasis =
-                        when {
-                            uncertainRegionIsUnsafe -> DagMediaDecisionBasis.UncertainRegional
-                            regionalProbability >=
-                                DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ->
-                                DagMediaDecisionBasis.RegionalStrong
-                            else -> DagMediaDecisionBasis.RegionalConsensus
-                        }
-                    return blocked(
-                        candidateId,
-                        DagOnDeviceImageAnalyzer.ModelFilterReason,
-                        maximumProbability,
-                    )
+                    is DagImageAnalysisResult.Classified ->
+                        GloshiaVisualAnalysisResult.Classified(result.filterProbability)
+                    is DagImageAnalysisResult.Unavailable ->
+                        GloshiaVisualAnalysisResult.Unavailable(result.reason)
                 }
             }
-            if (!workGuard.canContinue()) {
-                return blocked(candidateId, DagMediaBytesPolicy.AnalysisExpiredReason)
-            }
-            DagMediaDecision(
+        val shared =
+            GloshiaPreparedRasterPolicy.decide(
                 candidateId = candidateId,
-                action = DagMediaAction.Allow,
-                reason = DagOnDeviceImageAnalyzer.ModelAllowReason,
-                filterProbability = maximumProbability,
+                preparedImages = preparedImages,
+                analyzer = sharedAnalyzer,
+                canContinue = workGuard::canContinue,
             )
-        } finally {
-            generatedUncertainRegions.forEach { it.rgb888.fill(0) }
-        }
+        trace?.preparedImageCount = shared.preparedImageCount
+        trace?.regionalImageCount = shared.regionalImageCount
+        trace?.fullImageProbability = shared.fullImageProbability
+        trace?.decisionBasis = shared.basis.toDagBasis()
+        return DagMediaDecision(
+            candidateId = shared.candidateId,
+            action =
+                when (shared.action) {
+                    GloshiaVisualAction.Allow -> DagMediaAction.Allow
+                    GloshiaVisualAction.Block -> DagMediaAction.Block
+                },
+            reason = shared.reason,
+            filterProbability = shared.filterProbability,
+        )
     }
 
-    private fun blocked(
-        candidateId: String,
-        reason: String,
-        filterProbability: Float? = null,
-    ) = DagMediaDecision(
-        candidateId = candidateId.take(MaxCandidateIdLength),
-        action = DagMediaAction.Block,
-        reason = reason,
-        filterProbability = filterProbability,
-    )
-
-    private fun isValidProbability(probability: Float): Boolean = probability.isFinite() && probability in 0f..1f
-
-    private const val MaxCandidateIdLength = 80
+    private fun GloshiaVisualDecisionBasis.toDagBasis(): DagMediaDecisionBasis =
+        when (this) {
+            GloshiaVisualDecisionBasis.None -> DagMediaDecisionBasis.None
+            GloshiaVisualDecisionBasis.FullThreshold -> DagMediaDecisionBasis.FullThreshold
+            GloshiaVisualDecisionBasis.FullStrong -> DagMediaDecisionBasis.FullStrong
+            GloshiaVisualDecisionBasis.UncertainRegional -> DagMediaDecisionBasis.UncertainRegional
+            GloshiaVisualDecisionBasis.RegionalStrong -> DagMediaDecisionBasis.RegionalStrong
+            GloshiaVisualDecisionBasis.RegionalConsensus -> DagMediaDecisionBasis.RegionalConsensus
+        }
 }
-
-private fun <T> DagMediaPipelineTrace?.measureInference(operation: () -> T): T =
-    this?.measureInference(operation) ?: operation()
