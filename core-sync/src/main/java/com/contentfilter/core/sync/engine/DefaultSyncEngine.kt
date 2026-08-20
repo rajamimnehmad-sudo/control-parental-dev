@@ -11,6 +11,7 @@ import com.contentfilter.core.network.config.DeviceTokenProvider
 import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
 import com.contentfilter.core.network.dto.RemoteAppGroupDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
+import com.contentfilter.core.network.dto.RemotePolicyDto
 import com.contentfilter.core.network.dto.RemotePolicyRuleDto
 import com.contentfilter.core.network.remote.RemoteAccountRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
@@ -323,20 +324,42 @@ class DefaultSyncEngine
                         startedAt = startedAt,
                     )
                 }
+                val verifiedPolicy = policyRepository.pullPolicyById(policy.id).stablePolicyOrNull(policy)
+                if (verifiedPolicy == null) {
+                    return@withLock failedPolicyPull(
+                        requestId = requestId,
+                        deviceId = deviceId,
+                        policyId = policy.id,
+                        reason = "Policy revision changed while its bundle was being downloaded.",
+                        startedAt = startedAt,
+                    )
+                }
+                val rules = (bundle.rules as RemoteResult.Success).value
+                val limits = (bundle.limits as RemoteResult.Success).value
+                val groups = (bundle.groups as RemoteResult.Success).value
+                val groupApps = (bundle.groupApps as RemoteResult.Success).value
+                if (!PolicyBundleForSync(rules, limits, groups, groupApps).isConsistent(policy, deviceId)) {
+                    return@withLock failedPolicyPull(
+                        requestId = requestId,
+                        deviceId = deviceId,
+                        policyId = policy.id,
+                        reason = "Policy bundle target is inconsistent.",
+                        startedAt = startedAt,
+                    )
+                }
                 val applied =
                     applier.applyPolicyBundle(
-                        policy = policy,
-                        rules = (bundle.rules as RemoteResult.Success).value,
-                        limits = (bundle.limits as RemoteResult.Success).value,
-                        groups = (bundle.groups as RemoteResult.Success).value,
-                        groupApps = (bundle.groupApps as RemoteResult.Success).value,
+                        policy = verifiedPolicy,
+                        rules = rules,
+                        limits = limits,
+                        groups = groups,
+                        groupApps = groupApps,
                     )
                 Log.i(
                     LogTag,
                     "policy fast pull applied requestId=$requestId deviceId=${deviceId.take(8)} " +
                         "policyId=${policy.id.take(8)} revision=${policy.version} roomApplied=$applied " +
-                        "rules=${(bundle.rules as RemoteResult.Success).value.size} " +
-                        "limits=${(bundle.limits as RemoteResult.Success).value.size} " +
+                        "rules=${rules.size} limits=${limits.size} " +
                         "durationMs=${System.currentTimeMillis() - startedAt}",
                 )
                 PolicyPullResult(
@@ -466,36 +489,7 @@ class DefaultSyncEngine
                     apply = applier::applyDevices,
                     updatedAt = { it.updatedAt },
                 ),
-                pull(
-                    table = SupabaseTable.Policies,
-                    request = { policyRepository.pullPolicies(cursorFor(SupabaseTable.Policies, forceFull)) },
-                    apply = applier::applyPolicies,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.PolicyRules,
-                    request = { policyRepository.pullPolicyRules(cursorFor(SupabaseTable.PolicyRules, forceFull)) },
-                    apply = applier::applyPolicyRules,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.DailyLimits,
-                    request = { limitRepository.pullDailyLimits(cursorFor(SupabaseTable.DailyLimits, forceFull)) },
-                    apply = applier::applyDailyLimits,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.AppGroups,
-                    request = { limitRepository.pullAppGroups(cursorFor(SupabaseTable.AppGroups, forceFull)) },
-                    apply = applier::applyAppGroups,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.AppGroupApps,
-                    request = { limitRepository.pullAppGroupApps(cursorFor(SupabaseTable.AppGroupApps, forceFull)) },
-                    apply = applier::applyAppGroupApps,
-                    updatedAt = { it.updatedAt },
-                ),
+                pullPolicyBundleForCoreData(),
             )
 
         private suspend fun cursorFor(table: SupabaseTable): String? =
@@ -505,6 +499,122 @@ class DefaultSyncEngine
             table: SupabaseTable,
             forceFull: Boolean,
         ): String? = if (forceFull) null else cursorFor(table)
+
+        private suspend fun pullPolicyBundleForCoreData(): Boolean =
+            runCatching {
+                val targetDeviceId = deviceActivationRepository.currentActivation()?.deviceId ?: return@runCatching false
+                when (val result = policyRepository.pullPoliciesForDevice(targetDeviceId)) {
+                    is RemoteResult.Failure -> {
+                        Log.w(LogTag, "Pull failed table=${SupabaseTable.Policies.tableName}: ${result.reason}")
+                        return@runCatching false
+                    }
+                    is RemoteResult.Success -> {
+                        val policies = result.value
+                        val activePolicy =
+                            policies
+                                .asSequence()
+                                .filter { policy ->
+                                    policy.active &&
+                                        policy.deletedAt == null &&
+                                        policy.deviceId == targetDeviceId
+                                }
+                                .maxWithOrNull(compareBy({ it.version }, { it.updatedAt }))
+                        if (activePolicy != null) {
+                            val bundle = pullPolicyBundleForActivePolicy(activePolicy, targetDeviceId)
+                            if (bundle == null) {
+                                Log.w(
+                                    LogTag,
+                                    "Policy bundle pull failed policyId=${activePolicy.id.take(8)} " +
+                                        "revision=${activePolicy.version}",
+                                )
+                                return@runCatching false
+                            }
+                            val applied =
+                                applier.applyPolicyBundle(
+                                    policy = activePolicy,
+                                    rules = bundle.rules,
+                                    limits = bundle.limits,
+                                    groups = bundle.groups,
+                                    groupApps = bundle.groupApps,
+                                )
+                            if (!applied) {
+                                Log.w(
+                                    LogTag,
+                                    "Policy bundle rejected policyId=${activePolicy.id.take(
+                                        8,
+                                    )} revision=${activePolicy.version}",
+                                )
+                                return@runCatching false
+                            }
+                            syncCursorDao.upsert(
+                                SyncCursorEntity(
+                                    tableName = SupabaseTable.Policies.tableName,
+                                    updatedAfterIso = activePolicy.updatedAt,
+                                    syncedAtEpochMillis = System.currentTimeMillis(),
+                                ),
+                            )
+                            bundle.syncCursorEntries.forEach { (table, cursor) ->
+                                cursor?.let {
+                                    syncCursorDao.upsert(
+                                        SyncCursorEntity(
+                                            tableName = table.tableName,
+                                            updatedAfterIso = it,
+                                            syncedAtEpochMillis = System.currentTimeMillis(),
+                                        ),
+                                    )
+                                }
+                            }
+                            true
+                        } else {
+                            Log.w(LogTag, "No active policy bundle for device=${targetDeviceId.take(8)}")
+                            false
+                        }
+                    }
+                }
+            }.getOrElse { exception ->
+                Log.e(LogTag, "Policy bundle pull crashed: ${exception.message}", exception)
+                false
+            }
+
+        private suspend fun pullPolicyBundleForActivePolicy(
+            policy: RemotePolicyDto,
+            targetDeviceId: String,
+        ): PolicyBundleForSync? {
+            val policyId = policy.id
+            if (policy.deviceId != targetDeviceId) return null
+            val appGroupDeviceId = targetDeviceId
+            val rules =
+                when (val response = policyRepository.pullPolicyRulesForPolicy(policyId)) {
+                    is RemoteResult.Failure -> return null
+                    is RemoteResult.Success -> response.value
+                }
+            val limits =
+                when (val response = limitRepository.pullDailyLimitsForPolicy(policyId)) {
+                    is RemoteResult.Failure -> return null
+                    is RemoteResult.Success -> response.value
+                }
+            val groups =
+                when (val response = limitRepository.pullAppGroupsForDevice(appGroupDeviceId)) {
+                    is RemoteResult.Failure -> return null
+                    is RemoteResult.Success -> response.value
+                }
+            val groupApps =
+                when (val response = limitRepository.pullAppGroupAppsForDevice(appGroupDeviceId)) {
+                    is RemoteResult.Failure -> return null
+                    is RemoteResult.Success -> response.value
+                }
+            val bundle =
+                PolicyBundleForSync(
+                    rules = rules,
+                    limits = limits,
+                    groups = groups,
+                    groupApps = groupApps,
+                )
+            if (!bundle.isConsistent(policy, targetDeviceId)) return null
+            val verifiedPolicy = policyRepository.pullPolicyById(policyId).stablePolicyOrNull(policy) ?: return null
+            if (verifiedPolicy != policy) return null
+            return bundle
+        }
 
         private suspend fun <T> pull(
             table: SupabaseTable,
@@ -583,3 +693,43 @@ private data class PolicyRemoteBundle(
             .firstOrNull()
             ?.reason
 }
+
+private data class PolicyBundleForSync(
+    val rules: List<RemotePolicyRuleDto>,
+    val limits: List<RemoteDailyLimitDto>,
+    val groups: List<RemoteAppGroupDto>,
+    val groupApps: List<RemoteAppGroupAppDto>,
+) {
+    val syncCursorEntries: Map<SupabaseTable, String?>
+        get() =
+            mapOf(
+                SupabaseTable.PolicyRules to rules.maxByOrNull { it.updatedAt }?.updatedAt,
+                SupabaseTable.DailyLimits to limits.maxByOrNull { it.updatedAt }?.updatedAt,
+                SupabaseTable.AppGroups to groups.maxByOrNull { it.updatedAt }?.updatedAt,
+                SupabaseTable.AppGroupApps to groupApps.maxByOrNull { it.updatedAt }?.updatedAt,
+            )
+
+    fun isConsistent(
+        policy: RemotePolicyDto,
+        deviceId: String,
+    ): Boolean {
+        val groupIds = groups.mapTo(mutableSetOf()) { it.id }
+        return policy.deviceId == deviceId &&
+            rules.all { it.policyId == policy.id } &&
+            limits.all { it.policyId == policy.id } &&
+            groups.all { it.deviceId == deviceId } &&
+            groupApps.all { it.deviceId == deviceId && it.groupId in groupIds }
+    }
+}
+
+private fun RemoteResult<List<RemotePolicyDto>>.stablePolicyOrNull(expected: RemotePolicyDto): RemotePolicyDto? =
+    (this as? RemoteResult.Success)
+        ?.value
+        ?.singleOrNull { candidate ->
+            candidate.id == expected.id &&
+                candidate.deviceId == expected.deviceId &&
+                candidate.version == expected.version &&
+                candidate.updatedAt == expected.updatedAt &&
+                candidate.active == expected.active &&
+                candidate.deletedAt == expected.deletedAt
+        }

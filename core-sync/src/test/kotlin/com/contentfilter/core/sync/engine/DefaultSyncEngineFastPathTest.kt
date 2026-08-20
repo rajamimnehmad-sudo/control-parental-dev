@@ -62,7 +62,7 @@ class DefaultSyncEngineFastPathTest {
                 )
 
             assertTrue(result.success)
-            assertEquals(1, policies.policyByIdCalls)
+            assertEquals(2, policies.policyByIdCalls)
             assertEquals(1, policies.rulesForPolicyCalls)
             assertEquals(3, limits.targetedCalls)
             assertEquals(0, accounts.pullCalls)
@@ -382,21 +382,37 @@ class DefaultSyncEngineFastPathTest {
     }
 
     private class FakeActivationRepository : DeviceActivationRepository {
-        override fun observeActivation(): Flow<DeviceActivation?> = flowOf(null)
+        private val activation = DeviceActivation("activation", "account-1", DeviceId, 1L)
 
-        override suspend fun currentActivation(): DeviceActivation? = null
+        override fun observeActivation(): Flow<DeviceActivation?> = flowOf(activation)
+
+        override suspend fun currentActivation(): DeviceActivation = activation
 
         override suspend fun saveActivation(activation: DeviceActivation) = Unit
     }
 
     private class FakeLicenseRepository : RemoteLicenseRepository {
-        override suspend fun getDeviceEntitlement(deviceId: String): RemoteResult<LicenseEntitlement> = error("unused")
+        override suspend fun getDeviceEntitlement(deviceId: String): RemoteResult<LicenseEntitlement> =
+            RemoteResult.Success(LicenseEntitlement(LicenseState.Active, null, null, 0L))
     }
 
     private class FakeSystemStatusRepository : SystemStatusRepository {
-        override fun observeHealth(): Flow<SystemHealthSnapshot> = flowOf(error("unused"))
+        private val health =
+            SystemHealthSnapshot(
+                vpnState = ComponentState.Enabled,
+                accessibilityState = ComponentState.Enabled,
+                deviceAdminState = ComponentState.Enabled,
+                syncState = ComponentState.Enabled,
+                integrityState = ComponentState.Enabled,
+                databaseState = ComponentState.Enabled,
+                licenseState = LicenseState.Active,
+                updateState = com.contentfilter.core.domain.model.UpdateState.Unknown,
+                checkedAtEpochMillis = 0L,
+            )
 
-        override suspend fun currentHealth(): SystemHealthSnapshot = error("unused")
+        override fun observeHealth(): Flow<SystemHealthSnapshot> = flowOf(health)
+
+        override suspend fun currentHealth(): SystemHealthSnapshot = health
 
         override suspend fun updateVpnState(state: ComponentState) = Unit
 
