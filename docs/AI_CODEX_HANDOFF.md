@@ -12,4 +12,16 @@
 - Evidencia: lectura de `AI_WORKFLOW.md` y `AI_NEXT_TICKET.md` desde `origin/coordination/ai-control`; verificacion de rama, HEAD y estado Git.
 - Riesgos/bloqueos: ninguno.
 
+### Corrección del runner validada por el smoke
+
+- PR draft: https://github.com/rajamimnehmad-sudo/control-parental-dev/pull/98
+- Commit de corrección: `1e50a67d` (`fix(ai): refresh coordination ref reliably`).
+- `git fetch` actualiza explícitamente `refs/remotes/origin/coordination/ai-control` mediante refspec forzado.
+- La invocación usa `codex exec --approve-for-me`; el CLI confirma que este modo aplica `workspace-write` con revisión automática. Se eliminó la combinación inválida con `--sandbox`.
+- La reinstalación reemplaza el binario con temporal + `mv` atómico para que `launchd` nunca lea un script parcialmente copiado.
+- Gates: `bash -n`, self-test de deduplicación/single-flight y `git diff --check` — **PASS**.
+- Smoke final: inicio automático, un solo proceso, salida `0`, estado `completed`, servicio activo.
+- El primer intento del smoke salió `2` por la combinación inválida del CLI; se corrigió y el usuario autorizó una única repetición controlada.
+- Producto, APK, Production, Supabase y worktrees: **cero cambios**.
+
 Siguiente accion: ChatGPT audita este handoff. Codex se detiene sin ejecutar otro ticket.
