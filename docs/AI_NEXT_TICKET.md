@@ -1,131 +1,156 @@
 # AI NEXT TICKET
 
-## LOCAL-STATE-RECONCILIATION-00
+## LOCAL-WORK-PRESERVATION-01
 
-**Tipo:** inventario / reconciliación
+**Tipo:** preservación / seguridad operativa
 **Prioridad:** crítica
-**Modo:** SOLO LECTURA DEL PROYECTO
+**Modo:** NO EDITAR CÓDIGO / NO RECONCILIAR TODAVÍA
 **Responsable de ejecución:** Codex
 **Revisor:** ChatGPT / jefe técnico central
 
-> Antes de ejecutar, leer también `docs/AI_WORKFLOW.md` en esta misma rama. Esa es la regla operativa permanente.
+> Antes de ejecutar, leer `docs/AI_WORKFLOW.md` en esta misma rama.
+
+### Contexto validado
+
+El inventario `LOCAL-STATE-RECONCILIATION-00` confirmó:
+
+- repo auditado: `/Users/yejielnehmad/Developer/content-filter`;
+- worktree activo: `work/chrome-visual`;
+- HEAD: `6a045f1300336b1f033cab7bea2ce3ba25dcd119`;
+- `main` local: `9e41c309`, 39 commits delante de `origin/main`;
+- `work/chrome-visual`: 46 commits delante de `origin/main`;
+- 6 tracked modificados + 4 untracked, 0 staged;
+- los cambios sin commit corresponden a hosts Supabase exactos, sync atómico y pairing hardening;
+- no hay evidencia de que esos 10 archivos estén preservados remotamente.
 
 ### Objetivo
 
-Establecer la verdad exacta del proyecto local antes de ejecutar cualquier cambio nuevo. GitHub no refleja necesariamente todo lo que existe actualmente en la Mac (incluyendo Chrome Visual y trabajo acumulado de Codex/Spark), por lo que primero hay que reconciliar el estado local contra `origin/main` y contra las ramas remotas relevantes.
+**Preservar exactamente el estado local actual antes de revisar, arreglar, separar o limpiar nada.**
 
-### Regla absoluta
+Este ticket NO aprueba técnicamente ningún cambio. Solo crea copias remotas seguras y verificables para eliminar riesgo de pérdida.
 
-Durante este ticket **NO modificar el proyecto auditado**.
+### Gate inicial — detectar drift
 
-No:
-- editar/formatear archivos del proyecto;
-- crear/borrar archivos de producto;
-- commit/push de código;
-- crear PR de código;
-- mergear;
-- resetear;
-- limpiar;
-- stash;
-- checkout que pueda alterar el working tree auditado;
-- aplicar migraciones;
-- tocar Supabase/Production;
-- instalar APK;
-- ejecutar comandos destructivos.
+Antes de preservar, comprobar nuevamente en modo lectura:
 
-Si un comando pudiera modificar el estado auditado, no ejecutarlo.
+- rama actual;
+- HEAD;
+- `git status --short`;
+- lista exacta de tracked modificados y untracked.
 
-### Única excepción permitida: handoff a ChatGPT
+Si el estado cambió materialmente respecto del handoff anterior, **DETENERSE** y dejar el nuevo estado en `docs/AI_CODEX_HANDOFF.md`. No intentar adaptar el ticket por cuenta propia.
 
-Para que el usuario no tenga que copiar/pegar el resultado, al terminar Codex **DEBE** dejar el reporte en GitHub:
+### Preservación de commits ya existentes
+
+Sin cambiar de rama ni alterar el working tree auditado, preservar remotamente como ramas de seguridad:
+
+1. `preserve/local-main-2026-08-20` → tip actual de `main` local (`9e41c309` si sigue igual).
+2. `preserve/chrome-visual-2026-08-20` → tip actual de `work/chrome-visual` (`6a045f13` si sigue igual).
+3. `preserve/pre-chrome-visual-2026-08-17` → tip actual de `snapshot/pre-chrome-visual-2026-08-17` (`833d5ad8` si sigue igual).
+
+Estas ramas son **snapshots de seguridad**, no ramas aprobadas ni listas para merge.
+
+No crear PRs para ellas.
+
+### Preservación exacta de los 10 archivos sin commit
+
+Crear una rama remota:
+
+`preserve/uncommitted-2026-08-20`
+
+baseada exactamente en el HEAD observado de `work/chrome-visual`.
+
+Para no tocar el working tree sucio:
+
+1. usar un worktree temporal limpio o clon temporal;
+2. reproducir allí **únicamente** el diff tracked actual y los 4 archivos untracked del inventario;
+3. verificar que el contenido preservado coincida byte a byte con la fuente cuando sea posible;
+4. verificar que solo estén presentes los 10 paths esperados;
+5. ejecutar `git diff --check`;
+6. crear un único commit de snapshot;
+7. push de esa rama;
+8. verificar que la rama remota apunta al commit creado.
+
+Commit sugerido:
+
+`chore(preserve): snapshot local uncommitted state 2026-08-20`
+
+### Exclusiones absolutas
+
+NO incluir ni leer/subir:
+
+- `.env`;
+- `.codex-tmp/`;
+- APKs;
+- `build/`;
+- logs de instrumentación;
+- caches;
+- keystores/certificados;
+- secretos o credenciales;
+- cualquier archivo ignorado fuera de los 4 untracked ya identificados.
+
+Los 4 untracked permitidos son solamente:
+
+- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/DefaultSyncEngineAtomicPolicySyncTest.kt`
+- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/TargetedPolicySyncCoordinatorTest.kt`
+- `supabase/migrations/20260819150000_harden_pairing_tokens.sql`
+- `supabase/pairing_hardening_03b_checks.sql`
+
+### No hacer todavía
+
+- no editar código;
+- no corregir tests;
+- no reordenar commits;
+- no cherry-pick;
+- no merge;
+- no rebase;
+- no reset/clean/stash del worktree original;
+- no aplicar migraciones;
+- no tocar Supabase;
+- no ejecutar builds ni suites pesadas;
+- no probar APK;
+- no decidir qué cambios son buenos/malos;
+- no eliminar ramas ni worktrees existentes.
+
+Puede eliminarse únicamente el worktree/clon temporal creado por este ticket, y solo después de verificar que esté limpio y que todo quedó preservado remotamente.
+
+### Verificación final obligatoria
+
+Confirmar:
+
+- las 4 ramas `preserve/...` existen en remoto;
+- sus SHAs exactos;
+- `preserve/uncommitted-2026-08-20` contiene únicamente los 10 paths esperados respecto de `6a045f13` (o el HEAD validado si hubiera drift autorizado por ChatGPT);
+- el working tree original conserva exactamente su estado inicial del ticket;
+- no se subieron secretos ni artefactos ignorados.
+
+### Handoff obligatorio
+
+Actualizar únicamente:
 
 `docs/AI_CODEX_HANDOFF.md`
 
-en la rama:
-
-`coordination/ai-control`
-
-Se permite exclusivamente crear/actualizar ese archivo, hacer commit y push de ese reporte. No modificar ningún otro archivo.
-
-Si hacerlo desde el worktree auditado pudiera alterar su estado, usar un worktree temporal limpio o un mecanismo que no cambie el working tree observado.
-
-### Inventario obligatorio
-
-Reportar con evidencia:
-
-1. Ruta exacta del repo y worktree actual.
-2. Rama actual.
-3. HEAD exacto.
-4. `git status --short`.
-5. Archivos modificados tracked.
-6. Archivos staged.
-7. Archivos nuevos/untracked.
-8. Archivos borrados/renombrados si existen.
-9. Commits locales no presentes en `origin/main`.
-10. Commits remotos no presentes localmente, si los hubiera.
-11. Diferencia completa de la rama actual contra `origin/main`.
-12. Ramas locales y su relación con remotas.
-13. Worktrees existentes y su estado.
-14. Ramas remotas relevantes (`review/*`, `codex/*`, `agent/*`, Chrome/DAG, etc.).
-15. Migraciones Supabase locales nuevas o modificadas que todavía no estén reconciliadas.
-16. Cambios locales acumulados provenientes de Spark/Codex, separándolos por tema cuando sea posible:
-    - exact technical Supabase hosts;
-    - sync atómico de políticas;
-    - pairing hardening;
-    - Chrome Visual;
-    - cualquier otro cambio no reconocido.
-17. Estado exacto de Chrome Visual:
-    - localizar commit `6a045f13` si existe;
-    - rama/worktree donde vive;
-    - archivos incluidos;
-    - commits posteriores relacionados;
-    - qué pruebas/evidencia existen localmente.
-18. Tests/builds/lint que hayan quedado documentados pero cuyo código aún no esté en GitHub.
-19. Archivos sensibles, secretos, credenciales, keystores, APKs, logs o artefactos que **no deban subirse**.
-20. Cualquier diferencia entre handoffs/documentación local y el código real que pueda afectar la reconciliación.
-
-### No ejecutar suites pesadas todavía
-
-Este ticket no busca volver a probar el proyecto. No gastar tiempo/créditos en builds completos, emuladores ni pruebas físicas. Solo puede ejecutarse una comprobación inocua si es imprescindible para identificar el estado existente.
-
-### Clasificación final requerida
-
-Clasificar todo lo encontrado en:
-
-1. **YA EN GITHUB / APROBADO**
-2. **LOCAL CON COMMIT, NO SUBIDO**
-3. **LOCAL SIN COMMIT**
-4. **PENDIENTE DE REVISIÓN TÉCNICA**
-5. **NO DEBE SUBIRSE**
-6. **ESTADO INCIERTO / REQUIERE DECISIÓN**
-
-### Formato de `AI_CODEX_HANDOFF.md`
-
-Debe ser compacto y contener:
+en `coordination/ai-control` con:
 
 - ticket ejecutado;
-- fecha/hora;
-- rama + HEAD;
-- resumen del working tree;
-- commits locales no subidos;
-- tabla por grupo de cambios;
-- estado Chrome Visual;
-- estado de migraciones;
-- riesgos de pérdida/mezcla;
-- comandos de solo lectura relevantes;
-- propuesta de separación futura en ramas `review/<ticket>` **sin ejecutarla**.
+- estado inicial/final del working tree original;
+- las cuatro ramas de preservación y SHAs;
+- SHA del commit snapshot de los 10 archivos;
+- lista exacta de paths preservados;
+- verificaciones ejecutadas;
+- cualquier anomalía o riesgo.
 
-No pegar logs enormes ni historia ya irrelevante.
+No acumular el handoff anterior: reemplazarlo por el estado vigente.
 
-### Gate
+### Criterio de terminado
 
-Al terminar:
-1. subir únicamente `docs/AI_CODEX_HANDOFF.md` a `coordination/ai-control`;
-2. verificar que quedó disponible en GitHub;
-3. **DETENERSE**.
+El ticket termina solo cuando todo el trabajo local crítico está preservado remotamente sin alterar el estado original de la Mac.
 
-No arreglar nada aunque el problema parezca obvio.
-No hacer commit de código aunque un cambio parezca terminado.
-No comenzar el siguiente ticket.
+Después: **DETENERSE**.
 
-Después el usuario solo debe decir **“ya”** a ChatGPT. ChatGPT leerá el handoff y auditará directamente desde GitHub.
+No comenzar revisión técnica. El siguiente paso será decidido por ChatGPT y probablemente separará la revisión de:
+
+1. hosts Supabase exactos;
+2. sync atómico;
+3. pairing hardening;
+4. integración DAG/Chrome Visual.
