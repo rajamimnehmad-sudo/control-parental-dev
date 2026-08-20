@@ -1,48 +1,67 @@
 # AI CODEX HANDOFF
 
-## P0-HARDENING-BATCH-01
+## P0-BACKEND-CLOSEOUT-02
 
-- Fecha: 2026-08-20 10:40:44 -03.
-- Estado global: **NEEDS-FIX**.
+- Fecha: 2026-08-20.
+- Estado global: **BLOCKED** por falta de sandbox SQL local; la implementación y los controles estáticos están completos.
 - Rama: `review/p0-hardening-batch-01`.
 - Base: `preserve/local-main-2026-08-20`.
-- PR draft: https://github.com/rajamimnehmad-sudo/control-parental-dev/pull/95
+- PR draft actualizado: https://github.com/rajamimnehmad-sudo/control-parental-dev/pull/95
 
 ## Estado por bloque
 
-- **A — PASS** — `0100cf9e`: allowlist técnica exacta; Glosh conserva su host y no privilegia `supabase.co`, proyectos hermanos ni subdominios.
-- **B — PASS** — `5aa1f8cf`: bundle periódico/dirigido coherente, verificación doble de revisión/target, aplicación Room transaccional, last-known-good, cursores posteriores y ACK tras VPN + Accessibility.
-- **C — NEEDS-FIX** — `bb148ea2`: tokens de 128 bits, SHA-256 indexado, TTL acotado, locks, grants explícitos, `search_path` fijo y cutoff derivado del rollout. Los checks SQL quedaron escritos pero no pudieron ejecutarse porque esta Mac no tiene Docker/Postgres local disponible.
+- **C2 — BLOCKED-SQL-GATE** — commit `bf37b77e` (`fix(pairing): close SQL hardening gate`). `public.pairing_hardening_rollout` conserva los `REVOKE`, tiene RLS habilitado y no crea políticas API. `pairing_hardening_03b_checks.sql` ahora exige RLS y cero policies. También se retiraron dos líneas vacías finales que hacían fallar el diff global, sin cambiar semántica SQL.
+- **D — BLOCKED-SQL-GATE (estático PASS)** — commit `76bbf975` (`fix(security): scope device token writes to device`). Las policies de escritura de `access_requests` y `device_apps` usan `device_token_matches_device(device_id)`, coherencia explícita `device_id ↔ account_id`, `USING` y `WITH CHECK`, y roles `anon, authenticated`.
 
-## Desviaciones del candidato preservado
+## Evidencia de aislamiento cross-device
 
-- A conserva la precedencia histórica de bloques explícitos para buscadores; solo los hosts técnicos críticos exactos tienen prioridad.
-- B no usa el cursor de `policies` como disparador del bundle: siempre relee la policy activa del dispositivo, valida todos los hijos y vuelve a comprobar la revisión antes del commit.
-- C elimina el cutoff fijo `2026-08-19`, usa una marca persistente del rollout efectivo, endurece revokes y divide la migración de 1.221 líneas en tres archivos de 577/415/251 líneas.
-- `anon EXECUTE` en `admin_create_device_relink_code` se conserva deliberadamente: el cliente de admin puede operar solo con anon JWT + `x-device-token`, y la función valida ese token antes de acceder al target.
+La estructura implementada garantiza estáticamente:
 
-## Archivos y validación
+- token A solo satisface el helper exacto para `device_id=A`;
+- una fila de B falla aunque A y B compartan cuenta;
+- un UPDATE de A hacia B o hacia otra cuenta falla en `WITH CHECK`;
+- `access_requests.device_id = null` falla explícitamente;
+- DELETE evalúa `USING` sobre la fila existente;
+- las policies independientes de owner/admin no fueron modificadas;
+- no se agregó otra policy de escritura basada en `device_token_matches(account_id)`.
 
-Áreas tocadas: `core-policy`, `feature-vpn`, `core-sync`, `feature-activation` y cuatro archivos SQL de pairing. No se tocó DAG, Chrome Visual, Admin, Production ni device-token scope.
+El archivo `supabase/device_token_scope_checks.sql` valida catálogo, roles, helper exacto, no-null, coherencia de cuenta y ausencia del patrón account-scoped anterior. Estos casos todavía no tienen evidencia dinámica porque no hubo base local donde ejecutar SQL; no se declara PASS runtime.
 
-Comandos verdes:
+El App Usuario ya cumple el contrato y no fue modificado:
 
-- `./gradlew --no-daemon :core-policy:test :feature-vpn:test`
-- `./gradlew --no-daemon :core-sync:testDebugUnitTest :core-sync:ktlintCheck`
-- `./gradlew --no-daemon :feature-activation:testDebugUnitTest :feature-activation:ktlintCheck`
-- `./gradlew --no-daemon :core-policy:test :feature-vpn:test :core-sync:testDebugUnitTest :feature-activation:testDebugUnitTest :app-user:assembleDevDebug`
-- `git diff --check`
+- `InstalledAppPublisher.kt` envía `activation.accountId` y `activation.deviceId` en `device_apps`.
+- `MyAppsViewModel.kt` construye `RemoteAccessRequestDto` con `accountId` y `deviceId` no nulo.
 
-No disponible:
+## Archivos tocados en este ticket
 
-- `supabase status`: Docker daemon inexistente/no disponible; migraciones y `pairing_hardening_03b_checks.sql` no ejecutados.
+- `supabase/migrations/20260819145959_harden_pairing_tokens.sql`
+- `supabase/migrations/20260819150001_harden_pairing_consumers.sql` (solo EOF)
+- `supabase/migrations/20260819150002_harden_pairing_entrypoints.sql` (solo EOF)
+- `supabase/pairing_hardening_03b_checks.sql`
+- `supabase/migrations/20260820142155_scope_device_token_writes.sql`
+- `supabase/device_token_scope_checks.sql`
 
-## Riesgos vigentes y cierre
+## Comandos, checks y resultados
 
-- Antes de aprobar C o aplicar la migración, ejecutar las tres migraciones y los checks en un Supabase/Postgres local limpio, incluyendo consumo único, legacy transition, grants y `search_path`.
-- Ninguna migración fue aplicada a Supabase/Production.
-- No hubo instalación ni prueba física; no era requerida.
-- `DefaultSyncEngine.kt` (731 líneas) y el fixture atómico (772) permanecen unidos por cohesión del ticket y siguen debajo del umbral obligatorio de división.
-- El worktree original `work/chrome-visual` quedó intacto.
+- `supabase --version`: CLI `2.109.0` disponible.
+- Runtime local: `docker`, una instancia operativa de Docker Desktop, `colima`, `orbctl`, `podman`, `postgres` y `psql` no disponibles; `supabase status` no pudo iniciar por ausencia de Docker daemon.
+- No se instaló infraestructura pesada ni se usó un backend remoto.
+- `git diff --check origin/preserve/local-main-2026-08-20...HEAD`: **PASS**.
+- Inspección con `rg` de RLS, policies, grants y payloads App Usuario: **PASS**.
+- `pairing_hardening_03b_checks.sql`: **NO EJECUTADO — BLOCKED-SQL-GATE**.
+- `device_token_scope_checks.sql`: **NO EJECUTADO — BLOCKED-SQL-GATE**.
+- No se repitió Gradle ni `assembleDevDebug`: los cambios nuevos son exclusivamente SQL y no entran en el grafo Android; se conserva el build verde del lote anterior.
+- No hubo prueba física; no correspondía.
 
-Siguiente acción: ChatGPT debe auditar los tres commits y decidir si pide solo el gate SQL de C o cambios adicionales. Codex se detiene.
+## Observaciones y riesgos vigentes
+
+- Antes de aplicar estas migraciones, ejecutar ambas suites SQL en un Supabase/Postgres local limpio y demostrar dinámicamente A→A permitido, A→B denegado, UPDATE de identidad denegado, null denegado y owner/admin permitido.
+- Las lecturas account-scoped existentes siguen intactas por decisión explícita del ticket.
+- `anon EXECUTE` de `admin_create_device_relink_code` sigue deliberadamente preservado porque la función valida `x-device-token` antes del target.
+- PR #95 permanece draft, sin merge.
+- Ninguna migración fue aplicada a Supabase o Production.
+- No se tocó DAG, Chrome Visual, Super Admin UI ni creación oficial de usuarios Auth.
+- Production quedó intacto.
+- El worktree original sigue exactamente en `work/chrome-visual` / `6a045f13`, con sus 6 archivos modificados y 4 untracked preexistentes; no se limpió, reseteó, stasheó ni alteró.
+
+Siguiente decisión: ChatGPT debe definir dónde ejecutar el gate SQL real. Codex se detiene.
