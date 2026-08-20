@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -336,7 +335,12 @@ private fun SectionsScreen(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp, bottom = 28.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            start = 0.dp,
+            top = 10.dp,
+            end = 0.dp,
+            bottom = 28.dp,
+        ),
     ) {
         items(tracker.sections, key = { it.id }) { section ->
             val expanded = expandedSectionId == section.id
@@ -474,6 +478,7 @@ private fun TaskRow(
     inset: Boolean = false,
     onClick: () -> Unit,
 ) {
+    val priority = priorityLabel(task.priority)
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -503,7 +508,6 @@ private fun TaskRow(
                         Text(sectionTitle, fontSize = 11.sp, color = Muted)
                     }
                 }
-                val priority = priorityLabel(task.priority)
                 if (priority != "Normal") {
                     Text(
                         text = priority,
