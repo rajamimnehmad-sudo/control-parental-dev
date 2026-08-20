@@ -89,7 +89,16 @@ Reglas obligatorias:
 9. **Medir cuando sea posible.** Si Codex CLI expone tokens/uso de forma fiable, registrarlos por ticket para detectar regresiones de costo. Nunca inventar métricas.
 10. **Una automatización cara se corrige o se elimina.** Si una mejora de workflow aumenta materialmente el consumo sin beneficio técnico proporcional, ChatGPT debe simplificarla.
 
-Referencia práctica: el smoke inicial del autorun consumió ~42.500 tokens para una tarea read-only mínima; ese nivel se considera **inaceptable como baseline** y debe reducirse materialmente antes de usar el autorun para lotes grandes.
+Routing vigente: Luna/low para trabajo simple, Terra/medium para desarrollo
+normal y Sol para high/xhigh. Todos usan contexto aislado `lean` por defecto;
+`Perfil Codex: full` debe ser una excepción explícita y justificada. El ticket
+completo se entrega en el prompt y no debe releerse desde GitHub.
+
+Referencia práctica: el smoke inicial consumió ~42.500 tokens y la primera
+medición incompleta llegó a 493.222 tokens agregados. El perfil lean final midió
+10.531 tokens en un smoke real Luna/low (reducción de 75,2% contra el smoke
+inicial y 97,9% contra la corrida inflada). Para coordinación sin trabajo local,
+el objetivo sigue siendo cero sesiones Codex.
 
 ## Regla de cierre obligatoria
 

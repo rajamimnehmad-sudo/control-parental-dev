@@ -60,6 +60,19 @@ El runner debe:
 
 `codex exec -c model_reasoning_effort=<nivel> ...`
 
+Routing económico vigente:
+
+- `low` -> `gpt-5.6-luna`;
+- `medium` -> `gpt-5.6-terra`;
+- `high` / `xhigh` -> `gpt-5.6-sol`.
+
+El perfil por defecto es `lean`: `CODEX_HOME` aislado con enlace a la
+autenticación existente, sin copiar secretos; plugins/apps/herramientas ajenas
+desactivadas; ejecución efímera; ticket completo incluido en el prompt. Solo un
+ticket que declare `**Perfil Codex:** full` puede cargar la configuración
+personal completa. Smoke/medición corren fuera del repo con hechos Git mínimos
+precalculados.
+
 Mapa semántico definido por ChatGPT:
 
 - Bajo = `low`
@@ -68,6 +81,10 @@ Mapa semántico definido por ChatGPT:
 - Extra alto = `xhigh`
 
 Codex no debe autoelevar ni reducir este valor. Si considera que el nivel asignado es insuficiente para continuar con seguridad/calidad, debe dejarlo como observación/bloqueo para que ChatGPT decida.
+
+No publicar tickets Codex para coordinación que ChatGPT pueda resolver
+directamente con GitHub. El costo idle del watcher es cero tokens; una sesión de
+modelo solo se justifica cuando hace falta trabajo local real.
 
 ## Guardas obligatorias
 
