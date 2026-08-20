@@ -1,207 +1,184 @@
 # AI NEXT TICKET
 
-## P0-HARDENING-BATCH-01
+## P0-BACKEND-CLOSEOUT-02
 
-**Tipo:** revisión técnica + reconstrucción limpia por lote
+**Tipo:** hardening backend + validación SQL
 **Prioridad:** crítica
-**Responsable de ejecución:** Codex
+**Responsable:** Codex
 **Revisor:** ChatGPT / jefe técnico central
 
-> Antes de ejecutar, leer `docs/AI_WORKFLOW.md` en `coordination/ai-control`.
+> Leer primero `docs/AI_WORKFLOW.md` en `coordination/ai-control`.
 
-## Contexto
+## Estado aprobado de partida
 
-`LOCAL-STATE-RECONCILIATION-00` y `LOCAL-WORK-PRESERVATION-01` están cerrados con PASS.
-Todo el estado local crítico quedó preservado en ramas `preserve/*`.
+El lote anterior fue auditado en PR #95.
 
-Este lote agrupa los tres cambios P0 locales ya preservados que provienen del mismo bloque de hardening y que conviene revisar juntos, pero deben quedar internamente separados y auditables:
+- **A — exact technical hosts: APROBADO.** No modificar salvo necesidad de compilación demostrada.
+- **B — atomic policy sync: APROBADO.** No modificar salvo necesidad de compilación demostrada.
+- **C — pairing hardening: NEEDS-FIX.** Falta gate SQL real y un ajuste defensivo de RLS/aislamiento.
 
-1. allowlist exacta de hosts técnicos Supabase;
-2. sync atómico de policy + rules + limits + groups;
-3. pairing hardening (cliente + migración + checks SQL).
+Continuar sobre:
 
-No incluir Chrome Visual, DAG ni device-token scope en este lote.
+- rama: `review/p0-hardening-batch-01`
+- PR: `#95`
+- base: `preserve/local-main-2026-08-20`
 
-## Rama
+No mergear.
 
-Crear una rama limpia:
+Este ticket agrupa dos bloques independientes y debe cerrarlos con commits separados:
 
-`review/p0-hardening-batch-01`
-
-Base:
-
-`preserve/local-main-2026-08-20`
-
-No trabajar sobre el worktree original sucio. Usar worktree/clon temporal limpio.
-
-Fuente de candidatos:
-
-`preserve/uncommitted-2026-08-20`
-
-Copiar/reconstruir únicamente los cambios correspondientes a estos tres bloques.
+1. finalizar Pairing Hardening;
+2. cerrar scope de token por dispositivo para escrituras del App Usuario.
 
 ---
 
-# Bloque A — Exact technical hosts
+# Bloque C2 — Finalizar Pairing Hardening
 
-Rutas principales:
+## Ajuste obligatorio antes del gate
 
-- `core-policy/src/main/kotlin/com/contentfilter/core/policy/DefaultPolicyEngine.kt`
-- `feature-vpn/src/main/java/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluator.kt`
-- `feature-vpn/src/test/kotlin/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluatorTest.kt`
+La migración crea `public.pairing_hardening_rollout`. Al estar en schema expuesto, no alcanza con `REVOKE`.
 
-Validar:
+Dejarla defensivamente aislada mediante **RLS habilitado y sin políticas API**, manteniendo los `REVOKE`, o una solución privada equivalente si demuestra ser más segura y compatible. No ampliar innecesariamente el diseño.
 
-- `syeycayasyufedwoprea.supabase.co` conserva el acceso técnico previsto;
-- `proyecto-ajeno.supabase.co` NO obtiene trato técnico privilegiado;
-- `supabase.co` NO queda privilegiado;
-- `api.syeycayasyufedwoprea.supabase.co` NO hereda automáticamente la excepción;
-- normalización de host no reabre matching amplio;
-- SafeSearch, reglas explícitas, lista local y precedencias no sufren regresiones.
+No aplicar a Production.
+
+## Gate SQL real
+
+Intentar primero utilizar infraestructura local ya instalada:
+
+- comprobar `supabase --version` / `supabase --help`;
+- comprobar runtime disponible (`docker`, Docker Desktop, OrbStack, Colima, etc.);
+- si Docker Desktop u otro runtime ya está instalado pero detenido, puede iniciarse;
+- no instalar un runtime pesado nuevo ni generar gastos externos sin autorización.
+
+Si existe un sandbox local viable:
+
+1. levantar un Supabase/Postgres local limpio compatible con el proyecto;
+2. aplicar la historia/migraciones necesarias hasta este lote;
+3. ejecutar las tres migraciones de pairing en orden;
+4. ejecutar `supabase/pairing_hardening_03b_checks.sql`;
+5. verificar consumo único, expiración, transición legacy, índice/hash, grants y `search_path`;
+6. verificar RLS/aislamiento de `pairing_hardening_rollout`;
+7. si el CLI lo soporta, ejecutar advisors locales relevantes;
+8. `git diff --check`.
+
+Si el sandbox expone un error real, corregir únicamente C y volver a ejecutar el gate.
+
+Si no existe ningún sandbox local utilizable sin instalación pesada/permisos, dejar C como `BLOCKED-SQL-GATE`, pero sí aplicar el ajuste estático de RLS/aislamiento y continuar con el Bloque D. No inventar PASS.
+
+## Compatibilidad a conservar
+
+- tokens nuevos >=128 bits;
+- lookup SHA-256 indexado;
+- legacy solo pre-rollout real;
+- single-use con row lock;
+- TTL acotado;
+- helpers no ejecutables por API roles;
+- grants mínimos;
+- `admin_create_device_relink_code` puede conservar `anon EXECUTE` solo porque valida `x-device-token` antes del target; documentarlo;
+- NO tocar todavía la deuda conocida de creación directa en `auth.users`; queda para el siguiente lote P1.
 
 Commit separado sugerido:
 
-`fix(security): restrict technical Supabase host allowlist`
+`fix(pairing): close SQL hardening gate`
 
 ---
 
-# Bloque B — Atomic policy revision sync
+# Bloque D — Device token scope por dispositivo
 
-Rutas candidatas principales:
+## Problema confirmado en Supabase real
 
-- `core-sync/src/main/java/com/contentfilter/core/sync/engine/DefaultSyncEngine.kt`
-- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/DefaultSyncEngineAtomicPolicySyncTest.kt`
-- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/TargetedPolicySyncCoordinatorTest.kt`
+Hoy `access_requests_device_token_all` y `device_apps_device_token_all` autorizan con:
 
-Objetivo:
+`device_token_matches(account_id)`
 
-Evitar estados efectivos mixtos donde una policy/revisión nueva quede aplicada con reglas, límites o grupos de una revisión anterior.
+Eso permite que un token válido de un dispositivo pueda mutar filas de otro dispositivo de la misma cuenta.
 
-Validar como mínimo:
+Las lecturas account-scoped compartidas NO forman parte de este bloque salvo que una prueba demuestre que deben cambiar para cerrar el bypass.
 
-- policy + rules + daily limits + app groups + group apps pertenecen al mismo target/revision;
-- aplicación local ocurre transaccionalmente como bundle;
-- fallo en cualquier parte conserva last-known-good;
-- cursor/revisión solo avanza después del commit completo;
-- ACK solo ocurre cuando el bundle completo quedó aplicado y confirmado;
-- un fallo intermedio no deja policy N+1 con hijos N;
-- targeted sync y periodic sync mantienen semántica coherente.
+## Objetivo
 
-Si el candidato no cumple exactamente esto, corregirlo dentro de este bloque sin ampliar a otras áreas no relacionadas.
+Para escrituras hechas con device-token de App Usuario:
+
+- `device_apps`: un dispositivo solo puede INSERT/UPDATE/DELETE filas cuyo `device_id` sea ese mismo dispositivo y cuyo `account_id` corresponda al dispositivo.
+- `access_requests`: misma regla; un device-token no puede escribir filas de un sibling device ni filas con `device_id = null`.
+- impedir cambiar una fila propia hacia otro `device_id`/`account_id` mediante UPDATE (`USING` + `WITH CHECK`).
+- conservar intactos los flujos del account owner y los administradores autorizados mediante sus políticas independientes.
+
+Usar `device_token_matches_device(device_id)` y coherencia explícita `device_id ↔ account_id` o un helper equivalente mínimo y auditable.
+
+Preferir roles explícitos `anon, authenticated` en las nuevas policies en lugar de `public` cuando sea compatible con el cliente actual.
+
+## Migración
+
+Crear la migración con el CLI (`supabase migration new ...`) si está disponible; no inventar nombre manualmente si el CLI funciona.
+
+No aplicar a Production.
+
+## Checks SQL requeridos
+
+En sandbox local si está disponible, demostrar al menos:
+
+1. token del device A puede escribir `device_apps` de A;
+2. token A no puede insertar/update/delete `device_apps` de B aunque compartan account;
+3. token A no puede cambiar `device_id` o `account_id` de una fila propia hacia B;
+4. token A puede crear/gestionar su `access_request` con `device_id=A`;
+5. token A no puede mutar request de B;
+6. token A no puede crear request con `device_id=null`;
+7. owner/admin siguen funcionando por sus policies propias;
+8. no aparece una nueva policy account-scoped de escritura equivalente al bypass anterior.
+
+Agregar un archivo de checks SQL pequeño si hace falta.
+
+## Cliente / tests
+
+Verificar que App Usuario siempre manda `device_id` en los dos flujos afectados. Si el cliente ya cumple, no modificarlo.
+
+Ejecutar solo suites relacionadas + una `:app-user:assembleDevDebug` final si hubo cambios que entran en su grafo.
 
 Commit separado sugerido:
 
-`fix(sync): apply policy revisions atomically`
+`fix(security): scope device token writes to device`
 
 ---
 
-# Bloque C — Pairing hardening
+# Cierre del lote
 
-Rutas candidatas principales:
+La rama/PR debe terminar con A y B intactos y dos nuevos commits auditables para C2 y D.
 
-- `feature-activation/src/main/java/com/contentfilter/feature/activation/ActivationViewModel.kt`
-- `feature-activation/src/test/kotlin/com/contentfilter/feature/activation/UserPairingCodeTest.kt`
-- `supabase/migrations/20260819150000_harden_pairing_tokens.sql`
-- `supabase/pairing_hardening_03b_checks.sql`
+No tocar:
 
-Objetivo:
+- Chrome Visual;
+- DAG;
+- Super Admin UI;
+- credenciales locales/Keystore;
+- creación oficial de usuarios Auth;
+- Production;
+- `main`;
+- worktree original sucio.
 
-Cerrar el pairing débil sin romper códigos legacy válidos durante rollout.
+No prueba física.
 
-Revisar obligatoriamente:
+## Observaciones obligatorias de Codex
 
-1. Nuevos tokens con >=128 bits efectivos de entropía.
-2. Lookup determinista por SHA-256/HMAC/index o equivalente seguro; no bcrypt por scan para tokens nuevos.
-3. TTL corto razonable para nuevos códigos.
-4. Single-use real con protección contra carreras/concurrencia.
-5. `SECURITY DEFINER` con `search_path` fijo donde corresponda.
-6. Grants mínimos necesarios; revisar específicamente si `anon EXECUTE` en `admin_create_device_relink_code` es realmente imprescindible.
-7. NO aceptar un cutoff legacy histórico fijo como `2026-08-19 15:00:00+00` si puede invalidar códigos emitidos entre esa fecha y el rollout real.
-8. Diseñar la transición legacy usando una marca/cutoff derivado del rollout efectivo o un mecanismo equivalente robusto.
-9. Incluir estrategia clara de rollback/compatibilidad.
-10. No aplicar todavía la migración a Production/Supabase.
-
-Los checks SQL deben demostrar, sin depender de Production:
-
-- nuevo token creado y consumido una sola vez;
-- token inválido rechazado;
-- expirado rechazado;
-- legacy válido de transición sigue funcionando según la estrategia elegida;
-- token nuevo no depende de scan bcrypt;
-- grants/search_path quedan como se pretende.
-
-Commit separado sugerido:
-
-`fix(pairing): harden pairing token lifecycle`
-
----
-
-# Orden dentro del lote
-
-Ejecutar A → B → C.
-
-Cada bloque debe quedar en su propio commit y con sus tests estrechos. Si A o B falla por un problema arquitectónico inesperado, no seguir ciegamente al bloque siguiente: dejar evidencia y detenerse según `AI_WORKFLOW.md`.
-
-No mezclar los tres cambios en un único commit.
-
-## Tests / validación
-
-Ejecutar las suites más estrechas relevantes por bloque y después, si los tres bloques pasan:
-
-- `git diff --check`;
-- compilación de módulos afectados;
-- una compilación App Usuario final si los cambios impactan su grafo;
-- NO repetir suites DAG/Chrome/Admin;
-- NO prueba física;
-- NO aplicar migraciones a Supabase.
-
-Si ya existe evidencia válida que el cambio no afecta, no repetirla sin motivo.
-
-## Resultado esperado
-
-Si los tres bloques quedan correctos:
-
-1. rama `review/p0-hardening-batch-01` con tres commits separados;
-2. push;
-3. abrir una única PR contra `preserve/local-main-2026-08-20`;
-4. PR con sección por bloque y cierre estándar:
-   - resumen;
-   - archivos tocados;
-   - comandos/tests;
-   - resultados;
-   - riesgos pendientes;
-   - branch + commits;
-   - migración: NO aplicada;
-   - prueba física: no requerida;
-5. NO mergear.
-
-## Prohibiciones
-
-- no tocar el worktree original sucio;
-- no tocar `main`;
-- no merge/rebase/reset/clean/stash sobre el repo original;
-- no tocar Chrome Visual ni DAG;
-- no resolver device-token scope todavía;
-- no aplicar Supabase/Production;
-- no instalar APK;
-- no iniciar otro ticket.
+Además del resultado, anotar en el handoff cualquier hallazgo relevante detectado durante el trabajo, incluso si queda fuera de scope. **No arreglarlo fuera del lote**; solo describir impacto y recomendación para que ChatGPT decida.
 
 ## Handoff obligatorio
 
 Reemplazar `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` con:
 
-- `P0-HARDENING-BATCH-01`;
-- PASS / NEEDS-FIX / BLOCKED global;
-- estado individual A/B/C;
-- branch + 3 commits;
-- PR;
+- `P0-BACKEND-CLOSEOUT-02`;
+- estado global PASS / NEEDS-FIX / BLOCKED;
+- estado C2 y D por separado;
+- branch + commits nuevos;
+- PR #95;
 - archivos tocados;
-- tests/comandos exactos y resultado;
-- cualquier desviación respecto de los candidatos preservados;
+- comandos/tests/checks y resultados exactos;
+- resultado del sandbox SQL o motivo preciso por el que no estuvo disponible;
+- confirmación de RLS/aislamiento de rollout;
+- evidencia de los casos cross-device;
+- observaciones técnicas adicionales;
 - riesgos restantes;
-- confirmación de que ninguna migración fue aplicada;
-- confirmación de que el worktree original quedó intacto.
+- confirmación de que Production y el worktree original quedaron intactos.
 
 Después: **DETENERSE**.
-
-ChatGPT auditará el lote completo, pero podrá aprobar/rechazar cada commit por separado.
