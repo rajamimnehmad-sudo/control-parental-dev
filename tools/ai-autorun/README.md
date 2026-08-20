@@ -29,6 +29,17 @@ El primer `install` marca el ticket vigente como procesado antes de activar
 y conserva el estado. `uninstall` preserva estado y logs para evitar repeticiones
 accidentales si se reinstala.
 
+Cada ticket puede declarar `Esfuerzo Codex` como Bajo, Medio, Alto o Extra alto.
+El runner aplica respectivamente `low`, `medium`, `high` o `xhigh` mediante
+`model_reasoning_effort`; un valor ausente o inválido cae a `medium` y queda
+registrado. Bajo/Medio usan una ejecución efímera sin la configuración personal
+de plugins/apps para evitar contexto irrelevante. Alto/Extra alto conservan la
+configuración completa. El modelo configurado se preserva en ambos modos.
+
+El estado y el log registran esfuerzo solicitado/aplicado, SHA del ticket y el
+uso de tokens informado por el evento JSON final de la CLI; si no existe una
+métrica estable se guarda `unavailable`.
+
 ## Seguridad
 
 - un lock por `mkdir` impide ejecuciones paralelas;
@@ -43,6 +54,6 @@ accidentales si se reinstala.
 
 ## Pruebas
 
-`tools/ai-autorun/self-test.sh` sustituye Codex por un stub interno y valida
-detección única, deduplicación, single-flight, estado y liberación del lock sin
-consumir créditos.
+`tools/ai-autorun/self-test.sh` sustituye Codex por un stub interno y valida los
+cuatro niveles de esfuerzo, defaults inválido/ausente, detección única,
+deduplicación, single-flight, estado y liberación del lock sin consumir créditos.

@@ -7,6 +7,7 @@ POLL_SECONDS=45
 REMOTE_BRANCH="origin/coordination/ai-control"
 TICKET_PATH="docs/AI_NEXT_TICKET.md"
 DEFAULT_CODEX="/Applications/ChatGPT.app/Contents/Resources/codex"
+DEFAULT_EFFORT="medium"
 
 runtime_home() {
   if [ -n "${GLOSH_AI_AUTORUN_HOME:-}" ]; then
@@ -49,6 +50,9 @@ write_state() {
     printf 'detected_sha=%s\n' "$(sanitize_value "${DETECTED_SHA:-}")"
     printf 'executed_sha=%s\n' "$(sanitize_value "${EXECUTED_SHA:-}")"
     printf 'ticket_id=%s\n' "$(sanitize_value "${TICKET_ID:-}")"
+    printf 'requested_effort=%s\n' "$(sanitize_value "${REQUESTED_EFFORT:-}")"
+    printf 'applied_effort=%s\n' "$(sanitize_value "${APPLIED_EFFORT:-$DEFAULT_EFFORT}")"
+    printf 'token_usage=%s\n' "$(sanitize_value "${TOKEN_USAGE:-unavailable}")"
     printf 'status=%s\n' "$(sanitize_value "${RUN_STATUS:-idle}")"
     printf 'pid=%s\n' "$(sanitize_value "${RUN_PID:-}")"
     printf 'detected_at=%s\n' "$(sanitize_value "${DETECTED_AT:-}")"
@@ -64,6 +68,9 @@ load_state() {
   DETECTED_SHA="$(state_get detected_sha)"
   EXECUTED_SHA="$(state_get executed_sha)"
   TICKET_ID="$(state_get ticket_id)"
+  REQUESTED_EFFORT="$(state_get requested_effort)"
+  APPLIED_EFFORT="$(state_get applied_effort)"
+  TOKEN_USAGE="$(state_get token_usage)"
   RUN_STATUS="$(state_get status)"
   RUN_PID="$(state_get pid)"
   DETECTED_AT="$(state_get detected_at)"
@@ -71,6 +78,8 @@ load_state() {
   FINISHED_AT="$(state_get finished_at)"
   LAST_EXIT="$(state_get last_exit)"
   [ -n "$RUN_STATUS" ] || RUN_STATUS="idle"
+  [ -n "$APPLIED_EFFORT" ] || APPLIED_EFFORT="$DEFAULT_EFFORT"
+  [ -n "$TOKEN_USAGE" ] || TOKEN_USAGE="unavailable"
 }
 
 config_get() {
@@ -142,13 +151,56 @@ ticket_id_from_file() {
     cut -c 1-120
 }
 
+ticket_effort_from_file() {
+  raw="$(awk '
+    /Esfuerzo Codex:/ {
+      line=$0
+      sub(/^.*Esfuerzo Codex:[[:space:]]*/, "", line)
+      gsub(/[*`]/, "", line)
+      sub(/^[[:space:]]+/, "", line)
+      sub(/[[:space:]]*\|.*$/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      print line
+      exit
+    }
+  ' "$RUNTIME_HOME/ticket.current")"
+  REQUESTED_EFFORT="${raw:-missing}"
+  normalized="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  case "$normalized" in
+    bajo|low) APPLIED_EFFORT="low" ;;
+    medio|medium) APPLIED_EFFORT="medium" ;;
+    alto|high) APPLIED_EFFORT="high" ;;
+    "extra alto"|xhigh) APPLIED_EFFORT="xhigh" ;;
+    *)
+      APPLIED_EFFORT="$DEFAULT_EFFORT"
+      log_line "effort_default requested=$(sanitize_value "$REQUESTED_EFFORT") applied=$APPLIED_EFFORT"
+      ;;
+  esac
+}
+
+extract_token_usage() {
+  file="$1"
+  line="$(grep '"type":"turn.completed"' "$file" | tail -1 || true)"
+  input="$(printf '%s\n' "$line" | sed -n 's/.*"input_tokens":\([0-9][0-9]*\).*/\1/p')"
+  cached="$(printf '%s\n' "$line" | sed -n 's/.*"cached_input_tokens":\([0-9][0-9]*\).*/\1/p')"
+  output="$(printf '%s\n' "$line" | sed -n 's/.*"output_tokens":\([0-9][0-9]*\).*/\1/p')"
+  if [ -n "$input" ] && [ -n "$output" ]; then
+    [ -n "$cached" ] || cached=0
+    total=$((input + output))
+    printf 'input:%s,cached_input:%s,output:%s,total:%s\n' "$input" "$cached" "$output" "$total"
+  else
+    printf 'unavailable\n'
+  fi
+}
+
 execute_ticket() {
   repo="$(config_get repo)"
   codex_bin="$(config_get codex_bin)"
   [ -n "$codex_bin" ] || codex_bin="$DEFAULT_CODEX"
   if [ "${GLOSH_AI_AUTORUN_TEST_MODE:-0}" = "1" ]; then
-    printf '%s %s\n' "$CURRENT_SHA" "$CURRENT_TICKET_ID" >> "${GLOSH_AI_AUTORUN_TEST_EXEC_LOG:?}"
+    printf '%s %s %s %s\n' "$CURRENT_SHA" "$CURRENT_TICKET_ID" "$REQUESTED_EFFORT" "$APPLIED_EFFORT" >> "${GLOSH_AI_AUTORUN_TEST_EXEC_LOG:?}"
     sleep "${GLOSH_AI_AUTORUN_TEST_SLEEP:-0}"
+    TOKEN_USAGE="unavailable"
     return "${GLOSH_AI_AUTORUN_TEST_EXIT:-0}"
   fi
   if [ ! -x "$codex_bin" ]; then
@@ -156,8 +208,31 @@ execute_ticket() {
     return 127
   fi
   rotate_log "$EXEC_LOG"
-  prompt="Ejecución automática autorizada únicamente para el ticket vigente. Leé docs/AI_WORKFLOW.md y docs/AI_NEXT_TICKET.md desde origin/coordination/ai-control, ejecutá exactamente ese ticket y ningún otro. Respetá sus ramas, límites, prohibiciones y gates. El trigger automático no autoriza Production, despliegues, merges, borrados destructivos, gastos, pruebas físicas ni envío de APK salvo autorización explícita del usuario en el ticket/chat vigente. Dejá la PR y/o docs/AI_CODEX_HANDOFF.md exigidos en GitHub y detenete al terminar o bloquearte."
-  "$codex_bin" exec --approve-for-me --cd "$repo" "$prompt" >> "$EXEC_LOG" 2>&1
+  prompt="Ejecución automática autorizada únicamente para el ticket vigente. Leé docs/AI_WORKFLOW.md y docs/AI_NEXT_TICKET.md desde origin/coordination/ai-control, ejecutá exactamente ese ticket y ningún otro. Respetá sus ramas, límites, prohibiciones y gates. Evitá cargar backlog, handoffs históricos o áreas no indicadas por el ticket. El trigger no autoriza Production, despliegues, merges, borrados destructivos, gastos, pruebas físicas ni envío de APK. Dejá la PR y/o docs/AI_CODEX_HANDOFF.md exigidos en GitHub y detenete."
+  exec_dir="$repo"
+  extra_repo_arg=""
+  if [ "${GLOSH_AI_AUTORUN_SMOKE_MODE:-0}" = "1" ]; then
+    exec_dir="$RUNTIME_HOME/smoke-workspace"
+    mkdir -p "$exec_dir"
+    extra_repo_arg="--skip-git-repo-check"
+    prompt="Smoke read-only del autorun. No uses herramientas ni modifiques archivos. Respondé exactamente: AUTORUN_SMOKE_PASS"
+  fi
+  exec_tmp="$RUNTIME_HOME/codex-exec.current.$$"
+  model="$(config_get model)"
+  set -- exec --approve-for-me --ephemeral --json -c "model_reasoning_effort=\"$APPLIED_EFFORT\"" --cd "$exec_dir"
+  [ -n "$model" ] && set -- "$@" --model "$model"
+  [ -n "$extra_repo_arg" ] && set -- "$@" "$extra_repo_arg"
+  if [ "$APPLIED_EFFORT" = "low" ] || [ "$APPLIED_EFFORT" = "medium" ]; then
+    set -- "$@" --ignore-user-config
+  fi
+  log_line "codex_config ticket=$CURRENT_TICKET_ID sha=$CURRENT_SHA requested_effort=$(sanitize_value "$REQUESTED_EFFORT") applied_effort=$APPLIED_EFFORT lean_config=$([ "$APPLIED_EFFORT" = high ] || [ "$APPLIED_EFFORT" = xhigh ] && printf no || printf yes)"
+  "$codex_bin" "$@" "$prompt" > "$exec_tmp" 2>&1
+  rc=$?
+  cat "$exec_tmp" >> "$EXEC_LOG"
+  TOKEN_USAGE="$(extract_token_usage "$exec_tmp")"
+  rm -f "$exec_tmp"
+  log_line "codex_usage ticket=$CURRENT_TICKET_ID sha=$CURRENT_SHA effort=$APPLIED_EFFORT usage=$TOKEN_USAGE"
+  return "$rc"
 }
 
 poll() {
@@ -183,6 +258,7 @@ poll() {
     log_line "blocked ticket_id_missing sha=$CURRENT_SHA"
     return 1
   fi
+  ticket_effort_from_file
   DETECTED_SHA="$CURRENT_SHA"
   TICKET_ID="$CURRENT_TICKET_ID"
   DETECTED_AT="$(now)"
@@ -197,11 +273,14 @@ poll() {
   STARTED_AT="$(now)"
   FINISHED_AT=""
   LAST_EXIT=""
+  TOKEN_USAGE="unavailable"
   write_state
   log_line "start sha=$CURRENT_SHA ticket=$CURRENT_TICKET_ID pid=$$"
   execute_ticket
   rc=$?
+  execution_usage="$TOKEN_USAGE"
   load_state
+  TOKEN_USAGE="$execution_usage"
   RUN_PID=""
   FINISHED_AT="$(now)"
   LAST_EXIT="$rc"
@@ -224,6 +303,7 @@ mark_current() {
   load_ticket || return 1
   CURRENT_TICKET_ID="$(ticket_id_from_file)"
   [ -n "$CURRENT_TICKET_ID" ] || return 1
+  ticket_effort_from_file
   DETECTED_SHA="$CURRENT_SHA"
   EXECUTED_SHA="$CURRENT_SHA"
   TICKET_ID="$CURRENT_TICKET_ID"
@@ -240,11 +320,13 @@ mark_current() {
 write_config() {
   repo="$1"
   codex_bin="$2"
+  model="$3"
   mkdir -p "$RUNTIME_HOME" "$LOG_DIR"
   umask 077
   {
     printf 'repo=%s\n' "$repo"
     printf 'codex_bin=%s\n' "$codex_bin"
+    printf 'model=%s\n' "$model"
   } > "$CONFIG_FILE"
 }
 
@@ -313,20 +395,29 @@ install_service() {
     printf 'ERROR: codex exec no está disponible.\n' >&2
     return 2
   fi
+  model="$(sed -n 's/^[[:space:]]*model[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "${HOME:?}/.codex/config.toml" 2>/dev/null | head -1)"
   first_install=0
   [ -f "$STATE_FILE" ] || first_install=1
-  stop_service
+  load_state
+  active_run=0
+  if [ -n "$RUN_PID" ] && kill -0 "$RUN_PID" 2>/dev/null; then
+    active_run=1
+  else
+    stop_service
+  fi
   mkdir -p "$INSTALL_DIR" "$LOG_DIR"
   install_tmp="$INSTALLED_RUNNER.tmp.$$"
   cp "$0" "$install_tmp"
   chmod 700 "$install_tmp"
   mv "$install_tmp" "$INSTALLED_RUNNER"
-  write_config "$repo" "$codex_bin"
+  write_config "$repo" "$codex_bin" "$model"
   write_plist
   if [ "$first_install" -eq 1 ]; then
     "$INSTALLED_RUNNER" mark-current
   fi
-  start_service
+  if [ "$active_run" -eq 0 ]; then
+    start_service
+  fi
   printf 'Instalado: %s\n' "$LABEL"
   status_service
 }
@@ -336,6 +427,9 @@ status_service() {
   if service_loaded; then service="active"; else service="inactive"; fi
   printf 'service=%s\n' "$service"
   printf 'ticket=%s\n' "${TICKET_ID:-}"
+  printf 'requested_effort=%s\n' "${REQUESTED_EFFORT:-}"
+  printf 'applied_effort=%s\n' "${APPLIED_EFFORT:-$DEFAULT_EFFORT}"
+  printf 'token_usage=%s\n' "${TOKEN_USAGE:-unavailable}"
   printf 'detected_sha=%s\n' "${DETECTED_SHA:-}"
   printf 'executed_sha=%s\n' "${EXECUTED_SHA:-}"
   printf 'status=%s\n' "${RUN_STATUS:-idle}"
