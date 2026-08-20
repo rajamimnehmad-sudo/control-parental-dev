@@ -231,4 +231,4 @@ internal fun String.normalizedUserPairingCodeOrNull(): String? {
     return normalized.takeIf { it.matches(UserPairingCodeRegex) }
 }
 
-private val UserPairingCodeRegex = Regex("(?:[A-Z0-9]{6}|[A-Z0-9]{8})")
+private val UserPairingCodeRegex = Regex("(?:[A-Z0-9]{6}|[A-Z0-9]{8}|[A-Z0-9]{32})")

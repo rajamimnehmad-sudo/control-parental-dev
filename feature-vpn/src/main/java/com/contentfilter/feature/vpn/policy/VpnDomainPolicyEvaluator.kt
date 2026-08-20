@@ -66,14 +66,18 @@ class VpnDomainPolicyEvaluator
             if (webBlocked || (onlyResults && policyDecision !is PolicyDecision.Allow)) {
                 return policyDecision
             }
+            val criticalTechnicalHostAllowed =
+                policyDecision is PolicyDecision.Allow && normalizedDomain.isCriticalTechnicalHost()
             val technicalHostAllowed =
-                policyDecision is PolicyDecision.Allow && normalizedDomain.isTechnicalWebProtectionHost()
+                criticalTechnicalHostAllowed ||
+                    (policyDecision is PolicyDecision.Allow && SearchEngineCatalog.isSearchResultsAllowedDomain(normalizedDomain))
             val explicitDecision =
                 snapshot.rules
                     .bestExplicitDomainRule(
                         normalizedDomain,
                         TimePolicyContext(now, minuteOfDay, isoDayOfWeek),
                     )?.toDecision(normalizedDomain)
+            if (criticalTechnicalHostAllowed) return policyDecision
             if (explicitDecision != null && explicitDecision !is PolicyDecision.Allow) return explicitDecision
             if (policyDecision !is PolicyDecision.Allow) return policyDecision
             val finalDecision = explicitDecision ?: policyDecision
@@ -127,9 +131,7 @@ class VpnDomainPolicyEvaluator
                 RuleAction.RequestAuthorization -> PolicyDecision.RequestAuthorization(domain)
             }
 
-        private fun String.isTechnicalWebProtectionHost(): Boolean =
-            SearchEngineCatalog.isSearchResultsAllowedDomain(this) ||
-                TechnicalAllowedDomains.any { matchesLimitTarget(it) }
+        private fun String.isCriticalTechnicalHost(): Boolean = TechnicalAllowedDomains.any { this == it }
 
         private fun String.matchesLimitTarget(target: String): Boolean = this == target || endsWith(".$target")
 
@@ -142,9 +144,9 @@ class VpnDomainPolicyEvaluator
         private companion object {
             val TechnicalAllowedDomains =
                 setOf(
-                    "supabase.co",
                     "android.clients.google.com",
                     "connectivitycheck.gstatic.com",
+                    "syeycayasyufedwoprea.supabase.co",
                 )
         }
     }
