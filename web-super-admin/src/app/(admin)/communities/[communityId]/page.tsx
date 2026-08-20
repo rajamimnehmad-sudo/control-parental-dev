@@ -12,7 +12,7 @@ import { LicenseForm } from "@/components/LicenseForm";
 import { RevokeAdminTokenButton } from "@/components/RevokeAdminTokenButton";
 import { getCommunityBundle } from "@/lib/data";
 import type { CommunityAdmin, CommunityDevice, DevAppVersions, ProtectedUser } from "@/lib/types";
-import { compactNumber, formatDate, formatShortDate } from "@/lib/utils";
+import { capacitySnapshot, compactNumber, formatDate, formatShortDate } from "@/lib/utils";
 
 type Props = {
   params: Promise<{ communityId: string }>;
@@ -21,8 +21,6 @@ type Props = {
 export default async function CommunityDetailPage({ params }: Props) {
   const { communityId } = await params;
   const { detail, admins, protectedUsers, devices, devVersions } = await getCommunityBundle(communityId);
-  const pendingUsers = protectedUsers.filter((user) => user.status === "pending").length;
-  const activatedUsers = protectedUsers.filter((user) => user.status === "activated").length;
   const orderedUsers = [...protectedUsers].sort((left, right) => userPriority(left) - userPriority(right) || left.display_name.localeCompare(right.display_name, "es"));
 
   return (
@@ -45,9 +43,9 @@ export default async function CommunityDetailPage({ params }: Props) {
       </div>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <MiniMetric label="Admins" value={`${compactNumber(detail.admin_count)} / ${detail.max_admins ?? "Sin límite"}`} icon={UsersRound} />
-        <MiniMetric label="Usuarios activos" value={`${compactNumber(activatedUsers)} / ${detail.max_user_devices ?? "Sin límite"}`} icon={MonitorSmartphone} />
-        <MiniMetric label="Pendientes" value={compactNumber(pendingUsers)} icon={KeyRound} />
+        <CapacityMetric label="Administradores" used={detail.admin_count} maximum={detail.max_admins} icon={UsersRound} />
+        <CapacityMetric label="Usuarios" used={detail.user_device_count} maximum={detail.max_user_devices} icon={MonitorSmartphone} />
+        <CapacityMetric label="Dispositivos Admin" used={detail.admin_device_count} maximum={detail.max_admin_devices} icon={Smartphone} />
         <MiniMetric label="Vence" value={formatShortDate(detail.expires_at, "Sin vencimiento")} icon={CalendarClock} />
       </section>
 
@@ -183,6 +181,20 @@ function MiniMetric({ label, value, icon: Icon }: { label: string; value: string
         <Icon className="h-4 w-4 text-accent" />
       </div>
       <p className="mt-2 text-lg font-bold text-ink">{value}</p>
+    </div>
+  );
+}
+
+function CapacityMetric({ label, used, maximum, icon: Icon }: { label: string; used: number; maximum: number | null; icon: LucideIcon }) {
+  const capacity = capacitySnapshot(used, maximum);
+  return (
+    <div className="rounded-md border border-line bg-white p-3 shadow-soft">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-semibold text-slate-500">{label}</p>
+        <Icon className="h-4 w-4 text-accent" />
+      </div>
+      <p className="mt-2 text-lg font-bold text-ink">{compactNumber(capacity.used)} / {capacity.maximum === null ? "Sin límite" : compactNumber(capacity.maximum)}</p>
+      <p className={`mt-1 text-xs ${capacity.exceeded ? "font-semibold text-danger" : "text-slate-500"}`}>{capacity.available === null ? "Disponibilidad sin definir" : `${compactNumber(capacity.available)} disponibles`}</p>
     </div>
   );
 }

@@ -13,6 +13,9 @@ export function CreateCommunityForm({ compact = false }: { compact?: boolean }) 
 
   return (
     <form action={action} className={gridClassName}>
+      <div className={compact ? "rounded-xl bg-teal-50 p-3 text-sm text-teal-900" : "rounded-xl bg-teal-50 p-3 text-sm text-teal-900 lg:col-span-4"}>
+        La licencia inicial comienza al crear la comunidad. Podés dejar el vencimiento vacío para que no expire.
+      </div>
       <label className={compact ? "field" : "field lg:col-span-2"}>
         Comunidad
         <input className="input" name="name" placeholder="Nombre de la comunidad" required />
@@ -26,19 +29,19 @@ export function CreateCommunityForm({ compact = false }: { compact?: boolean }) 
         <input className="input" name="planName" defaultValue="Produccion" required />
       </label>
       <label className="field">
-        Vence
+        Vencimiento (opcional)
         <input className="input" name="expiresAt" type="date" />
       </label>
       <label className="field">
-        Max admins
+        Máximo de administradores
         <input className="input" name="maxAdmins" type="number" min="1" defaultValue="10" required />
       </label>
       <label className="field">
-        Max usuarios
+        Máximo de usuarios
         <input className="input" name="maxUserDevices" type="number" min="1" defaultValue="250" required />
       </label>
       <label className="field">
-        Max admin devices
+        Máximo de dispositivos Admin
         <input className="input" name="maxAdminDevices" type="number" min="1" defaultValue="10" required />
       </label>
       <label className={compact ? "field" : "field lg:col-span-3"}>
@@ -48,7 +51,7 @@ export function CreateCommunityForm({ compact = false }: { compact?: boolean }) 
       <div className="flex items-end">
         <button className="button button-primary w-full" type="submit" disabled={pending}>
           <Plus className="h-4 w-4" />
-          {pending ? "Creando" : "Crear"}
+          {pending ? "Creando…" : "Crear comunidad"}
         </button>
       </div>
       {state.message ? (

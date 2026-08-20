@@ -30,10 +30,14 @@ const licenseSchema = z.object({
   maxUserDevices: z.coerce.number().int().min(1),
   maxAdminDevices: z.coerce.number().int().min(1),
   internalNotes: z.string().trim().optional(),
-}).refine(
-  (value) => !value.expiresAt || !value.startsAt || value.expiresAt >= value.startsAt,
-  { message: "El vencimiento no puede ser anterior al inicio", path: ["expiresAt"] },
-);
+}).superRefine((value, context) => {
+  if (value.expiresAt && value.startsAt && value.expiresAt < value.startsAt) {
+    context.addIssue({ code: "custom", message: "El vencimiento no puede ser anterior al inicio", path: ["expiresAt"] });
+  }
+  if (value.status === "active" && value.expiresAt && new Date(`${value.expiresAt}T23:59:59.000Z`) <= new Date()) {
+    context.addIssue({ code: "custom", message: "Una licencia activa no puede tener un vencimiento ya pasado", path: ["expiresAt"] });
+  }
+});
 
 const announcementSchema = z.object({
   communityId: z.string().uuid(),
@@ -103,7 +107,7 @@ export async function createCommunityAction(_prevState: ActionState, formData: F
     internalNotes: formValue(formData, "internalNotes"),
   });
 
-  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos invalidos" };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Revisá los datos de la comunidad" };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("super_admin_create_community", {
@@ -122,7 +126,7 @@ export async function createCommunityAction(_prevState: ActionState, formData: F
   const created = (data ?? [])[0] as { community_id?: string } | undefined;
   revalidatePath("/communities");
   if (created?.community_id) redirect(`/communities/${created.community_id}`);
-  return { ok: true, message: "Comunidad creada" };
+  return { ok: true, message: "Comunidad y licencia inicial creadas correctamente" };
 }
 
 export async function updateLicenseAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -138,7 +142,7 @@ export async function updateLicenseAction(_prevState: ActionState, formData: For
     internalNotes: formValue(formData, "internalNotes"),
   });
 
-  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos invalidos" };
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Revisá los datos de la licencia" };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("super_admin_upsert_license", {
@@ -156,7 +160,14 @@ export async function updateLicenseAction(_prevState: ActionState, formData: For
   if (error) return errorState(error);
   revalidatePath(`/communities/${parsed.data.communityId}`);
   revalidatePath("/communities");
-  return { ok: true, message: "Licencia actualizada" };
+  revalidatePath("/dashboard");
+  return { ok: true, message: `Licencia actualizada. Estado configurado: ${configuredStatusLabel(parsed.data.status, parsed.data.startsAt)}` };
+}
+
+function configuredStatusLabel(status: "active" | "suspended" | "expired", startsAt?: string) {
+  if (status === "suspended") return "Suspendida";
+  if (status === "expired") return "Vencida";
+  return startsAt && new Date(`${startsAt}T00:00:00.000Z`) > new Date() ? "Programada" : "Activa";
 }
 
 export async function createAnnouncementAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
