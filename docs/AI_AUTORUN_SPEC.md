@@ -1,0 +1,147 @@
+# AI AUTORUN — Glosh
+
+## Objetivo
+
+Eliminar el `ya` manual del lado de Codex sin convertir el proyecto en una cadena autónoma sin control.
+
+Circuito objetivo:
+
+**ChatGPT publica ticket nuevo → Mac lo detecta → Codex ejecuta → GitHub recibe PR/handoff → Codex se detiene → ChatGPT audita → ChatGPT publica siguiente ticket.**
+
+El usuario conserva decisiones de producto, autorizaciones sensibles y pruebas físicas.
+
+## Trigger
+
+Fuente única:
+
+- repo: `rajamimnehmad-sudo/control-parental-dev`
+- rama: `coordination/ai-control`
+- archivo: `docs/AI_NEXT_TICKET.md`
+
+El runner local debe detectar un cambio de commit/contenido de ese archivo y ejecutar el ticket solamente si:
+
+1. el ticket es nuevo respecto del último ticket procesado;
+2. el archivo contiene un ticket vigente y explícito;
+3. no hay otra ejecución de Codex activa por este runner;
+4. el mismo ticket no figura como terminado/bloqueado en el estado local del runner.
+
+## Ejecución Codex
+
+Usar la CLI actual en modo no interactivo:
+
+`codex exec`
+
+El prompt debe ordenar:
+
+- leer `docs/AI_WORKFLOW.md` y `docs/AI_NEXT_TICKET.md` desde `coordination/ai-control`;
+- ejecutar exactamente el ticket vigente;
+- respetar branch/base/permisos/prohibiciones del ticket;
+- dejar PR/handoff obligatorio;
+- detenerse al terminar o bloquearse;
+- no iniciar ningún ticket posterior.
+
+Permisos: usar el mínimo suficiente. Para tickets que editan el repo, preferir sandbox `workspace-write`. No usar `danger-full-access` como configuración por defecto.
+
+## Guardas obligatorias
+
+### No duplicar
+
+Persistir fuera del repo de producto un estado pequeño con al menos:
+
+- último SHA de `AI_NEXT_TICKET.md` ejecutado;
+- identificador/título del ticket;
+- estado `running`, `completed`, `blocked`, `failed`;
+- hora de inicio/fin;
+- PID/session id si aplica.
+
+Un mismo SHA/ticket nunca debe ejecutarse dos veces automáticamente.
+
+### Single-flight
+
+Debe existir lock local. Si Codex ya está trabajando, un nuevo cambio de ticket queda pendiente pero no inicia en paralelo.
+
+### Sin encadenado autónomo
+
+Codex nunca decide el siguiente ticket. Solo un cambio nuevo publicado por ChatGPT en `AI_NEXT_TICKET.md` puede disparar otra ejecución.
+
+### Acciones sensibles
+
+El runner NO concede por sí solo autorización para:
+
+- Production;
+- deploy/publicación;
+- merge importante;
+- borrado destructivo;
+- gastos;
+- instalación de software pesado;
+- prueba física;
+- envío de APK.
+
+Esas acciones siguen requiriendo autorización explícita del usuario cuando corresponda.
+
+### Fallos
+
+Si `codex exec` sale con error, timeout, auth faltante, conflicto de git o ticket ambiguo:
+
+- no reintentar en loop;
+- máximo un reintento automático solo para error transitorio claramente identificable;
+- después marcar `failed/blocked`;
+- dejar log local acotado;
+- no modificar `AI_NEXT_TICKET.md`;
+- no iniciar otro ticket.
+
+## Implementación Mac
+
+Preferencia: servicio nativo liviano de macOS con `launchd`, sin Docker ni daemon pesado.
+
+Componentes esperados:
+
+1. script pequeño, por ejemplo bajo `tools/ai-autorun/` o ubicación equivalente;
+2. polling liviano de GitHub cada 30–60 s o mecanismo equivalente confiable;
+3. `launchd` para iniciar al login y mantener el watcher;
+4. lock/state/log fuera del working tree de producto o en una ruta ignorada;
+5. comandos de `status`, `start`, `stop`, `run-once` y `uninstall`;
+6. instalación idempotente;
+7. consumo prácticamente nulo cuando no hay ticket nuevo.
+
+No depender de que una terminal quede abierta.
+
+## Repos / worktrees
+
+El runner debe conocer el repo principal pero no debe trabajar directamente sobre un worktree sucio salvo que el ticket lo ordene de forma explícita.
+
+Debe dejar que cada ticket determine rama/base/worktree. Si el ticket exige worktree temporal limpio, Codex lo crea.
+
+## Observabilidad mínima
+
+Comando de estado debe mostrar:
+
+- servicio activo/inactivo;
+- último ticket detectado;
+- último ticket ejecutado;
+- estado actual;
+- última ejecución;
+- PID si está corriendo;
+- ruta del log.
+
+Logs rotados/acotados. No registrar secretos, tokens ni contenido de `.env`.
+
+## Criterio de aceptación del ticket AI-AUTO-HANDOFF-01
+
+1. instalación local idempotente en la Mac;
+2. `launchd` activo;
+3. un ticket de prueba inocuo se detecta exactamente una vez;
+4. `codex exec` arranca automáticamente;
+5. una segunda lectura del mismo SHA no vuelve a arrancarlo;
+6. single-flight evita ejecuciones paralelas;
+7. stop/start/status funcionan;
+8. reinicio de sesión/Mac no pierde la configuración;
+9. ningún secreto queda versionado;
+10. no se altera el working tree Android actual;
+11. handoff a ChatGPT con comandos, archivos, estado y rollback/uninstall.
+
+## Después de instalar
+
+El usuario ya no necesita decir `ya` en Codex.
+
+En operación normal solo hará falta que ChatGPT publique el siguiente ticket. El usuario seguirá diciendo `ya` en ChatGPT cuando quiera forzar una revisión inmediata, aunque más adelante también puede automatizarse la detección del handoff por separado si conviene.
