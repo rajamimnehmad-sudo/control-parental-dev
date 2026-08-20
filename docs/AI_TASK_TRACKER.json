@@ -1,10 +1,10 @@
 {
-  "updatedAt": "20 ago 2026 · 13:05",
+  "updatedAt": "20 ago 2026 · 14:53",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
-      "context": "Chrome Visual automático aprobado; ahora se instala el runner que elimina el ya manual de Codex",
+      "context": "Chrome Visual automático aprobado; autorun en corrección y esfuerzo Codex por ticket en incorporación",
       "tasks": [
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
         {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"PASS: commits locales y los 10 archivos sin commit quedaron preservados en ramas remotas preserve/*.","status":"done","priority":"critical"},
@@ -12,7 +12,8 @@
         {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Implementación estática terminada; pendiente solo gate SQL dinámico. No instalar Docker ni repetir trabajo.","status":"blocked","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96: datos visibles, licencias/cupos y UX/UI profesional.","status":"done","priority":"important"},
         {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Falta gate físico único en S22 antes de producto.","status":"done","priority":"critical"},
-        {"id":"ai-auto-handoff-01","title":"Automatizar arranque de Codex","detail":"Instalar runner local macOS: nuevo AI_NEXT_TICKET dispara Codex automáticamente, con deduplicación, single-flight y launchd.","status":"in_progress","priority":"important"},
+        {"id":"ai-auto-handoff-01","title":"Automatizar arranque de Codex","detail":"Runner instalado; se corrige el fetch para que vea siempre el ticket remoto nuevo y pase el smoke real.","status":"in_progress","priority":"important"},
+        {"id":"codex-effort-routing","title":"Elegir esfuerzo Codex por cada ticket","detail":"ChatGPT asigna low/medium/high/xhigh según dificultad; medium por defecto. El autorun aplicará automáticamente model_reasoning_effort al iniciar Codex.","status":"in_progress","priority":"important"},
         {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Completado: 0 comunidades, 0 cuentas, 0 admins comunitarios, 0 dispositivos y 0 datos operativos viejos; se preservó el Super Admin.","status":"done","priority":"important"},
         {"id":"control-center-v2","title":"Control Center V2","detail":"Tablero solo lectura con pull-to-refresh y sincronización desde GitHub.","status":"done","priority":"normal"},
         {"id":"pro-audit","title":"Auditoría Pro y mapa técnico","detail":"Auditoría integral completada; ahora se cierran hallazgos por lotes grandes y auditables.","status":"done","priority":"important"}
