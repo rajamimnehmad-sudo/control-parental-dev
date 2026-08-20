@@ -1,156 +1,145 @@
 # AI NEXT TICKET
 
-## LOCAL-WORK-PRESERVATION-01
+## SEC-EXACT-TECHNICAL-HOSTS-01-REVIEW
 
-**Tipo:** preservación / seguridad operativa
+**Tipo:** revisión técnica + reconstrucción limpia
 **Prioridad:** crítica
-**Modo:** NO EDITAR CÓDIGO / NO RECONCILIAR TODAVÍA
 **Responsable de ejecución:** Codex
 **Revisor:** ChatGPT / jefe técnico central
 
-> Antes de ejecutar, leer `docs/AI_WORKFLOW.md` en esta misma rama.
+> Antes de ejecutar, leer `docs/AI_WORKFLOW.md` en `coordination/ai-control`.
 
 ### Contexto validado
 
-El inventario `LOCAL-STATE-RECONCILIATION-00` confirmó:
+Los tickets `LOCAL-STATE-RECONCILIATION-00` y `LOCAL-WORK-PRESERVATION-01` están cerrados.
 
-- repo auditado: `/Users/yejielnehmad/Developer/content-filter`;
-- worktree activo: `work/chrome-visual`;
-- HEAD: `6a045f1300336b1f033cab7bea2ce3ba25dcd119`;
-- `main` local: `9e41c309`, 39 commits delante de `origin/main`;
-- `work/chrome-visual`: 46 commits delante de `origin/main`;
-- 6 tracked modificados + 4 untracked, 0 staged;
-- los cambios sin commit corresponden a hosts Supabase exactos, sync atómico y pairing hardening;
-- no hay evidencia de que esos 10 archivos estén preservados remotamente.
+El estado local crítico ya está preservado remotamente en ramas `preserve/*`. En particular:
 
-### Objetivo
+- `preserve/local-main-2026-08-20` conserva la base local previa a Chrome Visual;
+- `preserve/uncommitted-2026-08-20` conserva el snapshot de los 10 archivos que estaban sin commit;
+- el worktree original de la Mac debe permanecer intacto.
 
-**Preservar exactamente el estado local actual antes de revisar, arreglar, separar o limpiar nada.**
+La auditoría detectó que el código remoto aprobado todavía trataba `supabase.co` de forma demasiado amplia como infraestructura técnica. El snapshot preservado contiene un candidato que restringe la excepción técnica al host real de Glosh:
 
-Este ticket NO aprueba técnicamente ningún cambio. Solo crea copias remotas seguras y verificables para eliminar riesgo de pérdida.
+`syeycayasyufedwoprea.supabase.co`
 
-### Gate inicial — detectar drift
+Este ticket debe revisar ese candidato, reconstruirlo de forma aislada y demostrar que no abre hosts hermanos ni subdominios falsos.
 
-Antes de preservar, comprobar nuevamente en modo lectura:
+### Alcance exacto
 
-- rama actual;
-- HEAD;
-- `git status --short`;
-- lista exacta de tracked modificados y untracked.
+Trabajar únicamente sobre estas rutas, salvo que un test existente estrictamente relacionado requiera un ajuste mínimo justificado:
 
-Si el estado cambió materialmente respecto del handoff anterior, **DETENERSE** y dejar el nuevo estado en `docs/AI_CODEX_HANDOFF.md`. No intentar adaptar el ticket por cuenta propia.
+1. `core-policy/src/main/kotlin/com/contentfilter/core/policy/DefaultPolicyEngine.kt`
+2. `feature-vpn/src/main/java/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluator.kt`
+3. `feature-vpn/src/test/kotlin/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluatorTest.kt`
 
-### Preservación de commits ya existentes
+No tocar sync, pairing, Chrome Visual, DAG, Supabase migrations ni otros frentes.
 
-Sin cambiar de rama ni alterar el working tree auditado, preservar remotamente como ramas de seguridad:
+### Rama de trabajo
 
-1. `preserve/local-main-2026-08-20` → tip actual de `main` local (`9e41c309` si sigue igual).
-2. `preserve/chrome-visual-2026-08-20` → tip actual de `work/chrome-visual` (`6a045f13` si sigue igual).
-3. `preserve/pre-chrome-visual-2026-08-17` → tip actual de `snapshot/pre-chrome-visual-2026-08-17` (`833d5ad8` si sigue igual).
+Crear una rama limpia:
 
-Estas ramas son **snapshots de seguridad**, no ramas aprobadas ni listas para merge.
+`review/sec-exact-technical-hosts-01`
 
-No crear PRs para ellas.
+Base:
 
-### Preservación exacta de los 10 archivos sin commit
+`preserve/local-main-2026-08-20`
 
-Crear una rama remota:
+No trabajar en el worktree original sucio. Usar un worktree temporal limpio o clon temporal.
+
+### Fuente del candidato
+
+Tomar como referencia únicamente el cambio correspondiente a hosts técnicos de:
 
 `preserve/uncommitted-2026-08-20`
 
-baseada exactamente en el HEAD observado de `work/chrome-visual`.
+No copiar los demás cambios preservados en esa rama.
 
-Para no tocar el working tree sucio:
+### Revisión técnica obligatoria
 
-1. usar un worktree temporal limpio o clon temporal;
-2. reproducir allí **únicamente** el diff tracked actual y los 4 archivos untracked del inventario;
-3. verificar que el contenido preservado coincida byte a byte con la fuente cuando sea posible;
-4. verificar que solo estén presentes los 10 paths esperados;
-5. ejecutar `git diff --check`;
-6. crear un único commit de snapshot;
-7. push de esa rama;
-8. verificar que la rama remota apunta al commit creado.
+Antes de aceptar el candidato, verificar el comportamiento y ajustar solo si es necesario:
 
-Commit sugerido:
+1. El host exacto de Glosh `syeycayasyufedwoprea.supabase.co` debe conservar acceso técnico cuando corresponde.
+2. `proyecto-ajeno.supabase.co` NO debe obtener trato técnico privilegiado.
+3. El apex `supabase.co` NO debe quedar auto-permitido por esta excepción.
+4. `api.syeycayasyufedwoprea.supabase.co` u otros subdominios inventados del proyecto NO deben heredar automáticamente la excepción exacta.
+5. La normalización habitual de host (minúsculas, punto final, `www.` si aplica al contrato actual) no debe reintroducir matching amplio.
+6. Las reglas explícitas, SafeSearch, UT1/lista local y precedencias existentes fuera de esta excepción no deben alterarse accidentalmente.
+7. Los hosts técnicos Google ya existentes no deben cambiar de semántica salvo que el candidato original lo haga de forma necesaria y demostrada.
 
-`chore(preserve): snapshot local uncommitted state 2026-08-20`
+### Tests mínimos requeridos
 
-### Exclusiones absolutas
+Usar los tests existentes y agregar/modificar solo los estrictamente necesarios para probar:
 
-NO incluir ni leer/subir:
+- Glosh Supabase exacto permitido;
+- proyecto Supabase ajeno no privilegiado;
+- `supabase.co` no privilegiado;
+- subdominio falso del host Glosh no privilegiado;
+- host técnico crítico conserva la precedencia prevista;
+- una regla/manual/lista local sigue actuando normalmente sobre hosts que ya no son técnicos.
 
-- `.env`;
-- `.codex-tmp/`;
-- APKs;
-- `build/`;
-- logs de instrumentación;
-- caches;
-- keystores/certificados;
-- secretos o credenciales;
-- cualquier archivo ignorado fuera de los 4 untracked ya identificados.
+Ejecutar la suite unitaria más estrecha que cubra `core-policy` y `feature-vpn`, más una comprobación de compilación de los módulos afectados. Si esas capas pasan y el cambio afecta compilación de App Usuario, ejecutar una compilación no física de App Usuario una sola vez.
 
-Los 4 untracked permitidos son solamente:
+No repetir suites DAG/Chrome/Admin ni pruebas físicas: este cambio no las afecta.
 
-- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/DefaultSyncEngineAtomicPolicySyncTest.kt`
-- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/TargetedPolicySyncCoordinatorTest.kt`
-- `supabase/migrations/20260819150000_harden_pairing_tokens.sql`
-- `supabase/pairing_hardening_03b_checks.sql`
+Ejecutar `git diff --check`.
 
-### No hacer todavía
+### Resultado esperado
 
-- no editar código;
-- no corregir tests;
-- no reordenar commits;
-- no cherry-pick;
-- no merge;
-- no rebase;
-- no reset/clean/stash del worktree original;
+Si el candidato es correcto:
+
+1. dejar únicamente el cambio aislado en `review/sec-exact-technical-hosts-01`;
+2. un commit coherente, sugerido:
+   `fix(security): restrict technical Supabase host allowlist`
+3. push de la rama;
+4. abrir PR contra `preserve/local-main-2026-08-20` para que el diff sea aislado y auditable;
+5. NO mergear.
+
+La PR debe usar el cierre estándar de `AI_WORKFLOW.md`:
+
+- resumen;
+- archivos tocados;
+- comandos/tests ejecutados;
+- resultados exactos;
+- riesgos pendientes;
+- branch + commit;
+- prueba física: `no requerida` salvo hallazgo inesperado.
+
+### Manejo de bloqueo
+
+Si aparece una incompatibilidad estructural, fallo inesperado no atribuible al candidato o necesidad de tocar áreas fuera del alcance:
+
+- no hacer reescrituras amplias;
+- preservar evidencia;
+- no ampliar el ticket por cuenta propia;
+- actualizar `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` con el bloqueo;
+- detenerse.
+
+### Prohibiciones
+
+- no tocar el worktree original sucio;
+- no merge/rebase/reset/clean/stash sobre el repo original;
+- no tocar `main`;
 - no aplicar migraciones;
-- no tocar Supabase;
-- no ejecutar builds ni suites pesadas;
-- no probar APK;
-- no decidir qué cambios son buenos/malos;
-- no eliminar ramas ni worktrees existentes.
-
-Puede eliminarse únicamente el worktree/clon temporal creado por este ticket, y solo después de verificar que esté limpio y que todo quedó preservado remotamente.
-
-### Verificación final obligatoria
-
-Confirmar:
-
-- las 4 ramas `preserve/...` existen en remoto;
-- sus SHAs exactos;
-- `preserve/uncommitted-2026-08-20` contiene únicamente los 10 paths esperados respecto de `6a045f13` (o el HEAD validado si hubiera drift autorizado por ChatGPT);
-- el working tree original conserva exactamente su estado inicial del ticket;
-- no se subieron secretos ni artefactos ignorados.
+- no tocar Supabase/Production;
+- no modificar sync/pairing/Chrome/DAG;
+- no instalar APK ni pedir prueba física;
+- no iniciar el siguiente ticket.
 
 ### Handoff obligatorio
 
-Actualizar únicamente:
+Al cerrar, reemplazar `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` con:
 
-`docs/AI_CODEX_HANDOFF.md`
-
-en `coordination/ai-control` con:
-
-- ticket ejecutado;
-- estado inicial/final del working tree original;
-- las cuatro ramas de preservación y SHAs;
-- SHA del commit snapshot de los 10 archivos;
-- lista exacta de paths preservados;
-- verificaciones ejecutadas;
-- cualquier anomalía o riesgo.
-
-No acumular el handoff anterior: reemplazarlo por el estado vigente.
-
-### Criterio de terminado
-
-El ticket termina solo cuando todo el trabajo local crítico está preservado remotamente sin alterar el estado original de la Mac.
+- ticket;
+- PASS / NEEDS-FIX / BLOCKED;
+- branch + commit;
+- PR;
+- archivos tocados;
+- tests/comandos y resultados;
+- revisión de los 4 casos Supabase exactos;
+- riesgos restantes;
+- confirmación de que el worktree original quedó intacto.
 
 Después: **DETENERSE**.
 
-No comenzar revisión técnica. El siguiente paso será decidido por ChatGPT y probablemente separará la revisión de:
-
-1. hosts Supabase exactos;
-2. sync atómico;
-3. pairing hardening;
-4. integración DAG/Chrome Visual.
+ChatGPT auditará la PR/diff/tests y decidirá si el cambio se aprueba y cuál es el próximo ticket.
