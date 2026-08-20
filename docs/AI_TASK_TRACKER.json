@@ -1,23 +1,26 @@
 {
-  "updatedAt": "20 ago 2026 · 15:05",
+  "updatedAt": "20 ago 2026 · 17:42",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
-      "context": "Autorun real validado; ahora se optimiza para bajar contexto, tokens y esfuerzo por ticket",
+      "context": "Workflow manual confirmado: ChatGPT resuelve primero; Codex solo cuando hace falta trabajo local/Mac",
       "tasks": [
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
-        {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"PASS: commits locales y los 10 archivos sin commit quedaron preservados en ramas remotas preserve/*.","status":"done","priority":"critical"},
+        {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"PASS: commits locales y archivos sin commit quedaron preservados en ramas remotas preserve/*.","status":"done","priority":"critical"},
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing quedó pendiente de gate SQL real.","status":"done","priority":"critical"},
-        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Implementación estática terminada; pendiente solo gate SQL dinámico. No instalar Docker ni repetir trabajo.","status":"blocked","priority":"critical"},
+        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Implementación estática terminada; pendiente solo gate SQL dinámico seguro.","status":"blocked","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96: datos visibles, licencias/cupos y UX/UI profesional.","status":"done","priority":"important"},
-        {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Falta gate físico único en S22 antes de producto.","status":"done","priority":"critical"},
-        {"id":"ai-auto-handoff-01","title":"Automatizar arranque de Codex","detail":"PASS real: runner detectó y ejecutó AI-AUTORUN-SMOKE-02 automáticamente una sola vez.","status":"done","priority":"important"},
-        {"id":"codex-effort-routing","title":"Elegir esfuerzo Codex por cada ticket","detail":"ChatGPT asigna low/medium/high/xhigh según dificultad; medium por defecto. El autorun aplicará automáticamente model_reasoning_effort al iniciar Codex.","status":"in_progress","priority":"important"},
-        {"id":"workflow-cost-optimization","title":"Optimizar workflow para bajar costos","detail":"Regla permanente: contexto mínimo, lotes coherentes, esfuerzo mínimo suficiente, tests estrechos, no repetir evidencia y usar Codex solo cuando hace falta la Mac. Baseline de ~42.500 tokens del smoke se considera demasiado alto.","status":"in_progress","priority":"important"},
-        {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Completado: 0 comunidades, 0 cuentas, 0 admins comunitarios, 0 dispositivos y 0 datos operativos viejos; se preservó el Super Admin.","status":"done","priority":"important"},
+        {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado por decisión actual.","status":"done","priority":"critical"},
+        {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; cuando hace falta Mac/Codex entrega ticket listo para copiar. Codex deja PR/handoff y ChatGPT audita al recibir 'ya'.","status":"done","priority":"critical"},
+        {"id":"ai-auto-handoff-01","title":"Autorun experimental de Codex","detail":"Retirado del flujo normal. AI_NEXT_TICKET neutralizado; no se depende de launchd/watchers para trabajar.","status":"done","priority":"normal"},
+        {"id":"codex-effort-routing","title":"Elegir esfuerzo Codex por cada ticket","detail":"Regla vigente en tickets manuales: ChatGPT elige el menor esfuerzo suficiente (low/medium/high/xhigh).","status":"done","priority":"important"},
+        {"id":"workflow-cost-optimization","title":"Optimizar workflow para bajar costos","detail":"Regla permanente: contexto mínimo, lotes coherentes, tests estrechos, no repetir evidencia y usar Codex solo cuando hace falta la Mac.","status":"done","priority":"important"},
+        {"id":"control-center-sync-rule","title":"Sincronizar siempre Glosh Central","detail":"Regla permanente: todo cambio de ruta, prioridad, estado, tarea, bloqueo, cierre o workflow se refleja en Control Center en el mismo ciclo.","status":"done","priority":"critical"},
+        {"id":"apps-account-product-batch-07","title":"Próximo lote Apps / cuentas","detail":"Reservado: vencimiento de licencia, cupos disponibles, propósito de contraseña Admin y bloqueo de acciones simultáneas. Sin S22.","status":"pending","priority":"important"},
+        {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Completado: datos operativos viejos eliminados y Super Admin preservado.","status":"done","priority":"important"},
         {"id":"control-center-v2","title":"Control Center V2","detail":"Tablero solo lectura con pull-to-refresh y sincronización desde GitHub.","status":"done","priority":"normal"},
-        {"id":"pro-audit","title":"Auditoría Pro y mapa técnico","detail":"Auditoría integral completada; ahora se cierran hallazgos por lotes grandes y auditables.","status":"done","priority":"important"}
+        {"id":"pro-audit","title":"Auditoría Pro y mapa técnico","detail":"Auditoría integral completada; hallazgos se cierran por lotes grandes y auditables.","status":"done","priority":"important"}
       ]
     },
     {
@@ -34,15 +37,15 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "Backlog funcional para Admin y Usuario",
+      "context": "Próximo frente sin dispositivo físico: lote conjunto para reducir sesiones Codex",
       "tasks": [
-        {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"En pedidos de apps, mostrar una explicación simple de para qué sirve la app antes de aprobarla.","status":"pending","priority":"important"},
-        {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Revisar y dejar claro el comportamiento de Usuario/Admin cuando la licencia vence y cómo se recupera.","status":"pending","priority":"important"},
-        {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Revisar dónde se pide y explicar claramente su función para evitar confusión.","status":"pending","priority":"normal"},
-        {"id":"account-capacity-remaining","title":"Mostrar cupos disponibles","detail":"Mostrar en las apps cuántos usuarios y administradores quedan disponibles según el plan/licencia.","status":"pending","priority":"important"},
-        {"id":"user-relink","title":"Reenlazar usuario","detail":"Permitir un flujo claro y seguro para reenlazar un usuario/dispositivo existente.","status":"pending","priority":"important"},
-        {"id":"user-request-history-delete","title":"Borrar historial de pedidos en Usuario","detail":"Permitir limpiar el historial visible de pedidos sin romper auditoría necesaria.","status":"pending","priority":"normal"},
-        {"id":"prevent-double-control-actions","title":"Evitar dos controles simultáneos","detail":"Bloquear taps/acciones simultáneas sobre dos controles para evitar estados inconsistentes en ambas apps.","status":"pending","priority":"important"}
+        {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Mostrar explicación simple de para qué sirve la app antes de aprobarla.","status":"pending","priority":"important"},
+        {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Incluido en próximo lote: estado vencido, información al usuario y recuperación al renovar.","status":"pending","priority":"important"},
+        {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote: propósito claro en los puntos donde se solicita.","status":"pending","priority":"normal"},
+        {"id":"account-capacity-remaining","title":"Mostrar cupos disponibles","detail":"Incluido en próximo lote: cupos restantes según fuente de verdad de licencia existente.","status":"pending","priority":"important"},
+        {"id":"user-relink","title":"Reenlazar usuario","detail":"Permitir flujo claro y seguro para reenlazar usuario/dispositivo existente.","status":"pending","priority":"important"},
+        {"id":"user-request-history-delete","title":"Borrar historial de pedidos en Usuario","detail":"Permitir limpiar historial visible sin romper auditoría necesaria.","status":"pending","priority":"normal"},
+        {"id":"prevent-double-control-actions","title":"Evitar dos controles simultáneos","detail":"Incluido en próximo lote: serializar/bloquear acciones concurrentes que puedan producir estados inconsistentes.","status":"pending","priority":"important"}
       ]
     },
     {
@@ -58,20 +61,20 @@
     {
       "id": "delivery",
       "title": "Entrega / APKs",
-      "context": "Actualizar APK solo cuando aporta una validación o entrega real",
+      "context": "Pruebas físicas pausadas hasta retomarlas explícitamente",
       "tasks": [
-        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Compilar cuando un cambio entra en el grafo. Para prueba física, enviar por Taildrop al S22; ChatGPT avisa antes para que el usuario lo encienda. No generar/enviar un APK por cada ticket pequeño.","status":"pending","priority":"important"}
+        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Compilar cuando aporte un gate real; envío físico al S22 queda pausado por ahora.","status":"pending","priority":"important"}
       ]
     },
     {
       "id": "chrome-visual",
       "title": "Chrome Visual",
-      "context": "Cierre automático aprobado; falta una única validación física en S22",
+      "context": "Automático PASS; validación física S22 pausada",
       "tasks": [
         {"id":"chrome-review-local","title":"Separar y revisar Chrome Visual local","detail":"PASS: reconstrucción limpia y auditable en PR #97.","status":"done","priority":"critical"},
-        {"id":"chrome-video-a23","title":"Revalidar video en hardware","detail":"Reemplazado por gate físico completo en S22 después de auditoría automática PASS.","status":"pending","priority":"critical"},
-        {"id":"chrome-images","title":"Confirmar fotos estáticas en Chrome","detail":"Automático PASS; falta confirmación física final junto al gate S22.","status":"pending","priority":"important"},
-        {"id":"google-ai-field-visible","title":"Evitar que el teclado tape el campo de IA de Google","detail":"Corregir el layout/insets para que el campo de IA de Google siga visible y usable cuando aparece el teclado.","status":"pending","priority":"important"}
+        {"id":"chrome-video-a23","title":"Revalidar video en hardware","detail":"Pendiente; se retomará junto al gate físico cuando se reactive trabajo con S22.","status":"pending","priority":"critical"},
+        {"id":"chrome-images","title":"Confirmar fotos estáticas en Chrome","detail":"Automático PASS; confirmación física queda para el gate S22 posterior.","status":"pending","priority":"important"},
+        {"id":"google-ai-field-visible","title":"Evitar que el teclado tape el campo de IA de Google","detail":"Corregir layout/insets para mantener visible el campo con teclado.","status":"pending","priority":"important"}
       ]
     },
     {
@@ -79,10 +82,10 @@
       "title": "GloshIA",
       "context": "Visual, textual y asistente real",
       "tasks": [
-        {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Exponer claramente la versión del motor/modelo visual activo dentro de DAG.","status":"pending","priority":"normal"},
-        {"id":"gloshia-textual","title":"GloshIA textual","detail":"Definir e integrar la capa textual de GloshIA con alcance y criterios claros.","status":"pending","priority":"important"},
-        {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"Crear una IA conversacional de ayuda dentro de App Usuario y App Admin, tipo asistente de Mercado Pago: responde dudas, explica funciones y guía al usuario dentro de Glosh.","status":"pending","priority":"important"},
-        {"id":"shared-gloshia-engine","title":"Motor GloshIA compartido","detail":"Consolidar después de validar Chrome Visual y la base DAG.","status":"pending","priority":"normal"}
+        {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Exponer versión del motor/modelo visual activo dentro de DAG.","status":"pending","priority":"normal"},
+        {"id":"gloshia-textual","title":"GloshIA textual","detail":"Definir e integrar capa textual con alcance y criterios claros.","status":"pending","priority":"important"},
+        {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"IA conversacional de ayuda en Usuario y Admin, tipo asistente de Mercado Pago.","status":"pending","priority":"important"},
+        {"id":"shared-gloshia-engine","title":"Motor GloshIA compartido","detail":"Consolidar después de validar Chrome Visual y base DAG.","status":"pending","priority":"normal"}
       ]
     },
     {
@@ -90,14 +93,14 @@
       "title": "DAG",
       "context": "UX, actualización y eficiencia del navegador",
       "tasks": [
-        {"id":"dag-local-review","title":"Revisar integración DAG local","detail":"Auditar los 39 commits preservados por bloques antes de integrar.","status":"pending","priority":"important"},
-        {"id":"dag-update-section-move","title":"Mover sección de actualización en DAG","detail":"Reubicar la sección de actualización para que quede en una posición más lógica y accesible.","status":"pending","priority":"normal"},
-        {"id":"dag-hide-http-scheme","title":"Ocultar http/https en DAG","detail":"No mostrar el prefijo http:// o https:// en la barra visible cuando no aporte información útil.","status":"pending","priority":"normal"},
-        {"id":"dag-self-update","title":"Actualizar desde DAG","detail":"Permitir iniciar la actualización de DAG desde el propio navegador con validaciones seguras.","status":"pending","priority":"important"},
-        {"id":"dag-tab-memory","title":"Ahorrar memoria de pestañas DAG","detail":"Reducir memoria de pestañas en segundo plano sin perder estabilidad ni estado necesario.","status":"pending","priority":"important"},
+        {"id":"dag-local-review","title":"Revisar integración DAG local","detail":"Auditar commits preservados por bloques antes de integrar.","status":"pending","priority":"important"},
+        {"id":"dag-update-section-move","title":"Mover sección de actualización en DAG","detail":"Reubicar sección de actualización a una posición más lógica.","status":"pending","priority":"normal"},
+        {"id":"dag-hide-http-scheme","title":"Ocultar http/https en DAG","detail":"No mostrar prefijo http:// o https:// cuando no aporte información útil.","status":"pending","priority":"normal"},
+        {"id":"dag-self-update","title":"Actualizar desde DAG","detail":"Permitir iniciar actualización desde DAG con validaciones seguras.","status":"pending","priority":"important"},
+        {"id":"dag-tab-memory","title":"Ahorrar memoria de pestañas DAG","detail":"Reducir memoria de pestañas en segundo plano sin perder estabilidad.","status":"pending","priority":"important"},
         {"id":"dag-desktop-mobile-mode","title":"Modo escritorio y móvil en DAG","detail":"Agregar selector confiable entre representación móvil y escritorio.","status":"pending","priority":"normal"},
-        {"id":"dag-icons-fix","title":"Corregir iconos de DAG","detail":"Revisar iconos incorrectos, inconsistentes o faltantes en la interfaz.","status":"pending","priority":"normal"},
-        {"id":"dag-image-scroll-loading","title":"Revisar comportamiento de fotos al bajar","detail":"Pendiente de aclaración funcional; no implementar hasta definir exactamente qué comportamiento de las fotos hay que corregir.","status":"pending","priority":"normal"}
+        {"id":"dag-icons-fix","title":"Corregir iconos de DAG","detail":"Revisar iconos incorrectos, inconsistentes o faltantes.","status":"pending","priority":"normal"},
+        {"id":"dag-image-scroll-loading","title":"Revisar comportamiento de fotos al bajar","detail":"Pendiente de aclaración funcional antes de implementar.","status":"pending","priority":"normal"}
       ]
     }
   ]
