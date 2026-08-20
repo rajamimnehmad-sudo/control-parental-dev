@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 10:47",
+  "updatedAt": "20 ago 2026 · 11:14",
   "sections": [
     {
       "id": "coordination",
@@ -55,17 +55,17 @@
         {"id":"chrome-review-local","title":"Separar y revisar Chrome Visual local","detail":"Reconstruir una rama de revisión limpia antes del gate físico.","status":"pending","priority":"critical"},
         {"id":"chrome-video-a23","title":"Revalidar video en A23","detail":"Solo después de tests/ADB y auditoría de la rama limpia.","status":"pending","priority":"critical"},
         {"id":"chrome-images","title":"Confirmar fotos estáticas en Chrome","detail":"Verificar imágenes, scroll y overlays localizados.","status":"pending","priority":"important"},
-        {"id":"google-ai-field-visible","title":"Mostrar el campo de IA de Google","detail":"Asegurar que el campo/área de IA de Google siga visible y usable con el filtrado activo.","status":"pending","priority":"normal"}
+        {"id":"google-ai-field-visible","title":"Evitar que el teclado tape el campo de IA de Google","detail":"Corregir el layout/insets para que el campo de IA de Google siga visible y usable cuando aparece el teclado.","status":"pending","priority":"important"}
       ]
     },
     {
       "id": "gloshia",
       "title": "GloshIA",
-      "context": "Visual, textual y ayuda",
+      "context": "Visual, textual y asistente real",
       "tasks": [
         {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Exponer claramente la versión del motor/modelo visual activo dentro de DAG.","status":"pending","priority":"normal"},
         {"id":"gloshia-textual","title":"GloshIA textual","detail":"Definir e integrar la capa textual de GloshIA con alcance y criterios claros.","status":"pending","priority":"important"},
-        {"id":"gloshia-help-both-apps","title":"GloshIA ayuda en ambas apps","detail":"Agregar ayuda/explicación de GloshIA en App Usuario y App Admin.","status":"pending","priority":"normal"},
+        {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"Crear una IA conversacional de ayuda dentro de App Usuario y App Admin, tipo asistente de Mercado Pago: responde dudas, explica funciones y guía al usuario dentro de Glosh.","status":"pending","priority":"important"},
         {"id":"shared-gloshia-engine","title":"Motor GloshIA compartido","detail":"Consolidar después de validar Chrome Visual y la base DAG.","status":"pending","priority":"normal"}
       ]
     },
@@ -81,7 +81,7 @@
         {"id":"dag-tab-memory","title":"Ahorrar memoria de pestañas DAG","detail":"Reducir memoria de pestañas en segundo plano sin perder estabilidad ni estado necesario.","status":"pending","priority":"important"},
         {"id":"dag-desktop-mobile-mode","title":"Modo escritorio y móvil en DAG","detail":"Agregar selector confiable entre representación móvil y escritorio.","status":"pending","priority":"normal"},
         {"id":"dag-icons-fix","title":"Corregir iconos de DAG","detail":"Revisar iconos incorrectos, inconsistentes o faltantes en la interfaz.","status":"pending","priority":"normal"},
-        {"id":"dag-image-scroll-loading","title":"Corregir aparición de fotos al bajar","detail":"Revisar la carga/aparición de imágenes durante scroll para evitar retrasos, saltos o comportamiento visual extraño.","status":"pending","priority":"important"}
+        {"id":"dag-image-scroll-loading","title":"Revisar comportamiento de fotos al bajar","detail":"Pendiente de aclaración funcional; no implementar hasta definir exactamente qué comportamiento de las fotos hay que corregir.","status":"pending","priority":"normal"}
       ]
     }
   ]
