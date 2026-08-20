@@ -1,27 +1,27 @@
 # AI CODEX HANDOFF
 
-## AI-AUTORUN-SMOKE-02
+## AI-AUTORUN-EFFICIENCY-03
 
-- Fecha/hora: 2026-08-20 14:57 ART.
-- Estado: **PASS**.
-- Inicio automatico: **si**; el runner local detecto y ejecuto el ticket vigente.
-- SHA del ticket observado (`docs/AI_NEXT_TICKET.md`): `7f1faf9959f443b58b5dc60055284a31be8a3324`.
-- Rama y HEAD observados: `work/chrome-visual` / `6a045f1300336b1f033cab7bea2ce3ba25dcd119`.
-- Rama de control observada antes del reporte: `coordination/ai-control` / `f4051eb0358b9e53df8ca376f61ddc7d9fd4d63e`.
-- Cambios de producto: **cero**. Los 6 archivos modificados y 4 untracked del checkout eran preexistentes y no fueron tocados.
-- Evidencia: lectura de `AI_WORKFLOW.md` y `AI_NEXT_TICKET.md` desde `origin/coordination/ai-control`; verificacion de rama, HEAD y estado Git.
-- Riesgos/bloqueos: ninguno.
+- Fecha/hora: 2026-08-20 15:15 ART.
+- Estado: **BLOCKED** (implementación y gates locales PASS; smoke real pendiente).
+- Ticket SHA: `4631126e5b12a559ec7a580c8781218b92212c51`.
+- Rama / HEAD / PR: `review/ai-auto-handoff-01` / `2b651e93` / https://github.com/rajamimnehmad-sudo/control-parental-dev/pull/98
 
-### Corrección del runner validada por el smoke
+### Resultado
 
-- PR draft: https://github.com/rajamimnehmad-sudo/control-parental-dev/pull/98
-- Commit de corrección: `1e50a67d` (`fix(ai): refresh coordination ref reliably`).
-- `git fetch` actualiza explícitamente `refs/remotes/origin/coordination/ai-control` mediante refspec forzado.
-- La invocación usa `codex exec --approve-for-me`; el CLI confirma que este modo aplica `workspace-write` con revisión automática. Se eliminó la combinación inválida con `--sandbox`.
-- La reinstalación reemplaza el binario con temporal + `mv` atómico para que `launchd` nunca lea un script parcialmente copiado.
-- Gates: `bash -n`, self-test de deduplicación/single-flight y `git diff --check` — **PASS**.
-- Smoke final: inicio automático, un solo proceso, salida `0`, estado `completed`, servicio activo.
-- El primer intento del smoke salió `2` por la combinación inválida del CLI; se corrigió y el usuario autorizó una única repetición controlada.
-- Producto, APK, Production, Supabase y worktrees: **cero cambios**.
+- Causa principal del costo: ejecución desde el checkout de producto con configuración personal completa (plugins/apps/MCP) y lecturas amplias posteriores. La inspección no generativa midió 31.907 bytes de prompt base y 22.640 bytes al desactivar capacidades opcionales.
+- Cambio: Bajo/Medio ejecutan `codex exec` de forma efímera y sin configuración personal; Alto/Extra alto conservan el contexto completo para no reducir calidad. El modelo configurado se preserva.
+- Esfuerzo: Bajo→`low`, Medio→`medium`, Alto→`high`, Extra alto→`xhigh`; ausente o inválido→`medium` con log explícito. El override real es `-c model_reasoning_effort="<nivel>"` en Codex CLI 0.148.0-alpha.9.
+- Medición: el runner registra ticket/SHA, esfuerzo solicitado/aplicado y el evento JSON de uso; usa `unavailable` si la CLI no entrega una métrica fiable.
 
-Siguiente accion: ChatGPT audita este handoff. Codex se detiene sin ejecutar otro ticket.
+### Evidencia y gates
+
+- `bash -n tools/ai-autorun/glosh-ai-autorun tools/ai-autorun/self-test.sh`: PASS.
+- `tools/ai-autorun/self-test.sh`: PASS (`effort=6/6`, argumentos CLI, parser de uso, deduplicación y single-flight).
+- Reinstalación atómica: PASS; servicio `com.glosh.ai-autorun` activo y ejecución vigente preservada.
+- `git diff --check`: PASS.
+- Smoke automático mínimo: **BLOCKED**. La guardia rechazó la única invocación porque `codex exec` puede consumir créditos y el trigger no autoriza gastos. No se reintentó ni se usó un workaround.
+- Comparación contra 42.562 tokens: pendiente hasta autorizar ese único gasto; no se inventó una cifra.
+- Cambios de producto, APK, Production, deploy, Supabase, ADB y prueba física: **cero**.
+
+Siguiente acción propuesta: ChatGPT audita PR #98 y decide si autoriza un único smoke read-only con consumo de créditos. Codex no ejecuta otro ticket.
