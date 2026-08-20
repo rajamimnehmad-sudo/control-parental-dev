@@ -1,84 +1,115 @@
 {
-  "updatedAt": "19 ago 2026",
+  "updatedAt": "hoy 23:15",
   "sections": [
+    {
+      "id": "coordination",
+      "title": "Coordinación",
+      "context": "Estado local y ruta de trabajo",
+      "tasks": [
+        {
+          "id": "codex-local-inventory",
+          "title": "Inventario local completo con Codex",
+          "detail": "Reconciliar cambios sin commit, ramas, migraciones y diferencias contra GitHub antes de nuevos tickets.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "control-center-v2",
+          "title": "Control Center V2",
+          "detail": "Tablero solo lectura, compacto y sincronizado con la ruta técnica.",
+          "status": "in_progress",
+          "priority": "normal"
+        },
+        {
+          "id": "pro-audit",
+          "title": "Auditoría Pro y mapa técnico",
+          "detail": "Dejar el mapa estable del proyecto y el orden de trabajo después de reconciliar el estado local.",
+          "status": "pending",
+          "priority": "important"
+        }
+      ]
+    },
     {
       "id": "chrome-visual",
       "title": "Chrome Visual",
+      "context": "Filtrado directo en Chrome",
       "tasks": [
         {
           "id": "chrome-video-a23",
           "title": "Revalidar video en A23",
-          "detail": "Confirmar que la corrección de tormenta de eventos eliminó las coberturas completas repetidas en YouTube.",
+          "detail": "Confirmar físicamente que no reaparezcan coberturas completas en YouTube después del arreglo de eventos.",
           "status": "pending",
-          "priority": "P0"
+          "priority": "critical"
         },
         {
           "id": "chrome-images",
-          "title": "Confirmar filtrado de fotos en Chrome",
-          "detail": "Validar físicamente imágenes estáticas, scroll y overlays localizados.",
+          "title": "Confirmar fotos estáticas en Chrome",
+          "detail": "Verificar imágenes normales, scroll y overlays localizados por separado del video.",
           "status": "pending",
-          "priority": "P0"
+          "priority": "important"
+        },
+        {
+          "id": "chrome-fallback",
+          "title": "Fallback de captura y DRM",
+          "detail": "Definir degradación segura cuando Chrome no pueda capturarse o la geometría sea ambigua.",
+          "status": "pending",
+          "priority": "normal"
         }
       ]
     },
     {
       "id": "security",
       "title": "Seguridad",
+      "context": "Tokens, permisos y hardening",
       "tasks": [
         {
-          "id": "exact-supabase-hosts",
-          "title": "Cerrar allowlist amplia de Supabase",
-          "detail": "Implementado por Spark; pendiente revisión y commit limpio con Codex.",
-          "status": "in_progress",
-          "priority": "P0"
+          "id": "spark-review",
+          "title": "Revisar cambios acumulados de Spark",
+          "detail": "Codex debe reconstruir y validar los cambios candidatos antes de continuar desarrollo nuevo.",
+          "status": "pending",
+          "priority": "critical"
         },
         {
-          "id": "atomic-policy-sync",
-          "title": "Sincronización atómica de políticas",
-          "detail": "Implementado y testeado por Spark; pendiente reconciliación local con Codex.",
+          "id": "exact-hosts",
+          "title": "Allowlist exacta de Supabase",
+          "detail": "Cambio preparado y testeado por Spark; pendiente revisión y commit limpio con Codex.",
           "status": "in_progress",
-          "priority": "P0"
+          "priority": "important"
+        },
+        {
+          "id": "atomic-sync",
+          "title": "Sync atómico de políticas",
+          "detail": "Cambio preparado con tests de last-known-good; pendiente reconciliación local.",
+          "status": "in_progress",
+          "priority": "important"
         },
         {
           "id": "pairing-hardening",
-          "title": "Endurecer pairing y activación",
-          "detail": "Tokens de alta entropía preparados; falta revisión final del estado acumulado.",
+          "title": "Hardening de pairing",
+          "detail": "Tokens fuertes y lookup por hash preparados; falta revisión final de migración y transición legacy.",
           "status": "in_progress",
-          "priority": "P0"
+          "priority": "important"
         },
         {
           "id": "device-token-scope",
-          "title": "Restringir tokens por dispositivo",
-          "detail": "Evitar que un token de un dispositivo pueda escribir datos de otro dispositivo de la misma cuenta.",
+          "title": "Scope de token por dispositivo",
+          "detail": "Restringir escrituras para que un dispositivo no opere sobre otro de la misma cuenta.",
           "status": "pending",
-          "priority": "P0"
+          "priority": "important"
         }
       ]
     },
     {
-      "id": "coordination",
-      "title": "Coordinación",
+      "id": "gloshia-dag",
+      "title": "GloshIA / DAG",
+      "context": "Motor visual y navegador protegido",
       "tasks": [
         {
-          "id": "codex-local-inventory",
-          "title": "Inventario local completo con Codex",
-          "detail": "Antes de nuevos tickets: reconciliar cambios sin commit, ramas, migraciones y diferencias contra GitHub.",
+          "id": "shared-gloshia-engine",
+          "title": "Motor GloshIA compartido",
+          "detail": "Extraer R3.1 de DAG solo cuando Chrome Visual quede validado y con paridad exacta.",
           "status": "pending",
-          "priority": "P0"
-        },
-        {
-          "id": "pro-audit",
-          "title": "Auditoría Pro y mapa técnico",
-          "detail": "Dejar mapa estable, control center, tareas y orden de trabajo definitivo.",
-          "status": "pending",
-          "priority": "P1"
-        },
-        {
-          "id": "control-center-app",
-          "title": "Glosh Control Center",
-          "detail": "APK elegante de tareas para seguimiento compartido entre usuario y ChatGPT.",
-          "status": "in_progress",
-          "priority": "P1"
+          "priority": "normal"
         }
       ]
     }
