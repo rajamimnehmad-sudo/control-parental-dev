@@ -2,109 +2,91 @@
 
 Estado: auditoría read-only. No se aplicaron cambios en Production.
 
-## Contexto
+Documento canónico de plan: `docs/RPC_PERMISSION_HARDENING_PLAN.md`.
 
-Supabase Security Advisor detectó múltiples funciones `SECURITY DEFINER` ejecutables por `anon` y/o `authenticated`. Se inspeccionaron ACL reales y cuerpos de funciones para separar exposición legítima de permisos innecesarios.
+## Hallazgos confirmados
 
-Supabase recomienda restringir `EXECUTE` explícitamente en funciones `SECURITY DEFINER` y otorgarlo solo a los roles que realmente necesitan llamar cada RPC.
+- Supabase Security Advisor detectó múltiples funciones `SECURITY DEFINER` ejecutables por `anon` y/o `authenticated`.
+- Las ACL revisadas son grants explícitos por rol.
+- `require_super_admin()` no es ejecutable directamente por `anon/authenticated` y las RPC de Super Admin verificadas la invocan internamente.
+- `is_super_admin()` valida `auth.uid()` contra `public.super_admins` con `enabled = true` y `deleted_at is null`.
+- `request_device_token()` lee `x-device-token` de `request.headers`; `device_token_matches*()` valida contra hashes del dispositivo o sesión de relink.
+- Prueba read-only con rol `anon` sobre `super_admin_list_app_ratings(1)` fue rechazada con `Not authorized`.
 
-## Guardas base verificadas
+## `anon` necesario por diseño — mantener
 
-- `public.require_super_admin()` no es ejecutable por `anon` ni `authenticated`; las RPC Super Admin la invocan internamente como `SECURITY DEFINER`.
-- `public.is_super_admin()` no es ejecutable por `anon`; valida `auth.uid()` contra `public.super_admins`, `enabled = true`, `deleted_at is null`.
-- `public.request_device_token()` lee `x-device-token` de `request.headers`.
-- `device_token_matches*()` valida el token contra hashes del dispositivo o sesión de relink.
+Mantener `anon` en RPC cuyo modelo real es `x-device-token` o bootstrap de pairing:
 
-Prueba read-only con rol `anon` sobre `super_admin_list_app_ratings(1)`: rechazó con `Not authorized`.
+- helpers `device_token_matches*` y `admin_device_token_matches`;
+- `admin_create_device_relink_code`;
+- protección/ACK/metadata/license entitlement del dispositivo;
+- anuncios y push token del dispositivo;
+- `create_device_pairing_code`;
+- `pair_device_with_code`;
+- `pair_admin_device_with_password`;
+- `complete_own_device_relink` y demás RPC equivalentes autenticadas por device-token.
 
-## Clasificación
+Retirar `anon` de este grupo rompería el modelo actual de App Usuario/Admin.
 
-### A. `anon` necesario por diseño — mantener
+## Primer hardening de bajo riesgo — listo, NO aplicado
 
-Estas RPC dependen de `x-device-token` o deben funcionar antes de que exista una sesión Supabase autenticada:
+Cuatro RPC exclusivamente de Super Admin tienen `anon EXECUTE` innecesario y guardas internas de Super Admin:
 
-- `admin_create_device_relink_code(uuid,integer)`
-- `admin_device_token_matches(uuid)`
-- `device_token_matches(uuid)`
-- `device_token_matches_device(uuid)`
-- `device_token_matches_role(uuid,text)`
-- `auto_arm_device_protection(uuid)`
-- `ack_device_protection_control(uuid,bigint,bigint,bigint,integer[])`
-- `complete_own_device_relink()`
-- `get_device_license_entitlement(uuid)`
-- `list_device_announcements(integer)`
-- `list_device_announcements_v2(integer)`
-- `mark_device_announcements_read()`
-- `dismiss_device_announcement(uuid)`
-- `restore_device_announcement(uuid)`
-- `register_device_push_token(text)`
-- `report_own_device_metadata(uuid,text,text,text,integer)`
-- `create_device_pairing_code(integer)` (soporta sesión autenticada o token de admin)
-- `pair_device_with_code(text,text,integer,text)` (pairing inicial/relink)
-- `pair_admin_device_with_password(text,text,text,text,integer)` (pairing inicial/relink)
+1. `super_admin_create_announcement(uuid,text,text,text,timestamptz)`
+2. `super_admin_list_admin_contacts(uuid)`
+3. `super_admin_list_app_ratings(integer)`
+4. `super_admin_list_device_metadata(uuid)`
 
-No revocar `anon` de este grupo sin cambiar antes el modelo de autenticación del cliente Android.
-
-### B. `authenticated` legítimo — mantener
-
-RPC de administración y Super Admin que requieren sesión autenticada y guardas internas:
-
-- `create_admin_pairing_code(text,text,integer)`
-- `admin_archive_protected_user(uuid)`
-- `admin_create_archived_user_restore_code(uuid,integer)`
-- `admin_list_archived_protected_users()`
-- `revoke_device(uuid)`
-- RPC `super_admin_*` en general: verificadas las principales y todas llaman `require_super_admin()` antes de operar.
-
-### C. `anon` innecesario — candidato de bajo riesgo a revocar
-
-Estas funciones no pueden completar legítimamente una operación anónima y/o ya exigen Super Admin autenticado internamente:
-
-1. `activate_device(text,text,integer,text)` — exige que el código pertenezca a una cuenta cuyo `owner_user_id = auth.uid()`; con rol anónimo `auth.uid()` es nulo.
-2. `super_admin_create_announcement(uuid,text,text,text,timestamptz)` — exige `require_super_admin()`.
-3. `super_admin_list_admin_contacts(uuid)` — exige `require_super_admin()`.
-4. `super_admin_list_app_ratings(integer)` — exige `require_super_admin()`; prueba `anon` confirmó rechazo.
-5. `super_admin_list_device_metadata(uuid)` — exige `require_super_admin()`.
-
-Primer lote propuesto (NO aplicado):
+Cambio propuesto:
 
 ```sql
-revoke execute on function public.activate_device(text,text,integer,text) from anon;
 revoke execute on function public.super_admin_create_announcement(uuid,text,text,text,timestamptz) from anon;
 revoke execute on function public.super_admin_list_admin_contacts(uuid) from anon;
 revoke execute on function public.super_admin_list_app_ratings(integer) from anon;
 revoke execute on function public.super_admin_list_device_metadata(uuid) from anon;
 ```
 
-Mantener `authenticated` y `service_role` para estas RPC.
+Conservar `authenticated` y `service_role`.
 
-## D. Internas correctamente cerradas — mantener
+## `activate_device` — legacy, NO incluir en primer lote
 
-Entre otras:
+Aunque `activate_device(text,text,integer,text)` exige `auth.uid()` y no obtiene capacidad útil desde `anon`, `pg_stat_statements` registra **27 llamadas históricas** a ese RPC. Por compatibilidad, no se revoca todavía.
 
-- `broadcast_community_license_invalidation()`
-- `ensure_device_protection_control()`
-- `generate_device_offline_alerts(timestamptz)`
-- `license_allows_activation(uuid,text)`
-- `license_allows_relink(uuid,text)`
-- `pair_admin_device_with_password_new_internal(...)`
-- `pair_device_with_code_new_or_restore_internal(...)`
-- `process_due_community_license_transitions(timestamptz)`
-- `revoke_open_device_relinks(uuid)`
-- `send_community_license_invalidation(uuid)`
+Primero hay que localizar qué cliente/versión legacy lo usa y migrarlo al pairing actual si corresponde.
 
-Estas aparecen solo para `service_role`.
+## Default privileges — causa estructural confirmada
 
-## Observaciones de seguridad
+Para funciones creadas por `postgres` en schema `public`, los defaults actuales conceden `EXECUTE` a:
 
-- Los grants observados son explícitos por rol; no provienen de `PUBLIC EXECUTE` en las funciones revisadas.
-- Algunas funciones antiguas usan `search_path=public` o `public, extensions`; las más recientes usan `search_path=''`. Conviene normalizar gradualmente `SECURITY DEFINER` hacia `search_path=''` cuando se toquen por otros motivos, sin mezclarlo con este primer lote de permisos.
-- Security Advisor también reporta `Leaked Password Protection` desactivada. Se mantiene como pendiente separado; no se cambió Auth.
+- `anon`
+- `authenticated`
+- `service_role`
+
+Existen defaults equivalentes para objetos creados por `supabase_admin`.
+
+Por eso el plan canónico propone, en un cambio separado y posterior, hacer opt-in de `anon/authenticated` para funciones nuevas creadas por `postgres`, sin tocar `service_role` ni defaults de plataforma en el primer lote.
+
+## Uso histórico relevante
+
+`pg_stat_statements` confirma tráfico real en los flujos modernos:
+
+- `pair_device_with_code(...)`: múltiples firmas/planes con decenas de llamadas.
+- `pair_admin_device_with_password(...)`: uso real registrado.
+- `activate_device(...)`: 27 llamadas históricas.
+
+Esto justifica mantener pairing público y tratar `activate_device` como compatibilidad legacy hasta identificar su consumidor.
+
+## Otros pendientes
+
+- Varias funciones antiguas usan `search_path=public` o `public, extensions`; normalizar gradualmente hacia `search_path=''` cuando se modifiquen por otros motivos.
+- `Leaked Password Protection` está desactivada; pendiente separado.
+- El pairing Admin mantiene deuda P1 por escritura directa en `auth.users` / `auth.identities`; no mezclar con este lote de grants.
 
 ## Próximo paso
 
-1. Obtener autorización explícita del owner antes de cambiar grants en Production.
-2. Aplicar solo el lote C en una transacción.
-3. Verificar con `has_function_privilege` que `anon=false`, `authenticated=true`, `service_role=true` para esas cinco RPC.
-4. Ejecutar Security Advisor otra vez y confirmar que no aparecen regresiones.
-5. Continuar luego con clasificación de permisos `authenticated` de RPC no-client-facing si todavía aparecen avisos relevantes.
+Requiere autorización explícita del owner porque modifica Production:
+
+1. aplicar únicamente los 4 `REVOKE ... FROM anon` de Super Admin;
+2. verificar `anon=false`, `authenticated=true`, `service_role=true` en esas firmas;
+3. volver a correr Security Advisor;
+4. solo después preparar el hardening de default privileges como segundo cambio independiente.
