@@ -54,6 +54,26 @@ Reglas:
 4. El detalle debe mantenerse compacto: título + contexto breve + estado/prioridad; evidencia larga queda en PR/handoff/documentación correspondiente.
 5. Si por una limitación técnica no puede actualizarse el tablero en ese momento, ChatGPT debe decirlo explícitamente y corregirlo en cuanto vuelva a estar disponible.
 
+## Regla permanente — Preservar datos útiles para GloshIA
+
+Un **reset operativo** nunca incluye automáticamente datos que puedan servir para entrenar, calibrar, evaluar o auditar GloshIA.
+
+Se consideran preservables, aunque ya no pertenezcan a usuarios/dispositivos activos:
+- datasets y muestras;
+- imágenes/objetos de calibración permitidos por el flujo de privacidad;
+- etiquetas `show` / `hide` / `unsure` u otras etiquetas humanas;
+- sesiones, items y owner reviews de GloshIA;
+- métricas, scores, thresholds, resultados de benchmark y evidencia de calibración;
+- outboxes/recibos/evidencia remota que permitan reconstruir o mejorar el dataset;
+- documentación o artefactos que permitan reproducir entrenamiento/evaluación.
+
+Reglas:
+1. Cuando el usuario pida “reset”, “borrar todo”, “volver a cero” o equivalente, interpretar por defecto **reset de operación**: comunidades, cuentas operativas, admins comunitarios, dispositivos, licencias, códigos, pedidos, sesiones de dispositivo y telemetría puramente operacional.
+2. **No borrar material útil para GloshIA** salvo autorización explícita separada que mencione también datos de entrenamiento/calibración/IA.
+3. Antes de cualquier limpieza destructiva, clasificar tablas/buckets en `operativo borrable` vs `IA/evidencia preservable` y excluir este segundo grupo.
+4. Si existe duda razonable sobre si un dato puede servir para GloshIA, **preservarlo** y reportarlo.
+5. Si alguna limpieza borra por error evidencia de IA, detener nuevas limpiezas de IA, registrar el incidente, buscar copias/exportaciones/backups/evidencia en GitHub/Supabase y actualizar Control Center.
+
 ## Formato de ticket
 
 Cada ticket entregado por ChatGPT debe ser autocontenido y listo para copiar en Codex. Debe incluir, cuando corresponda:
