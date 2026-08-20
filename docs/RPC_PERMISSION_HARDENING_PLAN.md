@@ -17,6 +17,7 @@ Reducir la superficie de `SECURITY DEFINER` expuesta por la Data API sin romper 
 - `activate_device(...)` exige `auth.uid()` y por diseño actual no puede funcionar desde `anon`, pero `pg_stat_statements` registra **27 llamadas históricas** al RPC. Por seguridad de compatibilidad, queda fuera del primer hardening hasta identificar el cliente legacy.
 - Los `DEFAULT PRIVILEGES` actuales para funciones nuevas en `public` conceden `EXECUTE` automáticamente a `anon`, `authenticated` y `service_role` para objetos creados por `postgres` (y existen defaults equivalentes de plataforma para `supabase_admin`). Esto explica la exposición accidental de RPC nuevas.
 - El pairing actual sí muestra uso real: `pair_device_with_code(...)` acumula decenas de llamadas y `pair_admin_device_with_password(...)` también aparece en estadísticas; `anon` se conserva en esos flujos.
+- Hay **14 funciones `SECURITY DEFINER` accesibles solo por `service_role`** (helpers internos, tareas programadas, transiciones de licencia, pairing interno, etc.). Por eso `service_role` no se endurece en este lote ni se quita de defaults por ahora.
 - El pairing de Admin mantiene una deuda P1 independiente: `pair_admin_device_with_password_new_internal(...)` inserta directamente en `auth.users` / `auth.identities`. No se modifica en este hardening de permisos.
 
 ## Matriz de permisos propuesta
@@ -94,17 +95,17 @@ Acción posterior:
 
 - Permisos `authenticated` de RPC `super_admin_*`: el acceso se restringe internamente por Super Admin y es el patrón esperado para el frontend autenticado.
 - Funciones internas ya cerradas a `anon/authenticated`, como `require_super_admin`, `license_allows_activation`, `license_allows_relink`, `pair_*_internal`, tareas cron y helpers internos.
-- `service_role`: no reducir en este lote hasta inventariar Edge Functions/automatizaciones que puedan depender de estas RPC.
+- `service_role`: conservar tanto los grants actuales como su default de funciones por ahora. Hay 14 `SECURITY DEFINER` internos accesibles solo por ese rol y reducirlo no aporta una mejora proporcional en este lote.
 
 ## Hardening de defaults para funciones futuras
 
-La causa estructural es que nuevas funciones creadas por `postgres` en `public` heredan `EXECUTE` para roles de Data API. Para evitar repetir el problema, preparar un cambio **opt-in** para funciones nuevas.
+La causa estructural es que nuevas funciones creadas por `postgres` en `public` heredan `EXECUTE` para roles de Data API. Para evitar repetir el problema, preparar un cambio **opt-in** para los roles cliente (`anon` y `authenticated`) sin alterar `service_role` todavía.
 
 Cambio recomendado para el rol `postgres` creador de nuestras funciones (NO ejecutado):
 
 ```sql
 alter default privileges for role postgres in schema public
-  revoke execute on functions from anon, authenticated, service_role;
+  revoke execute on functions from anon, authenticated;
 ```
 
 Después, cada nueva RPC pública debe recibir grants explícitos según su modelo:
@@ -115,7 +116,7 @@ grant execute on function public.<rpc>(...) to anon;
 grant execute on function public.<rpc>(...) to authenticated;
 ```
 
-No modificar defaults de `supabase_admin` sin necesidad explícita; son parte de la plataforma y deben tratarse por separado.
+`service_role` se mantiene como default por compatibilidad con tareas internas. No modificar defaults de `supabase_admin` sin necesidad explícita; son parte de la plataforma y deben tratarse por separado.
 
 ## Verificación antes/después
 
@@ -145,4 +146,4 @@ Además:
 
 ## Siguiente decisión
 
-Aplicar cambios reales a Production requiere autorización explícita del owner. La primera aplicación recomendada es mínima: **solo los 4 `REVOKE ... FROM anon` de Super Admin**, seguida por verificación inmediata. `activate_device` queda fuera del cambio. El hardening de default privileges debe ir en un segundo cambio separado para reducir blast radius.
+Aplicar cambios reales a Production requiere autorización explícita del owner. La primera aplicación recomendada es mínima: **solo los 4 `REVOKE ... FROM anon` de Super Admin**, seguida por verificación inmediata. `activate_device` queda fuera del cambio. El hardening de default privileges (`anon/authenticated` solamente) debe ir en un segundo cambio separado para reducir blast radius.
