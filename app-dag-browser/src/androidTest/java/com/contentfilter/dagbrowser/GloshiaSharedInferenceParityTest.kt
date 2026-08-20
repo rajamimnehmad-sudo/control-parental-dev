@@ -8,12 +8,12 @@ import com.glosh.visual.GloshiaPreparedImage
 import com.glosh.visual.GloshiaVisualAnalysisResult
 import com.glosh.visual.GloshiaVisualModelInfo
 import com.glosh.visual.OnDeviceGloshiaVisualAnalyzer
-import java.io.Closeable
-import java.nio.FloatBuffer
-import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.Closeable
+import java.nio.FloatBuffer
+import kotlin.math.abs
 
 class GloshiaSharedInferenceParityTest {
     @Test
