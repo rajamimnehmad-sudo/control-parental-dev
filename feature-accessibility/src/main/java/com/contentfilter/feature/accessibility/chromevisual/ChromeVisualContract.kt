@@ -28,6 +28,7 @@ internal data class ChromeVisualIdentity(
     val contentEpoch: Long,
     val captureSequence: Long,
     val regionId: String,
+    val region: ChromeVisualRegion,
     val visualSignature: Long,
 )
 

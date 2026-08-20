@@ -98,13 +98,14 @@ class ChromeVisualContractTest {
         val gate = ChromeVisualIdentityGate()
         gate.invalidate(windowId = 7)
         val capture = gate.nextCapture()
-        val old = ChromeVisualIdentity(7, capture.first, capture.second, "image", 42L)
+        val region = ChromeVisualRegion("image", 0, 0, 100, 100)
+        val old = ChromeVisualIdentity(7, capture.first, capture.second, "image", region, 42L)
 
         assertTrue(gate.isCurrent(old))
         gate.invalidate(windowId = 7)
         assertFalse(gate.isCurrent(old))
         val next = gate.nextCapture()
-        assertTrue(gate.isCurrent(ChromeVisualIdentity(7, next.first, next.second, "image", 43L)))
+        assertTrue(gate.isCurrent(ChromeVisualIdentity(7, next.first, next.second, "image", region, 43L)))
     }
 
     private fun candidate(

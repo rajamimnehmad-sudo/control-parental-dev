@@ -1,6 +1,6 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
-import com.glosh.visual.GloshiaVisualAction
+import com.glosh.visual.GloshiaVisualDecision
 import java.util.LinkedHashMap
 
 internal data class RegionCounts(
@@ -8,9 +8,75 @@ internal data class RegionCounts(
     val blocked: Int,
 )
 
+internal data class ChromeVisualBaselineContext(
+    val windowId: Int,
+    val pageIdentity: Long,
+    val viewport: ChromeVisualViewport,
+)
+
+internal class ChromeVisualBaselineCoordinator {
+    private var active: ChromeVisualBaselineContext? = null
+    private var rescanRequested = false
+
+    @Synchronized
+    fun coalesceIfActive(context: ChromeVisualBaselineContext): Boolean {
+        if (active != context) return false
+        rescanRequested = true
+        return true
+    }
+
+    @Synchronized
+    fun replace(context: ChromeVisualBaselineContext) {
+        active = context
+        rescanRequested = false
+    }
+
+    @Synchronized
+    fun startIfIdle(context: ChromeVisualBaselineContext): Boolean {
+        if (active != null) return false
+        replace(context)
+        return true
+    }
+
+    @Synchronized
+    fun finish(context: ChromeVisualBaselineContext): Boolean {
+        if (active != context) return false
+        active = null
+        return rescanRequested.also { rescanRequested = false }
+    }
+
+    @Synchronized
+    fun clear() {
+        active = null
+        rescanRequested = false
+    }
+}
+
+internal object ChromeVisualEventModePolicy {
+    fun requiresBaseline(
+        pageChanged: Boolean,
+        activeWindowId: Int,
+        eventWindowId: Int,
+        lastViewport: ChromeVisualViewport?,
+        eventViewport: ChromeVisualViewport,
+        hasSignatures: Boolean,
+    ): Boolean =
+        pageChanged ||
+            activeWindowId != eventWindowId ||
+            lastViewport != eventViewport ||
+            !hasSignatures
+}
+
 internal object ChromeVisualVerificationSchedule {
-    fun delayMillis(stableVerificationCount: Int): Long =
-        if (stableVerificationCount < FastVerificationCount) FastDelayMillis else StableDelayMillis
+    fun delayMillis(
+        stableVerificationCount: Int,
+        hasDynamicRegions: Boolean = false,
+    ): Long =
+        if (hasDynamicRegions || stableVerificationCount < FastVerificationCount) {
+            FastDelayMillis
+        } else {
+            StableDelayMillis
+        }
 
     private const val FastVerificationCount = 2
     private const val FastDelayMillis = 500L
@@ -67,18 +133,18 @@ internal class ChromeVisualDecisionCache(
     private val maximumSize: Int,
 ) {
     private val entries =
-        object : LinkedHashMap<Long, GloshiaVisualAction>(maximumSize, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, GloshiaVisualAction>?): Boolean =
+        object : LinkedHashMap<Long, GloshiaVisualDecision>(maximumSize, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, GloshiaVisualDecision>?): Boolean =
                 size > maximumSize
         }
 
-    operator fun get(signature: Long): GloshiaVisualAction? = synchronized(entries) { entries[signature] }
+    operator fun get(signature: Long): GloshiaVisualDecision? = synchronized(entries) { entries[signature] }
 
     operator fun set(
         signature: Long,
-        action: GloshiaVisualAction,
+        decision: GloshiaVisualDecision,
     ) {
-        synchronized(entries) { entries[signature] = action }
+        synchronized(entries) { entries[signature] = decision }
     }
 
     fun clear() = synchronized(entries) { entries.clear() }
