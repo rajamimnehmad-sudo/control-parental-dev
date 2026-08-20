@@ -1,198 +1,126 @@
 # AI WORKFLOW — Glosh
 
-## Objetivo
+## Modo operativo oficial
 
-Que el usuario pueda operar el proyecto con el circuito mínimo:
+El flujo normal es **manual y controlado**:
 
-**Usuario pide → ChatGPT dirige → Codex ejecuta → GitHub deja evidencia → ChatGPT audita → siguiente ticket.**
+**Usuario pide → ChatGPT diseña el ticket → usuario copia el ticket en Codex → Codex ejecuta → Codex deja PR/handoff en GitHub → usuario dice “ya” en ChatGPT → ChatGPT audita → siguiente ticket.**
 
-El usuario no debe copiar reportes manualmente entre Codex y ChatGPT. Cuando Codex termine, el usuario debería poder decir únicamente **“ya”** y ChatGPT debe poder reconstruir el estado desde GitHub.
-
-## Comando corto del usuario: “ya”
-
-La palabra **“ya”** es el trigger operativo estándar de este circuito mientras el autorun no esté disponible o como fallback manual.
-
-### Cuando el usuario diga “ya” en Codex
-Codex debe interpretar que tiene autorización para **arrancar el ticket vigente**, no para inventar trabajo nuevo.
-
-Debe, en este orden:
-1. leer `docs/AI_WORKFLOW.md` de la rama `coordination/ai-control`;
-2. leer `docs/AI_NEXT_TICKET.md` de esa misma rama;
-3. identificar el ticket vigente y ejecutar exactamente su alcance, permisos, límites y criterio de cierre;
-4. dejar la evidencia/handoff exigido en GitHub antes de detenerse;
-5. no avanzar al siguiente ticket por iniciativa propia.
-
-Si no existe un ticket vigente claro, si ya está cerrado, o si las instrucciones se contradicen, Codex debe **detenerse y dejar handoff de bloqueo**, no adivinar.
-
-### Cuando el usuario diga “ya” en ChatGPT
-ChatGPT debe interpretar que Codex terminó o se bloqueó y debe revisar GitHub directamente: handoff, rama/PR, diff y tests correspondientes. Luego aprueba, pide corrección o publica el siguiente ticket.
+El autorun local queda fuera del flujo normal. No se debe depender de `launchd`, watchers ni cambios en `docs/AI_NEXT_TICKET.md` para iniciar trabajo. `AI_NEXT_TICKET.md` puede conservarse como referencia histórica/coordinación, pero ChatGPT no lo usa como mecanismo de ejecución salvo decisión explícita futura del usuario.
 
 ## Roles
 
 ### Usuario / owner
 - Define objetivos de producto y negocio.
-- Autoriza Production, publicación, gastos, borrados, merges importantes y pruebas físicas cuando sean necesarias.
+- Copia en Codex el ticket que ChatGPT entrega en el chat.
+- Autoriza Production, publicación, gastos, borrados destructivos, merges importantes y pruebas físicas cuando sean necesarias.
+- Cuando Codex termina, normalmente solo necesita decir **“ya”** en ChatGPT.
 
 ### ChatGPT / jefe técnico central
-- Define arquitectura, prioridades, tickets y criterios de aceptación.
-- Revisa código real, diffs, tests, evidencia y handoffs.
-- Aprueba/rechaza el trabajo y decide el siguiente ticket.
-- Mantiene la ruta técnica y el Control Center.
-- Decide también el **esfuerzo de razonamiento de Codex por ticket**.
+- Mantiene visión global, arquitectura, prioridades y máximo de frentes activos.
+- Decide si Codex realmente hace falta.
+- Escribe tickets completos, listos para copiar, con alcance, esfuerzo, permisos, límites y criterio de cierre.
+- Revisa el trabajo real de Codex en GitHub: diff, archivos, tests, PR y handoff; no confía solo en el resumen.
+- Aprueba, rechaza o emite una corrección.
+- Mantiene Control Center y backlog.
 
-### Codex / ejecutor técnico local
-- Trabaja en la Mac.
-- Modifica código cuando el ticket lo autoriza.
-- Corre Gradle/tests/scripts/ADB.
-- Compila APKs y diagnostica fallos.
-- Deja evidencia suficiente en GitHub para que ChatGPT pueda auditar sin que el usuario copie/pegue nada.
+### Codex / ejecutor local
+- Ejecuta únicamente el ticket que el usuario pega en la sesión.
+- Trabaja en la Mac y usa código/tests/Gradle/scripts/ADB solo cuando el ticket lo autoriza.
+- No inventa el siguiente trabajo.
+- Antes de detenerse deja evidencia suficiente en GitHub para que ChatGPT pueda auditar sin copiar reportes manualmente.
 
 ### GitHub
-- Fuente compartida de verdad para código, ramas, PRs, tickets y handoffs.
-- `main` representa estado aprobado/integrado; no usarlo para trabajo directo sin autorización.
+- Fuente compartida de verdad para código, ramas, PRs y handoffs.
+- `main` representa estado aprobado/integrado; no trabajar directamente allí sin autorización.
 
-## Esfuerzo Codex por ticket
+## Formato de ticket
 
-Cada ticket nuevo debe incluir un campo explícito:
+Cada ticket entregado por ChatGPT debe ser autocontenido y listo para copiar en Codex. Debe incluir, cuando corresponda:
 
-`**Esfuerzo Codex:** low | medium | high | xhigh`
+- identificador y objetivo;
+- rama/base o regla para crearla;
+- alcance exacto y áreas permitidas;
+- `Esfuerzo Codex`;
+- permisos y prohibiciones;
+- tests/gates mínimos;
+- criterio de cierre;
+- handoff requerido.
 
-Mapa operativo:
+No obligar a Codex a releer un backlog enorme ni documentación histórica si el ticket ya contiene lo necesario. Puede leer archivos del repo únicamente cuando son relevantes para ejecutar el trabajo.
 
-- **Bajo → `low`**: documentación, inspecciones simples, cambios mecánicos y tareas de muy bajo riesgo.
-- **Medio → `medium`**: implementación normal bien especificada. **Default** si el ticket no declara otro nivel.
-- **Alto → `high`**: debugging difícil, integración entre módulos, refactors grandes, problemas de concurrencia/estado o validación técnica delicada.
-- **Extra alto → `xhigh`**: seguridad crítica, arquitectura, fallos especialmente difíciles, migraciones complejas o auditorías de alto impacto.
+## Esfuerzo Codex
 
-Reglas:
+ChatGPT elige el menor esfuerzo suficiente:
 
-1. ChatGPT decide el nivel según dificultad/riesgo, no el usuario ni Codex por defecto.
-2. No usar `high/xhigh` por costumbre: subir esfuerzo solo cuando aporta calidad real.
-3. El runner automático debe leer este campo y lanzar Codex con el valor correspondiente mediante configuración de CLI.
-4. Si falta el campo, usar `medium` y registrar esa decisión en el log/handoff.
-5. Codex no cambia autónomamente el esfuerzo del ticket; si detecta que el nivel es claramente insuficiente, deja observación/bloqueo para que ChatGPT decida.
+- **Bajo / low:** documentación, inspecciones simples, cambios mecánicos o riesgo bajo.
+- **Medio / medium:** implementación normal bien especificada. Default.
+- **Alto / high:** debugging difícil, integración compleja, concurrencia/estado o refactor importante.
+- **Extra alto / xhigh:** seguridad crítica, arquitectura, migraciones complejas o fallos especialmente difíciles.
+
+No usar `high/xhigh` por costumbre. Si Codex considera insuficiente el esfuerzo indicado, debe reportarlo en vez de ampliarlo por su cuenta.
 
 ## Regla de costo y eficiencia
 
-La automatización existe para **reducir costo total, intervención manual y trabajo repetido**. No debe generar más sesiones, más contexto o más pruebas que el flujo manual equivalente.
+Este workflow existe para abaratar el desarrollo, no encarecerlo.
 
-Reglas obligatorias:
+1. ChatGPT resuelve directamente con GitHub/web/conectores todo lo que no requiera la Mac/Codex.
+2. Agrupar trabajo relacionado en lotes coherentes antes que microtickets.
+3. Contexto mínimo: no cargar backlog, handoffs históricos ni áreas no relacionadas por costumbre.
+4. Tests estrechos por módulos afectados; gate final solo cuando aporta evidencia nueva.
+5. No repetir evidencia válida si el cambio no toca esa capa.
+6. No compilar/enviar APK por cada cambio pequeño.
+7. Usar el menor esfuerzo de Codex suficiente.
+8. Handoffs cortos: estado, evidencia, riesgos y próximo paso.
+9. Si una automatización o proceso aumenta el consumo sin beneficio proporcional, simplificarlo o retirarlo.
+10. Las tareas de coordinación que ChatGPT puede resolver sin Codex tienen costo objetivo de **0 sesiones Codex**.
 
-1. **Contexto mínimo por defecto.** Codex empieza con `AI_NEXT_TICKET.md` + reglas mínimas del workflow y solo abre documentación/áreas adicionales cuando el ticket lo necesita.
-2. **No cargar historia por costumbre.** No leer backlog gigante, handoffs antiguos, evidencia histórica ni áreas no relacionadas si no son necesarias para ejecutar el ticket.
-3. **Lotes coherentes antes que microtickets.** Agrupar trabajo relacionado en un lote auditable para evitar pagar varias veces el costo fijo de iniciar Codex.
-4. **Usar Codex solo cuando hace falta la Mac/local.** Lecturas de GitHub, coordinación, tracker y revisiones que ChatGPT pueda resolver con conectores no deben convertirse en una nueva sesión Codex.
-5. **No repetir pruebas válidas.** Ejecutar solo tests afectados + gate final necesario. No repetir suites completas si el cambio no toca esa capa.
-6. **No generar APKs sin utilidad.** Compilar solo cuando corresponde al grafo o gate; enviar/instalar solo cuando aporta validación física real.
-7. **Esfuerzo mínimo suficiente.** `low` para tareas mecánicas/read-only simples, `medium` para desarrollo normal; `high/xhigh` solo por riesgo o complejidad demostrada.
-8. **Handoff corto.** Estado, evidencia mínima, riesgos y siguiente paso; no volcar logs extensos al contexto futuro.
-9. **Medir cuando sea posible.** Si Codex CLI expone tokens/uso de forma fiable, registrarlos por ticket para detectar regresiones de costo. Nunca inventar métricas.
-10. **Una automatización cara se corrige o se elimina.** Si una mejora de workflow aumenta materialmente el consumo sin beneficio técnico proporcional, ChatGPT debe simplificarla.
+La optimización del runner queda documentada como trabajo experimental previo, pero no define el flujo normal.
 
-Routing vigente: Luna/low para trabajo simple, Terra/medium para desarrollo
-normal y Sol para high/xhigh. Todos usan contexto aislado `lean` por defecto;
-`Perfil Codex: full` debe ser una excepción explícita y justificada. El ticket
-completo se entrega en el prompt y no debe releerse desde GitHub.
-
-Referencia práctica: el smoke inicial consumió ~42.500 tokens y la primera
-medición incompleta llegó a 493.222 tokens agregados. El perfil lean final midió
-10.531 tokens en un smoke real Luna/low (reducción de 75,2% contra el smoke
-inicial y 97,9% contra la corrida inflada). Para coordinación sin trabajo local,
-el objetivo sigue siendo cero sesiones Codex.
-
-## Regla de cierre obligatoria
-
-**Todo ticket debe dejar una huella auditable en GitHub antes de que Codex se detenga.**
+## Cierre obligatorio de Codex
 
 ### Ticket con cambios de código
 
 Codex debe:
-1. trabajar en una rama `review/<ticket>` o la rama explícitamente indicada;
-2. dejar commits separados y coherentes;
+1. trabajar en rama `review/<ticket>` o la rama indicada;
+2. hacer commits coherentes;
 3. subir la rama;
-4. abrir o actualizar una PR contra la base indicada cuando corresponda;
-5. usar descripción estandarizada con:
-   - resumen del cambio;
-   - archivos/áreas tocadas;
-   - tests y comandos ejecutados;
-   - resultado exacto;
-   - riesgos pendientes;
-   - branch + commit;
-   - pruebas físicas pendientes, si aplican.
+4. abrir/actualizar PR cuando corresponda;
+5. dejar resumen de archivos/áreas, tests/comandos, resultado, riesgos, branch/commit y pruebas físicas pendientes.
 
-### Ticket SOLO LECTURA / auditoría / inventario
+### Ticket read-only / auditoría
 
-Aunque el ticket prohíba cambios de producto, **se permite una única excepción de coordinación**:
+Puede actualizar únicamente `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` como excepción de coordinación, sin alterar el estado auditado.
 
-- crear o actualizar `docs/AI_CODEX_HANDOFF.md` en la rama `coordination/ai-control`;
-- commit y push únicamente de ese archivo de reporte;
-- no tocar ningún otro archivo de producto/documentación;
-- no alterar el working tree que está siendo auditado;
-- si escribir desde ese worktree implicara riesgo, usar un worktree temporal limpio o la API/CLI de GitHub sin cambiar el estado auditado.
-
-El handoff debe contener:
+Todo handoff debe indicar:
 - ticket ejecutado;
-- fecha/hora;
-- rama + HEAD observados;
-- resumen;
-- evidencia/comandos relevantes;
-- hallazgos;
+- PASS / BLOCKED / FAILED;
+- rama + HEAD;
+- resumen y evidencia mínima;
 - riesgos/bloqueos;
-- siguiente acción propuesta, sin ejecutarla si no está autorizada.
+- siguiente acción propuesta, sin ejecutarla.
 
-Después debe detenerse.
+Después Codex se detiene.
 
-## Trigger de auditoría
+## Cuando el usuario diga “ya” en ChatGPT
 
-Cuando el usuario diga **“ya”** en ChatGPT, ChatGPT debe revisar directamente:
-1. la PR/rama `review/<ticket>` si hubo cambios de código;
-2. `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control`;
-3. código/diff/tests reales que correspondan;
-4. aprobar, pedir corrección o emitir el siguiente ticket.
+ChatGPT revisa directamente:
+1. `docs/AI_CODEX_HANDOFF.md`;
+2. PR/rama del ticket;
+3. diff/código real relevante;
+4. tests/evidencia;
+5. aprueba, pide corrección o prepara el siguiente ticket listo para copiar.
 
-El usuario no tiene que copiar el reporte de Codex salvo que GitHub falle.
+El usuario no necesita pegar el reporte de Codex salvo que GitHub falle.
 
 ## Manejo de bloqueos
 
-Si Codex encuentra un error inesperado de compilación/tests, incompatibilidad o problema arquitectónico:
-- no hacer reescrituras amplias a ciegas;
-- preservar evidencia;
-- dejar handoff en GitHub con el bloqueo exacto;
-- detenerse para que ChatGPT diagnostique y decida.
+Ante error inesperado, conflicto o problema arquitectónico Codex no hace reescrituras amplias a ciegas. Preserva evidencia, deja handoff y se detiene para decisión de ChatGPT.
 
-## Pruebas físicas
+## Pruebas físicas y APKs
 
-El usuario solo prueba un APK cuando:
-1. tests automatizados relevantes pasaron;
-2. Codex validó técnicamente y por ADB todo lo posible;
-3. ChatGPT auditó el cambio;
-4. la prueba física aporta evidencia que no puede obtenerse automáticamente.
+Una prueba física se pide solo si aporta evidencia que no puede obtenerse automáticamente y después de gates automáticos pertinentes.
 
-## Entrega de APKs al dispositivo físico
+Para el Samsung S22 Ultra, el canal preferido de APK sigue siendo Taildrop/Tailscale. **ChatGPT avisa antes de cualquier envío** y no se envía hasta que el usuario confirme que el dispositivo está listo.
 
-Regla operativa por defecto:
-
-- Codex puede compilar APKs como gate técnico cuando un cambio entra en el grafo de App Usuario, App Admin o DAG.
-- No se envía/instala un APK nuevo por cada ticket pequeño; solo al cerrar un lote aprobado que requiera validación física o una versión utilizable.
-- El dispositivo físico principal para recepción es el **Samsung S22 Ultra** del usuario.
-- El canal preferido de entrega es **Taildrop/Tailscale desde la Mac al S22**.
-- **Antes de enviar cualquier APK por Taildrop, ChatGPT debe avisar al usuario para que encienda/conecte el S22.** No enviar hasta que el usuario confirme que está listo.
-- Si el APK es de DAG, App Usuario o App Admin, indicar claramente cuál es y qué versión/lote se está enviando.
-
-## Handoffs limpios
-
-No acumular basura histórica.
-
-Cada handoff debe ser corto y vigente:
-- estado actual;
-- qué cerró;
-- qué queda;
-- riesgos vigentes;
-- próximo paso;
-- referencias mínimas a evidencia.
-
-Logs largos, pruebas históricas y evidencia detallada deben quedar fuera del handoff o vinculados desde él.
-
-## No repetir evidencia válida
-
-Si una capa ya fue demostrada y el nuevo cambio no la afecta, no repetir suites o pruebas completas sin una razón concreta.
+No Production, deploy, gastos, borrados destructivos ni merges importantes sin autorización explícita del usuario.
