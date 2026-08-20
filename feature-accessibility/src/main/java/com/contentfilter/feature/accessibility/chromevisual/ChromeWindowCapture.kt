@@ -21,10 +21,16 @@ internal data class ChromeWindowFrame(
     }
 }
 
+internal sealed interface ChromeWindowCaptureResult {
+    data class Captured(val frame: ChromeWindowFrame) : ChromeWindowCaptureResult
+
+    data class Failed(val errorCode: Int) : ChromeWindowCaptureResult
+}
+
 internal class ChromeWindowCapture(
     private val service: AccessibilityService,
 ) {
-    suspend fun capture(windowId: Int): ChromeWindowFrame? =
+    suspend fun capture(windowId: Int): ChromeWindowCaptureResult =
         suspendCancellableCoroutine { continuation ->
             val startedAt = SystemClock.elapsedRealtime()
             service.takeScreenshotOfWindow(
@@ -50,16 +56,25 @@ internal class ChromeWindowCapture(
                                 hardwareBuffer.close()
                             }
                         if (continuation.isActive) {
-                            continuation.resume(frame)
+                            continuation.resume(
+                                frame?.let(ChromeWindowCaptureResult::Captured)
+                                    ?: ChromeWindowCaptureResult.Failed(InvalidBitmapErrorCode),
+                            )
                         } else {
                             frame?.close()
                         }
                     }
 
                     override fun onFailure(errorCode: Int) {
-                        if (continuation.isActive) continuation.resume(null)
+                        if (continuation.isActive) {
+                            continuation.resume(ChromeWindowCaptureResult.Failed(errorCode))
+                        }
                     }
                 },
             )
         }
+
+    private companion object {
+        const val InvalidBitmapErrorCode = -1
+    }
 }

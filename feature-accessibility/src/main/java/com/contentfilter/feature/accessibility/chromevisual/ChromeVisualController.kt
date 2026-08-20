@@ -21,10 +21,14 @@ internal class ChromeVisualController(
     private val service: AccessibilityService,
     private val scope: CoroutineScope,
 ) : AutoCloseable {
-    private val enabled =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            service.resources.getBoolean(R.bool.chrome_visual_images_enabled) &&
-            ChromeVisualGloshiaEngineProvider.isAvailableInCurrentProcess()
+    private val initialCapability =
+        ChromeVisualCapabilityPolicy.initial(
+            sdkInt = Build.VERSION.SDK_INT,
+            is64BitProcess = ChromeVisualGloshiaEngineProvider.isAvailableInCurrentProcess(),
+            featureEnabled = service.resources.getBoolean(R.bool.chrome_visual_images_enabled),
+            engineAvailable = ChromeVisualGloshiaEngineProvider.isAvailableInCurrentProcess(),
+        )
+    private val enabled = initialCapability.canAnalyzeChrome
     private val capture = ChromeWindowCapture(service)
     private val overlay = ChromeVisualOverlay(service)
     private val windowInspector = ChromeVisualWindowInspector(service)
@@ -38,6 +42,11 @@ internal class ChromeVisualController(
     private var activeJob: Job? = null
     private var verificationJob: Job? = null
     private var pendingSinceMillis = 0L
+    private var lastFallbackReason: String? = null
+
+    init {
+        if (!enabled) logFallback(initialCapability)
+    }
 
     @Volatile
     private var lastTileSignatures = emptyMap<String, Long>()
@@ -63,8 +72,16 @@ internal class ChromeVisualController(
             return
         }
         val windowId = event.windowId.takeIf { it >= 0 } ?: return
-        val window = windowInspector.find(windowId) ?: return
-        val viewport = windowInspector.viewport(window) ?: return
+        val window =
+            windowInspector.find(windowId) ?: run {
+                logFallback(ChromeVisualCapabilityPolicy.runtimeUnavailable())
+                return
+            }
+        val viewport =
+            windowInspector.viewport(window) ?: run {
+                logFallback(ChromeVisualCapabilityPolicy.runtimeUnavailable(ambiguousGeometry = true))
+                return
+            }
         val currentContext = ChromeVisualBaselineContext(windowId, windowInspector.pageIdentity(window), viewport)
         if (baselineCoordinator.coalesceIfActive(currentContext)) return
         val pageChanged = beginPage(currentContext.pageIdentity)
@@ -175,12 +192,21 @@ internal class ChromeVisualController(
         )
         val startedAt = SystemClock.elapsedRealtime()
         val frame =
-            capture.capture(window.id) ?: run {
-                Log.i(LogTag, "windowId=${window.id} phase=capture result=failed")
-                coverFailedVideoRegions()
-                markEventAnalysisComplete()
-                scheduleVerification(window.id)
-                return
+            when (val result = capture.capture(window.id)) {
+                is ChromeWindowCaptureResult.Captured -> result.frame
+                is ChromeWindowCaptureResult.Failed -> {
+                    Log.i(LogTag, "windowId=${window.id} phase=capture result=failed")
+                    logFallback(
+                        ChromeVisualCapabilityPolicy.captureFailure(
+                            secureWindow =
+                                result.errorCode == AccessibilityService.ERROR_TAKE_SCREENSHOT_SECURE_WINDOW,
+                        ),
+                    )
+                    coverFailedVideoRegions()
+                    markEventAnalysisComplete()
+                    scheduleVerification(window.id)
+                    return
+                }
             }
         try {
             val topInset = (FallbackTopInsetDp * metrics.density).toInt()
@@ -222,10 +248,19 @@ internal class ChromeVisualController(
             return
         }
         val frame =
-            capture.capture(window.id) ?: run {
-                coverFailedVideoRegions()
-                scheduleVerification(window.id)
-                return
+            when (val result = capture.capture(window.id)) {
+                is ChromeWindowCaptureResult.Captured -> result.frame
+                is ChromeWindowCaptureResult.Failed -> {
+                    logFallback(
+                        ChromeVisualCapabilityPolicy.captureFailure(
+                            secureWindow =
+                                result.errorCode == AccessibilityService.ERROR_TAKE_SCREENSHOT_SECURE_WINDOW,
+                        ),
+                    )
+                    coverFailedVideoRegions()
+                    scheduleVerification(window.id)
+                    return
+                }
             }
         try {
             val tiles = fallbackTiles(viewport)
@@ -412,6 +447,16 @@ internal class ChromeVisualController(
 
     private fun markEventAnalysisComplete() {
         synchronized(lock) { pendingSinceMillis = 0L }
+    }
+
+    private fun logFallback(decision: ChromeVisualCapabilityDecision) {
+        if (lastFallbackReason == decision.reason) return
+        lastFallbackReason = decision.reason
+        Log.i(
+            LogTag,
+            "capability=${decision.state.name} reason=${decision.reason} " +
+                "keepCoverage=${decision.keepExistingCoverage} fallback=dag_required",
+        )
     }
 
     private suspend fun runBaseline(
