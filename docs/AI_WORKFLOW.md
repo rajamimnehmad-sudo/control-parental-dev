@@ -72,6 +72,25 @@ Reglas:
 4. Si falta el campo, usar `medium` y registrar esa decisión en el log/handoff.
 5. Codex no cambia autónomamente el esfuerzo del ticket; si detecta que el nivel es claramente insuficiente, deja observación/bloqueo para que ChatGPT decida.
 
+## Regla de costo y eficiencia
+
+La automatización existe para **reducir costo total, intervención manual y trabajo repetido**. No debe generar más sesiones, más contexto o más pruebas que el flujo manual equivalente.
+
+Reglas obligatorias:
+
+1. **Contexto mínimo por defecto.** Codex empieza con `AI_NEXT_TICKET.md` + reglas mínimas del workflow y solo abre documentación/áreas adicionales cuando el ticket lo necesita.
+2. **No cargar historia por costumbre.** No leer backlog gigante, handoffs antiguos, evidencia histórica ni áreas no relacionadas si no son necesarias para ejecutar el ticket.
+3. **Lotes coherentes antes que microtickets.** Agrupar trabajo relacionado en un lote auditable para evitar pagar varias veces el costo fijo de iniciar Codex.
+4. **Usar Codex solo cuando hace falta la Mac/local.** Lecturas de GitHub, coordinación, tracker y revisiones que ChatGPT pueda resolver con conectores no deben convertirse en una nueva sesión Codex.
+5. **No repetir pruebas válidas.** Ejecutar solo tests afectados + gate final necesario. No repetir suites completas si el cambio no toca esa capa.
+6. **No generar APKs sin utilidad.** Compilar solo cuando corresponde al grafo o gate; enviar/instalar solo cuando aporta validación física real.
+7. **Esfuerzo mínimo suficiente.** `low` para tareas mecánicas/read-only simples, `medium` para desarrollo normal; `high/xhigh` solo por riesgo o complejidad demostrada.
+8. **Handoff corto.** Estado, evidencia mínima, riesgos y siguiente paso; no volcar logs extensos al contexto futuro.
+9. **Medir cuando sea posible.** Si Codex CLI expone tokens/uso de forma fiable, registrarlos por ticket para detectar regresiones de costo. Nunca inventar métricas.
+10. **Una automatización cara se corrige o se elimina.** Si una mejora de workflow aumenta materialmente el consumo sin beneficio técnico proporcional, ChatGPT debe simplificarla.
+
+Referencia práctica: el smoke inicial del autorun consumió ~42.500 tokens para una tarea read-only mínima; ese nivel se considera **inaceptable como baseline** y debe reducirse materialmente antes de usar el autorun para lotes grandes.
+
 ## Regla de cierre obligatoria
 
 **Todo ticket debe dejar una huella auditable en GitHub antes de que Codex se detenga.**
