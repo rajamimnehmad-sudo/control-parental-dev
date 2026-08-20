@@ -4,9 +4,11 @@
 
 **Tipo:** inventario / reconciliación
 **Prioridad:** crítica
-**Modo:** SOLO LECTURA
+**Modo:** SOLO LECTURA DEL PROYECTO
 **Responsable de ejecución:** Codex
 **Revisor:** ChatGPT / jefe técnico central
+
+> Antes de ejecutar, leer también `docs/AI_WORKFLOW.md` en esta misma rama. Esa es la regla operativa permanente.
 
 ### Objetivo
 
@@ -14,26 +16,38 @@ Establecer la verdad exacta del proyecto local antes de ejecutar cualquier cambi
 
 ### Regla absoluta
 
-Durante este ticket **NO modificar el proyecto**.
+Durante este ticket **NO modificar el proyecto auditado**.
 
 No:
-- editar archivos;
-- formatear archivos;
-- crear ni borrar archivos;
-- hacer commit;
-- hacer push;
-- crear PR;
+- editar/formatear archivos del proyecto;
+- crear/borrar archivos de producto;
+- commit/push de código;
+- crear PR de código;
 - mergear;
 - resetear;
 - limpiar;
 - stash;
-- checkout que pueda alterar el working tree;
+- checkout que pueda alterar el working tree auditado;
 - aplicar migraciones;
 - tocar Supabase/Production;
 - instalar APK;
 - ejecutar comandos destructivos.
 
-Si un comando pudiera modificar estado, no ejecutarlo.
+Si un comando pudiera modificar el estado auditado, no ejecutarlo.
+
+### Única excepción permitida: handoff a ChatGPT
+
+Para que el usuario no tenga que copiar/pegar el resultado, al terminar Codex **DEBE** dejar el reporte en GitHub:
+
+`docs/AI_CODEX_HANDOFF.md`
+
+en la rama:
+
+`coordination/ai-control`
+
+Se permite exclusivamente crear/actualizar ese archivo, hacer commit y push de ese reporte. No modificar ningún otro archivo.
+
+Si hacerlo desde el worktree auditado pudiera alterar su estado, usar un worktree temporal limpio o un mecanismo que no cambie el working tree observado.
 
 ### Inventario obligatorio
 
@@ -76,7 +90,7 @@ Este ticket no busca volver a probar el proyecto. No gastar tiempo/créditos en 
 
 ### Clasificación final requerida
 
-Al finalizar, clasificar todo lo encontrado en:
+Clasificar todo lo encontrado en:
 
 1. **YA EN GITHUB / APROBADO**
 2. **LOCAL CON COMMIT, NO SUBIDO**
@@ -85,10 +99,12 @@ Al finalizar, clasificar todo lo encontrado en:
 5. **NO DEBE SUBIRSE**
 6. **ESTADO INCIERTO / REQUIERE DECISIÓN**
 
-### Cierre obligatorio
+### Formato de `AI_CODEX_HANDOFF.md`
 
-Entregar un único reporte compacto con:
+Debe ser compacto y contener:
 
+- ticket ejecutado;
+- fecha/hora;
 - rama + HEAD;
 - resumen del working tree;
 - commits locales no subidos;
@@ -96,15 +112,20 @@ Entregar un único reporte compacto con:
 - estado Chrome Visual;
 - estado de migraciones;
 - riesgos de pérdida/mezcla;
-- propuesta de cómo separar los cambios en futuras ramas `review/<ticket>` **sin ejecutar esa propuesta**.
+- comandos de solo lectura relevantes;
+- propuesta de separación futura en ramas `review/<ticket>` **sin ejecutarla**.
+
+No pegar logs enormes ni historia ya irrelevante.
 
 ### Gate
 
-Al terminar: **DETENERSE**.
+Al terminar:
+1. subir únicamente `docs/AI_CODEX_HANDOFF.md` a `coordination/ai-control`;
+2. verificar que quedó disponible en GitHub;
+3. **DETENERSE**.
 
 No arreglar nada aunque el problema parezca obvio.
-No hacer commit aunque un cambio parezca terminado.
-No subir nada.
+No hacer commit de código aunque un cambio parezca terminado.
 No comenzar el siguiente ticket.
 
-El usuario llevará el reporte a ChatGPT para auditoría y decisión del próximo paso.
+Después el usuario solo debe decir **“ya”** a ChatGPT. ChatGPT leerá el handoff y auditará directamente desde GitHub.
