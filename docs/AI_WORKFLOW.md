@@ -10,7 +10,7 @@ El usuario no debe copiar reportes manualmente entre Codex y ChatGPT. Cuando Cod
 
 ## Comando corto del usuario: “ya”
 
-La palabra **“ya”** es el trigger operativo estándar de este circuito.
+La palabra **“ya”** es el trigger operativo estándar de este circuito mientras el autorun no esté disponible o como fallback manual.
 
 ### Cuando el usuario diga “ya” en Codex
 Codex debe interpretar que tiene autorización para **arrancar el ticket vigente**, no para inventar trabajo nuevo.
@@ -27,8 +27,6 @@ Si no existe un ticket vigente claro, si ya está cerrado, o si las instruccione
 ### Cuando el usuario diga “ya” en ChatGPT
 ChatGPT debe interpretar que Codex terminó o se bloqueó y debe revisar GitHub directamente: handoff, rama/PR, diff y tests correspondientes. Luego aprueba, pide corrección o publica el siguiente ticket.
 
-Así, en operación normal, el usuario solo necesita decir **“ya”** en cada lado.
-
 ## Roles
 
 ### Usuario / owner
@@ -40,6 +38,7 @@ Así, en operación normal, el usuario solo necesita decir **“ya”** en cada 
 - Revisa código real, diffs, tests, evidencia y handoffs.
 - Aprueba/rechaza el trabajo y decide el siguiente ticket.
 - Mantiene la ruta técnica y el Control Center.
+- Decide también el **esfuerzo de razonamiento de Codex por ticket**.
 
 ### Codex / ejecutor técnico local
 - Trabaja en la Mac.
@@ -51,6 +50,27 @@ Así, en operación normal, el usuario solo necesita decir **“ya”** en cada 
 ### GitHub
 - Fuente compartida de verdad para código, ramas, PRs, tickets y handoffs.
 - `main` representa estado aprobado/integrado; no usarlo para trabajo directo sin autorización.
+
+## Esfuerzo Codex por ticket
+
+Cada ticket nuevo debe incluir un campo explícito:
+
+`**Esfuerzo Codex:** low | medium | high | xhigh`
+
+Mapa operativo:
+
+- **Bajo → `low`**: documentación, inspecciones simples, cambios mecánicos y tareas de muy bajo riesgo.
+- **Medio → `medium`**: implementación normal bien especificada. **Default** si el ticket no declara otro nivel.
+- **Alto → `high`**: debugging difícil, integración entre módulos, refactors grandes, problemas de concurrencia/estado o validación técnica delicada.
+- **Extra alto → `xhigh`**: seguridad crítica, arquitectura, fallos especialmente difíciles, migraciones complejas o auditorías de alto impacto.
+
+Reglas:
+
+1. ChatGPT decide el nivel según dificultad/riesgo, no el usuario ni Codex por defecto.
+2. No usar `high/xhigh` por costumbre: subir esfuerzo solo cuando aporta calidad real.
+3. El runner automático debe leer este campo y lanzar Codex con el valor correspondiente mediante configuración de CLI.
+4. Si falta el campo, usar `medium` y registrar esa decisión en el log/handoff.
+5. Codex no cambia autónomamente el esfuerzo del ticket; si detecta que el nivel es claramente insuficiente, deja observación/bloqueo para que ChatGPT decida.
 
 ## Regla de cierre obligatoria
 
