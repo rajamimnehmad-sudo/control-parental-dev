@@ -1,10 +1,10 @@
 {
-  "updatedAt": "20 ago 2026 · 11:14",
+  "updatedAt": "20 ago 2026 · 11:31",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
-      "context": "Backend P0 en cierre; luego seguimos con el siguiente lote grande",
+      "context": "Backend P0 en cierre; luego seguimos con lotes funcionales grandes",
       "tasks": [
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
         {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"PASS: commits locales y los 10 archivos sin commit quedaron preservados en ramas remotas preserve/*.","status":"done","priority":"critical"},
@@ -41,10 +41,20 @@
     },
     {
       "id": "super-admin-data",
-      "title": "Super Admin / datos",
-      "context": "Calidad y llegada de datos",
+      "title": "Super Admin",
+      "context": "Datos, licencias y UX/UI profesional",
       "tasks": [
-        {"id":"super-admin-data-cleanup","title":"Actualizar y limpiar datos del Super Admin","detail":"Eliminar nulls visibles, normalizar datos y verificar que la información necesaria llegue correctamente al Super Admin.","status":"pending","priority":"important"}
+        {"id":"super-admin-data-cleanup","title":"Actualizar y limpiar datos del Super Admin","detail":"Eliminar nulls visibles, normalizar datos y verificar que la información necesaria llegue correctamente al Super Admin.","status":"pending","priority":"important"},
+        {"id":"license-management-review","title":"Revisar sistema completo de licencias","detail":"Auditar creación al alta de comunidad, edición, estados activa/suspendida/vencida, fechas, cupos, recuperación al renovar y consistencia con Apps Usuario/Admin.","status":"pending","priority":"important"},
+        {"id":"super-admin-ux-ui","title":"Mejorar UX/UI del Super Admin","detail":"Revisar dashboard, comunidades, detalle, jerarquía visual y acciones. Simplificar pantallas densas, hacer licencias/cupos más claros y mantener diseño profesional responsive.","status":"pending","priority":"important"}
+      ]
+    },
+    {
+      "id": "delivery",
+      "title": "Entrega / APKs",
+      "context": "Actualizar APK solo cuando aporta una validación o entrega real",
+      "tasks": [
+        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Compilar cuando un cambio entra en el grafo de la app; instalar/distribuir APK solo al cerrar un lote aprobado que necesite prueba física o una versión utilizable. No generar APK nuevo por cada ticket pequeño.","status":"pending","priority":"important"}
       ]
     },
     {
