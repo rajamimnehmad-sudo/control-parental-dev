@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 20:42",
+  "updatedAt": "20 ago 2026 · 20:46",
   "sections": [
     {
       "id": "coordination",
@@ -27,13 +27,13 @@
     {
       "id": "security",
       "title": "Seguridad",
-      "context": "Primer hardening RPC aplicado y verificado; funciones futuras creadas por postgres ya no reciben anon/authenticated EXECUTE por defecto",
+      "context": "Super Admin cerrado a anon: 0 RPC super_admin_* ejecutables anónimamente; todas las RPC autenticadas verificadas con guarda interna",
       "tasks": [
         {"id":"exact-hosts","title":"Allowlist exacta de Supabase","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"atomic-sync","title":"Sync atómico de políticas","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"backend-security-advisor-audit","title":"Auditar exposición real de RPCs","detail":"DONE sin Codex: se separó exposición legítima por device-token/pairing de grants innecesarios.","status":"done","priority":"critical"},
         {"id":"rpc-permission-matrix","title":"Clasificar permisos reales de RPCs","detail":"DONE. Matriz documentada en docs/RPC_PERMISSION_HARDENING_PLAN.md.","status":"done","priority":"critical"},
-        {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: anon revocado de 4 RPC exclusivas de Super Admin; authenticated/service_role preservados y verificados.","status":"done","priority":"critical"},
+        {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: anon revocado de 4 RPC exclusivas de Super Admin; chequeo global confirma 0 super_admin_* ejecutables por anon y todas usan require/is_super_admin.","status":"done","priority":"critical"},
         {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"DONE para funciones futuras creadas por postgres en public: anon/authenticated pasan a opt-in; service_role preservado.","status":"done","priority":"critical"},
         {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Código estático listo; falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
         {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"Implementado estáticamente; falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
@@ -61,7 +61,7 @@
     {
       "id": "super-admin-data",
       "title": "Super Admin",
-      "context": "UX aprobada; primer hardening RPC de acceso ya aplicado",
+      "context": "UX aprobada; RPC Super Admin cerradas a anon y con guardas verificadas",
       "tasks": [
         {"id":"super-admin-data-cleanup","title":"Actualizar y limpiar datos del Super Admin","detail":"PASS en PR #96.","status":"done","priority":"important"},
         {"id":"license-management-review","title":"Revisar sistema completo de licencias","detail":"PASS funcional en PR #96.","status":"done","priority":"important"},
@@ -88,10 +88,10 @@
     {
       "id": "gloshia",
       "title": "GloshIA",
-      "context": "Evidencia histórica de calibración y final sealed preservada en GitHub; siguiente recuperación requiere inspeccionar archivos locales de la Mac",
+      "context": "GitHub conserva métricas/calibraciones/final sealed; recuperar material bruto restante requiere inspección local de la Mac",
       "tasks": [
         {"id":"gloshia-training-data-preservation","title":"Blindar datos de entrenamiento/calibración","detail":"DONE: regla permanente escrita en AI_WORKFLOW. Datasets, muestras, labels, owner reviews, métricas y evidencia quedan fuera de resets operativos.","status":"done","priority":"critical"},
-        {"id":"gloshia-r3-evidence-recovery","title":"Recuperar evidencia GloshIA local/remota","detail":"IN PROGRESS. GitHub preserva métricas de 100 revisiones humanas y banco de 800 muestras, además del final sealed R2.1 de 108 muestras. Evidencia histórica indica que decisiones humanas y bancos estaban en .codex-tmp/local; revisar Mac sin modificar archivos. Las tablas R3 remotas recientes quedaron vacías durante el reset.","status":"in_progress","priority":"critical"},
+        {"id":"gloshia-r3-evidence-recovery","title":"Recuperar evidencia GloshIA local/remota","detail":"IN PROGRESS. GitHub conserva métricas de 100 revisiones/800 muestras y final sealed R2.1 de 108 muestras. El material bruto/decisiones estaba en .codex-tmp/local; siguiente gate necesita inspección read-only de la Mac. Tablas R3 remotas recientes quedaron vacías durante el reset.","status":"in_progress","priority":"critical"},
         {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
         {"id":"gloshia-textual","title":"GloshIA textual","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"Pendiente.","status":"pending","priority":"important"},
