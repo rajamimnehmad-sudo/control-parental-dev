@@ -131,6 +131,62 @@ class VpnDomainPolicyEvaluatorTest {
     }
 
     @Test
+    fun `technical Glosh Supabase host is allowed and sibling hosts are not auto allowed`() {
+        domainBlocklist.blockedDomains +=
+            setOf(
+                "proyecto-ajeno.supabase.co",
+                "supabase.co",
+                "api.syeycayasyufedwoprea.supabase.co",
+            )
+
+        assertIs<PolicyDecision.Allow>(
+            evaluator.evaluate(
+                " SYEYCAYASYUFEDWOPREA.SUPABASE.CO. ",
+                snapshot(),
+                activeHealth(),
+            ),
+        )
+        assertIs<PolicyDecision.Block>(
+            evaluator.evaluate(
+                "proyecto-ajeno.supabase.co",
+                snapshot(),
+                activeHealth(),
+            ),
+        )
+        assertIs<PolicyDecision.Block>(
+            evaluator.evaluate(
+                "supabase.co",
+                snapshot(),
+                activeHealth(),
+            ),
+        )
+        assertIs<PolicyDecision.Block>(
+            evaluator.evaluate(
+                "api.syeycayasyufedwoprea.supabase.co",
+                snapshot(),
+                activeHealth(),
+            ),
+        )
+    }
+
+    @Test
+    fun `manual block does not override critical technical host`() {
+        val decision =
+            evaluator.evaluate(
+                "syeycayasyufedwoprea.supabase.co",
+                snapshot(
+                    rule(
+                        "syeycayasyufedwoprea.supabase.co",
+                        RuleAction.Block,
+                    ),
+                ),
+                activeHealth(),
+            )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
     fun `explicit allow rule wins over local list`() {
         domainBlocklist.blockedDomain = "adult.example"
 
