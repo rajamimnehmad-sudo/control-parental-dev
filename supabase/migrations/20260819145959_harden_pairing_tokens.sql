@@ -10,6 +10,8 @@ create table if not exists public.pairing_hardening_rollout (
     legacy_created_before timestamptz not null
 );
 
+alter table public.pairing_hardening_rollout enable row level security;
+
 insert into public.pairing_hardening_rollout (singleton, legacy_created_before)
 values (true, transaction_timestamp())
 on conflict (singleton) do nothing;

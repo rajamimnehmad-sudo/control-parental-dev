@@ -248,4 +248,3 @@ revoke all on function public.pair_admin_device_with_password(text, text, text, 
 from public, anon, authenticated;
 grant execute on function public.pair_admin_device_with_password(text, text, text, text, integer)
 to anon, authenticated;
-

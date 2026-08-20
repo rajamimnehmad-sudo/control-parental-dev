@@ -412,4 +412,3 @@ $$;
 
 revoke all on function public.pair_admin_device_with_password_new_internal(text, text, text, text, integer)
 from public, anon, authenticated;
-

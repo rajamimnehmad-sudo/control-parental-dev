@@ -284,6 +284,24 @@ do $$
 declare
     v_function record;
 begin
+    if not exists (
+        select 1
+        from pg_class relation
+        join pg_namespace namespace on namespace.oid = relation.relnamespace
+        where namespace.nspname = 'public'
+          and relation.relname = 'pairing_hardening_rollout'
+          and relation.relrowsecurity
+    ) or exists (
+        select 1
+        from pg_policy policy
+        join pg_class relation on relation.oid = policy.polrelid
+        join pg_namespace namespace on namespace.oid = relation.relnamespace
+        where namespace.nspname = 'public'
+          and relation.relname = 'pairing_hardening_rollout'
+    ) then
+        raise exception 'TEST-FAIL J: rollout marker must have RLS enabled with no API policies';
+    end if;
+
     for v_function in
         select procedure.oid, procedure.proname
         from pg_proc procedure
