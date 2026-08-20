@@ -521,6 +521,31 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `critical Supabase allowlist is exact after host normalization`() {
+        val exactHost = "syeycayasyufedwoprea.supabase.co"
+        val blockedHosts =
+            listOf(
+                "supabase.co",
+                "proyecto-ajeno.supabase.co",
+                "api.syeycayasyufedwoprea.supabase.co",
+            )
+        val snapshot =
+            policy(
+                rules =
+                    (blockedHosts + exactHost).map { host ->
+                        domainRule(target = host, action = RuleAction.Block)
+                    },
+            )
+
+        assertIs<PolicyDecision.Allow>(
+            engine.evaluateDomain(snapshot, domainContext(" SYEYCAYASYUFEDWOPREA.SUPABASE.CO. ")),
+        )
+        blockedHosts.forEach { host ->
+            assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext(host)), host)
+        }
+    }
+
+    @Test
     fun `open mode forces SafeSearch only on supported search engines`() {
         val snapshot = policy()
 
