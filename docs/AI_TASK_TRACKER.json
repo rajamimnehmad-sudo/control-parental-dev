@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 10:00",
+  "updatedAt": "20 ago 2026 · 10:37",
   "sections": [
     {
       "id": "coordination",
@@ -79,6 +79,76 @@
       ]
     },
     {
+      "id": "apps-account-ux",
+      "title": "Apps / cuentas",
+      "context": "Mejoras de uso para Admin y Usuario",
+      "tasks": [
+        {
+          "id": "ai-app-approval-explanation",
+          "title": "IA explica la app antes de aprobar",
+          "detail": "En pedidos de apps, mostrar una explicación simple de para qué sirve la app antes de aprobarla.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "license-expiry-flow",
+          "title": "Definir qué pasa al vencer la licencia",
+          "detail": "Revisar y dejar claro el comportamiento de Usuario/Admin cuando la licencia vence y cómo se recupera.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "admin-password-purpose",
+          "title": "Aclarar para qué sirve la contraseña Admin",
+          "detail": "Revisar dónde se pide y explicar claramente su función para evitar confusión.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "account-capacity-remaining",
+          "title": "Mostrar cupos disponibles",
+          "detail": "Mostrar en las apps cuántos usuarios y administradores quedan disponibles según el plan/licencia.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "user-relink",
+          "title": "Reenlazar usuario",
+          "detail": "Permitir un flujo claro y seguro para reenlazar un usuario/dispositivo existente.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "user-request-history-delete",
+          "title": "Borrar historial de pedidos en Usuario",
+          "detail": "Permitir limpiar el historial visible de pedidos de la App Usuario sin romper auditoría necesaria.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "prevent-double-control-actions",
+          "title": "Evitar dos controles simultáneos",
+          "detail": "Bloquear taps/acciones simultáneas sobre dos controles para evitar estados inconsistentes en ambas apps.",
+          "status": "pending",
+          "priority": "important"
+        }
+      ]
+    },
+    {
+      "id": "super-admin-data",
+      "title": "Super Admin / datos",
+      "context": "Calidad y llegada de datos",
+      "tasks": [
+        {
+          "id": "super-admin-data-cleanup",
+          "title": "Actualizar y limpiar datos del Super Admin",
+          "detail": "Eliminar nulls visibles, normalizar datos y verificar que la información necesaria llegue correctamente al Super Admin.",
+          "status": "pending",
+          "priority": "important"
+        }
+      ]
+    },
+    {
       "id": "chrome-visual",
       "title": "Chrome Visual",
       "context": "Código preservado; pendiente reconstrucción limpia y gate físico",
@@ -103,13 +173,55 @@
           "detail": "Verificar imágenes, scroll y overlays localizados.",
           "status": "pending",
           "priority": "important"
+        },
+        {
+          "id": "google-ai-field-visible",
+          "title": "Mostrar el campo de IA de Google",
+          "detail": "Asegurar que el campo/área de IA de Google siga visible y usable con el filtrado activo.",
+          "status": "pending",
+          "priority": "normal"
         }
       ]
     },
     {
-      "id": "gloshia-dag",
-      "title": "GloshIA / DAG",
-      "context": "39 commits locales ya preservados",
+      "id": "gloshia",
+      "title": "GloshIA",
+      "context": "Visual, textual y ayuda",
+      "tasks": [
+        {
+          "id": "gloshia-visual-version-dag",
+          "title": "Mostrar versión de GloshIA Visual en DAG",
+          "detail": "Exponer claramente la versión del motor/modelo visual activo dentro de DAG.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "gloshia-textual",
+          "title": "GloshIA textual",
+          "detail": "Definir e integrar la capa textual de GloshIA con alcance y criterios claros.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "gloshia-help-both-apps",
+          "title": "GloshIA ayuda en ambas apps",
+          "detail": "Agregar ayuda/explicación de GloshIA en App Usuario y App Admin.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "shared-gloshia-engine",
+          "title": "Motor GloshIA compartido",
+          "detail": "Consolidar después de validar Chrome Visual y la base DAG.",
+          "status": "pending",
+          "priority": "normal"
+        }
+      ]
+    },
+    {
+      "id": "dag-browser",
+      "title": "DAG",
+      "context": "UX, actualización y eficiencia del navegador",
       "tasks": [
         {
           "id": "dag-local-review",
@@ -119,11 +231,53 @@
           "priority": "important"
         },
         {
-          "id": "shared-gloshia-engine",
-          "title": "Motor GloshIA compartido",
-          "detail": "Consolidar después de validar Chrome Visual y la base DAG.",
+          "id": "dag-update-section-move",
+          "title": "Mover sección de actualización en DAG",
+          "detail": "Reubicar la sección de actualización para que quede en una posición más lógica y accesible.",
           "status": "pending",
           "priority": "normal"
+        },
+        {
+          "id": "dag-hide-http-scheme",
+          "title": "Ocultar http/https en DAG",
+          "detail": "No mostrar el prefijo http:// o https:// en la barra visible cuando no aporte información útil.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "dag-self-update",
+          "title": "Actualizar desde DAG",
+          "detail": "Permitir iniciar la actualización de DAG desde el propio navegador con validaciones seguras.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "dag-tab-memory",
+          "title": "Ahorrar memoria de pestañas DAG",
+          "detail": "Reducir memoria de pestañas en segundo plano sin perder estabilidad ni estado necesario.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "dag-desktop-mobile-mode",
+          "title": "Modo escritorio y móvil en DAG",
+          "detail": "Agregar selector confiable entre representación móvil y escritorio.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "dag-icons-fix",
+          "title": "Corregir iconos de DAG",
+          "detail": "Revisar iconos incorrectos, inconsistentes o faltantes en la interfaz.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "dag-image-scroll-loading",
+          "title": "Corregir aparición de fotos al bajar",
+          "detail": "Revisar la carga/aparición de imágenes durante scroll para evitar retrasos, saltos o comportamiento visual extraño.",
+          "status": "pending",
+          "priority": "important"
         }
       ]
     }
