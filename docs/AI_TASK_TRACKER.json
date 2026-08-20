@@ -1,0 +1,86 @@
+{
+  "updatedAt": "19 ago 2026",
+  "sections": [
+    {
+      "id": "chrome-visual",
+      "title": "Chrome Visual",
+      "tasks": [
+        {
+          "id": "chrome-video-a23",
+          "title": "Revalidar video en A23",
+          "detail": "Confirmar que la corrección de tormenta de eventos eliminó las coberturas completas repetidas en YouTube.",
+          "status": "pending",
+          "priority": "P0"
+        },
+        {
+          "id": "chrome-images",
+          "title": "Confirmar filtrado de fotos en Chrome",
+          "detail": "Validar físicamente imágenes estáticas, scroll y overlays localizados.",
+          "status": "pending",
+          "priority": "P0"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "title": "Seguridad",
+      "tasks": [
+        {
+          "id": "exact-supabase-hosts",
+          "title": "Cerrar allowlist amplia de Supabase",
+          "detail": "Implementado por Spark; pendiente revisión y commit limpio con Codex.",
+          "status": "in_progress",
+          "priority": "P0"
+        },
+        {
+          "id": "atomic-policy-sync",
+          "title": "Sincronización atómica de políticas",
+          "detail": "Implementado y testeado por Spark; pendiente reconciliación local con Codex.",
+          "status": "in_progress",
+          "priority": "P0"
+        },
+        {
+          "id": "pairing-hardening",
+          "title": "Endurecer pairing y activación",
+          "detail": "Tokens de alta entropía preparados; falta revisión final del estado acumulado.",
+          "status": "in_progress",
+          "priority": "P0"
+        },
+        {
+          "id": "device-token-scope",
+          "title": "Restringir tokens por dispositivo",
+          "detail": "Evitar que un token de un dispositivo pueda escribir datos de otro dispositivo de la misma cuenta.",
+          "status": "pending",
+          "priority": "P0"
+        }
+      ]
+    },
+    {
+      "id": "coordination",
+      "title": "Coordinación",
+      "tasks": [
+        {
+          "id": "codex-local-inventory",
+          "title": "Inventario local completo con Codex",
+          "detail": "Antes de nuevos tickets: reconciliar cambios sin commit, ramas, migraciones y diferencias contra GitHub.",
+          "status": "pending",
+          "priority": "P0"
+        },
+        {
+          "id": "pro-audit",
+          "title": "Auditoría Pro y mapa técnico",
+          "detail": "Dejar mapa estable, control center, tareas y orden de trabajo definitivo.",
+          "status": "pending",
+          "priority": "P1"
+        },
+        {
+          "id": "control-center-app",
+          "title": "Glosh Control Center",
+          "detail": "APK elegante de tareas para seguimiento compartido entre usuario y ChatGPT.",
+          "status": "in_progress",
+          "priority": "P1"
+        }
+      ]
+    }
+  ]
+}

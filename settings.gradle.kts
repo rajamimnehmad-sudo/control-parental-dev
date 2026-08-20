@@ -18,6 +18,7 @@ rootProject.name = "CommunityContentFilter"
 
 include(":app-user")
 include(":app-admin")
+include(":app-control-center")
 include(":core-domain")
 include(":core-policy")
 include(":core-data")

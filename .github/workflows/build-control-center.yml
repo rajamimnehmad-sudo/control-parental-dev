@@ -1,0 +1,43 @@
+name: Build Glosh Control Center APK
+
+on:
+  push:
+    branches:
+      - build/glosh-control-center-v2
+    paths:
+      - "app-control-center/**"
+      - "docs/AI_TASK_TRACKER.json"
+      - "settings.gradle.kts"
+      - ".github/workflows/build-control-center.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build APK
+        run: ./gradlew :app-control-center:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: glosh-control-center-apk
+          path: app-control-center/build/outputs/apk/debug/app-control-center-debug.apk
+          if-no-files-found: error
