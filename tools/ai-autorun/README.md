@@ -34,7 +34,8 @@ accidentales si se reinstala.
 - un lock por `mkdir` impide ejecuciones paralelas;
 - el SHA del blob del ticket se persiste antes de llamar a Codex;
 - el mismo SHA no se ejecuta dos veces, incluso después de un fallo;
-- Codex usa `workspace-write` con revisión automática de aprobaciones;
+- Codex usa `--approve-for-me`, que aplica `workspace-write` con revisión
+  automática de aprobaciones;
 - el trigger no concede Production, deploy, merge, borrados, gastos, pruebas
   físicas ni envíos de APK;
 - no se leen ni registran secretos;
