@@ -2,24 +2,42 @@
 
 ## Próximo lote reservado
 
-### APPS-ACCOUNT-UX-BATCH-01
+### APPS-ACCOUNT-PRODUCT-BATCH-07
 
-**Estado:** QUEUED — no promover mientras `AI-AUTORUN-AUTH-GUARD-06` siga en curso.
+**Estado:** QUEUED — no publicar en `AI_NEXT_TICKET.md` mientras `AI-AUTORUN-AUTH-GUARD-06` siga en curso.
 
-**Esfuerzo Codex:** medium
+**Esfuerzo Codex:** Medio
 **Perfil Codex:** lean
 
-**Objetivo:** cerrar en un solo lote coherente cuatro pendientes de Apps/cuentas, evitando cuatro arranques separados de Codex:
+## Objetivo
 
-1. definir e implementar el flujo visible cuando una licencia vence, incluida recuperación cuando vuelve a estar activa;
-2. mostrar cupos disponibles de usuarios/administradores según la licencia vigente donde corresponda;
-3. aclarar en App Admin para qué sirve la contraseña y en qué acciones se usa, sin cambiar seguridad por simple UX;
-4. impedir dobles taps/acciones simultáneas que puedan dejar estados inconsistentes en controles sensibles.
+Cerrar en un solo lote coherente cuatro pendientes relacionados de App Admin / App Usuario, evitando cuatro arranques separados de Codex:
 
-**Preparación obligatoria:** antes de modificar, Codex debe inspeccionar únicamente las áreas de App Usuario/App Admin/backend-contract directamente implicadas, reutilizar el sistema de licencias ya existente y no reinventar reglas que ya estén en Super Admin/backend.
+1. **Vencimiento de licencia:** definir e implementar qué ve y qué puede hacer cada app cuando la licencia está vencida, cómo se informa el estado y cómo se recupera al renovarse, sin dejar el dispositivo en un estado inseguro o ambiguo.
+2. **Cupos disponibles:** mostrar de forma clara los cupos restantes relevantes según la licencia/plan, reutilizando la fuente de verdad existente y sin duplicar lógica del Super Admin.
+3. **Contraseña Admin:** revisar dónde aparece/se solicita y dejar claro para el usuario para qué sirve, evitando textos ambiguos o flujos que parezcan una segunda contraseña de cuenta si no lo es.
+4. **Doble acción simultánea:** impedir taps/acciones concurrentes sobre controles que puedan producir estados inconsistentes, con estado pending/busy por operación y tests de regresión donde corresponda.
 
-**Gates:** tests afectados y builds mínimos de las apps tocadas; no repetir suites no relacionadas; handoff con comportamiento antes/después, archivos, tests y riesgos.
+## Reglas de alcance
 
-**Límites:** no S22, no ADB, no APK físico, no Chrome/DAG, no Production/deploy/merge, no cambios destructivos de datos. Si el comportamiento de licencia requiere una decisión de producto no deducible de lo ya existente, detener ese subpunto y continuar solo con los otros que sean seguros.
+- Antes de editar, inventariar únicamente los módulos/archivos que realmente implementan estos cuatro flujos.
+- Reutilizar contratos/licencia ya existentes; no crear un segundo modelo de licencia.
+- No rediseñar pantallas completas si no es necesario; cambios UX enfocados y consistentes con la UI actual.
+- Mantener separación por dispositivo/usuario y no romper sincronización existente.
+- No tocar Chrome Visual, DAG, Super Admin web salvo que sea imprescindible para leer un contrato compartido; si aparece una dependencia amplia, detenerse y reportarla.
+- No Production, deploy, Supabase writes, merge, APK físico, ADB ni S22.
+- Usar tests estrechos por módulos afectados; build solo de targets que entren realmente en el grafo del cambio.
+- Commits internos separados por responsabilidad aunque el ticket sea un lote grande.
 
-**Resultado esperado:** mejorar UX y coherencia de cuentas/licencias con un único costo de arranque Codex.
+## Criterio de cierre
+
+- comportamiento de licencia vencida/renovada definido y cubierto;
+- cupos restantes visibles donde aportan valor y basados en la fuente de verdad existente;
+- propósito de contraseña Admin comprensible y coherente en los puntos donde aparece;
+- acciones simultáneas que puedan competir quedan serializadas/bloqueadas correctamente;
+- tests afectados PASS y sin regresiones conocidas;
+- handoff corto con archivos, comandos, resultado, riesgos y PR/commit.
+
+## Orden
+
+Promover a `docs/AI_NEXT_TICKET.md` únicamente después de que ChatGPT audite y cierre `AI-AUTORUN-AUTH-GUARD-06`.
