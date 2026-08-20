@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 20:38",
+  "updatedAt": "20 ago 2026 · 20:42",
   "sections": [
     {
       "id": "coordination",
@@ -88,10 +88,10 @@
     {
       "id": "gloshia",
       "title": "GloshIA",
-      "context": "Entrenamiento/calibración se preserva fuera de resets operativos; recuperación de evidencia remota reciente en revisión",
+      "context": "Evidencia histórica de calibración y final sealed preservada en GitHub; siguiente recuperación requiere inspeccionar archivos locales de la Mac",
       "tasks": [
         {"id":"gloshia-training-data-preservation","title":"Blindar datos de entrenamiento/calibración","detail":"DONE: regla permanente escrita en AI_WORKFLOW. Datasets, muestras, labels, owner reviews, métricas y evidencia quedan fuera de resets operativos.","status":"done","priority":"critical"},
-        {"id":"gloshia-r3-evidence-recovery","title":"Revisar recuperación de evidencia R3 reciente","detail":"En revisión: tablas R3 y bucket privado quedaron vacíos durante el reset. Código/contratos/documentación histórica del colector siguen preservados en GitHub; buscar exportaciones/backups antes de concluir pérdida definitiva.","status":"in_progress","priority":"important"},
+        {"id":"gloshia-r3-evidence-recovery","title":"Recuperar evidencia GloshIA local/remota","detail":"IN PROGRESS. GitHub preserva métricas de 100 revisiones humanas y banco de 800 muestras, además del final sealed R2.1 de 108 muestras. Evidencia histórica indica que decisiones humanas y bancos estaban en .codex-tmp/local; revisar Mac sin modificar archivos. Las tablas R3 remotas recientes quedaron vacías durante el reset.","status":"in_progress","priority":"critical"},
         {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
         {"id":"gloshia-textual","title":"GloshIA textual","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"Pendiente.","status":"pending","priority":"important"},
