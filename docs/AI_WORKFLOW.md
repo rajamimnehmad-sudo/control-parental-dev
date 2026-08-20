@@ -120,6 +120,17 @@ El usuario solo prueba un APK cuando:
 3. ChatGPT auditó el cambio;
 4. la prueba física aporta evidencia que no puede obtenerse automáticamente.
 
+## Entrega de APKs al dispositivo físico
+
+Regla operativa por defecto:
+
+- Codex puede compilar APKs como gate técnico cuando un cambio entra en el grafo de App Usuario, App Admin o DAG.
+- No se envía/instala un APK nuevo por cada ticket pequeño; solo al cerrar un lote aprobado que requiera validación física o una versión utilizable.
+- El dispositivo físico principal para recepción es el **Samsung S22 Ultra** del usuario.
+- El canal preferido de entrega es **Taildrop/Tailscale desde la Mac al S22**.
+- **Antes de enviar cualquier APK por Taildrop, ChatGPT debe avisar al usuario para que encienda/conecte el S22.** No enviar hasta que el usuario confirme que está listo.
+- Si el APK es de DAG, App Usuario o App Admin, indicar claramente cuál es y qué versión/lote se está enviando.
+
 ## Handoffs limpios
 
 No acumular basura histórica.
