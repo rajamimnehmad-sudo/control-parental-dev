@@ -5,7 +5,7 @@ import { ArrowRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LicenseBadge } from "@/components/Badge";
 import type { CommunitySummary, LicenseStatus } from "@/lib/types";
-import { formatDate, formatShortDate } from "@/lib/utils";
+import { capacitySnapshot, compactNumber, formatDate, formatShortDate } from "@/lib/utils";
 
 const filters: Array<{ value: "all" | LicenseStatus; label: string }> = [
   { value: "all", label: "Todas" },
@@ -52,8 +52,8 @@ export function CommunityDirectory({ communities }: { communities: CommunitySumm
               <tr key={community.community_id}>
                 <td className="table-cell"><Link href={`/communities/${community.community_id}`} className="block"><span className="block font-semibold text-ink">{community.name}</span><span className="mt-0.5 block text-xs text-slate-500">{community.guide_label} · {community.plan_name}</span></Link></td>
                 <td className="table-cell"><LicenseBadge status={community.license_status} /></td>
-                <td className="table-cell"><strong className="text-ink">{community.user_device_count}</strong><span className="text-slate-400"> / {community.max_user_devices ?? "Sin límite"}</span></td>
-                <td className="table-cell"><strong className="text-ink">{community.admin_count}</strong><span className="text-slate-400"> / {community.max_admins ?? "Sin límite"}</span></td>
+                <td className="table-cell"><CapacityValue used={community.user_device_count} maximum={community.max_user_devices} /></td>
+                <td className="table-cell"><CapacityValue used={community.admin_count} maximum={community.max_admins} /></td>
                 <td className="table-cell text-slate-600">{formatShortDate(community.expires_at, "Sin vencimiento")}</td>
                 <td className="table-cell text-right"><Link href={`/communities/${community.community_id}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-accent" aria-label={`Abrir ${community.name}`}><ArrowRight className="h-4 w-4" /></Link></td>
               </tr>
@@ -67,7 +67,7 @@ export function CommunityDirectory({ communities }: { communities: CommunitySumm
         {visible.map((community) => (
           <Link className="subtle-card" href={`/communities/${community.community_id}`} key={community.community_id}>
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-bold text-ink">{community.name}</p><p className="mt-1 text-xs text-slate-500">{community.guide_label}</p></div><LicenseBadge status={community.license_status} /></div>
-            <div className="mt-4 grid grid-cols-2 gap-2"><SmallMetric label="Usuarios" value={`${community.user_device_count} / ${community.max_user_devices ?? "Sin límite"}`} /><SmallMetric label="Admins" value={`${community.admin_count} / ${community.max_admins ?? "Sin límite"}`} /></div>
+            <div className="mt-4 grid grid-cols-2 gap-2"><CapacityCard label="Usuarios" used={community.user_device_count} maximum={community.max_user_devices} /><CapacityCard label="Admins" used={community.admin_count} maximum={community.max_admins} /></div>
             <p className="mt-3 text-xs text-slate-500">Actualizada {formatDate(community.updated_at, "sin fecha informada")}</p>
           </Link>
         ))}
@@ -77,6 +77,25 @@ export function CommunityDirectory({ communities }: { communities: CommunitySumm
   );
 }
 
-function SmallMetric({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl bg-slate-50 px-3 py-2"><p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p><p className="mt-1 text-sm font-bold text-ink">{value}</p></div>;
+function CapacityValue({ used, maximum }: { used: number; maximum: number | null }) {
+  const capacity = capacitySnapshot(used, maximum);
+  return (
+    <div>
+      <p><strong className="text-ink">{compactNumber(capacity.used)}</strong><span className="text-slate-400"> usados de {capacity.maximum === null ? "un límite sin definir" : compactNumber(capacity.maximum)}</span></p>
+      <p className={`mt-0.5 text-xs ${capacity.exceeded ? "font-semibold text-danger" : "text-slate-500"}`}>
+        {capacity.available === null ? "Disponibilidad sin definir" : `${compactNumber(capacity.available)} disponibles`}
+      </p>
+    </div>
+  );
+}
+
+function CapacityCard({ label, used, maximum }: { label: string; used: number; maximum: number | null }) {
+  const capacity = capacitySnapshot(used, maximum);
+  return (
+    <div className="rounded-xl bg-slate-50 px-3 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-bold text-ink">{compactNumber(capacity.used)} / {capacity.maximum === null ? "Sin límite" : compactNumber(capacity.maximum)}</p>
+      <p className={`mt-0.5 text-[11px] ${capacity.exceeded ? "font-semibold text-danger" : "text-slate-500"}`}>{capacity.available === null ? "Disponibilidad sin definir" : `${compactNumber(capacity.available)} disponibles`}</p>
+    </div>
+  );
 }

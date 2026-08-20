@@ -32,3 +32,14 @@ export function formatDateInput(value: string | null | undefined) {
 export function compactNumber(value: number | bigint | null | undefined) {
   return Number(value ?? 0).toLocaleString("es-AR");
 }
+
+export function capacitySnapshot(usedValue: number | bigint, maximumValue: number | null | undefined) {
+  const used = Math.max(0, Number(usedValue));
+  const maximum = maximumValue === null || maximumValue === undefined ? null : Math.max(0, Number(maximumValue));
+  return {
+    used,
+    maximum,
+    available: maximum === null ? null : Math.max(0, maximum - used),
+    exceeded: maximum !== null && used > maximum,
+  };
+}
