@@ -1,145 +1,207 @@
 # AI NEXT TICKET
 
-## SEC-EXACT-TECHNICAL-HOSTS-01-REVIEW
+## P0-HARDENING-BATCH-01
 
-**Tipo:** revisión técnica + reconstrucción limpia
+**Tipo:** revisión técnica + reconstrucción limpia por lote
 **Prioridad:** crítica
 **Responsable de ejecución:** Codex
 **Revisor:** ChatGPT / jefe técnico central
 
 > Antes de ejecutar, leer `docs/AI_WORKFLOW.md` en `coordination/ai-control`.
 
-### Contexto validado
+## Contexto
 
-Los tickets `LOCAL-STATE-RECONCILIATION-00` y `LOCAL-WORK-PRESERVATION-01` están cerrados.
+`LOCAL-STATE-RECONCILIATION-00` y `LOCAL-WORK-PRESERVATION-01` están cerrados con PASS.
+Todo el estado local crítico quedó preservado en ramas `preserve/*`.
 
-El estado local crítico ya está preservado remotamente en ramas `preserve/*`. En particular:
+Este lote agrupa los tres cambios P0 locales ya preservados que provienen del mismo bloque de hardening y que conviene revisar juntos, pero deben quedar internamente separados y auditables:
 
-- `preserve/local-main-2026-08-20` conserva la base local previa a Chrome Visual;
-- `preserve/uncommitted-2026-08-20` conserva el snapshot de los 10 archivos que estaban sin commit;
-- el worktree original de la Mac debe permanecer intacto.
+1. allowlist exacta de hosts técnicos Supabase;
+2. sync atómico de policy + rules + limits + groups;
+3. pairing hardening (cliente + migración + checks SQL).
 
-La auditoría detectó que el código remoto aprobado todavía trataba `supabase.co` de forma demasiado amplia como infraestructura técnica. El snapshot preservado contiene un candidato que restringe la excepción técnica al host real de Glosh:
+No incluir Chrome Visual, DAG ni device-token scope en este lote.
 
-`syeycayasyufedwoprea.supabase.co`
-
-Este ticket debe revisar ese candidato, reconstruirlo de forma aislada y demostrar que no abre hosts hermanos ni subdominios falsos.
-
-### Alcance exacto
-
-Trabajar únicamente sobre estas rutas, salvo que un test existente estrictamente relacionado requiera un ajuste mínimo justificado:
-
-1. `core-policy/src/main/kotlin/com/contentfilter/core/policy/DefaultPolicyEngine.kt`
-2. `feature-vpn/src/main/java/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluator.kt`
-3. `feature-vpn/src/test/kotlin/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluatorTest.kt`
-
-No tocar sync, pairing, Chrome Visual, DAG, Supabase migrations ni otros frentes.
-
-### Rama de trabajo
+## Rama
 
 Crear una rama limpia:
 
-`review/sec-exact-technical-hosts-01`
+`review/p0-hardening-batch-01`
 
 Base:
 
 `preserve/local-main-2026-08-20`
 
-No trabajar en el worktree original sucio. Usar un worktree temporal limpio o clon temporal.
+No trabajar sobre el worktree original sucio. Usar worktree/clon temporal limpio.
 
-### Fuente del candidato
-
-Tomar como referencia únicamente el cambio correspondiente a hosts técnicos de:
+Fuente de candidatos:
 
 `preserve/uncommitted-2026-08-20`
 
-No copiar los demás cambios preservados en esa rama.
+Copiar/reconstruir únicamente los cambios correspondientes a estos tres bloques.
 
-### Revisión técnica obligatoria
+---
 
-Antes de aceptar el candidato, verificar el comportamiento y ajustar solo si es necesario:
+# Bloque A — Exact technical hosts
 
-1. El host exacto de Glosh `syeycayasyufedwoprea.supabase.co` debe conservar acceso técnico cuando corresponde.
-2. `proyecto-ajeno.supabase.co` NO debe obtener trato técnico privilegiado.
-3. El apex `supabase.co` NO debe quedar auto-permitido por esta excepción.
-4. `api.syeycayasyufedwoprea.supabase.co` u otros subdominios inventados del proyecto NO deben heredar automáticamente la excepción exacta.
-5. La normalización habitual de host (minúsculas, punto final, `www.` si aplica al contrato actual) no debe reintroducir matching amplio.
-6. Las reglas explícitas, SafeSearch, UT1/lista local y precedencias existentes fuera de esta excepción no deben alterarse accidentalmente.
-7. Los hosts técnicos Google ya existentes no deben cambiar de semántica salvo que el candidato original lo haga de forma necesaria y demostrada.
+Rutas principales:
 
-### Tests mínimos requeridos
+- `core-policy/src/main/kotlin/com/contentfilter/core/policy/DefaultPolicyEngine.kt`
+- `feature-vpn/src/main/java/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluator.kt`
+- `feature-vpn/src/test/kotlin/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluatorTest.kt`
 
-Usar los tests existentes y agregar/modificar solo los estrictamente necesarios para probar:
+Validar:
 
-- Glosh Supabase exacto permitido;
-- proyecto Supabase ajeno no privilegiado;
-- `supabase.co` no privilegiado;
-- subdominio falso del host Glosh no privilegiado;
-- host técnico crítico conserva la precedencia prevista;
-- una regla/manual/lista local sigue actuando normalmente sobre hosts que ya no son técnicos.
+- `syeycayasyufedwoprea.supabase.co` conserva el acceso técnico previsto;
+- `proyecto-ajeno.supabase.co` NO obtiene trato técnico privilegiado;
+- `supabase.co` NO queda privilegiado;
+- `api.syeycayasyufedwoprea.supabase.co` NO hereda automáticamente la excepción;
+- normalización de host no reabre matching amplio;
+- SafeSearch, reglas explícitas, lista local y precedencias no sufren regresiones.
 
-Ejecutar la suite unitaria más estrecha que cubra `core-policy` y `feature-vpn`, más una comprobación de compilación de los módulos afectados. Si esas capas pasan y el cambio afecta compilación de App Usuario, ejecutar una compilación no física de App Usuario una sola vez.
+Commit separado sugerido:
 
-No repetir suites DAG/Chrome/Admin ni pruebas físicas: este cambio no las afecta.
+`fix(security): restrict technical Supabase host allowlist`
 
-Ejecutar `git diff --check`.
+---
 
-### Resultado esperado
+# Bloque B — Atomic policy revision sync
 
-Si el candidato es correcto:
+Rutas candidatas principales:
 
-1. dejar únicamente el cambio aislado en `review/sec-exact-technical-hosts-01`;
-2. un commit coherente, sugerido:
-   `fix(security): restrict technical Supabase host allowlist`
-3. push de la rama;
-4. abrir PR contra `preserve/local-main-2026-08-20` para que el diff sea aislado y auditable;
+- `core-sync/src/main/java/com/contentfilter/core/sync/engine/DefaultSyncEngine.kt`
+- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/DefaultSyncEngineAtomicPolicySyncTest.kt`
+- `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/TargetedPolicySyncCoordinatorTest.kt`
+
+Objetivo:
+
+Evitar estados efectivos mixtos donde una policy/revisión nueva quede aplicada con reglas, límites o grupos de una revisión anterior.
+
+Validar como mínimo:
+
+- policy + rules + daily limits + app groups + group apps pertenecen al mismo target/revision;
+- aplicación local ocurre transaccionalmente como bundle;
+- fallo en cualquier parte conserva last-known-good;
+- cursor/revisión solo avanza después del commit completo;
+- ACK solo ocurre cuando el bundle completo quedó aplicado y confirmado;
+- un fallo intermedio no deja policy N+1 con hijos N;
+- targeted sync y periodic sync mantienen semántica coherente.
+
+Si el candidato no cumple exactamente esto, corregirlo dentro de este bloque sin ampliar a otras áreas no relacionadas.
+
+Commit separado sugerido:
+
+`fix(sync): apply policy revisions atomically`
+
+---
+
+# Bloque C — Pairing hardening
+
+Rutas candidatas principales:
+
+- `feature-activation/src/main/java/com/contentfilter/feature/activation/ActivationViewModel.kt`
+- `feature-activation/src/test/kotlin/com/contentfilter/feature/activation/UserPairingCodeTest.kt`
+- `supabase/migrations/20260819150000_harden_pairing_tokens.sql`
+- `supabase/pairing_hardening_03b_checks.sql`
+
+Objetivo:
+
+Cerrar el pairing débil sin romper códigos legacy válidos durante rollout.
+
+Revisar obligatoriamente:
+
+1. Nuevos tokens con >=128 bits efectivos de entropía.
+2. Lookup determinista por SHA-256/HMAC/index o equivalente seguro; no bcrypt por scan para tokens nuevos.
+3. TTL corto razonable para nuevos códigos.
+4. Single-use real con protección contra carreras/concurrencia.
+5. `SECURITY DEFINER` con `search_path` fijo donde corresponda.
+6. Grants mínimos necesarios; revisar específicamente si `anon EXECUTE` en `admin_create_device_relink_code` es realmente imprescindible.
+7. NO aceptar un cutoff legacy histórico fijo como `2026-08-19 15:00:00+00` si puede invalidar códigos emitidos entre esa fecha y el rollout real.
+8. Diseñar la transición legacy usando una marca/cutoff derivado del rollout efectivo o un mecanismo equivalente robusto.
+9. Incluir estrategia clara de rollback/compatibilidad.
+10. No aplicar todavía la migración a Production/Supabase.
+
+Los checks SQL deben demostrar, sin depender de Production:
+
+- nuevo token creado y consumido una sola vez;
+- token inválido rechazado;
+- expirado rechazado;
+- legacy válido de transición sigue funcionando según la estrategia elegida;
+- token nuevo no depende de scan bcrypt;
+- grants/search_path quedan como se pretende.
+
+Commit separado sugerido:
+
+`fix(pairing): harden pairing token lifecycle`
+
+---
+
+# Orden dentro del lote
+
+Ejecutar A → B → C.
+
+Cada bloque debe quedar en su propio commit y con sus tests estrechos. Si A o B falla por un problema arquitectónico inesperado, no seguir ciegamente al bloque siguiente: dejar evidencia y detenerse según `AI_WORKFLOW.md`.
+
+No mezclar los tres cambios en un único commit.
+
+## Tests / validación
+
+Ejecutar las suites más estrechas relevantes por bloque y después, si los tres bloques pasan:
+
+- `git diff --check`;
+- compilación de módulos afectados;
+- una compilación App Usuario final si los cambios impactan su grafo;
+- NO repetir suites DAG/Chrome/Admin;
+- NO prueba física;
+- NO aplicar migraciones a Supabase.
+
+Si ya existe evidencia válida que el cambio no afecta, no repetirla sin motivo.
+
+## Resultado esperado
+
+Si los tres bloques quedan correctos:
+
+1. rama `review/p0-hardening-batch-01` con tres commits separados;
+2. push;
+3. abrir una única PR contra `preserve/local-main-2026-08-20`;
+4. PR con sección por bloque y cierre estándar:
+   - resumen;
+   - archivos tocados;
+   - comandos/tests;
+   - resultados;
+   - riesgos pendientes;
+   - branch + commits;
+   - migración: NO aplicada;
+   - prueba física: no requerida;
 5. NO mergear.
 
-La PR debe usar el cierre estándar de `AI_WORKFLOW.md`:
-
-- resumen;
-- archivos tocados;
-- comandos/tests ejecutados;
-- resultados exactos;
-- riesgos pendientes;
-- branch + commit;
-- prueba física: `no requerida` salvo hallazgo inesperado.
-
-### Manejo de bloqueo
-
-Si aparece una incompatibilidad estructural, fallo inesperado no atribuible al candidato o necesidad de tocar áreas fuera del alcance:
-
-- no hacer reescrituras amplias;
-- preservar evidencia;
-- no ampliar el ticket por cuenta propia;
-- actualizar `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` con el bloqueo;
-- detenerse.
-
-### Prohibiciones
+## Prohibiciones
 
 - no tocar el worktree original sucio;
-- no merge/rebase/reset/clean/stash sobre el repo original;
 - no tocar `main`;
-- no aplicar migraciones;
-- no tocar Supabase/Production;
-- no modificar sync/pairing/Chrome/DAG;
-- no instalar APK ni pedir prueba física;
-- no iniciar el siguiente ticket.
+- no merge/rebase/reset/clean/stash sobre el repo original;
+- no tocar Chrome Visual ni DAG;
+- no resolver device-token scope todavía;
+- no aplicar Supabase/Production;
+- no instalar APK;
+- no iniciar otro ticket.
 
-### Handoff obligatorio
+## Handoff obligatorio
 
-Al cerrar, reemplazar `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` con:
+Reemplazar `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` con:
 
-- ticket;
-- PASS / NEEDS-FIX / BLOCKED;
-- branch + commit;
+- `P0-HARDENING-BATCH-01`;
+- PASS / NEEDS-FIX / BLOCKED global;
+- estado individual A/B/C;
+- branch + 3 commits;
 - PR;
 - archivos tocados;
-- tests/comandos y resultados;
-- revisión de los 4 casos Supabase exactos;
+- tests/comandos exactos y resultado;
+- cualquier desviación respecto de los candidatos preservados;
 - riesgos restantes;
+- confirmación de que ninguna migración fue aplicada;
 - confirmación de que el worktree original quedó intacto.
 
 Después: **DETENERSE**.
 
-ChatGPT auditará la PR/diff/tests y decidirá si el cambio se aprueba y cuál es el próximo ticket.
+ChatGPT auditará el lote completo, pero podrá aprobar/rechazar cada commit por separado.
