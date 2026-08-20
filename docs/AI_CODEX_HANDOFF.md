@@ -2,156 +2,91 @@
 
 ## Ticket
 
-- `LOCAL-STATE-RECONCILIATION-00`
-- Ejecutado: 2026-08-20 09:00:41 -03.
-- Resultado: inventario completo; proyecto auditado sin modificar.
-- Repo/worktree auditado: `/Users/yejielnehmad/Developer/content-filter`.
-- Rama observada: `work/chrome-visual`.
-- HEAD observado: `6a045f1300336b1f033cab7bea2ce3ba25dcd119`.
-- `origin` fue actualizado por `fetch` antes de comparar. `origin/main` sigue en
-  `2c3361fa77eefdf261762587a0bc9045cab3c7c8`.
+- `LOCAL-WORK-PRESERVATION-01`
+- Ejecutado: 2026-08-20 09:36:58 -03.
+- Resultado: PASS. Todo el estado local critico quedo preservado remotamente.
+- Repo auditado: `/Users/yejielnehmad/Developer/content-filter`.
+- Rama/HEAD observados: `work/chrome-visual` /
+  `6a045f1300336b1f033cab7bea2ce3ba25dcd119`.
 
-## Working tree observado
+## Estado original antes y despues
 
-- 6 archivos tracked modificados, 4 untracked, 0 staged, 0 borrados/renombrados
-  y 0 stashes.
-- Diff tracked sin commit: 224 inserciones / 37 eliminaciones.
-- `git diff --check`: limpio.
+El gate inicial no detecto drift respecto del inventario anterior. El estado
+final del worktree original es identico al inicial:
 
-| Grupo | Archivos | Clasificacion |
-| --- | --- | --- |
-| Hosts Supabase tecnicos exactos | `core-policy/.../DefaultPolicyEngine.kt`, `feature-vpn/.../VpnDomainPolicyEvaluator.kt` y su test | LOCAL SIN COMMIT / PENDIENTE DE REVISION |
-| Sync atomico de politicas | `core-sync/.../DefaultSyncEngine.kt` y dos tests nuevos | LOCAL SIN COMMIT / PENDIENTE DE REVISION |
-| Pairing hardening | `ActivationViewModel.kt`, `UserPairingCodeTest.kt`, migracion y checks SQL | LOCAL SIN COMMIT / PENDIENTE DE REVISION |
-| Chrome Visual | Rama y commits detallados abajo | LOCAL CON COMMIT, NO SUBIDO |
+- 6 tracked modificados;
+- 4 untracked;
+- 0 staged;
+- 0 borrados o renombrados;
+- no se hizo checkout, stash, reset, clean, merge ni commit en ese worktree.
 
-Untracked exactos:
+Tracked modificados:
+
+- `core-policy/src/main/kotlin/com/contentfilter/core/policy/DefaultPolicyEngine.kt`
+- `core-sync/src/main/java/com/contentfilter/core/sync/engine/DefaultSyncEngine.kt`
+- `feature-activation/src/main/java/com/contentfilter/feature/activation/ActivationViewModel.kt`
+- `feature-activation/src/test/kotlin/com/contentfilter/feature/activation/UserPairingCodeTest.kt`
+- `feature-vpn/src/main/java/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluator.kt`
+- `feature-vpn/src/test/kotlin/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluatorTest.kt`
+
+Untracked:
 
 - `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/DefaultSyncEngineAtomicPolicySyncTest.kt`
 - `core-sync/src/test/kotlin/com/contentfilter/core/sync/engine/TargetedPolicySyncCoordinatorTest.kt`
 - `supabase/migrations/20260819150000_harden_pairing_tokens.sql`
 - `supabase/pairing_hardening_03b_checks.sql`
 
-## Commits y ramas
+## Ramas remotas de preservacion
 
-- `main` = `9e41c309`; 39 commits delante y 0 detras de `origin/main`.
-  Rango: `86ab9080..9e41c309`, principalmente DAG video, GIF, estructura,
-  diagnostico, UI y evidencia fisica. Son LOCAL CON COMMIT, NO SUBIDO.
-- `work/chrome-visual` = `6a045f13`; 46 delante y 0 detras de `origin/main`.
-  Contiene los 39 de `main` mas 7 commits locales.
-- `snapshot/pre-chrome-visual-2026-08-17` = `833d5ad8`; contiene 41 commits
-  sobre `origin/main` y preserva el snapshot previo.
-- Locales exclusivos sin equivalente en ninguna referencia remota:
-  `codex/dag-stability-01` (4 commits) y
-  `codex/dag-browser-unfiltered-dev-baseline` (2 commits). Su vigencia es
-  ESTADO INCIERTO / REQUIERE DECISION.
-- Las ramas locales `agent/*`, `codex/dag-browser-v3-foundation-01` y
-  `codex/dag-chrome-batch-local` tienen referencia remota equivalente.
-- No hay commits de `origin/main` ausentes de la rama auditada.
-- Ramas remotas relevantes no integradas en la rama auditada:
-  `origin/build/glosh-control-center-v2`,
-  `origin/codex/dag-browser-v3-foundation-01`,
-  `origin/codex/superweb-professional-redesign`,
-  `origin/coordination/ai-control` y `sites/main`.
+| Rama | SHA remoto verificado | Contenido |
+| --- | --- | --- |
+| `preserve/local-main-2026-08-20` | `9e41c309bbf0adceb4a25e817e0a0dc8419d8ac2` | Tip exacto de `main` local |
+| `preserve/chrome-visual-2026-08-20` | `6a045f1300336b1f033cab7bea2ce3ba25dcd119` | Tip exacto de `work/chrome-visual` |
+| `preserve/pre-chrome-visual-2026-08-17` | `833d5ad848c2f11524c5e025d3d2d26c602da5bc` | Snapshot previo a Chrome Visual |
+| `preserve/uncommitted-2026-08-20` | `214e7c848c7c1770a11abb8a0af3b8b71698999e` | Los 10 paths sin commit sobre `6a045f13` |
 
-La diferencia comprometida completa `origin/main...work/chrome-visual` es de
-176 archivos, 20.537 inserciones y 1.351 eliminaciones. Por grupo superior:
-104 archivos DAG, 30 docs, 20 Accessibility, 8 `gloshia-visual-core`, 5 App
-Usuario y 9 archivos de configuracion/scripts/Supabase/tools.
+Commit unico del snapshot sin commit:
 
-## Worktrees
+`214e7c84 chore(preserve): snapshot local uncommitted state 2026-08-20`
 
-1. `/Users/yejielnehmad/Developer/content-filter`: `work/chrome-visual`, sucio
-   con los 10 archivos indicados.
-2. `/Users/yejielnehmad/Developer/content-filter-dag-browser-v3`:
-   `codex/dag-browser-v3-wip`, HEAD `434c15db`, limpio, 220 commits detras y 0
-   delante de `origin/main`.
-3. Worktree temporal de coordinacion usado solo para publicar este archivo.
+No se abrieron PRs. Estas ramas son copias de seguridad, no cambios aprobados ni
+listos para merge.
 
-## Chrome Visual
+## Verificaciones
 
-- Vive en `work/chrome-visual`; ultimo commit `6a045f13`.
-- Commits adicionales sobre `main`:
-  `b4b1bd9b`, `833d5ad8`, `87da6f63`, `827bb244`, `d6164b57`, `f094daaa` y
-  `6a045f13`.
-- No hay commits posteriores a `6a045f13` en esa rama.
-- Los cinco tickets funcionales cubren probe Accessibility, motor R3.1
-  compartido, imagenes, web dinamica y video reactivo. Incluyen
-  `feature-accessibility`, `gloshia-visual-core`, App Usuario y evidencia en
-  `docs/areas/protection`.
-- Evidencia local documenta PASS de unitarios Debug/Release, ktlint, lint y
-  assemble App Usuario. La prueba A23 de video fue FAIL de experiencia por
-  cobertura completa repetida; la correccion posterior esta automatizada pero
-  no revalidada fisicamente. Estado: DEV-only / NO-GO para producto.
+- `git ls-remote` confirmo las cuatro ramas y SHAs en GitHub.
+- `git diff-tree 6a045f13..214e7c84` contiene exactamente los 10 paths listados:
+  6 modificados y 4 agregados.
+- Cada archivo original fue comparado con el blob del commit mediante SHA-1 de
+  Git; no hubo ningun mismatch byte a byte.
+- `git diff --check` paso antes del commit snapshot.
+- El worktree temporal de preservacion quedo limpio y fue retirado despues de
+  verificar el push.
+- El `git status --short` final del worktree original coincide con el inicial.
 
-## Migraciones
+No se ejecutaron builds, tests, ADB, APK ni migraciones. No se toco Supabase.
 
-- No hay migraciones comprometidas nuevas en `origin/main...HEAD`.
-- `20260819150000_harden_pairing_tokens.sql` y
-  `pairing_hardening_03b_checks.sql` existen solo como untracked.
-- No se consulto ni modifico Supabase. No puede afirmarse si la migracion fue
-  aplicada externamente. PENDIENTE DE REVISION TECNICA.
+## Exclusiones y seguridad
 
-## Evidencia documentada pero no disponible en GitHub main
+El commit de preservacion contiene solo los 10 paths autorizados. No incluye ni
+leyo `.env`, `.codex-tmp/`, APKs, `build/`, logs, caches, keystores, certificados
+ni otros ignored. No se subieron secretos ni artefactos generados.
 
-- Los 39 commits DAG locales documentan gates JS/unitarios/ktlint/lint/assemble
-  y sesiones A23; S22 sigue pendiente en el estado local vigente.
-- Chrome Visual documenta gates automaticos y pruebas A23, pero su gate de video
-  no esta aprobado.
-- Los cambios sin commit del 19 de agosto tienen tests fuente nuevos, pero este
-  inventario no repitio suites y no encontro evidencia suficiente para declarar
-  el lote completo PASS.
-- `docs/PROJECT_CONTROL.md` local dice en una linea que `main` esta 32 commits
-  delante; Git real muestra 39. La documentacion y el codigo local tampoco
-  reflejan aun los cuatro grupos sin commit del working tree.
+## Anomalias y riesgos vigentes
 
-## No debe subirse
+- No hubo anomalías durante la preservacion.
+- Los cambios siguen sin revision tecnica; preservarlos no implica aprobarlos.
+- `work/chrome-visual` aun mezcla el historial DAG local, snapshots y Chrome
+  Visual. No debe proponerse para merge directo.
+- La migracion de pairing sigue sin aplicar y requiere ticket/revision propia.
 
-- `.env` real: existe y esta ignorado; no se leyo ni debe versionarse.
-- `.codex-tmp/`: ignorado, 5,4 GB y aproximadamente 43.555 archivos.
-- Artefactos ignorados: App Usuario DEV APK (60 MB), DAG DEV APK (116 MB), DAG
-  Diagnostic APK (116 MB), APKs de tests y logs de instrumentacion bajo `build/`.
-- No se encontraron keystores, `.jks`, `.p12` ni `.pem` fuera de rutas excluidas.
-- Los tokens presentes en los checks SQL son valores deterministas de prueba,
-  no credenciales operativas.
+## Siguiente accion propuesta — no ejecutada
 
-## Riesgos
+ChatGPT debe emitir tickets separados de revision para:
 
-1. Cambiar de rama o limpiar ahora puede perder o mezclar los 10 archivos sin
-   commit.
-2. Subir `work/chrome-visual` directamente mezclaria 39 commits DAG, dos
-   snapshots y cinco tickets Chrome Visual.
-3. La migracion de pairing no debe aplicarse antes de revision SQL y estrategia
-   de rollout/rollback.
-4. Los seis commits exclusivos de ramas DAG antiguas pueden ser legado o
-   trabajo util; requieren comparacion antes de archivarlas.
-5. Handoffs locales describen resultados que GitHub `main` todavia no contiene.
+1. hosts Supabase exactos;
+2. sync atomico;
+3. pairing hardening;
+4. integracion DAG/Chrome Visual.
 
-## Comandos de solo lectura relevantes
-
-- `git status --short --branch`
-- `git rev-list --left-right --count origin/main...HEAD`
-- `git log origin/main..HEAD`
-- `git diff --name-status` / `git diff --shortstat`
-- `git branch -avv`
-- `git worktree list --porcelain`
-- `git branch -r --no-merged HEAD`
-- `git show --stat 6a045f13`
-- `git diff --check`
-- inventario nominal de artefactos ignorados, sin leer secretos.
-
-No se ejecutaron builds, tests, ADB, APK, migraciones, reset, stash, clean,
-checkout del worktree auditado ni cambios de producto.
-
-## Separacion futura propuesta — no ejecutada
-
-1. `review/dag-local-integration` para los 39 commits de `main`.
-2. `review/chrome-visual-00-03` desde la base DAG aprobada, excluyendo snapshots.
-3. `review/exact-technical-hosts` para policy/VPN.
-4. `review/atomic-policy-sync` para sync y tests.
-5. `review/pairing-hardening-03b` para App, migracion y checks.
-6. Tickets de descarte o recuperacion separados para las dos ramas DAG
-   divergentes.
-
-Siguiente accion: ChatGPT debe definir el orden de preservacion/revision. Codex
-no debe reconciliar, mover ni subir codigo hasta recibir el siguiente ticket.
+Codex se detiene sin revisar, reconciliar, limpiar ni mover el trabajo original.
