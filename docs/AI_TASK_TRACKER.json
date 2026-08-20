@@ -1,40 +1,43 @@
 {
-  "updatedAt": "20 ago 2026 · 19:14",
+  "updatedAt": "20 ago 2026 · 19:22",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
-      "context": "Workflow manual confirmado: ChatGPT resuelve primero; Codex solo cuando hace falta trabajo local/Mac",
+      "context": "Prioridad actual: cerrar hardening RPC backend sin Codex ni cambios en Production hasta terminar la matriz de permisos",
       "tasks": [
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
-        {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"PASS: estado local relevante preservado en ramas remotas preserve/*.","status":"done","priority":"critical"},
+        {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"Estado local relevante preservado en ramas remotas preserve/*.","status":"done","priority":"critical"},
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
-        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Reabierto como prioridad crítica tras auditoría directa de Supabase: hay RPC SECURITY DEFINER con permisos demasiado amplios que requieren hardening controlado.","status":"blocked","priority":"critical"},
+        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"En curso: clasificación read-only de RPC SECURITY DEFINER y permisos reales antes de aplicar hardening.","status":"in_progress","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96: datos visibles, licencias/cupos y UX/UI profesional.","status":"done","priority":"important"},
-        {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado por decisión actual.","status":"done","priority":"critical"},
-        {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; cuando hace falta Mac/Codex entrega ticket listo para copiar. Codex deja PR/handoff y ChatGPT audita al recibir 'ya'.","status":"done","priority":"critical"},
-        {"id":"ai-auto-handoff-01","title":"Autorun experimental de Codex","detail":"Retirado del flujo normal. No se depende de launchd/watchers.","status":"done","priority":"normal"},
-        {"id":"codex-effort-routing","title":"Elegir esfuerzo Codex por cada ticket","detail":"ChatGPT elige el menor esfuerzo suficiente (low/medium/high/xhigh).","status":"done","priority":"important"},
-        {"id":"workflow-cost-optimization","title":"Optimizar workflow para bajar costos","detail":"Contexto mínimo, lotes coherentes, tests estrechos y Codex solo cuando hace falta Mac/local.","status":"done","priority":"important"},
+        {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado.","status":"done","priority":"critical"},
+        {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; Codex solo cuando hace falta Mac/local y siempre queda auditado por ChatGPT.","status":"done","priority":"critical"},
+        {"id":"ai-auto-handoff-01","title":"Autorun experimental de Codex","detail":"Retirado del flujo normal.","status":"done","priority":"normal"},
+        {"id":"codex-effort-routing","title":"Elegir esfuerzo Codex por cada ticket","detail":"ChatGPT elige el menor esfuerzo suficiente.","status":"done","priority":"important"},
+        {"id":"workflow-cost-optimization","title":"Optimizar workflow para bajar costos","detail":"Contexto mínimo, lotes coherentes, tests estrechos y Codex solo cuando hace falta.","status":"done","priority":"important"},
         {"id":"control-center-sync-rule","title":"Sincronizar siempre Glosh Central","detail":"Todo cambio de ruta, prioridad, estado, tarea, bloqueo, cierre o workflow se refleja aquí en el mismo ciclo.","status":"done","priority":"critical"},
-        {"id":"apps-account-product-batch-07","title":"Próximo lote Apps / cuentas","detail":"Reservado: vencimiento de licencia, cupos, contraseña Admin y bloqueo de acciones simultáneas. Queda detrás del hardening backend crítico.","status":"pending","priority":"important"},
-        {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Verificado nuevamente en Supabase: 0 comunidades, 0 cuentas, 0 admins comunitarios, 0 dispositivos y 0 licencias activas.","status":"done","priority":"important"},
-        {"id":"control-center-v2","title":"Control Center V2","detail":"Tablero solo lectura con pull-to-refresh y sincronización desde GitHub.","status":"done","priority":"normal"},
+        {"id":"apps-account-product-batch-07","title":"Próximo lote Apps / cuentas","detail":"Reservado detrás del hardening backend crítico: licencia, cupos, contraseña Admin y acciones simultáneas.","status":"pending","priority":"important"},
+        {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Verificado en Supabase: datos operativos viejos continúan limpios.","status":"done","priority":"important"},
+        {"id":"control-center-v2","title":"Control Center V2","detail":"Tablero solo lectura sincronizado desde GitHub.","status":"done","priority":"normal"},
         {"id":"pro-audit","title":"Auditoría Pro y mapa técnico","detail":"Auditoría integral completada; hallazgos se cierran por lotes auditables.","status":"done","priority":"important"}
       ]
     },
     {
       "id": "security",
       "title": "Seguridad",
-      "context": "Auditoría directa Supabase detectó superficie RPC SECURITY DEFINER demasiado amplia; no se modifica hasta clasificar permisos necesarios por cliente",
+      "context": "Matriz RPC en curso: 36 SECURITY DEFINER ejecutables por anon; mayoría protegidas por device-token/código. Se detectaron candidatos claros de reducción y default privileges demasiado amplios.",
       "tasks": [
         {"id":"exact-hosts","title":"Allowlist exacta de Supabase","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"atomic-sync","title":"Sync atómico de políticas","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
-        {"id":"backend-security-advisor-audit","title":"Auditar exposición real de RPCs","detail":"Hecho sin Codex: Supabase Security Advisor reporta múltiples SECURITY DEFINER ejecutables por anon/authenticated. Ejemplos anon: admin_create_device_relink_code, admin_device_token_matches y varias super_admin list/create RPC. Requiere clasificación antes de revocar permisos.","status":"done","priority":"critical"},
-        {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE de RPCs sensibles","detail":"Pendiente crítico: definir matriz anon/authenticated legítima y revocar EXECUTE sobrante sin romper activación/pairing/device-token. No aplicar a ciegas.","status":"blocked","priority":"critical"},
-        {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Código estático listo; debe cerrarse junto a la matriz real de permisos RPC y gate cross-device.","status":"blocked","priority":"critical"},
+        {"id":"backend-security-advisor-audit","title":"Auditar exposición real de RPCs","detail":"Hecho sin Codex: Security Advisor confirmó exposición amplia de SECURITY DEFINER.","status":"done","priority":"critical"},
+        {"id":"rpc-permission-matrix","title":"Clasificar permisos reales de RPCs","detail":"En curso sin Codex. Confirmado: RPC de dispositivo con x-device-token y pairing por código justifican anon en muchos casos. Cuatro super_admin_* tienen anon innecesario. activate_device exige auth.uid y también es candidato a quitar anon si no hay cliente legacy activo.","status":"in_progress","priority":"critical"},
+        {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"Pendiente de autorización para cambios Production. Primera corrección propuesta: retirar anon de 4 RPC super_admin; evaluar activate_device tras confirmar uso.","status":"pending","priority":"critical"},
+        {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"Causa estructural detectada: default privileges en public conceden EXECUTE a anon/authenticated/service_role para funciones nuevas. Preparar cambio opt-in para futuras RPC sin romper las existentes.","status":"pending","priority":"critical"},
+        {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Código estático listo; cerrar junto a matriz real de permisos y gate cross-device.","status":"blocked","priority":"critical"},
         {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"Implementado estáticamente; falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
-        {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor indica Leaked Password Protection desactivada. Pendiente revisar impacto/plan antes de cambiar Auth.","status":"pending","priority":"important"}
+        {"id":"direct-auth-users-write","title":"Eliminar escritura directa en auth.users","detail":"Deuda P1 confirmada en pairing de Admin: función interna crea filas directamente en auth.users/auth.identities. No tocar hasta diseñar reemplazo seguro.","status":"pending","priority":"important"},
+        {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor indica Leaked Password Protection desactivada. Revisar impacto/plan antes de cambiar Auth.","status":"pending","priority":"important"}
       ]
     },
     {
@@ -42,11 +45,11 @@
       "title": "Apps / cuentas",
       "context": "Lote funcional preparado; se ejecutará después del hardening backend crítico",
       "tasks": [
-        {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Mostrar explicación simple de para qué sirve la app antes de aprobarla.","status":"pending","priority":"important"},
+        {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
         {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote.","status":"pending","priority":"normal"},
         {"id":"account-capacity-remaining","title":"Mostrar cupos disponibles","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
-        {"id":"user-relink","title":"Reenlazar usuario","detail":"Flujo backend ya existe; pendiente cierre de seguridad antes de UX final.","status":"pending","priority":"important"},
+        {"id":"user-relink","title":"Reenlazar usuario","detail":"Backend existe; pendiente cierre de seguridad antes de UX final.","status":"pending","priority":"important"},
         {"id":"user-request-history-delete","title":"Borrar historial de pedidos en Usuario","detail":"Pendiente.","status":"pending","priority":"normal"},
         {"id":"prevent-double-control-actions","title":"Evitar dos controles simultáneos","detail":"Incluido en próximo lote.","status":"pending","priority":"important"}
       ]
@@ -54,10 +57,10 @@
     {
       "id": "super-admin-data",
       "title": "Super Admin",
-      "context": "Lote aprobado técnicamente; seguridad RPC backend requiere cierre antes de considerarlo listo para producción",
+      "context": "UX aprobada; backend RPC debe cerrarse antes de Production",
       "tasks": [
         {"id":"super-admin-data-cleanup","title":"Actualizar y limpiar datos del Super Admin","detail":"PASS en PR #96.","status":"done","priority":"important"},
-        {"id":"license-management-review","title":"Revisar sistema completo de licencias","detail":"PASS funcional en PR #96; backend aún no está cerrado para producción.","status":"done","priority":"important"},
+        {"id":"license-management-review","title":"Revisar sistema completo de licencias","detail":"PASS funcional en PR #96.","status":"done","priority":"important"},
         {"id":"super-admin-ux-ui","title":"Mejorar UX/UI del Super Admin","detail":"PASS en PR #96.","status":"done","priority":"important"}
       ]
     },
@@ -65,9 +68,7 @@
       "id": "delivery",
       "title": "Entrega / APKs",
       "context": "Pruebas físicas pausadas",
-      "tasks": [
-        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Envío físico al S22 pausado por ahora.","status":"pending","priority":"important"}
-      ]
+      "tasks": [{"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Envío físico al S22 pausado.","status":"pending","priority":"important"}]
     },
     {
       "id": "chrome-visual",
