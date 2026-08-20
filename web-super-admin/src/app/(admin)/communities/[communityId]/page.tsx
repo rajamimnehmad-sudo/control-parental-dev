@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, CheckCircle2, Download, KeyRound, Mail, MonitorSmartphone, Settings2, ShieldCheck, Smartphone, UserRound, UsersRound, WifiOff } from "lucide-react";
+import { ArrowLeft, ArrowRight, CalendarClock, CheckCircle2, CreditCard, Download, KeyRound, Mail, MonitorSmartphone, ShieldCheck, Smartphone, UserRound, UsersRound, WifiOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AdminTokenForm } from "@/components/AdminTokenForm";
 import { DeleteCommunityButton } from "@/components/DeleteCommunityButton";
@@ -18,12 +18,26 @@ import { capacitySnapshot, compactNumber, formatDate, formatShortDate } from "@/
 
 type Props = {
   params: Promise<{ communityId: string }>;
+  searchParams: Promise<{ section?: string | string[] }>;
 };
 
-export default async function CommunityDetailPage({ params }: Props) {
+type CommunitySection = "summary" | "users" | "admins" | "license" | "devices";
+
+const sections: Array<{ id: CommunitySection; label: string }> = [
+  { id: "summary", label: "Resumen" },
+  { id: "users", label: "Usuarios" },
+  { id: "admins", label: "Administradores" },
+  { id: "license", label: "Licencia" },
+  { id: "devices", label: "Dispositivos y actualizaciones" },
+];
+
+export default async function CommunityDetailPage({ params, searchParams }: Props) {
   const { communityId } = await params;
+  const section = normalizedSection((await searchParams).section);
   const { detail, admins, protectedUsers, devices, devVersions } = await getCommunityBundle(communityId);
   const orderedUsers = [...protectedUsers].sort((left, right) => userPriority(left) - userPriority(right) || left.display_name.localeCompare(right.display_name, "es"));
+  const pendingUsers = protectedUsers.filter((user) => user.status === "pending").length;
+  const offlineUsers = protectedUsers.filter((user) => user.last_seen_at && Date.now() - new Date(user.last_seen_at).getTime() >= 24 * 60 * 60 * 1000).length;
 
   return (
     <main className="community-detail page-shell">
@@ -44,88 +58,109 @@ export default async function CommunityDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <CapacityMetric label="Administradores" used={detail.admin_count} maximum={detail.max_admins} icon={UsersRound} />
-        <CapacityMetric label="Usuarios" used={detail.user_device_count} maximum={detail.max_user_devices} icon={MonitorSmartphone} />
-        <CapacityMetric label="Dispositivos Admin" used={detail.admin_device_count} maximum={detail.max_admin_devices} icon={Smartphone} />
-        <MiniMetric label="Vence" value={formatShortDate(detail.expires_at, "Sin vencimiento")} icon={CalendarClock} />
-      </section>
+      <nav aria-label="Secciones de la comunidad" className="-mx-4 flex gap-1 overflow-x-auto border-y border-line bg-white px-4 py-2 sm:mx-0 sm:rounded-2xl sm:border sm:p-2 sm:shadow-panel">
+        {sections.map((item) => (
+          <Link
+            key={item.id}
+            href={`/communities/${communityId}?section=${item.id}`}
+            aria-current={section === item.id ? "page" : undefined}
+            className={`min-h-10 shrink-0 rounded-xl px-3.5 py-2.5 text-sm font-semibold transition ${section === item.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100 hover:text-ink"}`}
+          >
+            {item.label}
+          </Link>
+        ))}
+      </nav>
 
-      <section className="grid gap-3">
-        <SectionTitle title="Administradores" count={admins.length} />
-        {admins.length === 0 ? (
-          <EmptyState title="Sin administradores" body="Crea un administrador y comparte el token para activar App Admin." />
-        ) : (
-          <div className="grid gap-3 xl:grid-cols-2">
-            {admins.map((admin) => (
-              <AdminCard key={admin.admin_id} admin={admin} communityId={communityId} />
-            ))}
-          </div>
-        )}
-      </section>
+      {section === "summary" ? (
+        <>
+          <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <CapacityMetric label="Administradores" used={detail.admin_count} maximum={detail.max_admins} icon={UsersRound} />
+            <CapacityMetric label="Usuarios" used={detail.user_device_count} maximum={detail.max_user_devices} icon={MonitorSmartphone} />
+            <CapacityMetric label="Dispositivos Admin" used={detail.admin_device_count} maximum={detail.max_admin_devices} icon={Smartphone} />
+            <MiniMetric label="Vence" value={formatShortDate(detail.expires_at, "Sin vencimiento")} icon={CalendarClock} />
+          </section>
+          <section className="grid gap-4 lg:grid-cols-2">
+            <article className="panel">
+              <div className="flex items-start justify-between gap-3">
+                <div><p className="eyebrow">Licencia</p><h2 className="section-title">{detail.plan_name}</h2></div>
+                <LicenseBadge status={detail.license_status} />
+              </div>
+              <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                <SummaryDetail label="Inicio" value={formatShortDate(detail.starts_at, "Inicio sin informar")} />
+                <SummaryDetail label="Vencimiento" value={formatShortDate(detail.expires_at, "Sin vencimiento")} />
+                <SummaryDetail label="DAG" value={detail.dag_entitled ? "Habilitado" : "No habilitado"} />
+                <SummaryDetail label="Notas internas" value={detail.internal_notes || "Sin notas internas"} />
+              </dl>
+              <SectionLink href={`/communities/${communityId}?section=license`} label="Administrar licencia y límites" icon={CreditCard} />
+            </article>
+            <article className="panel">
+              <p className="eyebrow">Operación</p>
+              <h2 className="section-title">Actividad de la comunidad</h2>
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                <SummaryCount label="Usuarios" value={protectedUsers.length} />
+                <SummaryCount label="Pendientes" value={pendingUsers} />
+                <SummaryCount label="Sin conexión" value={offlineUsers} />
+              </div>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <SectionLink href={`/communities/${communityId}?section=users`} label="Gestionar usuarios" icon={UserRound} />
+                <SectionLink href={`/communities/${communityId}?section=admins`} label="Gestionar administradores" icon={ShieldCheck} />
+              </div>
+            </article>
+          </section>
+        </>
+      ) : null}
 
-      <section className="grid gap-3">
-        <SectionTitle title="Usuarios protegidos" count={protectedUsers.length} />
-        {protectedUsers.length === 0 ? (
-          <EmptyState title="Sin usuarios protegidos" body="Aparecerán cuando un administrador genere tokens de App Usuario o cuando esos celulares se activen." />
-        ) : (
-          <div className="grid gap-3 xl:grid-cols-2">
-            {orderedUsers.map((user) => (
-              <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} device={devices.find((item) => item.device_id === user.device_id)} versions={devVersions} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="grid gap-3">
-        <SectionTitle title="Actualizaciones App Admin" count={devices.filter((device) => device.app_role === "admin").length} />
-        <p className="text-sm text-slate-500">
-          Estado informado por cada dispositivo frente a la publicación DEV vigente. Android pide confirmación para instalar.
-        </p>
-        {devices.filter((device) => device.app_role === "admin").length === 0 ? (
-          <EmptyState title="Sin administradores activos" body="El estado aparecerá cuando una App Admin complete su activación." />
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {devices.filter((device) => device.app_role === "admin").map((device) => (
-              <DeviceUpdateCard key={device.device_id} device={device} versions={devVersions} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="grid gap-3">
-        <SectionTitle title="Acciones" />
-        <details className="group rounded-md border border-line bg-white shadow-soft">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
-            <div className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-accent" />
-              <h2 className="text-base font-semibold text-ink">Agregar administrador</h2>
+      {section === "users" ? (
+        <section className="grid gap-3">
+          <SectionTitle title="Usuarios protegidos" count={protectedUsers.length} />
+          {protectedUsers.length === 0 ? (
+            <EmptyState title="Sin usuarios protegidos" body="Aparecerán cuando un administrador genere tokens de App Usuario o cuando esos celulares se activen." />
+          ) : (
+            <div className="grid gap-3 xl:grid-cols-2">
+              {orderedUsers.map((user) => (
+                <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} />
+              ))}
             </div>
-            <span className="text-sm font-semibold text-accent group-open:hidden">Abrir</span>
-            <span className="hidden text-sm font-semibold text-accent group-open:inline">Cerrar</span>
-          </summary>
-          <div className="border-t border-line p-4">
-            <AdminTokenForm communityId={communityId} />
-          </div>
-        </details>
+          )}
+        </section>
+      ) : null}
 
-        <details className="group rounded-md border border-line bg-white shadow-soft">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
-            <div className="flex items-center gap-2">
-              <Settings2 className="h-5 w-5 text-accent" />
-              <h2 className="text-base font-semibold text-ink">Licencia y límites</h2>
-            </div>
-            <span className="text-sm font-semibold text-accent group-open:hidden">Abrir</span>
-            <span className="hidden text-sm font-semibold text-accent group-open:inline">Cerrar</span>
-          </summary>
-          <div className="border-t border-line p-4">
-            <div className="grid gap-4">
-              <DagEntitlementForm detail={detail} />
-              <LicenseForm detail={detail} compact />
-            </div>
+      {section === "admins" ? (
+        <section className="grid gap-4">
+          <div className="panel" id="new-admin">
+            <div className="panel-header"><div><p className="eyebrow">Acción frecuente</p><h2 className="section-title">Agregar administrador</h2><p className="muted mt-1">Generá un token de activación para una nueva App Admin.</p></div><KeyRound className="h-5 w-5 text-accent" /></div>
+            <div className="mt-4"><AdminTokenForm communityId={communityId} /></div>
           </div>
-        </details>
-      </section>
+          <SectionTitle title="Administradores" count={admins.length} />
+          {admins.length === 0 ? (
+            <EmptyState title="Sin administradores" body="Creá el primero con el formulario de esta sección." />
+          ) : (
+            <div className="grid gap-3 xl:grid-cols-2">{admins.map((admin) => <AdminCard key={admin.admin_id} admin={admin} communityId={communityId} />)}</div>
+          )}
+        </section>
+      ) : null}
+
+      {section === "license" ? (
+        <section className="grid gap-4">
+          <div><p className="eyebrow">Configuración comercial</p><h2 className="section-title">Licencia y límites</h2><p className="muted mt-1">Los cambios se aplican mediante las funciones seguras del Super Admin.</p></div>
+          <div className="grid gap-4 xl:grid-cols-[minmax(280px,.65fr)_minmax(0,1.35fr)]">
+            <DagEntitlementForm detail={detail} />
+            <LicenseForm detail={detail} compact />
+          </div>
+        </section>
+      ) : null}
+
+      {section === "devices" ? (
+        <section className="grid gap-3">
+          <SectionTitle title="Dispositivos y actualizaciones" count={devices.length} />
+          <p className="text-sm text-slate-500">Estado informado por cada dispositivo frente a la publicación DEV vigente. El reenlace y la versión están junto al equipo correspondiente.</p>
+          {devices.length === 0 ? (
+            <EmptyState title="Sin dispositivos activos" body="Los equipos aparecerán cuando una App Admin o App Usuario complete su activación." />
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{devices.map((device) => <DeviceUpdateCard key={device.device_id} device={device} versions={devVersions} communityId={communityId} />)}</div>
+          )}
+        </section>
+      ) : null}
 
       <details className="group rounded-md border border-red-200 bg-red-50">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
@@ -141,6 +176,11 @@ export default async function CommunityDetailPage({ params }: Props) {
   );
 }
 
+function normalizedSection(value: string | string[] | undefined): CommunitySection {
+  const candidate = Array.isArray(value) ? value[0] : value;
+  return sections.some((section) => section.id === candidate) ? candidate as CommunitySection : "summary";
+}
+
 function userPriority(user: ProtectedUser) {
   if (user.status === "pending") return 0;
   if (user.last_seen_at && Date.now() - new Date(user.last_seen_at).getTime() >= 24 * 60 * 60 * 1000) return 1;
@@ -148,7 +188,7 @@ function userPriority(user: ProtectedUser) {
   return 3;
 }
 
-function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versions: DevAppVersions }) {
+function DeviceUpdateCard({ device, versions, communityId }: { device: CommunityDevice; versions: DevAppVersions; communityId: string }) {
   const latest = device.app_role === "admin" ? versions.admin : versions.user;
   const current = device.app_version_code;
   const needsUpdate = latest !== null && current < latest;
@@ -172,6 +212,9 @@ function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versi
           : "Modelo pendiente de sincronización"}
         {device.android_version ? ` · Android ${device.android_version}` : ""}
       </p>
+      <div className="mt-4 border-t border-line pt-3">
+        <DeviceRelinkButton communityId={communityId} deviceId={device.device_id} />
+      </div>
     </div>
   );
 }
@@ -211,6 +254,23 @@ function SectionTitle({ title, count }: { title: string; count?: number }) {
   );
 }
 
+function SummaryDetail({ label, value }: { label: string; value: string }) {
+  return <div><dt className="text-xs font-semibold text-slate-500">{label}</dt><dd className="mt-1 text-sm font-semibold text-ink">{value}</dd></div>;
+}
+
+function SummaryCount({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-xl bg-slate-50 p-3 text-center"><p className="text-2xl font-bold text-ink">{compactNumber(value)}</p><p className="mt-1 text-[11px] font-semibold text-slate-500">{label}</p></div>;
+}
+
+function SectionLink({ href, label, icon: Icon }: { href: string; label: string; icon: LucideIcon }) {
+  return (
+    <Link href={href} className="mt-5 flex min-h-11 items-center justify-between gap-3 rounded-xl border border-line px-3.5 text-sm font-semibold text-ink transition hover:border-teal-200 hover:bg-teal-50">
+      <span className="flex items-center gap-2"><Icon className="h-4 w-4 text-accent" />{label}</span>
+      <ArrowRight className="h-4 w-4 text-slate-400" />
+    </Link>
+  );
+}
+
 function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId: string }) {
   const active = Boolean(admin.activated_device_id);
 
@@ -241,7 +301,7 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
   );
 }
 
-function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }: { user: ProtectedUser; communityId: string; dagEntitled: boolean; device?: CommunityDevice; versions: DevAppVersions }) {
+function ProtectedUserCard({ user, communityId, dagEntitled }: { user: ProtectedUser; communityId: string; dagEntitled: boolean }) {
   const lastSeen = user.last_seen_at ? new Date(user.last_seen_at).getTime() : null;
   const offline = lastSeen !== null && Date.now() - lastSeen >= 24 * 60 * 60 * 1000;
   return (
@@ -267,7 +327,6 @@ function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }:
       </div>
       <DeviceDagForm communityId={communityId} deviceId={user.device_id} enabled={user.dag_enabled} entitled={dagEntitled} />
       {user.device_id ? <div className="mt-3"><DeviceRelinkButton communityId={communityId} deviceId={user.device_id} /></div> : null}
-      {device ? <div className="mt-3"><DeviceUpdateCard device={device} versions={versions} /></div> : null}
     </article>
   );
 }

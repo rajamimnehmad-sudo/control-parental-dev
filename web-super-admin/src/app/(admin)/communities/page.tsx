@@ -1,6 +1,7 @@
 import { Building2, MonitorSmartphone, Plus, UsersRound } from "lucide-react";
 import { CommunityDirectory } from "@/components/CommunityDirectory";
 import { CreateCommunityForm } from "@/components/CreateCommunityForm";
+import { EmptyState } from "@/components/EmptyState";
 import { listCommunities } from "@/lib/data";
 import { compactNumber } from "@/lib/utils";
 
@@ -27,7 +28,9 @@ export default async function CommunitiesPage() {
         <Summary label="Administradores" value={compactNumber(admins)} icon={UsersRound} />
       </section>
 
-      <CommunityDirectory communities={communities} />
+      {communities.length === 0 ? (
+        <EmptyState title="Todavía no hay comunidades" body="Usá “Nueva comunidad” para crear la primera organización junto con su licencia y cupos iniciales." />
+      ) : <CommunityDirectory communities={communities} />}
     </main>
   );
 }

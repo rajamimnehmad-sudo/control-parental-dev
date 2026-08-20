@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LicenseBadge } from "@/components/Badge";
+import { EmptyState } from "@/components/EmptyState";
 import { listAppRatings, listCommunities, listProtectionAlerts } from "@/lib/data";
 import { getDomainListStatus, protectionState } from "@/lib/domain-list";
 import { compactNumber, formatDate } from "@/lib/utils";
@@ -60,7 +61,16 @@ export default async function DashboardPage() {
             </div>
             <Link className="button button-secondary" href="/communities">Ver todas <ArrowRight className="h-4 w-4" /></Link>
           </div>
-          <div className="mt-2 divide-y divide-line">
+          {recentCommunities.length === 0 ? (
+            <div className="mt-5">
+              <EmptyState
+                title="Empezá con la primera comunidad"
+                body="Creá su licencia inicial y después sumá administradores, usuarios y dispositivos desde una operación ordenada."
+                action={<Link className="button button-primary" href="/communities">Crear comunidad <ArrowRight className="h-4 w-4" /></Link>}
+              />
+            </div>
+          ) : (
+            <div className="mt-2 divide-y divide-line">
             {recentCommunities.map((community) => (
               <Link key={community.community_id} href={`/communities/${community.community_id}`} className="grid gap-3 py-4 transition hover:bg-slate-50/70 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-2">
                 <div className="min-w-0">
@@ -74,8 +84,8 @@ export default async function DashboardPage() {
                 <LicenseBadge status={community.license_status} />
               </Link>
             ))}
-            {recentCommunities.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Todavía no hay comunidades.</p> : null}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="grid content-start gap-4">
