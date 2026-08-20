@@ -25,6 +25,8 @@ El runner local debe detectar un cambio de commit/contenido de ese archivo y eje
 3. no hay otra ejecución de Codex activa por este runner;
 4. el mismo ticket no figura como terminado/bloqueado en el estado local del runner.
 
+La lectura remota debe actualizar de forma explícita `refs/remotes/origin/coordination/ai-control`; no depender solo de `FETCH_HEAD` ni de una referencia remota local potencialmente stale.
+
 ## Ejecución Codex
 
 Usar la CLI actual en modo no interactivo:
@@ -42,6 +44,31 @@ El prompt debe ordenar:
 
 Permisos: usar el mínimo suficiente. Para tickets que editan el repo, preferir sandbox `workspace-write`. No usar `danger-full-access` como configuración por defecto.
 
+## Esfuerzo Codex por ticket
+
+El ticket debe declarar:
+
+`**Esfuerzo Codex:** low | medium | high | xhigh`
+
+El runner debe:
+
+1. leer ese campo de `AI_NEXT_TICKET.md`;
+2. aceptar únicamente `low`, `medium`, `high`, `xhigh`;
+3. usar `medium` si el campo falta o es inválido;
+4. registrar el esfuerzo efectivo en estado/log;
+5. lanzar Codex con un override por ejecución, equivalente a:
+
+`codex exec -c model_reasoning_effort=<nivel> ...`
+
+Mapa semántico definido por ChatGPT:
+
+- Bajo = `low`
+- Medio = `medium` (default)
+- Alto = `high`
+- Extra alto = `xhigh`
+
+Codex no debe autoelevar ni reducir este valor. Si considera que el nivel asignado es insuficiente para continuar con seguridad/calidad, debe dejarlo como observación/bloqueo para que ChatGPT decida.
+
 ## Guardas obligatorias
 
 ### No duplicar
@@ -50,6 +77,7 @@ Persistir fuera del repo de producto un estado pequeño con al menos:
 
 - último SHA de `AI_NEXT_TICKET.md` ejecutado;
 - identificador/título del ticket;
+- esfuerzo Codex efectivo;
 - estado `running`, `completed`, `blocked`, `failed`;
 - hora de inicio/fin;
 - PID/session id si aplica.
@@ -96,7 +124,7 @@ Preferencia: servicio nativo liviano de macOS con `launchd`, sin Docker ni daemo
 
 Componentes esperados:
 
-1. script pequeño, por ejemplo bajo `tools/ai-autorun/` o ubicación equivalente;
+1. script pequeño bajo `tools/ai-autorun/` o ubicación equivalente;
 2. polling liviano de GitHub cada 30–60 s o mecanismo equivalente confiable;
 3. `launchd` para iniciar al login y mantener el watcher;
 4. lock/state/log fuera del working tree de producto o en una ruta ignorada;
@@ -119,6 +147,7 @@ Comando de estado debe mostrar:
 - servicio activo/inactivo;
 - último ticket detectado;
 - último ticket ejecutado;
+- esfuerzo Codex efectivo;
 - estado actual;
 - última ejecución;
 - PID si está corriendo;
@@ -126,22 +155,24 @@ Comando de estado debe mostrar:
 
 Logs rotados/acotados. No registrar secretos, tokens ni contenido de `.env`.
 
-## Criterio de aceptación del ticket AI-AUTO-HANDOFF-01
+## Criterio de aceptación del autorun
 
 1. instalación local idempotente en la Mac;
 2. `launchd` activo;
 3. un ticket de prueba inocuo se detecta exactamente una vez;
-4. `codex exec` arranca automáticamente;
-5. una segunda lectura del mismo SHA no vuelve a arrancarlo;
-6. single-flight evita ejecuciones paralelas;
-7. stop/start/status funcionan;
-8. reinicio de sesión/Mac no pierde la configuración;
-9. ningún secreto queda versionado;
-10. no se altera el working tree Android actual;
-11. handoff a ChatGPT con comandos, archivos, estado y rollback/uninstall.
+4. la referencia remota se actualiza explícitamente y no queda stale;
+5. `codex exec` arranca automáticamente;
+6. una segunda lectura del mismo SHA no vuelve a arrancarlo;
+7. single-flight evita ejecuciones paralelas;
+8. stop/start/status funcionan;
+9. reinicio de sesión/Mac no pierde la configuración;
+10. ningún secreto queda versionado;
+11. no se altera el working tree Android actual;
+12. un self-test demuestra que `low/medium/high/xhigh` se traducen al override correcto y que ausencia/valor inválido cae a `medium`;
+13. handoff a ChatGPT con comandos, archivos, estado y rollback/uninstall.
 
 ## Después de instalar
 
 El usuario ya no necesita decir `ya` en Codex.
 
-En operación normal solo hará falta que ChatGPT publique el siguiente ticket. El usuario seguirá diciendo `ya` en ChatGPT cuando quiera forzar una revisión inmediata, aunque más adelante también puede automatizarse la detección del handoff por separado si conviene.
+En operación normal solo hará falta que ChatGPT publique el siguiente ticket. El usuario puede seguir diciendo `ya` en ChatGPT cuando quiera forzar una revisión inmediata.
