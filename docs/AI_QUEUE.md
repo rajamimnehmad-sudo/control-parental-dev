@@ -1,20 +1,25 @@
 # AI QUEUE — Glosh
 
-## Próximo ajuste reservado
+## Próximo lote reservado
 
-### AI-AUTORUN-HARDEN-03
+### APPS-ACCOUNT-UX-BATCH-01
 
-**Estado:** QUEUED — ejecutar después de cerrar la corrección/smoke actual del autorun; no reemplazar el ticket vigente mientras esté en curso.
+**Estado:** QUEUED — no promover mientras `AI-AUTORUN-AUTH-GUARD-06` siga en curso.
 
 **Esfuerzo Codex:** medium
+**Perfil Codex:** lean
 
-**Objetivo:** dejar el autorun definitivamente endurecido con dos mejoras coordinadas:
+**Objetivo:** cerrar en un solo lote coherente cuatro pendientes de Apps/cuentas, evitando cuatro arranques separados de Codex:
 
-1. asegurar que el fetch actualice explícitamente `refs/remotes/origin/coordination/ai-control`, evitando referencias stale;
-2. leer `**Esfuerzo Codex:** low|medium|high|xhigh` de cada ticket y lanzar `codex exec -c model_reasoning_effort=<nivel>`, con fallback `medium`.
+1. definir e implementar el flujo visible cuando una licencia vence, incluida recuperación cuando vuelve a estar activa;
+2. mostrar cupos disponibles de usuarios/administradores según la licencia vigente donde corresponda;
+3. aclarar en App Admin para qué sirve la contraseña y en qué acciones se usa, sin cambiar seguridad por simple UX;
+4. impedir dobles taps/acciones simultáneas que puedan dejar estados inconsistentes en controles sensibles.
 
-**Gates:** regresión del fetch/ref remoto, parser de esfuerzo, fallback medium, self-test de los cuatro niveles, deduplicación/single-flight intactos, reinstall idempotente y smoke real de un ticket read-only.
+**Preparación obligatoria:** antes de modificar, Codex debe inspeccionar únicamente las áreas de App Usuario/App Admin/backend-contract directamente implicadas, reutilizar el sistema de licencias ya existente y no reinventar reglas que ya estén en Super Admin/backend.
 
-**Límites:** no tocar producto, Production, Supabase, APKs ni worktree Android original.
+**Gates:** tests afectados y builds mínimos de las apps tocadas; no repetir suites no relacionadas; handoff con comportamiento antes/después, archivos, tests y riesgos.
 
-**Resultado esperado:** una vez cerrado este ajuste, ChatGPT decide el esfuerzo por ticket y la Mac aplica automáticamente ese nivel al iniciar Codex.
+**Límites:** no S22, no ADB, no APK físico, no Chrome/DAG, no Production/deploy/merge, no cambios destructivos de datos. Si el comportamiento de licencia requiere una decisión de producto no deducible de lo ya existente, detener ese subpunto y continuar solo con los otros que sean seguros.
+
+**Resultado esperado:** mejorar UX y coherencia de cuentas/licencias con un único costo de arranque Codex.
