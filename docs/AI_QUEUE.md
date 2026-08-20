@@ -1,15 +1,20 @@
 # AI QUEUE — Glosh
 
-## Próximo lote reservado
+## Próximo ajuste reservado
 
-### AI-AUTO-HANDOFF-01
+### AI-AUTORUN-HARDEN-03
 
-**Estado:** QUEUED — no ejecutar mientras haya un ticket vigente en curso.
+**Estado:** QUEUED — ejecutar después de cerrar la corrección/smoke actual del autorun; no reemplazar el ticket vigente mientras esté en curso.
 
-**Objetivo:** instalar en la Mac el runner local definido en `docs/AI_AUTORUN_SPEC.md` para que cada cambio nuevo de `docs/AI_NEXT_TICKET.md` dispare automáticamente `codex exec`, con single-flight, deduplicación, permisos mínimos, logs acotados y servicio `launchd`.
+**Esfuerzo Codex:** medium
 
-**Orden:** promover a `docs/AI_NEXT_TICKET.md` inmediatamente después de que ChatGPT audite/cierre el ticket que está ejecutándose actualmente.
+**Objetivo:** dejar el autorun definitivamente endurecido con dos mejoras coordinadas:
 
-**Regla:** no interrumpir ni modificar la ejecución actual para adelantar este bootstrap.
+1. asegurar que el fetch actualice explícitamente `refs/remotes/origin/coordination/ai-control`, evitando referencias stale;
+2. leer `**Esfuerzo Codex:** low|medium|high|xhigh` de cada ticket y lanzar `codex exec -c model_reasoning_effort=<nivel>`, con fallback `medium`.
 
-**Resultado esperado:** una vez cerrado `AI-AUTO-HANDOFF-01`, el usuario deja de tener que escribir `ya` en Codex. ChatGPT publica ticket nuevo y la Mac lo ejecuta automáticamente.
+**Gates:** regresión del fetch/ref remoto, parser de esfuerzo, fallback medium, self-test de los cuatro niveles, deduplicación/single-flight intactos, reinstall idempotente y smoke real de un ticket read-only.
+
+**Límites:** no tocar producto, Production, Supabase, APKs ni worktree Android original.
+
+**Resultado esperado:** una vez cerrado este ajuste, ChatGPT decide el esfuerzo por ticket y la Mac aplica automáticamente ese nivel al iniciar Codex.
