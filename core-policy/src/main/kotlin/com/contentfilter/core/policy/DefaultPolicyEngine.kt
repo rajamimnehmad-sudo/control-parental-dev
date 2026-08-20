@@ -116,7 +116,7 @@ class DefaultPolicyEngine : PolicyEngine {
         ) {
             return PolicyDecision.Block("Encrypted DNS bypass is disabled by web protection.")
         }
-        if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
+        if (normalizedContext.domain.matchesExactAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
         }
         if (!snapshot.rules.isDomainAllowedBySchedule(normalizedContext)) {
@@ -314,7 +314,6 @@ class DefaultPolicyEngine : PolicyEngine {
         const val DomainWildcard = "*"
         val CriticalAllowedDomains =
             setOf(
-                "supabase.co",
                 "syeycayasyufedwoprea.supabase.co",
                 "android.clients.google.com",
                 "connectivitycheck.gstatic.com",
@@ -343,6 +342,8 @@ class DefaultPolicyEngine : PolicyEngine {
         fun String.matchesDomainTarget(target: String): Boolean = this == target || endsWith(".$target")
 
         fun String.matchesAny(targets: Set<String>): Boolean = targets.any { matchesDomainTarget(it) }
+
+        fun String.matchesExactAny(targets: Set<String>): Boolean = targets.any { this == it }
 
         fun PolicySnapshot.hasSearchEngineBlockRule(): Boolean =
             rules.webNavigationBlocked() ||

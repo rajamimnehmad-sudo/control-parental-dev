@@ -74,7 +74,8 @@ class VpnDomainPolicyEvaluator
                         normalizedDomain,
                         TimePolicyContext(now, minuteOfDay, isoDayOfWeek),
                     )?.toDecision(normalizedDomain)
-            if (explicitDecision != null && explicitDecision !is PolicyDecision.Allow) return explicitDecision
+            if (explicitDecision != null && !technicalHostAllowed) return explicitDecision
+            if (technicalHostAllowed) return policyDecision
             if (policyDecision !is PolicyDecision.Allow) return policyDecision
             val finalDecision = explicitDecision ?: policyDecision
             if (explicitDecision == null && !technicalHostAllowed) {
@@ -128,8 +129,7 @@ class VpnDomainPolicyEvaluator
             }
 
         private fun String.isTechnicalWebProtectionHost(): Boolean =
-            SearchEngineCatalog.isSearchResultsAllowedDomain(this) ||
-                TechnicalAllowedDomains.any { matchesLimitTarget(it) }
+            SearchEngineCatalog.isSearchResultsAllowedDomain(this) || TechnicalAllowedDomains.any { this == it }
 
         private fun String.matchesLimitTarget(target: String): Boolean = this == target || endsWith(".$target")
 
@@ -142,9 +142,9 @@ class VpnDomainPolicyEvaluator
         private companion object {
             val TechnicalAllowedDomains =
                 setOf(
-                    "supabase.co",
                     "android.clients.google.com",
                     "connectivitycheck.gstatic.com",
+                    "syeycayasyufedwoprea.supabase.co",
                 )
         }
     }
