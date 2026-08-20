@@ -8,6 +8,7 @@ REMOTE_BRANCH="origin/coordination/ai-control"
 TICKET_PATH="docs/AI_NEXT_TICKET.md"
 DEFAULT_CODEX="/Applications/ChatGPT.app/Contents/Resources/codex"
 DEFAULT_EFFORT="medium"
+LEAN_CODEX_HOME_NAME="codex-home-lean"
 
 runtime_home() {
   if [ -n "${GLOSH_AI_AUTORUN_HOME:-}" ]; then
@@ -27,6 +28,7 @@ EXEC_LOG="$LOG_DIR/codex-exec.log"
 INSTALL_DIR="$RUNTIME_HOME/bin"
 INSTALLED_RUNNER="$INSTALL_DIR/glosh-ai-autorun"
 LAUNCH_AGENT="${HOME:?}/Library/LaunchAgents/$LABEL.plist"
+LEAN_CODEX_HOME="$RUNTIME_HOME/$LEAN_CODEX_HOME_NAME"
 
 now() {
   date -u '+%Y-%m-%dT%H:%M:%SZ'
@@ -52,6 +54,8 @@ write_state() {
     printf 'ticket_id=%s\n' "$(sanitize_value "${TICKET_ID:-}")"
     printf 'requested_effort=%s\n' "$(sanitize_value "${REQUESTED_EFFORT:-}")"
     printf 'applied_effort=%s\n' "$(sanitize_value "${APPLIED_EFFORT:-$DEFAULT_EFFORT}")"
+    printf 'execution_profile=%s\n' "$(sanitize_value "${EXECUTION_PROFILE:-lean}")"
+    printf 'effective_model=%s\n' "$(sanitize_value "${EFFECTIVE_MODEL:-}")"
     printf 'token_usage=%s\n' "$(sanitize_value "${TOKEN_USAGE:-unavailable}")"
     printf 'status=%s\n' "$(sanitize_value "${RUN_STATUS:-idle}")"
     printf 'pid=%s\n' "$(sanitize_value "${RUN_PID:-}")"
@@ -70,6 +74,8 @@ load_state() {
   TICKET_ID="$(state_get ticket_id)"
   REQUESTED_EFFORT="$(state_get requested_effort)"
   APPLIED_EFFORT="$(state_get applied_effort)"
+  EXECUTION_PROFILE="$(state_get execution_profile)"
+  EFFECTIVE_MODEL="$(state_get effective_model)"
   TOKEN_USAGE="$(state_get token_usage)"
   RUN_STATUS="$(state_get status)"
   RUN_PID="$(state_get pid)"
@@ -79,6 +85,7 @@ load_state() {
   LAST_EXIT="$(state_get last_exit)"
   [ -n "$RUN_STATUS" ] || RUN_STATUS="idle"
   [ -n "$APPLIED_EFFORT" ] || APPLIED_EFFORT="$DEFAULT_EFFORT"
+  [ -n "$EXECUTION_PROFILE" ] || EXECUTION_PROFILE="lean"
   [ -n "$TOKEN_USAGE" ] || TOKEN_USAGE="unavailable"
 }
 
@@ -178,6 +185,50 @@ ticket_effort_from_file() {
   esac
 }
 
+ticket_execution_profile() {
+  raw="$(awk '
+    /Perfil Codex:/ {
+      line=$0
+      sub(/^.*Perfil Codex:[[:space:]]*/, "", line)
+      gsub(/[*`]/, "", line)
+      sub(/[[:space:]]+$/, "", line)
+      print tolower(line)
+      exit
+    }
+  ' "$RUNTIME_HOME/ticket.current")"
+  case "$raw" in
+    full) EXECUTION_PROFILE="full" ;;
+    *) EXECUTION_PROFILE="lean" ;;
+  esac
+  case "$CURRENT_TICKET_ID" in
+    AI-AUTORUN-SMOKE-*|AI-AUTORUN-MEASURE-*) EXECUTION_PROFILE="coordination-lean" ;;
+  esac
+}
+
+model_for_effort() {
+  case "$APPLIED_EFFORT" in
+    low) EFFECTIVE_MODEL="gpt-5.6-luna" ;;
+    medium) EFFECTIVE_MODEL="gpt-5.6-terra" ;;
+    high|xhigh) EFFECTIVE_MODEL="gpt-5.6-sol" ;;
+    *) EFFECTIVE_MODEL="gpt-5.6-terra" ;;
+  esac
+}
+
+setup_lean_codex_home() {
+  auth_source="${HOME:?}/.codex/auth.json"
+  auth_link="$LEAN_CODEX_HOME/auth.json"
+  [ -f "$auth_source" ] || return 1
+  mkdir -p "$LEAN_CODEX_HOME"
+  chmod 700 "$LEAN_CODEX_HOME"
+  if [ -L "$auth_link" ] && [ "$(readlink "$auth_link")" = "$auth_source" ]; then
+    return 0
+  fi
+  [ ! -e "$auth_link" ] || return 1
+  auth_tmp="$auth_link.tmp.$$"
+  ln -s "$auth_source" "$auth_tmp"
+  mv "$auth_tmp" "$auth_link"
+}
+
 extract_token_usage() {
   file="$1"
   line="$(grep '"type":"turn.completed"' "$file" | tail -1 || true)"
@@ -198,7 +249,7 @@ execute_ticket() {
   codex_bin="$(config_get codex_bin)"
   [ -n "$codex_bin" ] || codex_bin="$DEFAULT_CODEX"
   if [ "${GLOSH_AI_AUTORUN_TEST_MODE:-0}" = "1" ]; then
-    printf '%s %s %s %s\n' "$CURRENT_SHA" "$CURRENT_TICKET_ID" "$REQUESTED_EFFORT" "$APPLIED_EFFORT" >> "${GLOSH_AI_AUTORUN_TEST_EXEC_LOG:?}"
+    printf '%s %s %s %s %s %s\n' "$CURRENT_SHA" "$CURRENT_TICKET_ID" "$REQUESTED_EFFORT" "$APPLIED_EFFORT" "$EXECUTION_PROFILE" "$EFFECTIVE_MODEL" >> "${GLOSH_AI_AUTORUN_TEST_EXEC_LOG:?}"
     sleep "${GLOSH_AI_AUTORUN_TEST_SLEEP:-0}"
     TOKEN_USAGE="unavailable"
     return "${GLOSH_AI_AUTORUN_TEST_EXIT:-0}"
@@ -208,9 +259,19 @@ execute_ticket() {
     return 127
   fi
   rotate_log "$EXEC_LOG"
-  prompt="Ejecución automática autorizada únicamente para el ticket vigente. Leé docs/AI_WORKFLOW.md y docs/AI_NEXT_TICKET.md desde origin/coordination/ai-control, ejecutá exactamente ese ticket y ningún otro. Respetá sus ramas, límites, prohibiciones y gates. Evitá cargar backlog, handoffs históricos o áreas no indicadas por el ticket. El trigger no autoriza Production, despliegues, merges, borrados destructivos, gastos, pruebas físicas ni envío de APK. Dejá la PR y/o docs/AI_CODEX_HANDOFF.md exigidos en GitHub y detenete."
+  ticket_body="$(cat "$RUNTIME_HOME/ticket.current")"
+  prompt="$(printf 'Ejecutá únicamente el ticket completo incluido abajo. Ya está sincronizado: no vuelvas a leer AI_WORKFLOW, AI_NEXT_TICKET, backlog ni handoffs históricos. Usá solo los archivos y pruebas indispensables. No inicies otro ticket. El trigger no autoriza Production, deploy, merge, borrados, gastos, pruebas físicas ni APK. Cerrá con la huella GitHub exigida y detenete.\n\nTICKET VIGENTE:\n%s' "$ticket_body")"
   exec_dir="$repo"
   extra_repo_arg=""
+  if [ "$EXECUTION_PROFILE" = "coordination-lean" ]; then
+    exec_dir="$RUNTIME_HOME/coordination-workspace"
+    mkdir -p "$exec_dir"
+    extra_repo_arg="--skip-git-repo-check"
+    observed_branch="$(git -C "$repo" branch --show-current 2>/dev/null || true)"
+    observed_head="$(git -C "$repo" rev-parse HEAD 2>/dev/null || true)"
+    observed_changes="$(git -C "$repo" status --short 2>/dev/null | wc -l | tr -d ' ')"
+    prompt="$(printf 'Ticket de coordinación mínimo. No inspecciones el repositorio ni leas documentación adicional. Datos ya observados: rama=%s HEAD=%s entradas_worktree=%s. Ejecutá solo el cierre solicitado usando como máximo dos llamadas de herramienta y detenete.\n\nTICKET VIGENTE:\n%s' "$observed_branch" "$observed_head" "$observed_changes" "$ticket_body")"
+  fi
   if [ "${GLOSH_AI_AUTORUN_SMOKE_MODE:-0}" = "1" ]; then
     exec_dir="$RUNTIME_HOME/smoke-workspace"
     mkdir -p "$exec_dir"
@@ -218,15 +279,18 @@ execute_ticket() {
     prompt="Smoke read-only del autorun. No uses herramientas ni modifiques archivos. Respondé exactamente: AUTORUN_SMOKE_PASS"
   fi
   exec_tmp="$RUNTIME_HOME/codex-exec.current.$$"
-  model="$(config_get model)"
-  set -- exec --approve-for-me --ephemeral --json -c "model_reasoning_effort=\"$APPLIED_EFFORT\"" --cd "$exec_dir"
-  [ -n "$model" ] && set -- "$@" --model "$model"
+  set -- exec --approve-for-me --ephemeral --json -c "model_reasoning_effort=\"$APPLIED_EFFORT\"" -c 'model_verbosity="low"' --model "$EFFECTIVE_MODEL" --cd "$exec_dir"
   [ -n "$extra_repo_arg" ] && set -- "$@" "$extra_repo_arg"
-  if [ "$APPLIED_EFFORT" = "low" ] || [ "$APPLIED_EFFORT" = "medium" ]; then
-    set -- "$@" --ignore-user-config
+  if [ "$EXECUTION_PROFILE" != "full" ]; then
+    setup_lean_codex_home || return 126
+    set -- "$@" --ignore-user-config --disable apps --disable plugins --disable browser_use --disable in_app_browser --disable image_generation --disable multi_agent --disable multi_agent_v2 --disable tool_suggest --disable skill_search --disable workspace_dependencies
   fi
-  log_line "codex_config ticket=$CURRENT_TICKET_ID sha=$CURRENT_SHA requested_effort=$(sanitize_value "$REQUESTED_EFFORT") applied_effort=$APPLIED_EFFORT lean_config=$([ "$APPLIED_EFFORT" = high ] || [ "$APPLIED_EFFORT" = xhigh ] && printf no || printf yes)"
-  "$codex_bin" "$@" "$prompt" > "$exec_tmp" 2>&1
+  log_line "codex_config ticket=$CURRENT_TICKET_ID sha=$CURRENT_SHA requested_effort=$(sanitize_value "$REQUESTED_EFFORT") applied_effort=$APPLIED_EFFORT profile=$EXECUTION_PROFILE model=$EFFECTIVE_MODEL"
+  if [ "$EXECUTION_PROFILE" = "full" ]; then
+    "$codex_bin" "$@" "$prompt" > "$exec_tmp" 2>&1
+  else
+    CODEX_HOME="$LEAN_CODEX_HOME" "$codex_bin" "$@" "$prompt" > "$exec_tmp" 2>&1
+  fi
   rc=$?
   cat "$exec_tmp" >> "$EXEC_LOG"
   TOKEN_USAGE="$(extract_token_usage "$exec_tmp")"
@@ -259,6 +323,8 @@ poll() {
     return 1
   fi
   ticket_effort_from_file
+  ticket_execution_profile
+  model_for_effort
   DETECTED_SHA="$CURRENT_SHA"
   TICKET_ID="$CURRENT_TICKET_ID"
   DETECTED_AT="$(now)"
@@ -304,6 +370,8 @@ mark_current() {
   CURRENT_TICKET_ID="$(ticket_id_from_file)"
   [ -n "$CURRENT_TICKET_ID" ] || return 1
   ticket_effort_from_file
+  ticket_execution_profile
+  model_for_effort
   DETECTED_SHA="$CURRENT_SHA"
   EXECUTED_SHA="$CURRENT_SHA"
   TICKET_ID="$CURRENT_TICKET_ID"
@@ -320,13 +388,11 @@ mark_current() {
 write_config() {
   repo="$1"
   codex_bin="$2"
-  model="$3"
   mkdir -p "$RUNTIME_HOME" "$LOG_DIR"
   umask 077
   {
     printf 'repo=%s\n' "$repo"
     printf 'codex_bin=%s\n' "$codex_bin"
-    printf 'model=%s\n' "$model"
   } > "$CONFIG_FILE"
 }
 
@@ -395,7 +461,6 @@ install_service() {
     printf 'ERROR: codex exec no está disponible.\n' >&2
     return 2
   fi
-  model="$(sed -n 's/^[[:space:]]*model[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "${HOME:?}/.codex/config.toml" 2>/dev/null | head -1)"
   first_install=0
   [ -f "$STATE_FILE" ] || first_install=1
   load_state
@@ -410,7 +475,11 @@ install_service() {
   cp "$0" "$install_tmp"
   chmod 700 "$install_tmp"
   mv "$install_tmp" "$INSTALLED_RUNNER"
-  write_config "$repo" "$codex_bin" "$model"
+  write_config "$repo" "$codex_bin"
+  setup_lean_codex_home || {
+    printf 'ERROR: no se pudo preparar el CODEX_HOME mínimo.\n' >&2
+    return 2
+  }
   write_plist
   if [ "$first_install" -eq 1 ]; then
     "$INSTALLED_RUNNER" mark-current
@@ -429,6 +498,8 @@ status_service() {
   printf 'ticket=%s\n' "${TICKET_ID:-}"
   printf 'requested_effort=%s\n' "${REQUESTED_EFFORT:-}"
   printf 'applied_effort=%s\n' "${APPLIED_EFFORT:-$DEFAULT_EFFORT}"
+  printf 'execution_profile=%s\n' "${EXECUTION_PROFILE:-lean}"
+  printf 'effective_model=%s\n' "${EFFECTIVE_MODEL:-}"
   printf 'token_usage=%s\n' "${TOKEN_USAGE:-unavailable}"
   printf 'detected_sha=%s\n' "${DETECTED_SHA:-}"
   printf 'executed_sha=%s\n' "${EXECUTED_SHA:-}"

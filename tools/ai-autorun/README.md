@@ -3,6 +3,11 @@
 Runner local liviano para observar `coordination/ai-control:docs/AI_NEXT_TICKET.md`
 y ejecutar exactamente un ticket nuevo mediante `codex exec`.
 
+El ejecutable permanece en un único archivo autocontenido (536 líneas) porque
+`install` debe copiar una sola unidad atómica y el estado/lock/ciclo de vida
+comparten invariantes. No se le agregará otra responsabilidad sin separar antes
+parsing, ejecución y servicio en un ticket dedicado.
+
 ## Operación
 
 ```bash
@@ -30,15 +35,20 @@ y conserva el estado. `uninstall` preserva estado y logs para evitar repeticione
 accidentales si se reinstala.
 
 Cada ticket puede declarar `Esfuerzo Codex` como Bajo, Medio, Alto o Extra alto.
-El runner aplica respectivamente `low`, `medium`, `high` o `xhigh` mediante
-`model_reasoning_effort`; un valor ausente o inválido cae a `medium` y queda
-registrado. Bajo/Medio usan una ejecución efímera sin la configuración personal
-de plugins/apps para evitar contexto irrelevante. Alto/Extra alto conservan la
-configuración completa. El modelo configurado se preserva en ambos modos.
+El runner aplica respectivamente `low`, `medium`, `high` o `xhigh` y enruta el
+modelo por costo/capacidad: Luna para Bajo, Terra para Medio y Sol para
+Alto/Extra alto. Un valor ausente o inválido cae a Medio/Terra.
 
-El estado y el log registran esfuerzo solicitado/aplicado, SHA del ticket y el
-uso de tokens informado por el evento JSON final de la CLI; si no existe una
-métrica estable se guarda `unavailable`.
+El perfil por defecto es `lean`: usa un `CODEX_HOME` aislado que solo enlaza la
+autenticación existente (sin copiarla), desactiva plugins/apps/herramientas no
+necesarias, trabaja en modo efímero y recibe el ticket completo en el prompt para
+no volver a cargar coordinación. Tickets de medición/smoke corren fuera del repo
+con hechos Git mínimos precomputados. Solo un ticket que declare explícitamente
+`Perfil Codex: full` conserva la configuración personal completa.
+
+El estado y el log registran esfuerzo, perfil, modelo, SHA y uso de tokens
+informado por el evento JSON final; si no existe una métrica estable se guarda
+`unavailable`.
 
 ## Seguridad
 
@@ -55,5 +65,6 @@ métrica estable se guarda `unavailable`.
 ## Pruebas
 
 `tools/ai-autorun/self-test.sh` sustituye Codex por un stub interno y valida los
-cuatro niveles de esfuerzo, defaults inválido/ausente, detección única,
-deduplicación, single-flight, estado y liberación del lock sin consumir créditos.
+cuatro niveles de esfuerzo/modelo, defaults inválido/ausente, perfil lean,
+detección única, deduplicación, single-flight, estado y liberación del lock sin
+consumir créditos.
