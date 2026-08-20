@@ -1,22 +1,29 @@
 {
-  "updatedAt": "20 ago 2026 · 09:13",
+  "updatedAt": "20 ago 2026 · 10:00",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
-      "context": "Preservar primero; revisar después",
+      "context": "Estado local preservado; empieza revisión técnica por lotes",
       "tasks": [
         {
           "id": "codex-local-inventory",
           "title": "Inventario local completo con Codex",
-          "detail": "Inventario terminado: commits locales, working tree, migraciones y Chrome Visual quedaron identificados sin modificar el proyecto.",
+          "detail": "Inventario terminado sin modificar el proyecto.",
           "status": "done",
           "priority": "critical"
         },
         {
           "id": "preserve-local-state",
           "title": "Preservar todo el estado local",
-          "detail": "Crear snapshots remotos de los commits locales y de los 10 archivos sin commit antes de revisar o limpiar nada.",
+          "detail": "PASS: commits locales y los 10 archivos sin commit quedaron preservados en ramas remotas preserve/*.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "p0-hardening-batch-01",
+          "title": "Cerrar primer lote P0",
+          "detail": "Revisar juntos, con commits separados: hosts Supabase exactos, sync atómico y pairing hardening.",
           "status": "in_progress",
           "priority": "critical"
         },
@@ -30,7 +37,7 @@
         {
           "id": "pro-audit",
           "title": "Auditoría Pro y mapa técnico",
-          "detail": "Auditoría integral completada; la ruta de ejecución queda condicionada a preservar y reconciliar primero el estado local.",
+          "detail": "Auditoría integral completada; ahora se cierran hallazgos por lotes auditables.",
           "status": "done",
           "priority": "important"
         }
@@ -39,40 +46,33 @@
     {
       "id": "security",
       "title": "Seguridad",
-      "context": "Primer bloque técnico después de preservar",
+      "context": "Lote P0 activo",
       "tasks": [
-        {
-          "id": "spark-review",
-          "title": "Revisar cambios acumulados de Spark",
-          "detail": "Separar y auditar por ticket hosts exactos, sync atómico y pairing hardening una vez preservados remotamente.",
-          "status": "pending",
-          "priority": "critical"
-        },
         {
           "id": "exact-hosts",
           "title": "Allowlist exacta de Supabase",
-          "detail": "Cambio local candidato pendiente de revisión técnica y tests reales.",
-          "status": "pending",
+          "detail": "Incluido en P0-HARDENING-BATCH-01.",
+          "status": "in_progress",
           "priority": "critical"
         },
         {
           "id": "atomic-sync",
           "title": "Sync atómico de políticas",
-          "detail": "Cambio local candidato pendiente de revisión técnica y tests de fallos intermedios.",
-          "status": "pending",
+          "detail": "Incluido en P0-HARDENING-BATCH-01.",
+          "status": "in_progress",
           "priority": "critical"
         },
         {
           "id": "pairing-hardening",
           "title": "Hardening de pairing",
-          "detail": "Migración y cliente locales pendientes de revisión del cutoff legacy, grants y rollout antes de Supabase.",
-          "status": "pending",
+          "detail": "Incluido en P0-HARDENING-BATCH-01; sin aplicar migración a Production.",
+          "status": "in_progress",
           "priority": "critical"
         },
         {
           "id": "device-token-scope",
           "title": "Scope de token por dispositivo",
-          "detail": "Restringir escrituras para que un dispositivo no opere sobre otro de la misma cuenta.",
+          "detail": "Siguiente bloque de seguridad después del lote actual.",
           "status": "pending",
           "priority": "important"
         }
@@ -81,54 +81,47 @@
     {
       "id": "chrome-visual",
       "title": "Chrome Visual",
-      "context": "Código local preservado antes del gate físico",
+      "context": "Código preservado; pendiente reconstrucción limpia y gate físico",
       "tasks": [
         {
           "id": "chrome-review-local",
           "title": "Separar y revisar Chrome Visual local",
-          "detail": "La rama local mezcla DAG y Chrome Visual; después de preservar hay que reconstruir una rama de revisión limpia.",
+          "detail": "Reconstruir una rama de revisión limpia antes del gate físico.",
           "status": "pending",
           "priority": "critical"
         },
         {
           "id": "chrome-video-a23",
           "title": "Revalidar video en A23",
-          "detail": "Solo después de tests/ADB y auditoría de la rama limpia; falta confirmar la corrección de coberturas completas.",
+          "detail": "Solo después de tests/ADB y auditoría de la rama limpia.",
           "status": "pending",
           "priority": "critical"
         },
         {
           "id": "chrome-images",
           "title": "Confirmar fotos estáticas en Chrome",
-          "detail": "Verificar imágenes, scroll y overlays localizados por separado del video.",
+          "detail": "Verificar imágenes, scroll y overlays localizados.",
           "status": "pending",
           "priority": "important"
-        },
-        {
-          "id": "chrome-fallback",
-          "title": "Fallback de captura y DRM",
-          "detail": "Definir degradación segura cuando Chrome no pueda capturarse o la geometría sea ambigua.",
-          "status": "pending",
-          "priority": "normal"
         }
       ]
     },
     {
       "id": "gloshia-dag",
       "title": "GloshIA / DAG",
-      "context": "39 commits locales detectados",
+      "context": "39 commits locales ya preservados",
       "tasks": [
         {
           "id": "dag-local-review",
           "title": "Revisar integración DAG local",
-          "detail": "Hay 39 commits en main local aún no subidos; primero se preservan y luego se auditan por bloques antes de integrar.",
+          "detail": "Auditar los 39 commits preservados por bloques antes de integrar.",
           "status": "pending",
           "priority": "important"
         },
         {
           "id": "shared-gloshia-engine",
           "title": "Motor GloshIA compartido",
-          "detail": "Consolidar el motor compartido solo después de validar la rama limpia de Chrome Visual y la base DAG.",
+          "detail": "Consolidar después de validar Chrome Visual y la base DAG.",
           "status": "pending",
           "priority": "normal"
         }
