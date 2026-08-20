@@ -42,7 +42,14 @@ internal class ChromeVisualVideoPolicy {
                 current == null && entries.size < MaximumRegions -> Entry(region, dynamic = observedChange)
                 current == null -> return ChromeVisualPresentation.Covered
                 current.region != region -> Entry(region, dynamic = current.dynamic || observedChange)
-                else -> current.apply { if (observedChange) dynamic = true }
+                else ->
+                    current.apply {
+                        if (observedChange) {
+                            dynamic = true
+                            safeSamples = 0
+                            presentation = ChromeVisualPresentation.Covered
+                        }
+                    }
             }
         entries[key] = entry
         return entry.presentation
