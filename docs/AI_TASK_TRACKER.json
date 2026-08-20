@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 20:30",
+  "updatedAt": "20 ago 2026 · 20:31",
   "sections": [
     {
       "id": "coordination",
@@ -43,9 +43,10 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "Auditoría UX/UI integral de App Usuario y App Admin activa en paralelo; el lote funcional permanece detrás del hardening backend crítico",
+      "context": "Auditoría UX/UI de Usuario y Admin cerrada: conservar navegación principal; siguiente paso es flujo objetivo y wireframes antes de maquetar o implementar",
       "tasks": [
-        {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"Auditoría de producto activa en ChatGPT: mapa de flujos, fricciones, lenguaje y sistema visual. Sin tocar APK; al cerrar sigue wireframe y maquetado.","status":"in_progress","priority":"important"},
+        {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT. Base estructural buena; principales fricciones: densidad en detalle Admin, lenguaje técnico, onboarding de permisos y sistema visual parcialmente fragmentado. No se tocó APK.","status":"done","priority":"important"},
+        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"Siguiente paso: acordar arquitectura de información y flujos objetivo de Usuario/Admin; después hacer wireframes y maquetas visuales antes de implementar.","status":"pending","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
         {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote.","status":"pending","priority":"normal"},
