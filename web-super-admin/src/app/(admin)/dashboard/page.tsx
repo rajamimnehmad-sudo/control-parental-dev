@@ -48,7 +48,7 @@ export default async function DashboardPage() {
         <DashboardMetric label="Comunidades activas" value={`${activeCommunities}`} detail={`${communities.length} totales`} icon={Building2} tone="teal" />
         <DashboardMetric label="Usuarios protegidos" value={compactNumber(users)} detail={`${compactNumber(admins)} administradores`} icon={MonitorSmartphone} tone="blue" />
         <DashboardMetric label="Alertas abiertas" value={compactNumber(alerts.length)} detail={alerts.length ? "Requieren revisión" : "Todo en orden"} icon={BellRing} tone={alerts.length ? "amber" : "green"} />
-        <DashboardMetric label="Valoración general" value={ratingAverage ? ratingAverage.toFixed(1) : "—"} detail={`${ratings.length} respuestas`} icon={Star} tone="violet" />
+        <DashboardMetric label="Valoración general" value={ratingAverage ? ratingAverage.toFixed(1) : "Sin datos"} detail={ratings.length ? `${ratings.length} respuestas` : "Todavía sin respuestas"} icon={Star} tone="violet" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.75fr)]">
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
               <Link key={community.community_id} href={`/communities/${community.community_id}`} className="grid gap-3 py-4 transition hover:bg-slate-50/70 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-2">
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-ink">{community.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">Actualizada {formatDate(community.updated_at)}</p>
+                  <p className="mt-1 text-xs text-slate-500">Actualizada {formatDate(community.updated_at, "sin fecha informada")}</p>
                 </div>
                 <div className="flex gap-5 text-sm text-slate-600">
                   <span><strong className="text-ink">{community.user_device_count}</strong> usuarios</span>
@@ -83,7 +83,7 @@ export default async function DashboardPage() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">Protección web</p>
-                <p className="mt-3 text-3xl font-bold tracking-tight">{domains.payload ? compactNumber(domains.payload.totalCount) : "—"}</p>
+                <p className="mt-3 text-3xl font-bold tracking-tight">{domains.payload ? compactNumber(domains.payload.totalCount) : "No disponible"}</p>
                 <p className="mt-1 text-sm text-slate-300">dominios protegidos</p>
               </div>
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-teal-200"><Database className="h-5 w-5" /></span>

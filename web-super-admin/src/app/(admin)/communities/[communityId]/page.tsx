@@ -14,7 +14,7 @@ import { LicenseForm } from "@/components/LicenseForm";
 import { RevokeAdminTokenButton } from "@/components/RevokeAdminTokenButton";
 import { getCommunityBundle } from "@/lib/data";
 import type { CommunityAdmin, CommunityDevice, DevAppVersions, ProtectedUser } from "@/lib/types";
-import { compactNumber, formatDate } from "@/lib/utils";
+import { compactNumber, formatDate, formatShortDate } from "@/lib/utils";
 
 type Props = {
   params: Promise<{ communityId: string }>;
@@ -47,10 +47,10 @@ export default async function CommunityDetailPage({ params }: Props) {
       </div>
 
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <MiniMetric label="Admins" value={`${compactNumber(detail.admin_count)} / ${detail.max_admins ?? "-"}`} icon={UsersRound} />
-        <MiniMetric label="Usuarios activos" value={`${compactNumber(activatedUsers)} / ${detail.max_user_devices ?? "-"}`} icon={MonitorSmartphone} />
+        <MiniMetric label="Admins" value={`${compactNumber(detail.admin_count)} / ${detail.max_admins ?? "Sin límite"}`} icon={UsersRound} />
+        <MiniMetric label="Usuarios activos" value={`${compactNumber(activatedUsers)} / ${detail.max_user_devices ?? "Sin límite"}`} icon={MonitorSmartphone} />
         <MiniMetric label="Pendientes" value={compactNumber(pendingUsers)} icon={KeyRound} />
-        <MiniMetric label="Vence" value={detail.expires_at ? new Date(detail.expires_at).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "Sin fecha"} icon={CalendarClock} />
+        <MiniMetric label="Vence" value={formatShortDate(detail.expires_at, "Sin vencimiento")} icon={CalendarClock} />
       </section>
 
       <section className="grid gap-3">
@@ -167,7 +167,7 @@ function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versi
           {needsUpdate ? `Actualizar a v${latest}` : latest === null ? "Sin manifiesto" : "Actualizada"}
         </span>
       </div>
-      <p className="mt-3 text-xs text-slate-500">Última conexión: {formatDate(device.last_seen_at)}</p>
+      <p className="mt-3 text-xs text-slate-500">Última conexión: {formatDate(device.last_seen_at, "Sin conexión informada")}</p>
       <p className="mt-1 text-xs text-slate-500">
         {device.manufacturer || device.model
           ? `${device.manufacturer ?? ""} ${device.model ?? ""}`.trim()
@@ -218,8 +218,8 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
         <InfoLine icon={Mail} label={admin.email ?? "Sin email todavía"} />
         <InfoLine icon={Smartphone} label={admin.phone_e164 ?? "Sin WhatsApp informado"} />
         <InfoLine icon={Smartphone} label={admin.activated_device_name ?? "Sin dispositivo activado"} />
-        <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(admin.last_seen_at)}`} />
-        {!active ? <InfoLine icon={KeyRound} label={`Token pendiente: ${formatDate(admin.pending_token_expires_at)}`} /> : null}
+        <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(admin.last_seen_at, "Sin conexión informada")}`} />
+        {!active ? <InfoLine icon={KeyRound} label={`Token pendiente: ${formatDate(admin.pending_token_expires_at, "Sin vencimiento informado")}`} /> : null}
         {!active && admin.pending_token_expires_at ? (
           <RevokeAdminTokenButton communityId={communityId} adminId={admin.admin_id} />
         ) : null}
@@ -248,9 +248,9 @@ function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }:
       </div>
       <div className="mt-4 grid gap-2 text-sm text-slate-600">
         <InfoLine icon={ShieldCheck} label={`Creado por: ${user.creator_admin_name ?? "Sin dato"}`} />
-        <InfoLine icon={Smartphone} label={user.device_id ? `Dispositivo activo · v${user.app_version_code ?? "-"}` : "Token sin activar"} />
-        <InfoLine icon={KeyRound} label={`Token vence: ${formatDate(user.token_expires_at)}`} />
-        <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(user.last_seen_at)}`} />
+        <InfoLine icon={Smartphone} label={user.device_id ? `Dispositivo activo · ${user.app_version_code === null ? "versión sin informar" : `v${user.app_version_code}`}` : "Token sin activar"} />
+        <InfoLine icon={KeyRound} label={`Token vence: ${formatDate(user.token_expires_at, "Sin vencimiento informado")}`} />
+        <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(user.last_seen_at, "Sin conexión informada")}`} />
         {offline ? <InfoLine icon={WifiOff} label="Sin comunicación desde hace más de 24 horas" /> : null}
       </div>
       <DeviceDagForm communityId={communityId} deviceId={user.device_id} enabled={user.dag_enabled} entitled={dagEntitled} />
