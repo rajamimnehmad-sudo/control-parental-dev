@@ -8,6 +8,27 @@ Que el usuario pueda operar el proyecto con el circuito mínimo:
 
 El usuario no debe copiar reportes manualmente entre Codex y ChatGPT. Cuando Codex termine, el usuario debería poder decir únicamente **“ya”** y ChatGPT debe poder reconstruir el estado desde GitHub.
 
+## Comando corto del usuario: “ya”
+
+La palabra **“ya”** es el trigger operativo estándar de este circuito.
+
+### Cuando el usuario diga “ya” en Codex
+Codex debe interpretar que tiene autorización para **arrancar el ticket vigente**, no para inventar trabajo nuevo.
+
+Debe, en este orden:
+1. leer `docs/AI_WORKFLOW.md` de la rama `coordination/ai-control`;
+2. leer `docs/AI_NEXT_TICKET.md` de esa misma rama;
+3. identificar el ticket vigente y ejecutar exactamente su alcance, permisos, límites y criterio de cierre;
+4. dejar la evidencia/handoff exigido en GitHub antes de detenerse;
+5. no avanzar al siguiente ticket por iniciativa propia.
+
+Si no existe un ticket vigente claro, si ya está cerrado, o si las instrucciones se contradicen, Codex debe **detenerse y dejar handoff de bloqueo**, no adivinar.
+
+### Cuando el usuario diga “ya” en ChatGPT
+ChatGPT debe interpretar que Codex terminó o se bloqueó y debe revisar GitHub directamente: handoff, rama/PR, diff y tests correspondientes. Luego aprueba, pide corrección o publica el siguiente ticket.
+
+Así, en operación normal, el usuario solo necesita decir **“ya”** en cada lado.
+
 ## Roles
 
 ### Usuario / owner
@@ -75,7 +96,7 @@ Después debe detenerse.
 
 ## Trigger de auditoría
 
-Cuando el usuario diga **“ya”**, ChatGPT debe revisar directamente:
+Cuando el usuario diga **“ya”** en ChatGPT, ChatGPT debe revisar directamente:
 1. la PR/rama `review/<ticket>` si hubo cambios de código;
 2. `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control`;
 3. código/diff/tests reales que correspondan;
