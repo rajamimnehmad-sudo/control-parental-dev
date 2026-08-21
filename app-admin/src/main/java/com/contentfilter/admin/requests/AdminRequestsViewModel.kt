@@ -100,23 +100,20 @@ class AdminRequestsViewModel
                 val pendingRequests = requests.filter { it.status.isPending() }
                 val resolvedRequests = requests.filterNot { it.status.isPending() }
                 val users = requests.toUserItems(devices, local.hiddenHistoryIds)
-                val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
+                val selected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
+                val visiblePending =
+                    selected?.let { selectedId -> pendingRequests.filter { it.deviceGroupId == selectedId } }
+                        ?: pendingRequests
+                val visibleResolved =
+                    (selected?.let { selectedId -> resolvedRequests.filter { it.deviceGroupId == selectedId } }
+                        ?: resolvedRequests)
+                        .filterNot { it.id in local.hiddenHistoryIds }
+                        .sortedByDescending(AccessRequest::createdAtEpochMillis)
                 AdminRequestsUiState(
-                    requests =
-                        resolvedSelected?.let { selectedId ->
-                            pendingRequests.filter { it.deviceGroupId == selectedId }
-                                .toRequestItems(local.apps)
-                        }.orEmpty(),
-                    resolvedRequests =
-                        resolvedSelected?.let { selectedId ->
-                            resolvedRequests
-                                .filter { it.deviceGroupId == selectedId }
-                                .filterNot { it.id in local.hiddenHistoryIds }
-                                .sortedByDescending(AccessRequest::createdAtEpochMillis)
-                                .toRequestItems(local.apps)
-                        }.orEmpty(),
+                    requests = visiblePending.toRequestItems(local.apps, devices),
+                    resolvedRequests = visibleResolved.toRequestItems(local.apps, devices),
                     users = users,
-                    selectedDeviceId = resolvedSelected,
+                    selectedDeviceId = selected,
                     offlineMode = false,
                     lastSyncMessage = local.message,
                     isLoading = local.loading,
@@ -222,8 +219,7 @@ class AdminRequestsViewModel
                 pendingActionIds.update { it + actionId }
                 runCatching {
                     if (!request.status.isPending()) return@runCatching
-                    val minutes =
-                        rawMinutes.filter(Char::isDigit).toIntOrNull()
+                    val minutes = rawMinutes.filter(Char::isDigit).toIntOrNull()
                     if (minutes == null || minutes < 1) {
                         syncMessage.update { "Ingresá cuántos minutos querés conceder." }
                         return@runCatching
@@ -347,10 +343,14 @@ private fun List<AccessRequest>.toUserItems(
         )
 }
 
-private fun List<AccessRequest>.toRequestItems(apps: List<RemoteInstalledAppDto>): List<AdminAccessRequestUiState> {
+private fun List<AccessRequest>.toRequestItems(
+    apps: List<RemoteInstalledAppDto>,
+    devices: List<Device>,
+): List<AdminAccessRequestUiState> {
     val appsByDeviceAndPackage = apps.preferAppsWithIcons().associateBy { "${it.deviceId}:${it.packageName}" }
     val appsByPackage = apps.preferAppsWithIcons().distinctBy { it.packageName }.associateBy { it.packageName }
-    return map { request ->
+    val devicesById = devices.associateBy(Device::id)
+    return sortedByDescending(AccessRequest::createdAtEpochMillis).map { request ->
         val packageName = request.targetPackageName ?: request.target
         val app =
             if (request.requestType == AccessRequestType.DOMAIN_ACCESS) {
@@ -369,6 +369,7 @@ private fun List<AccessRequest>.toRequestItems(apps: List<RemoteInstalledAppDto>
                     app?.appName?.takeIf { it.isNotBlank() } ?: "Aplicación solicitada"
                 },
             iconBase64 = app?.iconBase64,
+            userName = request.deviceId?.let { devicesById[it]?.displayName } ?: "Usuario",
         )
     }
 }
