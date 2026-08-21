@@ -2,7 +2,7 @@
 
 Fecha: 2026-08-21
 
-Resultado: **FAILED**
+Resultado: **PASS**
 
 Owner de escritura: Protección Android / Codex
 
@@ -22,7 +22,32 @@ La reconstrucción de `canonical-v3/**` coincidió exactamente con el README:
 El patch no se aplicó a ciegas. Se comparó contra la base real y se portó sólo la
 intención de superficie persistente, captura de ventana, epochs y routing de scroll.
 
-## Gates locales
+## Causa raíz y corrección
+
+El fallo físico de `versionCode=312` era un caso B real. El
+`TYPE_ACCESSIBILITY_OVERLAY` independiente era incluido por Samsung WindowManager en
+`AsyncRotationController` y recibía fade-out/fade-in durante la rotación. No era sólo
+un error del marcador.
+
+La corrección reemplaza esa ventana independiente por un único
+`SurfaceControlViewHost` opaco, publicado con
+`AccessibilityService.attachAccessibilityOverlayToWindow()` sobre la ventana de
+Chrome. El host:
+
+- se publica sólo después de preparar `FLAG_NOT_TOUCHABLE` y una región táctil vacía;
+- queda ligado al árbol de SurfaceControl de Chrome durante la transición;
+- mantiene un extent cuadrado y un único attachment lógico;
+- conserva el último frame seguro/fail-closed mientras una captura no está disponible;
+- no cambia los contratos de epoch, stale result ni captura sin persistencia.
+
+La candidata `317` redujo `surface_marker_missing_frames` de `120` a `9`. La revisión
+frame a frame demostró que el buffer azul protegido seguía compuesto, pero el marcador
+único anclado en `(8, 8)` quedaba fuera del recorte transformado durante dos breves
+tramos de rotación. Ese residual era caso A, de evidencia. La candidata `318` dibuja
+una retícula cian DEV de 16 px cada 128 px dentro del mismo buffer protegido. No se
+modificó el analizador ni sus thresholds.
+
+## Gates locales finales
 
 PASS:
 
@@ -30,69 +55,89 @@ PASS:
 - `:feature-accessibility:testReleaseUnitTest`
 - regresiones dirigidas de epoch/stale results, selección de ventana, routing de
   `TYPE_VIEW_SCROLLED` y host único
+- prueba determinista del extent de host y mensurabilidad de la retícula en replay
 - `:feature-accessibility:ktlintCheck`
 - `:feature-accessibility:lintDebug`
 - `:feature-accessibility:lintRelease`
 - `:app-user:compileDevDebugKotlin`
 - `:app-user:lintDevDebug`
-- una sola ejecución de `:app-user:assembleDevDebug`
+- `:app-user:assembleDevDebug`
 
-APK candidata única:
+APK final:
 
-- `versionCode=312`, `versionName=1.0.1-dev`
-- SHA-256: `09cd917e54b39beab47b943cca35acb449486aba38142b01b7bec524a946d513`
-- firma coincidente con la DEV instalada previamente; instalación in-place PASS
+- `versionCode=318`, `versionName=1.0.1-dev`
+- tamaño: `63017110` bytes
+- SHA-256: `f6b20dc84588a7a8262cfcb1ef2a7abd057c29b045ac1b4f475d19af5328cbfd`
+- instalación in-place: PASS
 - no publicada
 
-## Sesión física
+## Iteraciones físicas de esta corrección
+
+- `313`: fail-fast; el `AccessibilityService` de Samsung no exponía un `Display`
+  mediante el Context heredado.
+- `314`: creación local del SCVH, pero publicación fallida antes de armar.
+- `315`: `rootSurfaceControl` todavía nulo en la primera fase de publicación.
+- `316`: el canal de input local exigía `INTERNAL_SYSTEM_WINDOW` antes de aplicar los
+  metadatos no táctiles.
+- `317`: host window-attached operativo; replay `0` sentinel / `9` marker, FAIL.
+- `318`: retícula del mismo buffer; replay `0` / `0`, PASS.
+
+Las candidatas `313..316` se abortaron antes de grabar al aparecer su fallo dirigido.
+Hubo dos sesiones físicas completas/grabadas (`317` y `318`). El resultado `312` era
+la sesión heredada que originó esta corrección.
+
+## Sesión física final
 
 - dispositivo: Samsung Galaxy A23 `SM-A235M`, serial `R58T34V31AE`
 - Android 14 / API 34
 - Chrome `151.0.7922.137`
-- fixture centinela servida sólo por `adb reverse`; sin guardar ni transmitir capturas
-- gestos: scroll lento, flings, reversa rápida, teclado y rotación landscape/portrait
-- una sola grabación física: 720×1280, 974 frames, 15.687 fps, 62.09 s
-- video SHA-256: `e92f869e82d6c7f3dac660a229f521e7fbb0756b64ce1e8226a7bd4c6529a2a7`
+- fixture centinela servida sólo por `adb reverse`
+- gestos: scroll lento, fling, reversa, foco/teclado y portrait → landscape → portrait
+- grabación: `/tmp/glosh-chrome-rotation-v318.mp4`
+- tamaño de grabación: `5538947` bytes
+- video SHA-256: `44812c58b7e4e526cc634e8e15640aec30192238818460095762e0688c88b32c`
+- 720×1280, `663` frames, `8.212` fps según OpenCV
 
-Telemetría de la superficie durante Chrome:
+Telemetría final de Chrome protegido:
 
-- `attachmentCount`: sólo `1`; máximo `1`
-- epochs armados: `1..259`, monotónicos
-- commits presentados: `6, 19, 118, 121, 199, 230, 247, 248, 256, 259`
+- `attachmentCount`: sólo `1`
+- epochs armados: `2..159`, `158` eventos, monotónicos; violaciones: `0`
+- commits staged: `6`
 - commits stale: `0`
+- commits `stage_failed`: `0`
 - `rawPresented=true`: `0`
-- commits con `underlayChanged=true`: `8`
-- triggers `TYPE_VIEW_SCROLLED`: `78`
-- `layoutUpdates` máximo: `11`
-- capturas exitosas confirmaron Chrome debajo del overlay
-- tres capturas devolvieron `errorCode=3` durante cambios de ventana; el último frame
-  protegido se mantuvo
-- al salir de Chrome hubo un único `phase=disarm reason=chrome_absent`
-- crash: `0`; ANR: `0`; servicio general de Accessibility siguió bound/enabled
+- triggers `TYPE_VIEW_SCROLLED`: `42`
+- `layoutUpdates`: `0..1`; no hubo detach/reattach ni disarm durante la sesión
+- dos transiciones AsyncRotation: portrait → landscape → portrait
+- intentos de captura rate-limited (`errorCode=3`): `8`, siempre fail-closed
+- captura posterior a la rotación recuperada: commits epochs `147` y `159`
+- teclado posterior a rotación: abierto con el tap atravesando el host
+- `dumpsys input`: región táctil del host `Embedded{}` vacía
+- crash: `0`; ANR: `0`
+- Accessibility: servicio bound/enabled; `Crashed services:{}`
+
+No se guardaron ni transmitieron screenshots de Chrome. La grabación y las capturas de
+diagnóstico quedaron sólo como evidencia local temporal.
 
 ## Replay anti-flash exacto
 
-Comando oficial ejecutado con los valores por defecto del helper
-`detect_sentinel_frames.py`:
+Se ejecutó el helper verificado `detect_sentinel_frames.py` con sus valores por
+defecto, sin cambiar thresholds:
 
-- `checked_frames`: `974`
+- `fps`: `8.212`
+- `checked_frames`: `663`
+- `skip_seconds`: `0.0`
 - `sentinel_exposure_frames`: `0`
-- `surface_marker_missing_frames`: `120`
-- tramo continuo afectado: frames `778..897`, segundos `49.5949..57.1808`
-- marcador en ese tramo: `0..90` píxeles, por debajo del mínimo `120`
-- resultado exacto: **FAIL**
-
-El tramo coincide con landscape. La grabación redujo/letterboxeó la superficie y el
-marcador visible quedó por debajo del umbral; además WindowManager registró fade-out /
-fade-in de la ventana de Accessibility durante la rotación. Aunque no apareció ningún
-píxel centinela y el overlay volvió visible con el mismo host, el contrato exige cero
-frames sin marcador/cobertura demostrada. No se infiere seguridad ni se declara PASS.
+- `surface_marker_missing_frames`: `0`
+- `first_sentinel_failures`: `[]`
+- `first_marker_failures`: `[]`
+- resultado exacto: **PASS**
 
 ## Decisión
 
-**FAILED**. No avanzar a `CHROME-PHOTOS-REGION-DETECTOR-01`.
+**PASS** para `CHROME-PHOTOS-PROTECTED-SURFACE-00` en la matriz física probada.
 
-Siguiente paso mínimo: corregir el gate de rotación de la superficie persistente y/o
-la evidencia del marcador para que el replay oficial pueda demostrar continuidad con
-el mismo umbral en portrait y landscape; luego repetir los gates automáticos y una
-única sesión física nueva bajo ticket/reintento explícito.
+No se avanzó a `CHROME-PHOTOS-REGION-DETECTOR-01`. Riesgo residual: la evidencia de
+video del A23 quedó a `8.212` fps y la compatibilidad física sólo está demostrada en
+Android 14 / Chrome 151 sobre este modelo; la retícula es instrumentación DEV y debe
+seguir separada de una futura presentación de producto.

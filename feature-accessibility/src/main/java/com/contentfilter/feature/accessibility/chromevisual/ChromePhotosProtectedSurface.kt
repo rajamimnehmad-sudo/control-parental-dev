@@ -1,51 +1,67 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Looper
-import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
 
 internal data class ChromePhotosProtectedSurfaceStats(
     val attached: Boolean,
     val attachmentCount: Int,
     val layoutUpdateCount: Int,
+    val attachedWindowId: Int?,
+    val hostExtent: Int,
     val viewport: ChromeVisualViewport?,
     val authorityEpoch: Long,
     val pendingEpoch: Long?,
     val discardedPendingFrameCount: Int,
 )
 
+internal enum class ChromePhotosProtectedSurfaceCoverResult {
+    Ready,
+    Pending,
+    Failed,
+}
+
 /**
- * One opaque, non-touchable accessibility overlay for the whole protected Chrome viewport.
+ * One opaque, non-touchable accessibility surface for the whole protected Chrome viewport.
  *
- * The host is attached once and only updated in place until Chrome leaves. It owns every staged
- * bitmap and never makes itself transparent while armed. A frame swap happens inside one onDraw,
- * so a draw can only observe the old complete frame or the new complete frame.
+ * The SurfaceControl host is attached to Chrome's own window so it inherits that window's rotation
+ * transition instead of receiving the independent fade applied to TYPE_ACCESSIBILITY_OVERLAY
+ * windows. The host has an empty touchable region and a rotation-invariant square extent. It owns
+ * every staged bitmap and never makes itself transparent while armed. A frame swap happens inside
+ * one onDraw, so a draw can only observe the old complete frame or the new complete frame.
  */
 internal class ChromePhotosProtectedSurface(
-    service: AccessibilityService,
+    private val service: AccessibilityService,
+    private val onHostPublicationChanged: () -> Unit = {},
 ) : AutoCloseable {
-    private val windowManager = requireNotNull(service.getSystemService(WindowManager::class.java))
-    private val view = ProtectedSurfaceView(service)
+    private var view: ProtectedSurfaceView? = null
+    private var host: ChromePhotosProtectedSurfaceHost? = null
     private var attached = false
     private var attachmentCount = 0
     private var layoutUpdateCount = 0
+    private var attachedWindowId: Int? = null
+    private var hostExtent = 0
     private var viewport: ChromeVisualViewport? = null
 
     fun cover(
+        targetWindowId: Int,
         targetViewport: ChromeVisualViewport,
         authorityEpoch: Long,
-    ): Boolean {
-        if (!isMainThread() || !ensureAttached(targetViewport)) return false
-        view.cover(authorityEpoch)
-        return true
+    ): ChromePhotosProtectedSurfaceCoverResult {
+        if (!isMainThread()) return ChromePhotosProtectedSurfaceCoverResult.Failed
+        val result = ensureAttached(targetWindowId, targetViewport)
+        if (result == ChromePhotosProtectedSurfaceHostResult.Failed) {
+            return ChromePhotosProtectedSurfaceCoverResult.Failed
+        }
+        view?.cover(authorityEpoch) ?: return ChromePhotosProtectedSurfaceCoverResult.Failed
+        return result.toCoverResult()
     }
 
     /** Takes ownership of [frame], including when the operation is rejected. */
@@ -54,11 +70,20 @@ internal class ChromePhotosProtectedSurface(
         frame: Bitmap,
         token: ChromePhotosProtectedSurfaceToken,
     ): Boolean {
-        if (!isMainThread() || !ensureAttached(targetViewport)) {
+        if (
+            !isMainThread() ||
+            ensureAttached(token.windowId, targetViewport) !=
+            ChromePhotosProtectedSurfaceHostResult.Ready
+        ) {
             frame.recycleSafely()
             return false
         }
-        return view.stage(frame, token.epoch, token.sequence)
+        val hostedView = view
+        if (hostedView == null) {
+            frame.recycleSafely()
+            return false
+        }
+        return hostedView.stage(frame, token.epoch, token.sequence)
     }
 
     fun stats(): ChromePhotosProtectedSurfaceStats =
@@ -66,70 +91,88 @@ internal class ChromePhotosProtectedSurface(
             attached = attached,
             attachmentCount = attachmentCount,
             layoutUpdateCount = layoutUpdateCount,
+            attachedWindowId = attachedWindowId,
+            hostExtent = hostExtent,
             viewport = viewport,
-            authorityEpoch = view.authorityEpoch(),
-            pendingEpoch = view.pendingEpoch(),
-            discardedPendingFrameCount = view.discardedPendingFrameCount(),
+            authorityEpoch = view?.authorityEpoch() ?: 0L,
+            pendingEpoch = view?.pendingEpoch(),
+            discardedPendingFrameCount = view?.discardedPendingFrameCount() ?: 0,
         )
 
     override fun close() {
         if (!isMainThread()) return
-        if (attached) {
-            runCatching { windowManager.removeViewImmediate(view) }
-            attached = false
-        }
+        detachAndReleaseHost()
         viewport = null
-        view.close()
     }
 
-    private fun ensureAttached(targetViewport: ChromeVisualViewport): Boolean {
-        if (targetViewport.width <= 0 || targetViewport.height <= 0) return false
+    private fun ensureAttached(
+        targetWindowId: Int,
+        targetViewport: ChromeVisualViewport,
+    ): ChromePhotosProtectedSurfaceHostResult {
+        if (targetWindowId < 0 || targetViewport.width <= 0 || targetViewport.height <= 0) {
+            return ChromePhotosProtectedSurfaceHostResult.Failed
+        }
         if (!attached) {
-            val added =
-                runCatching {
-                    windowManager.addView(view, layoutParams(targetViewport))
-                    true
-                }.getOrDefault(false)
-            if (!added) return false
-            attached = true
-            attachmentCount += 1
-            viewport = targetViewport
-            return true
+            return createAndAttachHost(targetWindowId, targetViewport)
         }
-        if (viewport == targetViewport) return true
-        val updated =
-            runCatching {
-                windowManager.updateViewLayout(view, layoutParams(targetViewport))
-                true
-            }.getOrDefault(false)
-        if (!updated) return false
+        val currentHost = host ?: return ChromePhotosProtectedSurfaceHostResult.Failed
+        val previousExtent = currentHost.extent
+        val result = currentHost.ensureWindowAndExtent(targetWindowId, targetViewport)
+        if (result == ChromePhotosProtectedSurfaceHostResult.Failed) return result
+        if (currentHost.extent > previousExtent) {
+            layoutUpdateCount += 1
+        }
+        attachedWindowId = currentHost.windowId
+        hostExtent = currentHost.extent
         viewport = targetViewport
-        layoutUpdateCount += 1
-        return true
+        return result
     }
 
-    private fun layoutParams(targetViewport: ChromeVisualViewport) =
-        WindowManager.LayoutParams(
-            targetViewport.width,
-            targetViewport.height,
-            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.OPAQUE,
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = targetViewport.left
-            y = targetViewport.top
-            title = SurfaceTitle
+    private fun createAndAttachHost(
+        targetWindowId: Int,
+        targetViewport: ChromeVisualViewport,
+    ): ChromePhotosProtectedSurfaceHostResult {
+        val visualContext =
+            ChromePhotosProtectedSurfaceHostFactory.visualContext(service)
+                ?: return ChromePhotosProtectedSurfaceHostResult.Failed
+        val hostedView = ProtectedSurfaceView(visualContext)
+        val createdHost =
+            ChromePhotosProtectedSurfaceHostFactory.create(
+                service = service,
+                windowId = targetWindowId,
+                viewport = targetViewport,
+                view = hostedView,
+                onPublicationChanged = onHostPublicationChanged,
+            )
+        if (createdHost == null) {
+            hostedView.close()
+            return ChromePhotosProtectedSurfaceHostResult.Failed
         }
+        view = hostedView
+        host = createdHost
+        attached = true
+        attachmentCount += 1
+        attachedWindowId = createdHost.windowId
+        hostExtent = createdHost.extent
+        viewport = targetViewport
+        return createdHost.ensureWindowAndExtent(targetWindowId, targetViewport)
+    }
+
+    private fun detachAndReleaseHost() {
+        runCatching { host?.close() }
+        view?.close()
+        view = null
+        host = null
+        attached = false
+        attachedWindowId = null
+        hostExtent = 0
+    }
 
     private fun isMainThread(): Boolean = Looper.myLooper() == Looper.getMainLooper()
 
     private class ProtectedSurfaceView(
-        service: AccessibilityService,
-    ) : View(service), AutoCloseable {
+        context: Context,
+    ) : View(context), AutoCloseable {
         private val framePaint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val frameDestination = Rect()
         private val statusPaint =
@@ -214,15 +257,7 @@ internal class ChromePhotosProtectedSurface(
                     statusPaint,
                 )
             }
-            // DEV-only compositor marker. A physical recording can verify that the protected host
-            // itself remained in the composed output for every sampled frame.
-            canvas.drawRect(
-                MarkerInsetPx,
-                MarkerInsetPx,
-                MarkerInsetPx + MarkerSizePx,
-                MarkerInsetPx + MarkerSizePx,
-                SurfaceMarkerPaint,
-            )
+            drawSurfaceMarkerLattice(canvas)
         }
 
         fun authorityEpoch(): Long = minimumEpoch
@@ -255,13 +290,45 @@ internal class ChromePhotosProtectedSurface(
             discardedPendingFrameCount += 1
         }
 
+        /**
+         * DEV-only compositor marker. The square host is cropped and transformed by Android while
+         * its target window rotates, so a marker anchored only at (0, 0) can leave the visible crop
+         * even though the protected buffer remains composed. A sparse lattice makes every
+         * sufficiently large visible crop carry evidence from this same buffer.
+         */
+        private fun drawSurfaceMarkerLattice(canvas: Canvas) {
+            var x = MarkerInsetPx
+            while (x < width) {
+                canvas.drawRect(
+                    x,
+                    0f,
+                    (x + ChromePhotosProtectedSurfaceHostPolicy.MarkerLineWidthPx)
+                        .coerceAtMost(width.toFloat()),
+                    height.toFloat(),
+                    SurfaceMarkerPaint,
+                )
+                x += ChromePhotosProtectedSurfaceHostPolicy.MarkerPitchPx
+            }
+            var y = MarkerInsetPx
+            while (y < height) {
+                canvas.drawRect(
+                    0f,
+                    y,
+                    width.toFloat(),
+                    (y + ChromePhotosProtectedSurfaceHostPolicy.MarkerLineWidthPx)
+                        .coerceAtMost(height.toFloat()),
+                    SurfaceMarkerPaint,
+                )
+                y += ChromePhotosProtectedSurfaceHostPolicy.MarkerPitchPx
+            }
+        }
+
         private companion object {
             const val HorizontalPaddingPx = 32f
             const val VerticalPaddingPx = 40f
             const val PendingMessage = "Analizando contenido nuevo…"
             const val NeutralColor = 0xFF202124.toInt()
             const val MarkerInsetPx = 8f
-            const val MarkerSizePx = 32f
             val SurfaceMarkerPaint =
                 Paint().apply {
                     color = 0xFF00C8FF.toInt()
@@ -272,10 +339,27 @@ internal class ChromePhotosProtectedSurface(
                 }
         }
     }
+}
 
-    private companion object {
-        const val SurfaceTitle = "ChromePhotosProtectedSurface"
+private fun ChromePhotosProtectedSurfaceHostResult.toCoverResult() =
+    when (this) {
+        ChromePhotosProtectedSurfaceHostResult.Ready ->
+            ChromePhotosProtectedSurfaceCoverResult.Ready
+        ChromePhotosProtectedSurfaceHostResult.Pending ->
+            ChromePhotosProtectedSurfaceCoverResult.Pending
+        ChromePhotosProtectedSurfaceHostResult.Failed ->
+            ChromePhotosProtectedSurfaceCoverResult.Failed
     }
+
+internal object ChromePhotosProtectedSurfaceHostPolicy {
+    const val MarkerLineWidthPx = 16f
+    const val MarkerPitchPx = 128f
+
+    fun requiredExtent(
+        viewport: ChromeVisualViewport,
+        displayWidth: Int,
+        displayHeight: Int,
+    ): Int = maxOf(viewport.width, viewport.height, displayWidth, displayHeight)
 }
 
 private fun Bitmap?.recycleSafely() {

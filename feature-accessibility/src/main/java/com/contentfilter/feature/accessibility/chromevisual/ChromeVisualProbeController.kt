@@ -36,9 +36,12 @@ internal class ChromeVisualProbeController(
     private val capture = ChromeWindowCapture(service)
     private val windowInspector = ChromeVisualWindowInspector(service)
     private val state = ChromePhotosProtectedSurfaceState()
-    private val surface = ChromePhotosProtectedSurface(service)
+    private val surface = ChromePhotosProtectedSurface(service, ::onHostPublicationChanged)
     private val jobLock = Any()
     private var activeJob: Job? = null
+    private var pendingTrigger: String? = null
+    private var pendingMotion = false
+    private var lastArmedEpoch = 0L
 
     @Volatile
     private var lastUnderlaySignature: Long? = null
@@ -118,25 +121,74 @@ internal class ChromeVisualProbeController(
             } else {
                 state.invalidate(window.id, viewport, motion)
             }
-        if (!surface.cover(viewport, snapshot.epoch)) {
-            log("surface", window.id, "attach_or_cover_failed")
-            state.disarm()
-            surface.close()
+        val trigger = ChromePhotosProtectedSurfaceEventPolicy.label(signal.eventType)
+        when (surface.cover(window.id, viewport, snapshot.epoch)) {
+            ChromePhotosProtectedSurfaceCoverResult.Failed -> {
+                failSurface(window.id)
+                return
+            }
+            ChromePhotosProtectedSurfaceCoverResult.Pending -> {
+                pendingTrigger = trigger
+                pendingMotion = motion
+                log("surface", window.id, "host_pending")
+                return
+            }
+            ChromePhotosProtectedSurfaceCoverResult.Ready -> Unit
+        }
+        finishArming(snapshot, trigger, motion)
+    }
+
+    private fun onHostPublicationChanged() {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            service.mainExecutor.execute(::onHostPublicationChanged)
             return
         }
+        val snapshot = state.snapshot()
+        val viewport = snapshot.viewport ?: return
+        if (!snapshot.isActive) return
+        when (surface.cover(snapshot.windowId, viewport, snapshot.epoch)) {
+            ChromePhotosProtectedSurfaceCoverResult.Failed -> failSurface(snapshot.windowId)
+            ChromePhotosProtectedSurfaceCoverResult.Pending -> Unit
+            ChromePhotosProtectedSurfaceCoverResult.Ready ->
+                finishArming(
+                    snapshot,
+                    pendingTrigger ?: HostReadyTrigger,
+                    pendingMotion,
+                )
+        }
+    }
+
+    private fun finishArming(
+        snapshot: ChromePhotosProtectedSurfaceSnapshot,
+        trigger: String,
+        motion: Boolean,
+    ) {
+        if (snapshot.epoch == lastArmedEpoch) return
+        lastArmedEpoch = snapshot.epoch
+        pendingTrigger = null
+        pendingMotion = false
         val stats = surface.stats()
         Log.i(
             LogTag,
-            "phase=armed windowId=${window.id} epoch=${snapshot.epoch} " +
-                "trigger=${ChromePhotosProtectedSurfaceEventPolicy.label(signal.eventType)} " +
+            "phase=armed windowId=${snapshot.windowId} epoch=${snapshot.epoch} " +
+                "trigger=$trigger " +
                 "attachmentCount=${stats.attachmentCount} layoutUpdates=${stats.layoutUpdateCount} " +
+                "hostMode=window_surface_control hostExtent=${stats.hostExtent} " +
                 "rawPresented=false result=success",
         )
         scheduleCapture(
             epoch = snapshot.epoch,
-            trigger = ChromePhotosProtectedSurfaceEventPolicy.label(signal.eventType),
+            trigger = trigger,
             motion = motion,
         )
+    }
+
+    private fun failSurface(windowId: Int) {
+        log("surface", windowId, "attach_or_cover_failed")
+        state.disarm()
+        surface.close()
+        pendingTrigger = null
+        pendingMotion = false
     }
 
     private fun scheduleCapture(
@@ -200,7 +252,11 @@ internal class ChromeVisualProbeController(
                                     SurfaceCommitResult.Failed
                                 }
                                 !state.markPresented(token) -> {
-                                    surface.cover(token.viewport, state.snapshot().epoch)
+                                    surface.cover(
+                                        token.windowId,
+                                        token.viewport,
+                                        state.snapshot().epoch,
+                                    )
                                     SurfaceCommitResult.Stale
                                 }
                                 else -> SurfaceCommitResult.Staged
@@ -231,6 +287,9 @@ internal class ChromeVisualProbeController(
         state.disarm()
         surface.close()
         lastUnderlaySignature = null
+        pendingTrigger = null
+        pendingMotion = false
+        lastArmedEpoch = 0L
         if (wasActive) Log.i(LogTag, "phase=disarm reason=$reason rawPresented=false result=success")
     }
 
@@ -266,6 +325,7 @@ internal class ChromeVisualProbeController(
         const val AnyWindowId = -1
         const val MotionQuietMillis = 180L
         const val ContentQuietMillis = 90L
+        const val HostReadyTrigger = "HOST_READY"
         const val LogTag = "ChromePhotosSurfaceProbe"
     }
 }
