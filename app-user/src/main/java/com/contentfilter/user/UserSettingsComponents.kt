@@ -2,7 +2,6 @@ package com.contentfilter.user
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -16,9 +15,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshIconBubble
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
@@ -43,37 +43,37 @@ internal fun UserSettingsTab(
 ) {
     ProductVisualPage(
         title = "Ajustes",
-        subtitle = "Elegí qué querés configurar",
+        subtitle = "Protección, actualizaciones y ayuda",
     ) {
         ProductListSurface {
             SettingsIndexRow(
                 icon = ProductIcon.ShieldCheck,
-                title = "Protección y activación",
-                subtitle = activationSummary.ifBlank { "Estado y código de emergencia" },
+                title = "Protección",
+                subtitle = activationSummary.ifBlank { "Estado y recuperación" },
                 onClick = onProtection,
             )
             SettingsIndexRow(
                 icon = ProductIcon.Update,
-                title = "Actualizaciones e instalaciones",
+                title = "Actualizaciones",
                 subtitle = updateSummary,
                 onClick = onUpdates,
             )
             SettingsIndexRow(
                 icon = ProductIcon.People,
-                title = "Datos de contacto (opcional)",
-                subtitle = "Mail y número de celular",
+                title = "Contacto",
+                subtitle = "Datos opcionales para comunicaciones importantes",
                 onClick = onContact,
             )
             SettingsIndexRow(
                 icon = ProductIcon.Search,
                 title = "Ayuda",
-                subtitle = "Asistente y respuestas sobre la aplicación",
+                subtitle = "Respuestas y asistencia sobre Glosh",
                 onClick = onHelp,
             )
             SettingsIndexRow(
-                icon = ProductIcon.People,
+                icon = ProductIcon.Star,
                 title = "Tu opinión",
-                subtitle = "Valorá App Usuario y dejanos un comentario",
+                subtitle = "Contanos cómo podemos mejorar",
                 onClick = onFeedback,
                 showDivider = false,
             )
@@ -91,35 +91,35 @@ internal fun UserProtectionSettingsScreen(
     onBack: () -> Unit,
 ) {
     ProductVisualPage(
-        title = "Protección y activación",
+        title = "Protección",
         subtitle = "Estado y acceso de emergencia",
         onBack = onBack,
     ) {
         ProductListSurface {
             ProductListRow(
-                leading = {
-                    ProductGlyph(
-                        ProductIcon.ShieldCheck,
-                        MaterialTheme.colorScheme.primary,
-                        Modifier.size(24.dp),
+                leading = { GloshIconBubble(ProductIcon.ShieldCheck) },
+                headline = { Text("Estado de la protección", style = MaterialTheme.typography.titleMedium) },
+                supporting = {
+                    Text(
+                        activationState.ifBlank { "Revisando…" },
+                        color = GloshColors.Muted,
                     )
                 },
-                headline = { Text("Activación", style = MaterialTheme.typography.titleMedium) },
-                supporting = { Text(activationState.ifBlank { "Revisando…" }) },
                 showDivider = false,
             )
         }
         ProductCard {
             Text("Código de emergencia", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Ingresalo solamente si el administrador te dio un código para autorizar una desinstalación sin conexión.",
+                "Usalo solamente si tu administrador te dio un código para autorizar una desinstalación sin conexión.",
                 style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Muted,
             )
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = recoveryCode,
                 onValueChange = onRecoveryCodeChanged,
-                label = { Text("Código de emergencia") },
+                label = { Text("Código") },
                 singleLine = true,
             )
             Button(
@@ -146,23 +146,18 @@ internal fun UserFeedbackSettingsRoute(
     var comment by rememberSaveable { mutableStateOf("") }
     ProductVisualPage(
         title = "Tu opinión",
-        subtitle = "Ayudanos a mejorar App Usuario",
+        subtitle = "Ayudanos a mejorar Glosh",
         onBack = onBack,
     ) {
         ProductCard {
-            Text("Valorar App Usuario", style = MaterialTheme.typography.titleMedium)
-            Text("Tu calificación ayuda a mejorar la aplicación.", style = MaterialTheme.typography.bodyMedium)
+            Text("¿Cómo viene funcionando?", style = MaterialTheme.typography.titleMedium)
+            Text("Tu calificación nos ayuda a mejorar.", style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
             Row {
                 (1..5).forEach { value ->
                     IconButton(onClick = { rating = value }) {
                         ProductGlyph(
                             icon = ProductIcon.Star,
-                            color =
-                                if (value <= rating) {
-                                    MaterialTheme.colorScheme.tertiary
-                                } else {
-                                    MaterialTheme.colorScheme.outlineVariant
-                                },
+                            color = if (value <= rating) GloshColors.Warning else MaterialTheme.colorScheme.outlineVariant,
                             contentDescription = "$value estrellas",
                         )
                     }
@@ -180,9 +175,9 @@ internal fun UserFeedbackSettingsRoute(
                 enabled = rating > 0 && !state.saving && state.ratingAvailableAtEpochMillis <= System.currentTimeMillis(),
                 onClick = { viewModel.submit(rating, comment) },
             ) {
-                Text(if (state.saving) "Enviando…" else "Enviar valoración")
+                Text(if (state.saving) "Enviando…" else "Enviar")
             }
-            Text(ratingAvailabilityText(state.ratingAvailableAtEpochMillis), style = MaterialTheme.typography.bodySmall)
+            Text(ratingAvailabilityText(state.ratingAvailableAtEpochMillis), style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodyMedium)
             }
@@ -205,15 +200,16 @@ internal fun UserContactSettingsRoute(
         }
     }
     ProductVisualPage(
-        title = "Datos de contacto",
-        subtitle = "Opcional para comunicaciones importantes",
+        title = "Contacto",
+        subtitle = "Datos opcionales para comunicaciones importantes",
         onBack = onBack,
     ) {
         ProductCard {
-            Text("Datos de contacto (opcional)", style = MaterialTheme.typography.titleMedium)
+            Text("Tus datos", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Podés dejar estos datos vacíos. Se guardan solo para facilitar comunicaciones relacionadas con este dispositivo.",
+                "Podés dejarlos vacíos. Se usan únicamente para comunicaciones relacionadas con este dispositivo.",
                 style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Muted,
             )
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
@@ -234,7 +230,7 @@ internal fun UserContactSettingsRoute(
                 enabled = state.contactLoaded && !state.saving,
                 onClick = { viewModel.saveContact(contactEmail, phone) },
             ) {
-                Text(if (state.saving) "Guardando…" else "Guardar datos")
+                Text(if (state.saving) "Guardando…" else "Guardar")
             }
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodyMedium)
@@ -263,20 +259,14 @@ private fun SettingsIndexRow(
     showDivider: Boolean = true,
 ) {
     ProductListRow(
-        leading = {
-            ProductGlyph(
-                icon = icon,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(24.dp),
-            )
-        },
-        headline = { Text(title, style = MaterialTheme.typography.titleMedium) },
-        supporting = { Text(subtitle, style = MaterialTheme.typography.bodyMedium) },
+        leading = { GloshIconBubble(icon) },
+        headline = { Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite) },
+        supporting = { Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted) },
         trailing = {
             ProductGlyph(
                 ProductIcon.ChevronRight,
-                MaterialTheme.colorScheme.onSurfaceVariant,
-                Modifier.size(22.dp),
+                GloshColors.Muted,
+                Modifier,
             )
         },
         onClick = onClick,
