@@ -1,6 +1,7 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
 import android.accessibilityservice.AccessibilityService
+import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.SystemClock
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -30,6 +31,8 @@ internal sealed interface ChromeWindowCaptureResult {
 internal class ChromeWindowCapture(
     private val service: AccessibilityService,
 ) {
+    // Both Chrome Visual controllers reject events below API 34 before reaching capture().
+    @SuppressLint("NewApi")
     suspend fun capture(windowId: Int): ChromeWindowCaptureResult =
         suspendCancellableCoroutine { continuation ->
             val startedAt = SystemClock.elapsedRealtime()

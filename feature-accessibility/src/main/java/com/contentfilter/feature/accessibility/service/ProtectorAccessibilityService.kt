@@ -128,7 +128,13 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
+        if (event == null) return
+        if (AccessibilityEventFilter.isChromeVisualOnly(event.eventType)) {
+            chromeVisualProbeController?.onAccessibilityEvent(event)
+            chromeVisualController?.onAccessibilityEvent(event)
+            return
+        }
+        if (!AccessibilityEventFilter.isHandled(event.eventType)) return
         chromeVisualProbeController?.onAccessibilityEvent(event)
         chromeVisualController?.onAccessibilityEvent(event)
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return

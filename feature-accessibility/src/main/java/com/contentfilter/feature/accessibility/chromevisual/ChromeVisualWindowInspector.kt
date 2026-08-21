@@ -19,7 +19,15 @@ internal class ChromeVisualWindowInspector(
                 window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
                     window.root?.packageName?.toString() == ChromePackageName
             }
-        return candidates.firstOrNull { requestedWindowId != AnyWindowId && it.id == requestedWindowId }
+        return candidates
+            .firstOrNull { requestedWindowId != AnyWindowId && it.id == requestedWindowId }
+            ?.takeIf { candidate ->
+                ChromeVisualWindowSelectionPolicy.canUseExactCandidate(
+                    isActive = candidate.isActive,
+                    isFocused = candidate.isFocused,
+                    allowBehindInputMethod = allowBehindInputMethod,
+                )
+            }
             ?: candidates.firstOrNull { it.isActive }
             ?: candidates.firstOrNull { it.isFocused }
             ?: candidates.firstOrNull().takeIf { allowBehindInputMethod }
@@ -89,4 +97,12 @@ internal class ChromeVisualWindowInspector(
         const val FnvOffsetBasis = -3750763034362895579L
         const val FnvPrime = 1099511628211L
     }
+}
+
+internal object ChromeVisualWindowSelectionPolicy {
+    fun canUseExactCandidate(
+        isActive: Boolean,
+        isFocused: Boolean,
+        allowBehindInputMethod: Boolean,
+    ): Boolean = isActive || isFocused || allowBehindInputMethod
 }

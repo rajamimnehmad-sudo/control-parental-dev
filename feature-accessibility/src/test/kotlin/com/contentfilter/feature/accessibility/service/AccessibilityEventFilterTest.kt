@@ -18,11 +18,17 @@ class AccessibilityEventFilterTest {
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_CLICKED))
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_FOCUSED))
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED))
+    }
+
+    @Test
+    fun `scroll is routed only to chrome visual`() {
+        assertTrue(AccessibilityEventFilter.isChromeVisualOnly(AccessibilityEvent.TYPE_VIEW_SCROLLED))
         assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_SCROLLED))
     }
 
     @Test
     fun `ignores unrelated events`() {
-        assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_SCROLLED))
+        assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))
+        assertFalse(AccessibilityEventFilter.isChromeVisualOnly(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))
     }
 }

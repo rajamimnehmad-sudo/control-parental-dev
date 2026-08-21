@@ -2,4 +2,5 @@
 <resources>
     <bool name="chrome_visual_probe_enabled">false</bool>
     <bool name="chrome_visual_images_enabled">false</bool>
+    <bool name="chrome_photos_protected_surface_probe_enabled">false</bool>
 </resources>
