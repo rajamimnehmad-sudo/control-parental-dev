@@ -64,11 +64,8 @@ private class MyAppsListAdapter(
     private var onRequestAccess: (String) -> Unit = {}
 
     override fun getCount(): Int = apps.size
-
     override fun getItem(position: Int): MyAppItemUiState = apps[position]
-
     override fun getItemId(position: Int): Long = apps[position].packageName.hashCode().toLong()
-
     override fun hasStableIds(): Boolean = true
 
     fun submit(
@@ -86,17 +83,9 @@ private class MyAppsListAdapter(
         convertView: View?,
         parent: ViewGroup,
     ): View {
-        val holder =
-            (convertView?.tag as? AppRowHolder)
-                ?: AppRowHolder.create(context).also { it.root.tag = it }
-        val rowWidth =
-            parent.measuredWidth.takeIf { it > 0 }
-                ?: (context.resources.displayMetrics.widthPixels - context.dp(32))
-        holder.root.layoutParams =
-            AbsListView.LayoutParams(
-                rowWidth,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            )
+        val holder = (convertView?.tag as? AppRowHolder) ?: AppRowHolder.create(context).also { it.root.tag = it }
+        val rowWidth = parent.measuredWidth.takeIf { it > 0 } ?: (context.resources.displayMetrics.widthPixels - context.dp(32))
+        holder.root.layoutParams = AbsListView.LayoutParams(rowWidth, ViewGroup.LayoutParams.WRAP_CONTENT)
         holder.root.minimumWidth = rowWidth
         holder.bind(getItem(position), onRequestAccess)
         return holder.root
@@ -129,7 +118,8 @@ private class AppRowHolder private constructor(
                 app.status == AppAccessStatus.LimitReached
         requestButton.visibility = if (canRequest || app.isRequesting) View.VISIBLE else View.GONE
         requestButton.isEnabled = canRequest && !app.isRequesting
-        requestButton.text = if (app.isRequesting) "Enviando..." else "Pedir acceso"
+        requestButton.alpha = if (requestButton.isEnabled) 1f else 0.55f
+        requestButton.text = if (app.isRequesting) "Enviando…" else "Pedir acceso"
         requestButton.setOnClickListener { onRequestAccess(app.packageName) }
     }
 
@@ -159,58 +149,47 @@ private class AppRowHolder private constructor(
         fun create(context: Context): AppRowHolder {
             val root =
                 LinearLayout(context).apply {
-                    layoutParams =
-                        AbsListView.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                        )
+                    layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                     orientation = LinearLayout.VERTICAL
-                    setBackgroundColor(Color.WHITE)
+                    setBackgroundColor(Surface)
                 }
             val contentRow =
                 LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
-                    setPadding(context.dp(12), context.dp(8), context.dp(12), context.dp(8))
-                    minimumHeight = context.dp(68)
+                    setPadding(context.dp(14), context.dp(10), context.dp(14), context.dp(10))
+                    minimumHeight = context.dp(72)
                 }
             val iconFrame = FrameLayout(context)
-            val icon =
-                ImageView(context).apply {
-                    scaleType = ImageView.ScaleType.CENTER_CROP
-                }
+            val icon = ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
             val fallback =
                 TextView(context).apply {
                     gravity = Gravity.CENTER
-                    textSize = 18f
-                    setTextColor(Color.rgb(22, 34, 53))
+                    textSize = 17f
+                    setTextColor(Graphite)
                     setTypeface(typeface, Typeface.BOLD)
                     background =
                         GradientDrawable().apply {
-                            color = android.content.res.ColorStateList.valueOf(Color.rgb(214, 244, 240))
+                            color = android.content.res.ColorStateList.valueOf(LimeSoft)
                             shape = GradientDrawable.OVAL
                         }
                 }
-            iconFrame.addView(icon, FrameLayout.LayoutParams(context.dp(40), context.dp(40), Gravity.CENTER))
-            iconFrame.addView(fallback, FrameLayout.LayoutParams(context.dp(40), context.dp(40), Gravity.CENTER))
-            contentRow.addView(iconFrame, LinearLayout.LayoutParams(context.dp(50), context.dp(50)))
+            iconFrame.addView(icon, FrameLayout.LayoutParams(context.dp(42), context.dp(42), Gravity.CENTER))
+            iconFrame.addView(fallback, FrameLayout.LayoutParams(context.dp(42), context.dp(42), Gravity.CENTER))
+            contentRow.addView(iconFrame, LinearLayout.LayoutParams(context.dp(54), context.dp(54)))
 
-            val labels =
-                LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    gravity = Gravity.CENTER_VERTICAL
-                }
+            val labels = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER_VERTICAL }
             val name =
                 TextView(context).apply {
                     textSize = 16f
-                    setTextColor(Color.rgb(22, 34, 53))
+                    setTextColor(Graphite)
                     setTypeface(typeface, Typeface.BOLD)
                     maxLines = 1
                 }
             val limit =
                 TextView(context).apply {
-                    textSize = 14f
-                    setTextColor(Color.rgb(104, 117, 138))
+                    textSize = 13f
+                    setTextColor(Muted)
                     maxLines = 1
                 }
             labels.addView(name, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -223,43 +202,31 @@ private class AppRowHolder private constructor(
                     gravity = Gravity.END
                     setPadding(context.dp(8), 0, 0, 0)
                 }
-            val status =
-                TextView(context).apply {
-                    textSize = 13f
-                    gravity = Gravity.END
-                }
+            val status = TextView(context).apply { textSize = 12f; gravity = Gravity.END }
             val requestButton =
                 Button(context).apply {
                     textSize = 12f
                     isAllCaps = false
-                    setTextColor(Color.rgb(0, 125, 190))
-                    background = null
+                    setTypeface(typeface, Typeface.BOLD)
+                    setTextColor(Graphite)
                     minHeight = 0
                     minimumHeight = 0
-                    setPadding(context.dp(8), context.dp(2), 0, context.dp(2))
+                    minWidth = 0
+                    minimumWidth = 0
+                    setPadding(context.dp(12), context.dp(6), context.dp(12), context.dp(6))
+                    background =
+                        GradientDrawable().apply {
+                            color = android.content.res.ColorStateList.valueOf(Lime)
+                            cornerRadius = context.dp(999).toFloat()
+                        }
                 }
             actions.addView(status, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            actions.addView(
-                requestButton,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
+            actions.addView(requestButton, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             contentRow.addView(actions, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            root.addView(contentRow, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
             root.addView(
-                contentRow,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ),
-            )
-            root.addView(
-                View(context).apply { setBackgroundColor(Color.rgb(230, 235, 239)) },
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    context.dp(1),
-                ).apply {
-                    marginStart = context.dp(62)
-                },
+                View(context).apply { setBackgroundColor(Line) },
+                LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, context.dp(1)).apply { marginStart = context.dp(68) },
             )
 
             return AppRowHolder(root, icon, fallback, name, limit, status, requestButton)
@@ -270,10 +237,7 @@ private class AppRowHolder private constructor(
 private object NativeIconCache {
     private val cache =
         object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
-            override fun sizeOf(
-                key: String,
-                value: Bitmap,
-            ): Int = value.allocationByteCount
+            override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
         }
     private val decoder = Executors.newFixedThreadPool(2)
 
@@ -303,7 +267,7 @@ private fun AppAccessStatus.nativeLabel(extraTimeRemainingMinutes: Int?): String
         AppAccessStatus.LimitReached -> "Límite agotado"
         AppAccessStatus.ExtraTime -> extraTimeRemainingMinutes?.let { "Extra ${it}m" } ?: "Tiempo extra"
         AppAccessStatus.Blocked -> "Bloqueada"
-        AppAccessStatus.RequiresAuthorization -> "Requiere permiso"
+        AppAccessStatus.RequiresAuthorization -> "Necesita permiso"
         AppAccessStatus.WaitingAuthorization -> "Esperando permiso"
         AppAccessStatus.WaitingExtraTime -> "Esperando tiempo"
     }
@@ -312,15 +276,25 @@ private fun AppAccessStatus.nativeColor(): Int =
     when (this) {
         AppAccessStatus.Allowed,
         AppAccessStatus.ExtraTime,
-        -> Color.rgb(46, 125, 50)
+        -> Positive
         AppAccessStatus.Limited,
         AppAccessStatus.LimitReached,
         AppAccessStatus.WaitingExtraTime,
-        -> Color.rgb(249, 168, 37)
+        -> Warning
         AppAccessStatus.Blocked,
         AppAccessStatus.RequiresAuthorization,
         AppAccessStatus.WaitingAuthorization,
-        -> Color.rgb(198, 40, 40)
+        -> Danger
     }
 
 private fun Context.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+private val Surface = Color.rgb(255, 255, 255)
+private val Graphite = Color.rgb(23, 26, 24)
+private val Muted = Color.rgb(116, 121, 112)
+private val Line = Color.rgb(229, 227, 220)
+private val Lime = Color.rgb(200, 243, 29)
+private val LimeSoft = Color.rgb(240, 248, 200)
+private val Positive = Color.rgb(36, 122, 75)
+private val Warning = Color.rgb(148, 105, 0)
+private val Danger = Color.rgb(180, 35, 24)
