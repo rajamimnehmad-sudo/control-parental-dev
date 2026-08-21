@@ -393,36 +393,42 @@ internal class ChromeVisualController(
                 decisionCache[signature] ?: regionAnalyzer.analyze(frame.bitmap, frameRegion).also {
                     decisionCache[signature] = it
                 }
-            val windowStillCurrent =
+            val applied =
                 withContext(Dispatchers.Main.immediate) {
-                    windowInspector.find(windowId)?.let {
-                        windowInspector.pageIdentity(it) == pageIdentity && windowInspector.viewport(it) == viewport
-                    } == true
-                }
-            if (!windowStillCurrent || !synchronized(lock) { identityGate.isCurrent(identity) }) {
-                return RegionCounts(allowed, blocked, completed = false, processedRegionIds = processedRegionIds)
-            }
-            withContext(Dispatchers.Main.immediate) {
-                if (temporal) {
-                    when (videoPolicy.record(videoKey, decision.toSampleDecision())) {
-                        ChromeVisualPresentation.Visible -> overlay.remove(region.id)
-                        ChromeVisualPresentation.Covered -> overlay.show(region, ChromeVisualOverlayState.Blocked)
-                    }
-                } else {
-                    when (decision.action) {
-                        GloshiaVisualAction.Allow ->
-                            if (pageBlockLedger.mustRemainBlocked(pageIdentity, region.id)) {
-                                overlay.show(region, ChromeVisualOverlayState.Blocked)
-                            } else {
-                                overlay.remove(region.id)
+                    val windowStillCurrent =
+                        windowInspector.find(windowId)?.let {
+                            windowInspector.pageIdentity(it) == pageIdentity && windowInspector.viewport(it) == viewport
+                        } == true
+                    val identityStillCurrent = synchronized(lock) { identityGate.isCurrent(identity) }
+                    if (!windowStillCurrent || !identityStillCurrent) {
+                        false
+                    } else {
+                        if (temporal) {
+                            when (videoPolicy.record(videoKey, decision.toSampleDecision())) {
+                                ChromeVisualPresentation.Visible -> overlay.remove(region.id)
+                                ChromeVisualPresentation.Covered ->
+                                    overlay.show(region, ChromeVisualOverlayState.Blocked)
                             }
-                        GloshiaVisualAction.Block -> {
-                            pageBlockLedger.recordBlocked(pageIdentity, region, fallbackTiles)
-                            overlay.show(region, ChromeVisualOverlayState.Blocked)
+                        } else {
+                            when (decision.action) {
+                                GloshiaVisualAction.Allow ->
+                                    if (pageBlockLedger.mustRemainBlocked(pageIdentity, region.id)) {
+                                        overlay.show(region, ChromeVisualOverlayState.Blocked)
+                                    } else {
+                                        overlay.remove(region.id)
+                                    }
+                                GloshiaVisualAction.Block -> {
+                                    pageBlockLedger.recordBlocked(pageIdentity, region, fallbackTiles)
+                                    overlay.show(region, ChromeVisualOverlayState.Blocked)
+                                }
+                            }
                         }
+                        clipForInputMethod()
+                        true
                     }
                 }
-                clipForInputMethod()
+            if (!applied) {
+                return RegionCounts(allowed, blocked, completed = false, processedRegionIds = processedRegionIds)
             }
             processedRegionIds += region.id
             if (decision.action == GloshiaVisualAction.Block) blocked++ else allowed++
