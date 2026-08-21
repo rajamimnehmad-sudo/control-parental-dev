@@ -21,8 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ActionButtonTone
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshSpacing
+import com.contentfilter.core.ui.GloshWordmark
 import com.contentfilter.core.ui.ProductCard
-import com.contentfilter.core.ui.ProductHeader
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
@@ -57,13 +59,13 @@ private fun AdminAuthScreen(
     if (state.showResetConfirmation) {
         AlertDialog(
             onDismissRequest = onDismissReset,
-            title = { Text("Resetear esta app") },
-            text = { Text("Se borrará el admin guardado en este teléfono para poder ingresar un token nuevo.") },
+            title = { Text("Cambiar administrador") },
+            text = { Text("Se quitará el administrador guardado en este teléfono para poder ingresar un token nuevo.") },
             confirmButton = {
                 ProgressActionButton(
                     modifier = Modifier,
-                    text = "Resetear",
-                    loadingText = "Reseteando...",
+                    text = "Continuar",
+                    loadingText = "Preparando…",
                     successText = "Listo",
                     onClick = onConfirmReset,
                     loading = state.loading,
@@ -71,61 +73,79 @@ private fun AdminAuthScreen(
                 )
             },
             dismissButton = {
-                OutlinedButton(onClick = onDismissReset) {
-                    Text("Cancelar")
-                }
+                OutlinedButton(onClick = onDismissReset) { Text("Cancelar") }
             },
         )
     }
+
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 16.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+                .background(GloshColors.Bone)
+                .padding(horizontal = GloshSpacing.PageHorizontal, vertical = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
-        ProductHeader(
-            title = "Activación Admin",
-            subtitle = "Ingresá el token de administrador para activar este panel",
-        )
-        val bannerText = state.message.ifBlank { if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else "" }
+        GloshWordmark()
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("Activar Administrador", style = MaterialTheme.typography.headlineMedium, color = GloshColors.Graphite)
+            Text(
+                "Vinculá este teléfono con tu comunidad.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = GloshColors.Muted,
+            )
+        }
+
+        val bannerText = state.message.ifBlank { if (state.offlineMode) "Sin conexión. Intentá de nuevo cuando tengas Internet." else "" }
         if (bannerText.isNotBlank()) {
             FeedbackBanner(
                 text = bannerText,
                 isError = state.offlineMode || bannerText.startsWith("No se pudo"),
             )
         }
+
         Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             if (state.activated) {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !state.loading,
-                    onClick = onRequestReset,
-                ) {
-                    Text("Ingresar nuevo token")
+                ProductCard {
+                    Text("Administrador activo", style = MaterialTheme.typography.titleLarge, color = GloshColors.Graphite)
+                    Text(
+                        "Este teléfono ya quedó vinculado y no necesita iniciar sesión cada vez que abrís la app.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GloshColors.Muted,
+                    )
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !state.loading,
+                        onClick = onRequestReset,
+                    ) {
+                        Text("Cambiar administrador")
+                    }
                 }
                 return@Column
             }
+
             ProductCard {
+                Text("Datos de activación", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+                Text(
+                    "Usá el token de administrador que recibiste para esta comunidad.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GloshColors.Muted,
+                )
                 OutlinedTextField(
                     modifier = Modifier.fillMaxWidth(),
                     value = state.activationCode,
                     onValueChange = onCode,
-                    label = { Text("Token de administrador") },
+                    label = { Text("Token") },
                     singleLine = true,
                 )
                 OutlinedTextField(
                     modifier = Modifier.fillMaxWidth(),
                     value = state.email,
                     onValueChange = onEmail,
-                    label = { Text("Email") },
+                    label = { Text("Email del administrador") },
                     singleLine = true,
                 )
                 OutlinedTextField(
@@ -133,6 +153,7 @@ private fun AdminAuthScreen(
                     value = state.password,
                     onValueChange = onPassword,
                     label = { Text("Contraseña") },
+                    supportingText = { Text("Mínimo 8 caracteres. Protege la cuenta de administrador.") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                 )
@@ -149,9 +170,9 @@ private fun AdminAuthScreen(
                     enabled = !state.loading,
                     onClick = onActivate,
                     loading = state.loading,
-                    loadingText = "Activando...",
-                    successText = "Admin activado",
-                    text = "Activar",
+                    loadingText = "Activando…",
+                    successText = "Administrador activo",
+                    text = "Activar administrador",
                 )
             }
         }
