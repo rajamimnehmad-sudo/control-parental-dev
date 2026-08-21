@@ -21,6 +21,9 @@ internal object ChromeVisualAtomicMutationPolicy {
             else -> false
         }
 
+    fun requiresGeometryRestart(eventType: Int): Boolean =
+        eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED
+
     private val VisualContentChangeMask =
         AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE or
             AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION or
