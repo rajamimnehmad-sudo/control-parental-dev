@@ -1,0 +1,16 @@
+08-20 23:58:24.561 18834 18834 I ChromeVisual: windowId=6573 phase=precover coverMs=251 regions=8 result=success
+08-20 23:58:24.950 18834 19353 I ChromeVisual: windowId=6573 phase=cover coverMs=640 regions=0 result=success
+08-20 23:58:25.496 18834 19354 I ChromeVisual: windowId=6573 phase=cover coverMs=357 regions=0 result=success
+08-20 23:58:32.519 18834 18964 I ChromeVisual: windowId=6573 captureMs=118 totalMs=7019 width=1080 height=2408 temporaryBytes=10402560 allowed=8 blocked=0 result=success
+08-20 23:58:35.094 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=105 changed=8 allowed=8 blocked=0 result=updated
+08-20 23:58:36.043 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=114 changed=4 allowed=4 blocked=0 result=updated
+08-20 23:58:36.673 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=104 changed=0 result=stable
+08-20 23:58:37.308 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=110 changed=0 result=stable
+08-20 23:58:37.951 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=116 changed=0 result=stable
+08-20 23:58:38.589 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=112 changed=0 result=stable
+08-20 23:58:39.236 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=108 changed=0 result=stable
+08-20 23:58:39.868 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=106 changed=0 result=stable
+08-20 23:58:40.501 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=105 changed=0 result=stable
+08-20 23:58:41.131 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=103 changed=0 result=stable
+08-20 23:58:41.751 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=92 changed=0 result=stable
+08-20 23:58:42.336 18834 18964 I ChromeVisual: windowId=6573 phase=verify captureMs=68 changed=0 result=stable

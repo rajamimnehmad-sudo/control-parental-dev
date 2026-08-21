@@ -22,3 +22,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "DagBrowser"
+include(":gloshia-visual-core")
+project(":gloshia-visual-core").projectDir = file("../gloshia-visual-core")

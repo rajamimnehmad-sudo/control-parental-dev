@@ -139,8 +139,8 @@ ktlint {
 
 dependencies {
     implementation(kotlin("stdlib"))
+    implementation(project(":gloshia-visual-core"))
     implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
     implementation("org.mozilla.geckoview:geckoview-arm64-v8a:153.0.20260715202819")
 
     testImplementation(kotlin("test"))

@@ -31,6 +31,8 @@ import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
 import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualController
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualProbeController
 import com.contentfilter.feature.accessibility.policy.AccessibilityAppPolicyEvaluator
 import com.contentfilter.feature.accessibility.policy.AccessibilityClock
 import com.contentfilter.feature.accessibility.policy.AccessibilityPolicySnapshotProvider
@@ -97,11 +99,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var lastTamperAlertAt: Long = 0L
     private val foregroundDecisionDiagnosticGate = ForegroundDecisionDiagnosticGate()
     private val ownUninstallerPackages by lazy { resolveOwnUninstallerPackages() }
+    private var chromeVisualProbeController: ChromeVisualProbeController? = null
+    private var chromeVisualController: ChromeVisualController? = null
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         serviceScope = scope
+        chromeVisualProbeController = ChromeVisualProbeController(this, scope)
+        chromeVisualController = ChromeVisualController(this, scope)
         scope.launch {
             syncScheduler.requestSync()
             snapshotProvider.refresh()
@@ -123,6 +129,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
+        chromeVisualProbeController?.onAccessibilityEvent(event)
+        chromeVisualController?.onAccessibilityEvent(event)
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val resolvedOwnUninstaller = packageName in ownUninstallerPackages
@@ -220,6 +228,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        chromeVisualProbeController?.close()
+        chromeVisualProbeController = null
+        chromeVisualController?.close()
+        chromeVisualController = null
         webActionDebouncer.clear()
         clearSettingsEscape()
         val elapsed = clock.elapsedRealtimeMillis()

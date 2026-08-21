@@ -1,0 +1,4 @@
+--------- beginning of main
+08-20 23:52:05.197 18834 18834 I ChromeVisual: capability=Unavailable reason=chrome_window_unavailable keepCoverage=true fallback=dag_required
+08-20 23:52:06.665 18834 18834 I ChromeVisual: windowId=6573 phase=precover coverMs=579 regions=8 result=success
+08-20 23:52:15.196 18834 19357 I ChromeVisual: windowId=6573 phase=cover coverMs=8505 regions=0 result=success
