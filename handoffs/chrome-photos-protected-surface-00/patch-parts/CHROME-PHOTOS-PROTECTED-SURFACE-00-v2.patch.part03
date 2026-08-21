@@ -1,0 +1,296 @@
+-            activeJob = scope.launch { runProbe(requestedWindowId) }
+-        }
++        if (!enabled) return
++        val signal =
++            ProbeSignal(
++                eventType = event.eventType,
++                contentChangeTypes = event.contentChangeTypes,
++                packageName = event.packageName?.toString().orEmpty(),
++                requestedWindowId = event.windowId,
++            )
++        scope.launch(Dispatchers.Main.immediate) { handleOnMain(signal) }
+     }
+ 
+     override fun close() {
+-        synchronized(stateLock) {
++        synchronized(jobLock) {
+             activeJob?.cancel()
+             activeJob = null
+         }
++        if (Looper.myLooper() == Looper.getMainLooper()) {
++            deactivateOnMain("service_closed")
++        } else {
++            service.mainExecutor.execute { deactivateOnMain("service_closed") }
++        }
+     }
+ 
+-    private suspend fun runProbe(requestedWindowId: Int) {
+-        var before: ProbePixelSample? = null
+-        var after: ProbePixelSample? = null
+-        var overlay: ChromeVisualProbeOverlay? = null
+-        var completedWindowId = requestedWindowId
+-        try {
+-            val window = withContext(Dispatchers.Main.immediate) { findChromeWindow(requestedWindowId) }
+-            if (window == null) {
+-                logResult(requestedWindowId, "window", "not_found")
+-                return
+-            }
+-            completedWindowId = window.id
+-            val baseline = capture(window.id, "baseline", null, shouldSample = true) ?: return
+-            before = baseline.sample
+-            val region =
+-                ProbeOverlayRegion.centeredRight(
+-                    windowWidth = baseline.width,
+-                    windowHeight = baseline.height,
+-                    density = service.resources.displayMetrics.density,
+-                )
+-            overlay =
+-                withContext(Dispatchers.Main.immediate) {
+-                    ChromeVisualProbeOverlay.attach(
+-                        service = service,
+-                        windowId = window.id,
+-                        windowWidth = baseline.width,
+-                        windowHeight = baseline.height,
+-                        region = region,
++    private fun handleOnMain(signal: ProbeSignal) {
++        val chromeEvent = windowInspector.isChromePackage(signal.packageName)
++        val current = state.snapshot()
++        // Never arm Chrome from an unrelated event merely because a stale/background Chrome
++        // window is still present behind another app or IME. Non-Chrome events may only preserve
++        // an already-armed Chrome session while its exact application window remains inspectable.
++        if (!chromeEvent && !current.isActive) return
++        val inputMethodTop = windowInspector.inputMethodTop()
++        val window =
++            when {
++                chromeEvent ->
++                    windowInspector.find(signal.requestedWindowId.takeIf { it >= 0 } ?: AnyWindowId)
++                else ->
++                    windowInspector.find(
++                        current.windowId.takeIf { it >= 0 } ?: AnyWindowId,
++                        allowBehindInputMethod = inputMethodTop != null,
+                     )
+-                }
+-            if (overlay == null) {
+-                logResult(window.id, "overlay", "attach_failed")
+-                return
+-            }
+-            delay(ScreenshotIntervalMillis)
+-            val covered = capture(window.id, "overlay", region.asRect(), shouldSample = true) ?: return
+-            after = covered.sample
+-            val beforeSample = before ?: return
+-            val afterSample = after ?: return
+-            val decision = ChromeVisualProbeGate.decide(beforeSample, afterSample)
+-            Log.i(
+-                LogTag,
+-                "phase=underlay windowId=${window.id} width=${covered.width} height=${covered.height} " +
+-                    "result=${if (decision.passed) "pass" else "fail"}",
+-            )
+-            withContext(Dispatchers.Main.immediate) {
+-                overlay.close()
+-                overlay = null
+-            }
+-            measureStableFrequency(window.id)
+-        } catch (error: Throwable) {
+-            if (error !is kotlinx.coroutines.CancellationException) {
+-                logResult(completedWindowId, "probe", "error_${error.javaClass.simpleName}")
+             }
+-        } finally {
+-            ChromeVisualProbeGate.clear(before)
+-            ChromeVisualProbeGate.clear(after)
+-            withContext(NonCancellable + Dispatchers.Main.immediate) { overlay?.close() }
+-            synchronized(stateLock) {
+-                lastWindowId = completedWindowId
+-                lastCompletedAtMillis = SystemClock.elapsedRealtime()
+-                activeJob = null
++        if (window == null) {
++            deactivateOnMain("chrome_absent")
++            return
++        }
++        val rawViewport = windowInspector.viewport(window) ?: run {
++            log("geometry", window.id, "unavailable")
++            return
++        }
++        val viewport = rawViewport.clippedAt(inputMethodTop) ?: run {
++            log("geometry", window.id, "fully_clipped")
++            return
++        }
++        val contextChanged =
++            !current.isActive ||
++                current.windowId != window.id ||
++                current.viewport != viewport
++        val eventInvalidates =
++            chromeEvent &&
++                ChromePhotosProtectedSurfaceEventPolicy.requiresInvalidation(
++                    signal.eventType,
++                    signal.contentChangeTypes,
++                )
++        if (!contextChanged && !eventInvalidates) return
++
++        val motion = chromeEvent && signal.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED
++        val snapshot =
++            if (!current.isActive) {
++                state.arm(window.id, viewport)
++            } else {
++                state.invalidate(window.id, viewport, motion)
+             }
++        if (!surface.cover(viewport, snapshot.epoch)) {
++            log("surface", window.id, "attach_or_cover_failed")
++            state.disarm()
++            surface.close()
++            return
+         }
++        val stats = surface.stats()
++        Log.i(
++            LogTag,
++            "phase=armed windowId=${window.id} epoch=${snapshot.epoch} " +
++                "trigger=${ChromePhotosProtectedSurfaceEventPolicy.label(signal.eventType)} " +
++                "attachmentCount=${stats.attachmentCount} layoutUpdates=${stats.layoutUpdateCount} " +
++                "rawPresented=false result=success",
++        )
++        scheduleCapture(
++            epoch = snapshot.epoch,
++            trigger = ChromePhotosProtectedSurfaceEventPolicy.label(signal.eventType),
++            motion = motion,
++        )
+     }
+ 
+-    private fun findChromeWindow(requestedWindowId: Int): AccessibilityWindowInfo? {
+-        val candidates =
+-            service.windows.filter { window ->
+-                window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+-                    window.root?.packageName?.toString() == ChromePackageName
++    private fun scheduleCapture(
++        epoch: Long,
++        trigger: String,
++        motion: Boolean,
++    ) {
++        synchronized(jobLock) { activeJob?.cancel() }
++        var scheduled: Job? = null
++        scheduled =
++            scope.launch {
++                try {
++                    delay(if (motion) MotionQuietMillis else ContentQuietMillis)
++                    if (!state.markSettling(epoch)) return@launch
++                    val token = state.beginCapture(epoch) ?: return@launch
++                    captureAndStage(token, trigger)
++                } finally {
++                    synchronized(jobLock) {
++                        if (activeJob === scheduled) activeJob = null
++                    }
++                }
+             }
+-        return candidates.firstOrNull { it.id == requestedWindowId }
+-            ?: candidates.firstOrNull { it.isActive }
+-            ?: candidates.firstOrNull { it.isFocused }
++        synchronized(jobLock) { activeJob = scheduled }
+     }
+ 
+-    private suspend fun capture(
+-        windowId: Int,
+-        phase: String,
+-        sampleRect: Rect?,
+-        shouldSample: Boolean,
+-    ): ProbeCapture? =
+-        suspendCancellableCoroutine { continuation ->
+-            val startedAt = SystemClock.elapsedRealtime()
+-            service.takeScreenshotOfWindow(
+-                windowId,
+-                service.mainExecutor,
+-                object : AccessibilityService.TakeScreenshotCallback {
+-                    override fun onSuccess(screenshot: AccessibilityService.ScreenshotResult) {
+-                        val latencyMillis = SystemClock.elapsedRealtime() - startedAt
+-                        val hardwareBuffer = screenshot.hardwareBuffer
+-                        val width = hardwareBuffer.width
+-                        val height = hardwareBuffer.height
+-                        var sample: ProbePixelSample? = null
+-                        runCatching {
+-                            if (shouldSample) {
+-                                val resolvedRect =
+-                                    sampleRect
+-                                        ?: ProbeOverlayRegion.centeredRight(
+-                                            windowWidth = width,
+-                                            windowHeight = height,
+-                                            density = service.resources.displayMetrics.density,
+-                                        ).asRect()
+-                                val wrapped = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshot.colorSpace)
+-                                try {
+-                                    val software = wrapped?.copy(Bitmap.Config.ARGB_8888, false)
+-                                    try {
+-                                        if (software != null) sample = sample(software, resolvedRect)
+-                                    } finally {
+-                                        software?.recycle()
+-                                    }
+-                                } finally {
+-                                    wrapped?.recycle()
++    private suspend fun captureAndStage(
++        token: ChromePhotosProtectedSurfaceToken,
++        trigger: String,
++    ) {
++        when (val result = capture.capture(token.windowId)) {
++            is ChromeWindowCaptureResult.Failed -> {
++                state.fail(token)
++                Log.i(
++                    LogTag,
++                    "phase=capture windowId=${token.windowId} epoch=${token.epoch} " +
++                        "errorCode=${result.errorCode} rawPresented=false result=failed",
++                )
++            }
++            is ChromeWindowCaptureResult.Captured ->
++                result.frame.use { frame ->
++                    val signature = ChromePhotosUnderlaySignature.compute(frame.bitmap)
++                    val changed = lastUnderlaySignature?.let { it != signature } ?: true
++                    val proofFrame =
++                        ChromePhotosProofFrameFactory.create(
++                            width = frame.width,
++                            height = frame.height,
++                            token = token,
++                            captureLatencyMillis = frame.latencyMillis,
++                            trigger = trigger,
++                            underlayChanged = changed,
++                        )
++                    val commit =
++                        withContext(Dispatchers.Main.immediate) {
++                            when {
++                                !state.markCommitReady(token) -> {
++                                    proofFrame.recycle()
++                                    SurfaceCommitResult.Stale
++                                }
++                                !surface.stage(token.viewport, proofFrame, token) -> {
++                                    state.fail(token)
++                                    SurfaceCommitResult.Failed
++                                }
++                                !state.markPresented(token) -> {
++                                    surface.cover(token.viewport, state.snapshot().epoch)
++                                    SurfaceCommitResult.Stale
+                                 }
++                                else -> SurfaceCommitResult.Staged
+                             }
+-                        }.also {
+-                            hardwareBuffer.close()
+                         }
+-                        val successful = !shouldSample || sample != null
+-                        Log.i(
+-                            LogTag,
+-                            "phase=$phase windowId=$windowId width=$width height=$height " +
+-                                "latencyMs=$latencyMillis " +
+-                                "temporaryBytes=${width.toLong() * height * BytesPerPixel * if (shouldSample) 2 else 1} " +
+-                                "result=${if (successful) "success" else "sample_failed"}",
+-                        )
+-                        if (continuation.isActive) {
+-                            continuation.resume(ProbeCapture(width, height, sample))
+-                        } else {
+-                            ChromeVisualProbeGate.clear(sample)
+-                        }
+-                    }
+-
+-                    override fun onFailure(errorCode: Int) {
+-                        val latencyMillis = SystemClock.elapsedRealtime() - startedAt
+-                        Log.i(
+-                            LogTag,
+-                            "phase=$phase windowId=$windowId width=0 height=0 latencyMs=$latencyMillis " +
+-                                "temporaryBytes=0 result=failure_$errorCode",
+-                        )
+-                        if (continuation.isActive) continuation.resume(null)
+-                    }
+-                },
+-            )
