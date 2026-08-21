@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 22:18",
+  "updatedAt": "20 ago 2026 · 22:28",
   "sections": [
     {
       "id": "coordination",
@@ -9,7 +9,7 @@
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
         {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"Estado local relevante preservado en ramas remotas preserve/*.","status":"done","priority":"critical"},
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
-        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. activate_device anon cerrado y códigos de activación protegidos contra doble uso. Quedan gate dinámico cross-device y deuda Auth del pairing Admin.","status":"in_progress","priority":"critical"},
+        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. activate_device anon cerrado, códigos protegidos contra doble uso y superficie pública auditada. Quedan gate dinámico cross-device y deuda Auth del pairing Admin.","status":"in_progress","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96.","status":"done","priority":"important"},
         {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado.","status":"done","priority":"critical"},
         {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; Codex solo cuando hace falta Mac/local y siempre queda auditado por ChatGPT.","status":"done","priority":"critical"},
@@ -27,20 +27,21 @@
     {
       "id": "security",
       "title": "Seguridad",
-      "context": "Super Admin cerrado a anon; activate_device legacy ya no acepta anon; cada activation_code solo puede producir una activación",
+      "context": "Super Admin y legado innecesario cerrados; tablas/RPC/Edge Functions públicas revisadas; permisos públicos restantes tienen una guarda funcional identificada",
       "tasks": [
         {"id":"exact-hosts","title":"Allowlist exacta de Supabase","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"atomic-sync","title":"Sync atómico de políticas","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
-        {"id":"backend-security-advisor-audit","title":"Auditar exposición real de RPCs","detail":"DONE sin Codex: se separó exposición legítima por device-token/pairing de grants innecesarios.","status":"done","priority":"critical"},
+        {"id":"backend-security-advisor-audit","title":"Auditar exposición real del backend","detail":"DONE sin Codex: 0 tablas public sin RLS accesibles por anon/authenticated; RPC anon restantes muestran auth.uid, device-token o pairing-code; todas las SECURITY DEFINER public fijan search_path.","status":"done","priority":"critical"},
+        {"id":"edge-functions-public-auth","title":"Auditar Edge Functions públicas","detail":"DONE read-only: send-protection-alert delega en token exacto de dispositivo; update-web-domain-list exige secreto o Super Admin; dag-diagnostic-report usa secretos, límites y rate-limit; gloshia-r3-review usa token hash pero su cierre destructivo debe cambiarse antes de nueva calibración.","status":"done","priority":"critical"},
         {"id":"rpc-permission-matrix","title":"Clasificar permisos reales de RPCs","detail":"DONE. Matriz documentada en docs/RPC_PERMISSION_HARDENING_PLAN.md.","status":"done","priority":"critical"},
         {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: 0 RPC super_admin_* ejecutables por anon; activate_device también dejó de aceptar anon. Flujos device-token/pairing necesarios conservan sus permisos.","status":"done","priority":"critical"},
         {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"DONE y registrado como migración: funciones futuras creadas por postgres en public quedan opt-in; service_role preservado.","status":"done","priority":"critical"},
         {"id":"activation-code-single-use","title":"Impedir doble uso de códigos de activación","detail":"DONE en Production: índice único parcial sobre device_activations.activation_code_id evita dos activaciones con el mismo código incluso ante doble toque/reintento concurrente.","status":"done","priority":"critical"},
-        {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Código estático listo; falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
-        {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"Implementado estáticamente; falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
+        {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Internas *_internal cerradas a anon/authenticated y carrera de doble consumo protegida por unicidad en DB. Falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
+        {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"Helpers verificados contra hash del dispositivo/relink exacto; falta gate dinámico cross-device real para cierre formal.","status":"blocked","priority":"critical"},
         {"id":"direct-auth-users-write","title":"Eliminar escritura directa en auth.users","detail":"Deuda P1 confirmada: pair_admin_device_with_password_new_internal crea auth.users/auth.identities manualmente. Reemplazo requiere cambiar el flujo de autenticación de App Admin; no se retira mientras la app actual dependa de él.","status":"blocked","priority":"important"},
         {"id":"activate-device-legacy","title":"Cerrar acceso anónimo de activate_device legacy","detail":"DONE: anon revocado; authenticated y service_role preservados para no romper el cliente actual mientras se migra al pairing moderno.","status":"done","priority":"important"},
-        {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor sigue indicando Leaked Password Protection desactivada; requiere configuración Auth compatible con el plan.","status":"pending","priority":"important"}
+        {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor sigue indicando Leaked Password Protection desactivada. El conector actual no expone escritura de configuración Auth; queda pendiente sin workaround inseguro.","status":"pending","priority":"important"}
       ]
     },
     {
@@ -90,10 +91,11 @@
     {
       "id": "gloshia",
       "title": "GloshIA",
-      "context": "Evidencia útil preservada en GitHub; recuperación del material local queda pausada hasta volver a tener la Mac",
+      "context": "Evidencia útil se preserva; recuperación local pausada hasta volver a tener Mac y el endpoint de review debe dejar de borrar fotos al cerrar antes de una nueva calibración",
       "tasks": [
         {"id":"gloshia-training-data-preservation","title":"Blindar datos de entrenamiento/calibración","detail":"DONE: datasets, muestras, labels, reviews, calibraciones, métricas y evidencia quedan fuera de resets operativos.","status":"done","priority":"critical"},
         {"id":"gloshia-r3-evidence-recovery","title":"Recuperar evidencia GloshIA local/remota","detail":"BLOCKED por disponibilidad de Mac. Cuando se retome entrenamiento/calibración de GloshIA, pedir primero inventario read-only de .codex-tmp, bancos, labels/outboxes y material local antes de avanzar.","status":"blocked","priority":"critical"},
+        {"id":"gloshia-review-close-preservation","title":"Hacer no destructivo el cierre de revisión GloshIA","detail":"Pendiente antes de la próxima calibración: gloshia-r3-review action=close hoy elimina objetos del bucket. Cambiar a cierre/archivo preservando muestras o exigir backup/export confirmado. No desplegar mientras no se retome este frente.","status":"pending","priority":"critical"},
         {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
         {"id":"gloshia-textual","title":"GloshIA textual","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"Pendiente.","status":"pending","priority":"important"},
