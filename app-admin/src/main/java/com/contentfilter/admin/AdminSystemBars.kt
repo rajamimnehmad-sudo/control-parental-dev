@@ -10,19 +10,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import com.contentfilter.core.ui.GloshColors
 
 @Composable
 internal fun AdminSystemBars(darkHeader: Boolean) {
     val activity = LocalContext.current.findComponentActivity() ?: return
     LaunchedEffect(activity, darkHeader) {
-        val statusStyle =
-            if (darkHeader) {
-                SystemBarStyle.dark(AdminHomeStatusBarColor.toArgb())
-            } else {
-                SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb())
-            }
+        val statusColor = if (darkHeader) GloshColors.Bone else Color.White
         activity.enableEdgeToEdge(
-            statusBarStyle = statusStyle,
+            statusBarStyle = SystemBarStyle.light(statusColor.toArgb(), statusColor.toArgb()),
             navigationBarStyle = SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb()),
         )
     }
@@ -35,4 +31,4 @@ private tailrec fun Context.findComponentActivity(): ComponentActivity? =
         else -> null
     }
 
-internal val AdminHomeStatusBarColor = Color(0xFF172033)
+internal val AdminHomeStatusBarColor = GloshColors.Bone
