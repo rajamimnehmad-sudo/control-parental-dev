@@ -120,6 +120,17 @@ internal class ChromeVisualController(
         } else if (baselineCoordinator.coalesceIfActive(currentContext)) {
             return
         }
+        val activeAnalysis = synchronized(lock) { activeJob?.isActive == true }
+        if (
+            ChromeVisualAtomicMutationPolicy.shouldCoalesceIntoActiveAnalysis(
+                replayRequired = atomicMutation,
+                geometryRestart = geometryRestart,
+                analysisActive = activeAnalysis,
+            )
+        ) {
+            precover(viewport)
+            return
+        }
         val requiresBaseline =
             ChromeVisualEventModePolicy.requiresBaseline(
                 pageChanged,
