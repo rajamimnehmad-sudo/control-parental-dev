@@ -12,14 +12,12 @@ internal object ChromeVisualAtomicMutationPolicy {
     fun requiresReplay(
         eventType: Int,
         contentChangeTypes: Int,
-    ): Boolean =
-        when (eventType) {
-            AccessibilityEvent.TYPE_VIEW_SCROLLED -> true
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ->
-                contentChangeTypes == AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED ||
-                    contentChangeTypes and VisualContentChangeMask != 0
-            else -> false
-        }
+    ): Boolean {
+        if (eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) return true
+        if (eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return false
+        if (contentChangeTypes == AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED) return true
+        return contentChangeTypes and VisualContentChangeMask != 0
+    }
 
     fun requiresGeometryRestart(eventType: Int): Boolean =
         eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED
