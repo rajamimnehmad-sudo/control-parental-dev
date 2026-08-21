@@ -16,6 +16,19 @@ GloshIA.
 
 ## Ultimo cierre
 
+- `SUPERADMIN-UX-MOBILE-FIRST-01`: integrado en `main` mediante PR #100 y
+  publicado en la URL oficial
+  `https://web-super-admin-nine.vercel.app`. La salida de Vercel usa ahora el
+  build nativo de Next.js; `build:sites` conserva por separado el paquete
+  OpenNext/Sites y evita mezclar destinos durante Production.
+- La publicacion conserva las rutas actuales de GloshIA y Soporte, junto con la
+  logica funcional y de licencias recuperada del PR #96. No hubo cambios en
+  Android ni Supabase/RPC.
+- Gates de publicacion: lint sin errores (un warning preexistente de imagen en
+  revision GloshIA), typecheck, build Vercel, build Sites y diff-check verdes.
+- Pendiente: recorrido autenticado futuro con datos de prueba; el smoke publico
+  se limita a health, redirects y login sin credenciales reales.
+
 - `SUPERADMIN-UX-MOBILE-FIRST-01`: **PASS local** en
   `work/superadmin-ux-mobile-first-01`, base verificada `88edb882` (head del PR
   #96). Un unico owner de escritura y sin colisiones en `web-super-admin`.
