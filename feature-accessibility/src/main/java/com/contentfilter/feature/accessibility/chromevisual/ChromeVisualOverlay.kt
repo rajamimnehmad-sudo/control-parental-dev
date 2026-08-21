@@ -28,6 +28,29 @@ internal class ChromeVisualOverlay(
         return attach(region, state, View(service))
     }
 
+    fun beginBarrier(viewport: ChromeVisualViewport): Boolean {
+        val barrier =
+            ChromeVisualRegion(
+                id = BarrierRegionId,
+                left = viewport.left,
+                top = viewport.top,
+                right = viewport.right,
+                bottom = viewport.bottom,
+            )
+        val shown = show(barrier, ChromeVisualOverlayState.Pending)
+        if (shown) retain(setOf(BarrierRegionId))
+        return shown
+    }
+
+    fun handoffBarrierTo(regions: List<ChromeVisualRegion>): Boolean {
+        if (regions.isEmpty()) return false
+        val allShown = regions.all { show(it, ChromeVisualOverlayState.Pending) }
+        if (!allShown) return false
+        retain(regions.mapTo(mutableSetOf(BarrierRegionId), ChromeVisualRegion::id))
+        remove(BarrierRegionId)
+        return true
+    }
+
     fun remove(regionId: String) {
         entries.remove(regionId)?.let { runCatching { windowManager.removeViewImmediate(it.view) } }
     }
@@ -115,6 +138,7 @@ internal class ChromeVisualOverlay(
     )
 
     private companion object {
+        const val BarrierRegionId = "chrome_visual_barrier"
         const val PendingColor = Color.BLACK
         val BlockedColor = Color.rgb(70, 0, 20)
     }
