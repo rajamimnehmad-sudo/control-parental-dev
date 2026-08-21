@@ -31,13 +31,13 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
 import com.contentfilter.core.domain.model.PolicyWeekdays
+import com.contentfilter.core.ui.GloshColors
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
@@ -66,15 +66,11 @@ internal fun GlobalScheduleButton(
     if (visible) {
         Dialog(
             onDismissRequest = { if (!saving) visible = false },
-            properties =
-                DialogProperties(
-                    usePlatformDefaultWidth = false,
-                    decorFitsSystemWindows = false,
-                ),
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
         ) {
             Surface(
                 modifier = Modifier.fillMaxSize(),
-                color = Color(0xFFF2F8F7),
+                color = GloshColors.Bone,
             ) {
                 Column(
                     modifier =
@@ -89,20 +85,14 @@ internal fun GlobalScheduleButton(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                     ) {
-                        IconButton(
-                            enabled = !saving,
-                            onClick = { visible = false },
-                        ) {
+                        IconButton(enabled = !saving, onClick = { visible = false }) {
                             ProductGlyph(
                                 icon = ProductIcon.Back,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                color = GloshColors.Graphite,
                                 contentDescription = "Volver",
                             )
                         }
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
+                        Text(text = title, style = MaterialTheme.typography.headlineSmall, color = GloshColors.Graphite)
                     }
                     LazyColumn(
                         modifier = Modifier.weight(1f),
@@ -132,15 +122,9 @@ internal fun AllowedScheduleEditor(
     forceExpanded: Boolean = false,
     onSave: (List<AllowedScheduleWindowInput>) -> Unit,
 ) {
-    val scheduleRules =
-        remember(rules) { rules.filter { it.isScheduleRule() }.sortedBy(PolicyRule::id) }
-    val rulesFingerprint =
-        scheduleRules.joinToString("|") { rule ->
-            "${rule.id}:${rule.activeWindow}:${rule.activeDaysMask}:${rule.enabled}"
-        }
-    var expanded by rememberSaveable(rulesFingerprint) {
-        mutableStateOf(forceExpanded || scheduleRules.isNotEmpty())
-    }
+    val scheduleRules = remember(rules) { rules.filter { it.isScheduleRule() }.sortedBy(PolicyRule::id) }
+    val rulesFingerprint = scheduleRules.joinToString("|") { "${it.id}:${it.activeWindow}:${it.activeDaysMask}:${it.enabled}" }
+    var expanded by rememberSaveable(rulesFingerprint) { mutableStateOf(forceExpanded || scheduleRules.isNotEmpty()) }
     var drafts by rememberSaveable(rulesFingerprint, stateSaver = ScheduleDraftsSaver) {
         mutableStateOf(
             scheduleRules.map { rule ->
@@ -155,24 +139,19 @@ internal fun AllowedScheduleEditor(
     }
     val hasOverlap = remember(drafts) { scheduleDraftsOverlap(drafts) }
     ProductCard {
-        Text(title, style = MaterialTheme.typography.titleMedium)
+        Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
         Text(
-            if (scheduleRules.isEmpty()) {
-                "Sin horario: permitido todo el día."
-            } else {
-                "${scheduleRules.size} franja(s) permitida(s). Fuera de ellas se bloquea."
-            },
+            if (scheduleRules.isEmpty()) "Sin horario: permitido todo el día." else "${scheduleRules.size} franja(s) permitida(s). Fuera de ellas se bloquea.",
             style = MaterialTheme.typography.bodyMedium,
+            color = GloshColors.Muted,
         )
         Text(
-            "Hora oficial de Argentina · si también alcanza el límite diario, se aplica el bloqueo más restrictivo.",
+            "Hora de Argentina. Si también alcanza el límite diario, se aplica el bloqueo más restrictivo.",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = GloshColors.Muted,
         )
         if (!expanded) {
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = { expanded = true }) {
-                Text("Configurar horario")
-            }
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = { expanded = true }) { Text("Configurar horario") }
             return@ProductCard
         }
         drafts.forEachIndexed { index, draft ->
@@ -187,16 +166,14 @@ internal fun AllowedScheduleEditor(
             Text(
                 "Hay franjas superpuestas en uno o más días. Ajustalas antes de guardar.",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
+                color = GloshColors.Danger,
             )
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             enabled = !saving,
             onClick = { drafts = drafts + ScheduleWindowDraft() },
-        ) {
-            Text("Agregar franja")
-        }
+        ) { Text("Agregar franja") }
         Button(
             modifier = Modifier.fillMaxWidth(),
             enabled = !saving && !hasOverlap && drafts.all(ScheduleWindowDraft::isValid),
@@ -204,7 +181,7 @@ internal fun AllowedScheduleEditor(
         ) {
             Text(
                 when {
-                    saving -> "Guardando horario..."
+                    saving -> "Guardando horario…"
                     drafts.isEmpty() -> "Quitar horario"
                     else -> "Guardar horario"
                 },
@@ -223,23 +200,14 @@ private fun ScheduleWindowRow(
     val startMinute = parseScheduleMinute(draft.start)
     val endMinute = parseScheduleMinute(draft.end)
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 6.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("Franja ${index + 1}", style = MaterialTheme.typography.labelLarge)
             TextButton(onClick = onRemove) { Text("Quitar") }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             ScheduleTimeButton(
                 modifier = Modifier.weight(1f),
                 label = "Desde",
@@ -255,13 +223,9 @@ private fun ScheduleWindowRow(
         }
         if (startMinute != null && endMinute != null) {
             Text(
-                if (endMinute <= startMinute) {
-                    "${draft.start}–${draft.end} del día siguiente"
-                } else {
-                    "${draft.start}–${draft.end}"
-                },
+                if (endMinute <= startMinute) "${draft.start}–${draft.end} del día siguiente" else "${draft.start}–${draft.end}",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = GloshColors.Muted,
             )
         }
         Row(
@@ -278,7 +242,7 @@ private fun ScheduleWindowRow(
             }
         }
         TextButton(onClick = { onChanged(draft.copy(activeDaysMask = PolicyWeekdays.All)) }) {
-            Text("Copiar a todos los días")
+            Text("Todos los días")
         }
     }
 }
@@ -293,10 +257,7 @@ private fun ScheduleTimeButton(
 ) {
     var pickerVisible by rememberSaveable { mutableStateOf(false) }
     val current = parseScheduleMinute(value) ?: 0
-    OutlinedButton(
-        modifier = modifier,
-        onClick = { pickerVisible = true },
-    ) {
+    OutlinedButton(modifier = modifier, onClick = { pickerVisible = true }) {
         Column {
             Text(label, style = MaterialTheme.typography.labelSmall)
             Text(value, style = MaterialTheme.typography.titleMedium)
@@ -319,15 +280,9 @@ private fun ScheduleTimeButton(
                         onSelected(pickerState.hour * MinutesPerHour + pickerState.minute)
                         pickerVisible = false
                     },
-                ) {
-                    Text("Aceptar")
-                }
+                ) { Text("Aceptar") }
             },
-            dismissButton = {
-                TextButton(onClick = { pickerVisible = false }) {
-                    Text("Cancelar")
-                }
-            },
+            dismissButton = { TextButton(onClick = { pickerVisible = false }) { Text("Cancelar") } },
         )
     }
 }
@@ -391,12 +346,7 @@ private val ScheduleDraftsSaver =
 
 internal fun encodeScheduleDrafts(drafts: List<ScheduleWindowDraft>): List<String> =
     drafts.map { draft ->
-        listOf(
-            draft.id.orEmpty(),
-            draft.start,
-            draft.end,
-            draft.activeDaysMask.toString(),
-        ).joinToString("\t")
+        listOf(draft.id.orEmpty(), draft.start, draft.end, draft.activeDaysMask.toString()).joinToString("\t")
     }
 
 internal fun decodeScheduleDrafts(saved: List<String>): List<ScheduleWindowDraft> =
@@ -411,10 +361,7 @@ internal fun decodeScheduleDrafts(saved: List<String>): List<ScheduleWindowDraft
         )
     }
 
-private data class WeekdayUi(
-    val isoDayOfWeek: Int,
-    val label: String,
-)
+private data class WeekdayUi(val isoDayOfWeek: Int, val label: String)
 
 private val Weekdays =
     listOf(
