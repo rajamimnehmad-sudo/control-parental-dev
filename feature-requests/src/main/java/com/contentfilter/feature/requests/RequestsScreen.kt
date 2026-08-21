@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
@@ -42,9 +41,14 @@ import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.time.GloshTime
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshIconBubble
+import com.contentfilter.core.ui.GloshSpacing
+import com.contentfilter.core.ui.GloshSurfaceCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
+import com.contentfilter.core.ui.ProductListSurface
 import com.contentfilter.core.ui.ProductPageHeader
 import kotlinx.coroutines.delay
 import java.time.Instant
@@ -76,14 +80,14 @@ fun RequestsScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(GloshColors.Bone)
                 .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = GloshSpacing.PageHorizontal, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         ProductPageHeader(
             title = "Solicitudes",
-            subtitle = "${state.pendingCount} pendientes",
+            subtitle = if (state.pendingCount == 0) "Todo al día" else "${state.pendingCount} pendientes",
             onBack = onBack,
         )
         Row(
@@ -95,7 +99,7 @@ fun RequestsScreen(
                 text = requestsRefreshStatus(state),
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.labelMedium,
-                color = if (state.message.isRefreshError()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (state.message.isRefreshError()) GloshColors.Danger else GloshColors.Muted,
             )
             IconButton(
                 onClick = onRefresh,
@@ -104,30 +108,40 @@ fun RequestsScreen(
                     Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .background(GloshColors.Surface)
                         .semantics { contentDescription = "Actualizar solicitudes" },
             ) {
-                ProductGlyph(
-                    icon = ProductIcon.Refresh,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
+                ProductGlyph(ProductIcon.Refresh, GloshColors.Graphite, Modifier.size(22.dp))
             }
         }
+
         if (state.requests.isEmpty()) {
-            Text(
-                "Todavía no hay solicitudes. Pedilas desde Mis apps.",
-                modifier = Modifier.padding(vertical = 16.dp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            GloshSurfaceCard {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    GloshIconBubble(ProductIcon.Requests)
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Sin solicitudes", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+                        Text(
+                            "Cuando pidas acceso o más tiempo, vas a poder seguirlo desde acá.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GloshColors.Muted,
+                        )
+                    }
+                }
+            }
         } else {
-            LazyColumn(modifier = Modifier.weight(1f)) {
-                itemsIndexed(state.requests, key = { _, request -> request.id }) { index, request ->
-                    UserRequestRow(
-                        request = request,
-                        grant = state.extraTimeGrants.firstOrNull { it.requestId == request.id },
-                        showDivider = index < state.requests.lastIndex,
-                    )
+            ProductListSurface(modifier = Modifier.weight(1f)) {
+                LazyColumn {
+                    itemsIndexed(state.requests, key = { _, request -> request.id }) { index, request ->
+                        UserRequestRow(
+                            request = request,
+                            grant = state.extraTimeGrants.firstOrNull { it.requestId == request.id },
+                            showDivider = index < state.requests.lastIndex,
+                        )
+                    }
                 }
             }
         }
@@ -172,47 +186,35 @@ private fun UserRequestRow(
         when (request.status) {
             RequestStatus.PendingLocal,
             RequestStatus.PendingRemote,
-            -> MaterialTheme.colorScheme.primary
-            RequestStatus.Approved -> MaterialTheme.colorScheme.secondary
-            RequestStatus.Rejected -> MaterialTheme.colorScheme.error
-            RequestStatus.Expired -> MaterialTheme.colorScheme.outline
+            -> GloshColors.Warning
+            RequestStatus.Approved -> GloshColors.Positive
+            RequestStatus.Rejected -> GloshColors.Danger
+            RequestStatus.Expired -> GloshColors.Muted
         }
     ProductListRow(
         leading = { RequestIcon(target) },
-        headline = {
-            Text(target.title, style = MaterialTheme.typography.titleSmall)
-        },
+        headline = { Text(target.title, style = MaterialTheme.typography.titleSmall, color = GloshColors.Graphite) },
         supporting = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     "${request.requestType.displayName()} · ${request.createdAtEpochMillis.toDisplayDate()}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = GloshColors.Muted,
                 )
                 if (request.reason.isNotBlank()) {
-                    Text(
-                        request.reason,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Text(request.reason, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
                 }
                 grant?.let {
                     Text(
                         "Tiempo extra: ${it.grantedMinutes} min · hasta ${it.validUntilEpochMillis.toDisplayDate()}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = GloshColors.Muted,
                     )
                 }
             }
         },
         trailing = {
-            Text(
-                request.status.displayName(),
-                style = MaterialTheme.typography.labelMedium,
-                color = statusColor,
-            )
+            Text(request.status.displayName(), style = MaterialTheme.typography.labelMedium, color = statusColor)
         },
         showDivider = showDivider,
     )
@@ -220,9 +222,9 @@ private fun UserRequestRow(
 
 private fun AccessRequestType.displayName(): String =
     when (this) {
-        AccessRequestType.APP_ACCESS -> "Solicitud de app"
-        AccessRequestType.DOMAIN_ACCESS -> "Solicitud no disponible"
-        AccessRequestType.EXTRA_TIME -> "Solicitud de tiempo extra"
+        AccessRequestType.APP_ACCESS -> "Acceso a app"
+        AccessRequestType.DOMAIN_ACCESS -> "Acceso a sitio"
+        AccessRequestType.EXTRA_TIME -> "Más tiempo"
         AccessRequestType.OTHER -> "Solicitud"
     }
 
@@ -237,7 +239,7 @@ private fun RequestStatus.displayName(): String =
     }
 
 private fun Long.toDisplayDate(): String =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    DateTimeFormatter.ofPattern("dd/MM HH:mm")
         .withZone(GloshTime.ArgentinaZone)
         .format(Instant.ofEpochMilli(this))
 
@@ -245,19 +247,16 @@ private fun Long.toDisplayDate(): String =
 private fun rememberRequestTarget(request: AccessRequest): RequestTargetUi {
     val context = LocalContext.current
     return remember(request.id, request.target, request.targetPackageName, request.targetDomain) {
-        val packageName = request.targetPackageName ?: request.target.takeIf { it.contains(".") }
         if (request.requestType == AccessRequestType.DOMAIN_ACCESS) {
             RequestTargetUi(
-                title = "Solicitud no disponible",
+                title = request.targetDomain?.takeIf { it.isNotBlank() } ?: request.target.ifBlank { "Sitio web" },
                 icon = null,
                 web = true,
             )
         } else {
+            val packageName = request.targetPackageName ?: request.target.takeIf { it.contains(".") }
             val packageManager = context.packageManager
-            val appInfo =
-                packageName?.let {
-                    runCatching { packageManager.getApplicationInfo(it, 0) }.getOrNull()
-                }
+            val appInfo = packageName?.let { runCatching { packageManager.getApplicationInfo(it, 0) }.getOrNull() }
             RequestTargetUi(
                 title =
                     appInfo
@@ -274,30 +273,15 @@ private fun rememberRequestTarget(request: AccessRequest): RequestTargetUi {
 
 @Composable
 private fun RequestIcon(target: RequestTargetUi) {
-    val bitmap =
-        remember(target.icon) {
-            target.icon?.let { runCatching { it.toBitmap(width = 96, height = 96) }.getOrNull() }
-        }
+    val bitmap = remember(target.icon) { target.icon?.let { runCatching { it.toBitmap(width = 96, height = 96) }.getOrNull() } }
     if (bitmap != null) {
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = null,
-            modifier =
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape),
+            modifier = Modifier.size(44.dp).clip(CircleShape),
         )
     } else {
-        Box(
-            modifier =
-                Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(if (target.web) "WEB" else "APP", style = MaterialTheme.typography.labelSmall)
-        }
+        GloshIconBubble(if (target.web) ProductIcon.Web else ProductIcon.Apps)
     }
 }
 
@@ -309,8 +293,8 @@ private data class RequestTargetUi(
 
 private fun AccessRequestType.fallbackTitle(requestedMinutes: Int?): String =
     when (this) {
-        AccessRequestType.APP_ACCESS -> "App"
-        AccessRequestType.DOMAIN_ACCESS -> "Solicitud no disponible"
+        AccessRequestType.APP_ACCESS -> "Aplicación"
+        AccessRequestType.DOMAIN_ACCESS -> "Sitio web"
         AccessRequestType.EXTRA_TIME -> "Tiempo extra ${requestedMinutes ?: 0} min"
         AccessRequestType.OTHER -> "Solicitud"
     }
