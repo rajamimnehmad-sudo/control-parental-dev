@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 22:28",
+  "updatedAt": "20 ago 2026 · 22:34",
   "sections": [
     {
       "id": "coordination",
@@ -9,7 +9,7 @@
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
         {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"Estado local relevante preservado en ramas remotas preserve/*.","status":"done","priority":"critical"},
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
-        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. activate_device anon cerrado, códigos protegidos contra doble uso y superficie pública auditada. Quedan gate dinámico cross-device y deuda Auth del pairing Admin.","status":"in_progress","priority":"critical"},
+        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. Scope de token cross-device ya tiene gate dinámico PASS. Quedan gate end-to-end de pairing y deuda Auth del pairing Admin.","status":"in_progress","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96.","status":"done","priority":"important"},
         {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado.","status":"done","priority":"critical"},
         {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; Codex solo cuando hace falta Mac/local y siempre queda auditado por ChatGPT.","status":"done","priority":"critical"},
@@ -27,7 +27,7 @@
     {
       "id": "security",
       "title": "Seguridad",
-      "context": "Super Admin y legado innecesario cerrados; tablas/RPC/Edge Functions públicas revisadas; permisos públicos restantes tienen una guarda funcional identificada",
+      "context": "Super Admin y legado innecesario cerrados; superficie pública revisada; scope de token cross-device validado dinámicamente",
       "tasks": [
         {"id":"exact-hosts","title":"Allowlist exacta de Supabase","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"atomic-sync","title":"Sync atómico de políticas","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
@@ -37,8 +37,8 @@
         {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: 0 RPC super_admin_* ejecutables por anon; activate_device también dejó de aceptar anon. Flujos device-token/pairing necesarios conservan sus permisos.","status":"done","priority":"critical"},
         {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"DONE y registrado como migración: funciones futuras creadas por postgres en public quedan opt-in; service_role preservado.","status":"done","priority":"critical"},
         {"id":"activation-code-single-use","title":"Impedir doble uso de códigos de activación","detail":"DONE en Production: índice único parcial sobre device_activations.activation_code_id evita dos activaciones con el mismo código incluso ante doble toque/reintento concurrente.","status":"done","priority":"critical"},
-        {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Internas *_internal cerradas a anon/authenticated y carrera de doble consumo protegida por unicidad en DB. Falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
-        {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"Helpers verificados contra hash del dispositivo/relink exacto; falta gate dinámico cross-device real para cierre formal.","status":"blocked","priority":"critical"},
+        {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Internas *_internal cerradas a anon/authenticated, código nuevo usa FOR UPDATE y DB impide doble activación. Gate end-to-end transaccional preparado pero el conector lo bloqueó antes de ejecutar; no se declara PASS todavía.","status":"blocked","priority":"critical"},
+        {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"DONE: gate dinámico transaccional A/B en Supabase PASS. Token A solo validó dispositivo/cuenta/rol A; B solo B; rol, cuenta y token incorrectos fueron rechazados. ROLLBACK confirmado con 0 residuos. RPCs sensibles delegan en esta guarda.","status":"done","priority":"critical"},
         {"id":"direct-auth-users-write","title":"Eliminar escritura directa en auth.users","detail":"Deuda P1 confirmada: pair_admin_device_with_password_new_internal crea auth.users/auth.identities manualmente. Reemplazo requiere cambiar el flujo de autenticación de App Admin; no se retira mientras la app actual dependa de él.","status":"blocked","priority":"important"},
         {"id":"activate-device-legacy","title":"Cerrar acceso anónimo de activate_device legacy","detail":"DONE: anon revocado; authenticated y service_role preservados para no romper el cliente actual mientras se migra al pairing moderno.","status":"done","priority":"important"},
         {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor sigue indicando Leaked Password Protection desactivada. El conector actual no expone escritura de configuración Auth; queda pendiente sin workaround inseguro.","status":"pending","priority":"important"}
