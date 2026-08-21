@@ -22,8 +22,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,7 +32,6 @@ import com.contentfilter.core.domain.model.allowsProtection
 import com.contentfilter.core.ui.GloshColors
 import com.contentfilter.core.ui.GloshShapes
 import com.contentfilter.core.ui.GloshSpacing
-import com.contentfilter.core.ui.GloshStatusPill
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import java.time.Instant
