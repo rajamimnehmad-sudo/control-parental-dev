@@ -86,16 +86,24 @@ internal class ChromeVisualController(
         val currentContext = ChromeVisualBaselineContext(windowId, windowInspector.pageIdentity(window), viewport)
         val pageChanged = beginPage(currentContext.pageIdentity)
         val atomicMutation = ChromeVisualAtomicMutationPolicy.requiresReplay(event)
+        val geometryRestart = ChromeVisualAtomicMutationPolicy.requiresGeometryRestart(event.eventType)
         if (atomicMutation) {
             atomicReplayCoordinator.request()
             synchronized(lock) {
-                activeJob?.cancel()
-                activeJob = null
                 verificationJob?.cancel()
                 verificationJob = null
                 identityGate.invalidate(windowId)
+                if (geometryRestart) {
+                    activeJob?.cancel()
+                    activeJob = null
+                }
             }
-            baselineCoordinator.cancelIfActive(currentContext)
+            if (geometryRestart) {
+                baselineCoordinator.cancelIfActive(currentContext)
+            } else if (baselineCoordinator.coalesceIfActive(currentContext)) {
+                precover(viewport)
+                return
+            }
         } else if (baselineCoordinator.coalesceIfActive(currentContext)) {
             return
         }
