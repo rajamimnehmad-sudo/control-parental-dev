@@ -1,5 +1,6 @@
 package com.contentfilter.core.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -30,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -56,10 +55,10 @@ fun ProductVisualPage(
                 title = title,
                 subtitle = subtitle,
                 onBack = onBack,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                modifier = Modifier.padding(horizontal = GloshSpacing.PageHorizontal, vertical = 18.dp),
             )
             banner?.let { bannerContent ->
-                Box(modifier = Modifier.padding(horizontal = 18.dp)) {
+                Box(modifier = Modifier.padding(horizontal = GloshSpacing.PageHorizontal)) {
                     bannerContent()
                 }
             }
@@ -68,8 +67,13 @@ fun ProductVisualPage(
                     Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                        .padding(
+                            start = GloshSpacing.PageHorizontal,
+                            top = GloshSpacing.Section,
+                            end = GloshSpacing.PageHorizontal,
+                            bottom = 28.dp,
+                        ),
+                verticalArrangement = Arrangement.spacedBy(GloshSpacing.Section),
                 content = content,
             )
         }
@@ -82,8 +86,8 @@ fun ProductVisualPage(
                 .background(ProductAppBackground)
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
-                .padding(horizontal = 18.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+                .padding(horizontal = GloshSpacing.PageHorizontal, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(GloshSpacing.Section),
     ) {
         ProductPageHeader(title = title, subtitle = subtitle, onBack = onBack)
         content()
@@ -97,7 +101,7 @@ fun ProductLazyVisualPage(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     banner: (@Composable () -> Unit)? = null,
-    itemSpacing: Dp = 18.dp,
+    itemSpacing: Dp = GloshSpacing.Section,
     content: LazyListScope.() -> Unit,
 ) {
     if (onBack != null || banner != null) {
@@ -112,16 +116,22 @@ fun ProductLazyVisualPage(
                 title = title,
                 subtitle = subtitle,
                 onBack = onBack,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+                modifier = Modifier.padding(horizontal = GloshSpacing.PageHorizontal, vertical = 18.dp),
             )
             banner?.let { bannerContent ->
-                Box(modifier = Modifier.padding(horizontal = 18.dp)) {
+                Box(modifier = Modifier.padding(horizontal = GloshSpacing.PageHorizontal)) {
                     bannerContent()
                 }
             }
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 18.dp),
+                contentPadding =
+                    PaddingValues(
+                        start = GloshSpacing.PageHorizontal,
+                        top = GloshSpacing.Section,
+                        end = GloshSpacing.PageHorizontal,
+                        bottom = 28.dp,
+                    ),
                 verticalArrangement = Arrangement.spacedBy(itemSpacing),
                 content = content,
             )
@@ -134,7 +144,7 @@ fun ProductLazyVisualPage(
                 .fillMaxSize()
                 .background(ProductAppBackground)
                 .statusBarsPadding(),
-        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 18.dp),
+        contentPadding = PaddingValues(horizontal = GloshSpacing.PageHorizontal, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(itemSpacing),
     ) {
         item(key = "product-page-header") {
@@ -162,7 +172,7 @@ fun ProductPageHeader(
                 modifier =
                     Modifier
                         .size(40.dp)
-                        .background(Color.White.copy(alpha = 0.92f), CircleShape)
+                        .background(GloshColors.Surface, CircleShape)
                         .clickable(interactionSource = interactionSource, indication = null, onClick = it),
                 contentAlignment = Alignment.Center,
             ) {
@@ -170,13 +180,13 @@ fun ProductPageHeader(
                     icon = ProductIcon.Back,
                     color = ProductInk,
                     contentDescription = "Volver",
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(22.dp),
                 )
             }
         }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
             Text(title, style = MaterialTheme.typography.headlineSmall, color = ProductInk)
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = ProductMutedInk)
@@ -195,26 +205,28 @@ fun ProductHeroPanel(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(210.dp)
-                .background(
-                    brush =
-                        Brush.linearGradient(
-                            colors = listOf(ProductTeal, Color(0xFF5B6CFF), Color(0xFF1E2A4A)),
-                        ),
-                    shape = RoundedCornerShape(32.dp),
-                )
-                .padding(22.dp),
+                .height(190.dp)
+                .background(GloshColors.Graphite, GloshShapes.LargeCard)
+                .padding(20.dp),
     ) {
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .width(42.dp)
+                    .height(5.dp)
+                    .background(GloshColors.Lime, GloshShapes.Pill),
+        )
         Column(
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
                     .fillMaxWidth()
-                    .padding(end = if (mascot == null) 0.dp else 124.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(end = if (mascot == null) 0.dp else 112.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
         ) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = Color.White)
-            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.86f))
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.76f))
         }
         mascot?.let {
             Box(
@@ -239,35 +251,30 @@ fun ProductFeatureTile(
     Card(
         modifier = modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = GloshShapes.Card,
+        colors = CardDefaults.cardColors(containerColor = GloshColors.Surface),
+        border = BorderStroke(1.dp, GloshColors.Line),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(13.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier =
-                    Modifier
-                        .size(54.dp)
-                        .background(accent.copy(alpha = 0.18f), RoundedCornerShape(18.dp)),
+                modifier = Modifier.size(46.dp).background(accent.copy(alpha = 0.13f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                ProductGlyph(icon = icon, color = accent, modifier = Modifier.size(28.dp))
+                ProductGlyph(icon = icon, color = GloshColors.Graphite, modifier = Modifier.size(24.dp))
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Text(title, style = MaterialTheme.typography.titleMedium, color = ProductInk)
-                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = ProductMutedInk)
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = ProductMutedInk)
             }
-            ProductGlyph(icon = ProductIcon.ChevronRight, color = accent, modifier = Modifier.size(28.dp))
+            ProductGlyph(icon = ProductIcon.ChevronRight, color = ProductMutedInk, modifier = Modifier.size(22.dp))
         }
     }
 }
@@ -281,30 +288,25 @@ fun ProductLargeFeatureCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        shape = GloshShapes.LargeCard,
+        colors = CardDefaults.cardColors(containerColor = GloshColors.Surface),
+        border = BorderStroke(1.dp, GloshColors.Line),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier =
-                    Modifier
-                        .size(72.dp)
-                        .background(accent.copy(alpha = 0.16f), RoundedCornerShape(24.dp)),
+                modifier = Modifier.size(58.dp).background(accent.copy(alpha = 0.13f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 ProductMiniIllustration(accent = accent)
             }
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text(title, style = MaterialTheme.typography.titleLarge, color = ProductInk)
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = ProductMutedInk)
@@ -323,15 +325,12 @@ fun ProductStatCard(
     Column(
         modifier =
             modifier
-                .background(Color.White, RoundedCornerShape(24.dp))
+                .background(GloshColors.Surface, GloshShapes.Card)
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Box(
-            modifier =
-                Modifier
-                    .size(34.dp)
-                    .background(accent.copy(alpha = 0.16f), CircleShape),
+            modifier = Modifier.size(8.dp).background(accent, CircleShape),
         )
         Text(value, style = MaterialTheme.typography.titleLarge, color = ProductInk)
         Text(label, style = MaterialTheme.typography.bodySmall, color = ProductMutedInk)
@@ -343,57 +342,26 @@ fun ProductNavGlyph(
     icon: ProductIcon,
     selected: Boolean,
 ) {
-    Box(
-        modifier =
-            Modifier
-                .size(if (selected) 34.dp else 30.dp)
-                .background(
-                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                    CircleShape,
-                ),
-        contentAlignment = Alignment.Center,
-    ) {
-        ProductGlyph(
-            icon = icon,
-            color = if (selected) Color.White else ProductMutedInk,
-            modifier = Modifier.size(20.dp),
-        )
-    }
+    GloshNavigationGlyph(icon = icon, selected = selected)
 }
 
 @Composable
 private fun ProductMiniIllustration(accent: Color) {
-    Box(modifier = Modifier.size(46.dp)) {
+    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
         Box(
-            modifier =
-                Modifier
-                    .align(Alignment.Center)
-                    .size(38.dp)
-                    .background(Color.White, RoundedCornerShape(12.dp)),
+            modifier = Modifier.size(28.dp).background(GloshColors.Surface, CircleShape),
         )
         Box(
-            modifier =
-                Modifier
-                    .align(Alignment.TopEnd)
-                    .size(18.dp)
-                    .background(accent, CircleShape),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .width(28.dp)
-                    .height(10.dp)
-                    .background(accent.copy(alpha = 0.65f), CircleShape),
+            modifier = Modifier.align(Alignment.TopEnd).size(11.dp).background(accent, CircleShape),
         )
     }
 }
 
-val ProductAppBackground = Color(0xFFF2F8F7)
-val ProductInk = Color(0xFF162235)
-val ProductMutedInk = Color(0xFF68758A)
-val ProductTeal = Color(0xFF13BFAE)
-val ProductSky = Color(0xFF2C9AF4)
-val ProductSun = Color(0xFFFFC849)
-val ProductMint = Color(0xFF55E1B8)
-val ProductViolet = Color(0xFF6C63FF)
+val ProductAppBackground = GloshColors.Bone
+val ProductInk = GloshColors.Graphite
+val ProductMutedInk = GloshColors.Muted
+val ProductTeal = GloshColors.Positive
+val ProductSky = GloshColors.GraphiteSoft
+val ProductSun = GloshColors.Warning
+val ProductMint = GloshColors.Lime
+val ProductViolet = GloshColors.Graphite
