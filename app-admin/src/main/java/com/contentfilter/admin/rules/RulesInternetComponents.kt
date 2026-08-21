@@ -1,6 +1,7 @@
 package com.contentfilter.admin.rules
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -11,10 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,14 +29,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshIconBubble
+import com.contentfilter.core.ui.GloshShapes
+import com.contentfilter.core.ui.GloshSurfaceCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
-import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
 @Composable
@@ -51,63 +54,60 @@ internal fun RuleCard(
     val content: @Composable () -> Unit = {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(rule.target, style = MaterialTheme.typography.titleMedium)
-                    Text(rule.scope.displayName(), style = MaterialTheme.typography.bodyMedium)
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(rule.target, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+                    Text(
+                        "${rule.scope.displayName()} · ${rule.action.displayName()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GloshColors.Muted,
+                    )
                 }
-                Switch(
-                    checked = rule.enabled,
-                    enabled = enabled,
-                    onCheckedChange = { onToggle() },
-                )
+                Switch(checked = rule.enabled, enabled = enabled, onCheckedChange = { onToggle() })
             }
-            Text("Acción: ${rule.action.displayName()}")
-            if (dailyLimitMinutes != null) {
-                Text("Límite diario: $dailyLimitMinutes min")
+            dailyLimitMinutes?.let {
+                Text("Límite diario: $it min", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             }
-            Text("Estado: ${if (rule.enabled) "Activada" else "Desactivada"}")
             OutlinedButton(onClick = { confirmDelete = true }, enabled = enabled) {
                 Text("Eliminar")
             }
         }
     }
     if (flat) {
-        Column(modifier = Modifier.fillMaxWidth().background(Color.White)) {
+        Column(modifier = Modifier.fillMaxWidth().background(GloshColors.Surface)) {
             content()
-            HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp), color = GloshColors.Line)
         }
     } else {
-        Card(modifier = Modifier.fillMaxWidth()) { content() }
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = GloshShapes.Card,
+            colors = CardDefaults.cardColors(containerColor = GloshColors.Surface),
+            border = BorderStroke(1.dp, GloshColors.Line),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        ) { content() }
     }
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Eliminar regla") },
-            text = { Text("Esta regla se eliminará.") },
+            text = { Text("Esta configuración se eliminará.") },
             confirmButton = {
                 Button(
                     onClick = {
                         confirmDelete = false
                         onDelete()
                     },
-                ) {
-                    Text("Eliminar")
-                }
+                ) { Text("Eliminar") }
             },
             dismissButton = {
-                OutlinedButton(onClick = { confirmDelete = false }) {
-                    Text("Cancelar")
-                }
+                OutlinedButton(onClick = { confirmDelete = false }) { Text("Cancelar") }
             },
         )
     }
@@ -123,22 +123,18 @@ internal fun DomainRuleEditor(
     onAllow: () -> Unit,
     onAllowWithLimit: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Text("Agregar sitio", style = MaterialTheme.typography.titleMedium)
+    GloshSurfaceCard {
+        Text("Permitir un sitio", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
         Text(
-            "Podés permitir un sitio, limitar sus minutos por DNS o agregarle después un horario exacto.",
+            "Agregá un sitio permitido. Si querés, también podés ponerle un límite diario aproximado.",
             style = MaterialTheme.typography.bodyMedium,
-            color = HeaderMuted,
+            color = GloshColors.Muted,
         )
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
             value = domain,
             onValueChange = onDomainChanged,
-            label = { Text("Dominio") },
+            label = { Text("Sitio") },
             placeholder = { Text("ejemplo.com") },
             singleLine = true,
         )
@@ -146,8 +142,8 @@ internal fun DomainRuleEditor(
             modifier = Modifier.fillMaxWidth(),
             value = minutes,
             onValueChange = onMinutesChanged,
-            label = { Text("Minutos DNS opcionales") },
-            supportingText = { Text("Es una aproximación técnica; no equivale a tiempo real de lectura.") },
+            label = { Text("Límite diario opcional") },
+            supportingText = { Text("El tiempo web es estimado y puede no coincidir exactamente con el tiempo de lectura.") },
             singleLine = true,
         )
         Button(
@@ -155,9 +151,8 @@ internal fun DomainRuleEditor(
             enabled = !saving && domain.isNotBlank(),
             onClick = if (minutes.isBlank()) onAllow else onAllowWithLimit,
         ) {
-            Text(if (minutes.isBlank()) "Permitir sitio" else "Permitir con límite aproximado")
+            Text(if (minutes.isBlank()) "Permitir sitio" else "Permitir con límite")
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
@@ -177,121 +172,112 @@ internal fun WebNavigationPanel(
     onOnlyResultsChanged: (Boolean) -> Unit,
     onProtectedBrowserRequiredChanged: (Boolean) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Acceso a Internet", style = MaterialTheme.typography.titleLarge)
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Text("Acceso a Internet", style = MaterialTheme.typography.titleLarge, color = GloshColors.Graphite)
+            Text(
+                "Elegí si este usuario puede navegar ahora.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Muted,
+            )
+        }
         InternetModeSelector(
             blocked = blocked,
             saving = navigationSaving,
             onBlockedChanged = onBlockedChanged,
         )
-        Text(
-            text = presentation.headline,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        if (blocked) {
+
+        GloshSurfaceCard {
+            Text(presentation.headline, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
             Text(
-                "Los navegadores no pueden abrir sitios. Las protecciones quedan guardadas para cuando abras Internet.",
+                if (blocked) {
+                    "Internet está pausado. La configuración se conserva para cuando vuelvas a habilitarlo."
+                } else {
+                    "La navegación segura se aplica automáticamente."
+                },
                 style = MaterialTheme.typography.bodyMedium,
-                color = HeaderMuted,
-            )
-        } else {
-            Text(
-                presentation.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" },
-                style = MaterialTheme.typography.bodyMedium,
-                color = HeaderMuted,
+                color = GloshColors.Muted,
             )
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-        Text("Protecciones web", style = MaterialTheme.typography.titleMedium)
+
         AnimatedVisibility(visible = presentation.showLayers) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    "SafeSearch se aplica automáticamente.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HeaderMuted,
-                )
-                WebSwitchRow(
-                    icon = ProductIcon.Search,
-                    title = "Solo resultados",
-                    description = "Permite buscar y ver resultados, pero bloquea los sitios externos.",
-                    checked = onlyResultsEnabled,
-                    enabled = !onlyResultsSaving,
-                    saving = onlyResultsSaving,
-                    onCheckedChange = onOnlyResultsChanged,
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                WebSwitchRow(
-                    icon = ProductIcon.ShieldCheck,
-                    title = "Usar navegador DAG",
-                    description = "Hace obligatorio el navegador que revisa las fotos antes de mostrarlas.",
-                    checked = protectedBrowserRequired,
-                    enabled = !protectedBrowserSaving,
-                    saving = protectedBrowserSaving,
-                    onCheckedChange = onProtectedBrowserRequiredChanged,
-                )
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Nivel de protección", style = MaterialTheme.typography.labelLarge, color = GloshColors.Muted)
+                GloshSurfaceCard {
+                    WebSwitchRow(
+                        icon = ProductIcon.Search,
+                        title = "Solo resultados de búsqueda",
+                        description = "Permite buscar, pero evita abrir sitios externos desde los resultados.",
+                        checked = onlyResultsEnabled,
+                        enabled = !onlyResultsSaving,
+                        saving = onlyResultsSaving,
+                        onCheckedChange = onOnlyResultsChanged,
+                    )
+                    HorizontalDivider(color = GloshColors.Line)
+                    WebSwitchRow(
+                        icon = ProductIcon.ShieldCheck,
+                        title = "Navegador protegido",
+                        description = "Hace obligatorio el navegador de Glosh que revisa el contenido visual antes de mostrarlo.",
+                        checked = protectedBrowserRequired,
+                        enabled = !protectedBrowserSaving,
+                        saving = protectedBrowserSaving,
+                        onCheckedChange = onProtectedBrowserRequiredChanged,
+                    )
+                }
+
                 AnimatedVisibility(visible = protectedBrowserRequired) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(Color(0xFFF1F6F8))
-                                .padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("Configuración necesaria", style = MaterialTheme.typography.titleSmall)
-                        SetupStatusLine(
-                            complete = protectedBrowserInstalled,
-                            text =
-                                if (protectedBrowserInstalled) {
-                                    "DAG está instalado"
-                                } else {
-                                    "Falta instalar DAG en el teléfono"
-                                },
-                        )
-                        SetupStatusLine(
-                            complete = protectionActive,
-                            text =
-                                if (protectionActive) {
-                                    "Glosh y Accesibilidad están activos"
-                                } else {
-                                    "Falta reparar Glosh o Accesibilidad"
-                                },
-                        )
-                        SetupStatusLine(
-                            complete = false,
-                            text = "Confirmar DAG como navegador predeterminado en el teléfono",
-                        )
-                        Text(
-                            if (alternativeBrowsers.isEmpty()) {
-                                "Glosh bloqueará automáticamente otros navegadores que detecte."
-                            } else {
-                                "Glosh bloqueará: " +
-                                    alternativeBrowsers
-                                        .map(AppControlUiState::appName)
-                                        .distinct()
-                                        .sorted()
-                                        .joinToString(", ")
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = HeaderMuted,
-                        )
-                        Text(
-                            "No requiere reiniciar ni borrar el teléfono. Android siempre pide una confirmación local para cambiar el navegador predeterminado.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = HeaderMuted,
-                        )
-                    }
+                    ProtectedBrowserSetup(
+                        protectionActive = protectionActive,
+                        protectedBrowserInstalled = protectedBrowserInstalled,
+                        alternativeBrowsers = alternativeBrowsers,
+                    )
                 }
             }
         }
-        if (blocked && !protectionActive) {
+
+        if (!protectionActive) {
             FeedbackBanner(
-                "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
+                "La protección del teléfono necesita atención. Revisá Seguridad antes de dar por terminada la configuración.",
                 isError = true,
             )
         }
+    }
+}
+
+@Composable
+private fun ProtectedBrowserSetup(
+    protectionActive: Boolean,
+    protectedBrowserInstalled: Boolean,
+    alternativeBrowsers: List<AppControlUiState>,
+) {
+    GloshSurfaceCard {
+        Text("Para terminar", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+        SetupStatusLine(
+            complete = protectedBrowserInstalled,
+            text = if (protectedBrowserInstalled) "Navegador protegido instalado" else "Falta instalar el navegador protegido",
+        )
+        SetupStatusLine(
+            complete = protectionActive,
+            text = if (protectionActive) "Protección del teléfono activa" else "Falta reparar la protección del teléfono",
+        )
+        SetupStatusLine(
+            complete = false,
+            text = "Elegir el navegador protegido como predeterminado en el teléfono",
+        )
+        Text(
+            if (alternativeBrowsers.isEmpty()) {
+                "Glosh bloqueará otros navegadores que detecte cuando esta opción sea obligatoria."
+            } else {
+                "Otros navegadores detectados: " +
+                    alternativeBrowsers
+                        .map(AppControlUiState::appName)
+                        .distinct()
+                        .sorted()
+                        .joinToString(", ")
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = GloshColors.Muted,
+        )
     }
 }
 
@@ -301,15 +287,15 @@ private fun SetupStatusLine(
     text: String,
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         ProductGlyph(
             icon = if (complete) ProductIcon.ShieldCheck else ProductIcon.ShieldAlert,
-            color = if (complete) Color(0xFF17895D) else MaterialTheme.colorScheme.tertiary,
-            modifier = Modifier.size(18.dp),
+            color = if (complete) GloshColors.Positive else GloshColors.Warning,
+            modifier = Modifier.size(19.dp),
         )
-        Text(text, style = MaterialTheme.typography.bodySmall)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Graphite)
     }
 }
 
@@ -320,14 +306,13 @@ private fun InternetModeSelector(
     onBlockedChanged: (Boolean) -> Unit,
 ) {
     var dragDistance by remember { mutableStateOf(0f) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(52.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFFF1F4F5))
+                    .background(GloshColors.SurfaceMuted, GloshShapes.Pill)
                     .pointerInput(blocked, saving) {
                         if (!saving) {
                             val swipeThreshold = 48.dp.toPx()
@@ -350,14 +335,14 @@ private fun InternetModeSelector(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             InternetModeOption(
-                title = "Internet abierto",
+                title = "Abierto",
                 selected = !blocked,
                 enabled = !saving,
                 icon = ProductIcon.Web,
                 onClick = { if (blocked) onBlockedChanged(false) },
             )
             InternetModeOption(
-                title = "Internet bloqueado",
+                title = "Bloqueado",
                 selected = blocked,
                 enabled = !saving,
                 icon = ProductIcon.ShieldAlert,
@@ -365,7 +350,7 @@ private fun InternetModeSelector(
             )
         }
         if (saving) {
-            Text("Aplicando…", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
+            Text("Aplicando…", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
         }
     }
 }
@@ -383,22 +368,18 @@ private fun androidx.compose.foundation.layout.RowScope.InternetModeOption(
             Modifier
                 .weight(1f)
                 .height(52.dp)
-                .background(if (selected) ProductSky else Color.Transparent)
+                .background(if (selected) GloshColors.Lime else Color.Transparent, GloshShapes.Pill)
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProductGlyph(
-            icon = icon,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(20.dp),
-        )
+        ProductGlyph(icon = icon, color = GloshColors.Graphite, modifier = Modifier.size(20.dp))
         Text(
             text = title,
             modifier = Modifier.padding(start = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.labelLarge,
+            color = GloshColors.Graphite,
         )
     }
 }
@@ -414,25 +395,21 @@ private fun WebSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().background(Color.White).padding(vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().background(GloshColors.Surface).padding(vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ProductGlyph(icon = icon, color = ProductSky, modifier = Modifier.size(24.dp))
+        GloshIconBubble(icon = icon)
         Column(
             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(description, style = MaterialTheme.typography.bodyMedium, color = HeaderMuted)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             if (saving) {
-                Text("Guardando...", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
+                Text("Guardando…", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             }
         }
-        Switch(
-            checked = checked,
-            enabled = enabled,
-            onCheckedChange = onCheckedChange,
-        )
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
 }

@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.DeviceProtectionControl
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.ui.ActionButtonTone
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshIconBubble
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
@@ -36,74 +38,119 @@ internal fun ProtectionPanel(
 ) {
     val control = state.protectionControls[device.id]
     val loading = device.id in state.protectionLoadingDeviceIds
+    val attention = device.securityAttentionLevel()
+
     if (device.possibleUninstall) {
         ProductCard {
-            StatusChip("ALERTA MÁXIMA", CriticalRed)
-            Text("App Usuario posiblemente desinstalada", style = MaterialTheme.typography.titleLarge)
+            StatusChip("Atención urgente", GloshColors.Danger)
+            Text("La app de Glosh podría haberse quitado", style = MaterialTheme.typography.titleLarge, color = GloshColors.Graphite)
             Text(
                 "El teléfono dejó de reportar después de quedar sin protección contra desinstalación.",
                 style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Muted,
             )
-            Text("Qué hacer ahora", style = MaterialTheme.typography.titleMedium)
-            Text("1. Revisá el teléfono y buscá App Usuario.", style = MaterialTheme.typography.bodyMedium)
-            Text("2. Si no está, reinstalá el APK oficial.", style = MaterialTheme.typography.bodyMedium)
-            Text(
-                "3. En Más opciones, generá un token en Volver a enlazar.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                "4. En el teléfono, activá VPN, Accesibilidad y protección contra desinstalación.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                "Si sólo estaba apagado o sin Internet, la alerta se restablece sola cuando vuelve a reportar. " +
-                    "Si fue desinstalada, no se reinstala sola: requiere reinstalación y reenlace.",
-                style = MaterialTheme.typography.bodySmall,
-                color = HeaderMuted,
-            )
+            Text("Qué hacer", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text("1. Revisá si Glosh Usuario sigue instalado en el teléfono.", style = MaterialTheme.typography.bodyMedium)
+            Text("2. Si falta, reinstalá la APK oficial.", style = MaterialTheme.typography.bodyMedium)
+            Text("3. Abrí Más opciones → Volver a enlazar y generá un token nuevo.", style = MaterialTheme.typography.bodyMedium)
+            Text("4. En el teléfono, completá nuevamente los pasos de protección.", style = MaterialTheme.typography.bodyMedium)
         }
     }
+
     ProductCard {
-        Text("Estado de conexión", style = MaterialTheme.typography.titleMedium)
-        Text("Última conexión: ${device.lastSeenLabel}", style = MaterialTheme.typography.bodyMedium)
-        Text("VPN: ${device.vpnState}", style = MaterialTheme.typography.bodyMedium)
-        Text("Accesibilidad: ${device.accessibilityState}", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            "Protección contra desinstalación: ${device.deviceAdminState}",
-            style = MaterialTheme.typography.bodyMedium,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GloshIconBubble(
+                icon = if (attention == SecurityAttentionLevel.None) ProductIcon.ShieldCheck else ProductIcon.ShieldAlert,
+                accent = if (attention == SecurityAttentionLevel.None) GloshColors.Positive else attention.color,
+            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    if (attention == SecurityAttentionLevel.None) "Protección completa" else "Protección por revisar",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = GloshColors.Graphite,
+                )
+                Text("Última conexión: ${device.lastSeenLabel}", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
+            }
+            StatusChip(
+                if (attention == SecurityAttentionLevel.None) "Correcto" else "Atención",
+                if (attention == SecurityAttentionLevel.None) GloshColors.Positive else attention.color,
+            )
+        }
+
+        ProtectionComponentLine(
+            label = "Internet protegido",
+            active = device.vpnState == ActiveStateLabel,
+        )
+        ProtectionComponentLine(
+            label = "Bloqueo de apps activo",
+            active = device.accessibilityState == ActiveStateLabel,
+        )
+        ProtectionComponentLine(
+            label = "Protección contra desinstalación",
+            active = device.deviceAdminState == ActiveStateLabel,
         )
     }
+
     ProductCard {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Barrera reforzada", style = MaterialTheme.typography.titleMedium)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Protección reforzada", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
                 Text(
-                    if (control?.armed == true) "Armada" else "Pendiente",
-                    style = MaterialTheme.typography.bodyMedium,
+                    if (control?.armed == true) {
+                        "Activa y obligatoria en este usuario."
+                    } else {
+                        "Todavía falta activarla."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GloshColors.Muted,
                 )
             }
             StatusChip(
-                if (control?.armed == true) "Obligatoria" else "Requiere activación",
-                if (control?.armed == true) ActiveGreen else MaterialTheme.colorScheme.error,
-            )
-        }
-        if (control == null) {
-            Text("El control se creará al activar la barrera.", style = MaterialTheme.typography.bodySmall)
-        } else {
-            Text(
-                "Aplicación: revisión ${control.appliedRevision} de ${control.commandRevision}",
-                style = MaterialTheme.typography.bodySmall,
+                if (control?.armed == true) "Activa" else "Pendiente",
+                if (control?.armed == true) GloshColors.Positive else GloshColors.Warning,
             )
         }
         if (control?.armed != true) {
             Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onArmProtection) {
-                Text("Activar protección obligatoria")
+                Text("Completar protección")
             }
         }
+    }
+}
+
+@Composable
+private fun ProtectionComponentLine(
+    label: String,
+    active: Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProductGlyph(
+            icon = if (active) ProductIcon.ShieldCheck else ProductIcon.ShieldAlert,
+            color = if (active) GloshColors.Positive else GloshColors.Warning,
+        )
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = GloshColors.Graphite,
+        )
+        Text(
+            if (active) "Activo" else "Revisar",
+            style = MaterialTheme.typography.labelMedium,
+            color = if (active) GloshColors.Positive else GloshColors.Warning,
+        )
     }
 }
 
@@ -130,17 +177,18 @@ internal fun AdvancedUserOptions(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                GloshIconBubble(ProductIcon.Settings)
                 Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Más opciones", style = MaterialTheme.typography.titleMedium, color = HeaderInk)
+                    Text("Más opciones", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
                     Text(
-                        "Reenlace, desinstalación temporal, código de emergencia y archivo",
+                        "Reenlace, desinstalación temporal, recuperación y archivo",
                         style = MaterialTheme.typography.bodySmall,
-                        color = HeaderMuted,
+                        color = GloshColors.Muted,
                     )
                 }
                 ProductGlyph(
                     icon = ProductIcon.ChevronRight,
-                    color = HeaderMuted,
+                    color = GloshColors.Muted,
                     contentDescription = if (expanded) "Cerrar más opciones" else "Abrir más opciones",
                 )
             }
@@ -148,15 +196,16 @@ internal fun AdvancedUserOptions(
         AnimatedVisibility(visible = expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 ProductCard {
-                    Text("Desinstalación temporal", style = MaterialTheme.typography.titleMedium)
+                    Text("Desinstalación temporal", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
                     Text(
-                        "La autorización vence automáticamente a los 30 minutos.",
+                        "Autoriza la desinstalación durante 30 minutos y después vuelve a protegerse automáticamente.",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = GloshColors.Muted,
                     )
                     Text(
                         text = control.authorizationStatusLabel(),
                         style = MaterialTheme.typography.bodySmall,
-                        color = HeaderMuted,
+                        color = GloshColors.Muted,
                     )
                     Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
                         Text("Permitir desinstalación")
@@ -182,7 +231,7 @@ internal fun AdvancedUserOptions(
                     enabled = device.id !in state.pendingDeviceDeleteIds,
                     onClick = { confirmArchive = true },
                 ) {
-                    Text("Archivar usuario", color = MaterialTheme.colorScheme.error)
+                    Text("Archivar usuario", color = GloshColors.Danger)
                 }
             }
         }
@@ -205,15 +254,13 @@ internal fun AdvancedUserOptions(
                     enabled = device.id !in state.pendingDeviceDeleteIds,
                     modifier = Modifier,
                     text = "Archivar usuario",
-                    loadingText = "Archivando...",
+                    loadingText = "Archivando…",
                     successText = "Archivado",
                     tone = ActionButtonTone.Destructive,
                 )
             },
             dismissButton = {
-                OutlinedButton(onClick = { confirmArchive = false }) {
-                    Text("Cancelar")
-                }
+                OutlinedButton(onClick = { confirmArchive = false }) { Text("Cancelar") }
             },
         )
     }
@@ -228,10 +275,11 @@ private fun RelinkOptionCard(
     onRelinkCodeCopied: () -> Unit,
 ) {
     ProductCard {
-        Text("Volver a enlazar", style = MaterialTheme.typography.titleMedium)
+        Text("Volver a enlazar", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
         Text(
-            "Genera un token de un solo uso por 30 minutos. El vínculo anterior sigue activo hasta que el nuevo teléfono sincronice correctamente.",
+            "Generá un token temporal para volver a vincular este mismo usuario sin crear uno nuevo.",
             style = MaterialTheme.typography.bodyMedium,
+            color = GloshColors.Muted,
         )
         if (state.relinkCode.isBlank() || state.relinkDeviceId != device.id) {
             OutlinedButton(
@@ -239,26 +287,18 @@ private fun RelinkOptionCard(
                 enabled = device.id !in state.relinkLoadingDeviceIds,
                 onClick = onGenerateRelinkCode,
             ) {
-                Text(
-                    if (device.id in state.relinkLoadingDeviceIds) {
-                        "Generando token..."
-                    } else {
-                        "Generar token de reenlace"
-                    },
-                )
+                Text(if (device.id in state.relinkLoadingDeviceIds) "Generando…" else "Generar token")
             }
         } else {
             Text(state.relinkCode, style = MaterialTheme.typography.headlineSmall)
-            Text("Vence: ${state.relinkExpiresAt}", style = MaterialTheme.typography.bodySmall)
+            Text("Vence: ${state.relinkExpiresAt}", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     clipboardManager.setText(AnnotatedString(state.relinkCode))
                     onRelinkCodeCopied()
                 },
-            ) {
-                Text("Copiar y ocultar")
-            }
+            ) { Text("Copiar token") }
         }
     }
 }
@@ -273,40 +313,40 @@ private fun RecoveryOptionCard(
     onRecoveryCodeCopied: () -> Unit,
 ) {
     ProductCard {
-        Text("Recuperación sin conexión", style = MaterialTheme.typography.titleMedium)
+        Text("Recuperación sin conexión", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
         Text(
-            "Prepará cinco códigos de un solo uso mientras ambos teléfonos estén conectados. " +
-                "Después podés revelar el próximo código aunque no haya Internet.",
+            "Prepará códigos de un solo uso para poder recuperar el teléfono incluso cuando no tenga Internet.",
             style = MaterialTheme.typography.bodyMedium,
+            color = GloshColors.Muted,
         )
         val remaining = state.recoveryKitRemainingByDevice[deviceId] ?: 0
         val remoteKitPrepared = state.protectionControls[deviceId]?.recoveryKit?.isNotEmpty() == true
         Text(
             when {
-                remaining > 0 -> "Kit listo · $remaining códigos guardados en este Admin"
-                remoteKitPrepared -> "Kit activo, pero sin códigos disponibles en este Admin"
+                remaining > 0 -> "$remaining códigos disponibles"
+                remoteKitPrepared -> "Kit activo, sin códigos disponibles en este Admin"
                 else -> "Kit no preparado"
             },
             style = MaterialTheme.typography.bodySmall,
-            color = if (remaining > 0) ActiveGreen else HeaderMuted,
+            color = if (remaining > 0) GloshColors.Positive else GloshColors.Muted,
         )
         val recoveryCode = state.recoveryCodeFor(deviceId)
         if (recoveryCode.isBlank()) {
             OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onGenerateRecoveryCode) {
                 Text(
                     when {
-                        remaining > 0 -> "Revelar próximo código"
-                        remoteKitPrepared -> "Renovar kit offline"
-                        else -> "Preparar kit offline"
+                        remaining > 0 -> "Mostrar próximo código"
+                        remoteKitPrepared -> "Renovar kit"
+                        else -> "Preparar recuperación"
                     },
                 )
             }
         } else {
             Text(recoveryCode, style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Compartilo sólo con el usuario correcto. Vence al usarse y habilita la desinstalación durante 10 minutos.",
+                "Compartilo solamente con el usuario correcto. Es de un solo uso.",
                 style = MaterialTheme.typography.bodySmall,
-                color = HeaderMuted,
+                color = GloshColors.Muted,
             )
             Button(
                 modifier = Modifier.fillMaxWidth(),
@@ -314,9 +354,7 @@ private fun RecoveryOptionCard(
                     clipboardManager.setText(AnnotatedString(recoveryCode))
                     onRecoveryCodeCopied()
                 },
-            ) {
-                Text("Copiar y ocultar")
-            }
+            ) { Text("Copiar código") }
         }
     }
 }
@@ -327,7 +365,7 @@ private fun DeviceProtectionControl?.authorizationStatusLabel(
     val control = this ?: return "Sin permisos temporales activos."
     val expiresAt = control.authorizationExpiresAtEpochMillis ?: return "Sin permisos temporales activos."
     val remainingMillis = expiresAt - nowEpochMillis
-    if (remainingMillis <= 0) return "Los permisos temporales vencieron; la protección se reactivó automáticamente."
+    if (remainingMillis <= 0) return "El permiso temporal ya venció."
     val remainingMinutes = ((remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
     return when (control.authorizationScope) {
         ProtectionAuthorizationScope.Settings -> "Mantenimiento habilitado · quedan $remainingMinutes min."
@@ -335,3 +373,5 @@ private fun DeviceProtectionControl?.authorizationStatusLabel(
         ProtectionAuthorizationScope.None -> "Sin permisos temporales activos."
     }
 }
+
+private const val ActiveStateLabel = "Activa"

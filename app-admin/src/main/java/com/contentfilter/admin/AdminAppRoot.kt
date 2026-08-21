@@ -274,7 +274,7 @@ internal fun AdminAppRoot(
                 null ->
                     when (tab) {
                         AdminTab.Home ->
-                            HomeTab(
+                            RedesignedHomeTab(
                                 onCreateUser = {
                                     requestedUserId = null
                                     showUserListRequestKey += 1
@@ -366,7 +366,7 @@ private enum class AdminTab(
     val label: String,
     val icon: ProductIcon,
 ) {
-    Home("Home", ProductIcon.Home),
+    Home("Inicio", ProductIcon.Home),
     Users("Usuarios", ProductIcon.People),
     Requests("Solicitudes", ProductIcon.Requests),
     Account("Ajustes", ProductIcon.Settings),

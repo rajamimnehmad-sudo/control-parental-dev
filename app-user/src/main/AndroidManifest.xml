@@ -41,7 +41,7 @@
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@drawable/user_fish_icon"
-        android:label="Content Filter"
+        android:label="Glosh"
         android:roundIcon="@drawable/user_fish_icon"
         android:theme="@style/AppTheme">
         <uses-native-library
@@ -65,7 +65,7 @@
             android:enabled="true"
             android:exported="true"
             android:icon="@drawable/user_fish_icon"
-            android:label="Content Filter"
+            android:label="Glosh"
             android:roundIcon="@drawable/user_fish_icon"
             android:targetActivity=".MainActivity">
             <intent-filter>

@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+      - work/ui-ux-redesign-01
+      - build/ui-ux-apk-test-01
     paths-ignore:
       - "docs/**"
 
@@ -50,21 +52,91 @@ jobs:
         if: ${{ steps.scope.outputs.scope != 'none' }}
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Crear .env DEV desde secrets
+        if: ${{ steps.scope.outputs.scope != 'none' }}
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          UPDATE_MANIFEST_URL_USER: ${{ secrets.UPDATE_MANIFEST_URL_USER }}
+          UPDATE_MANIFEST_URL_ADMIN: ${{ secrets.UPDATE_MANIFEST_URL_ADMIN }}
+          FIREBASE_APPLICATION_ID: ${{ secrets.FIREBASE_APPLICATION_ID }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "${SUPABASE_URL:-}" || { echo "Falta SUPABASE_URL" >&2; exit 1; }
+          test -n "${SUPABASE_ANON_KEY:-}" || { echo "Falta SUPABASE_ANON_KEY" >&2; exit 1; }
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+            echo "UPDATE_MANIFEST_URL_USER=${UPDATE_MANIFEST_URL_USER:-}"
+            echo "UPDATE_MANIFEST_URL_ADMIN=${UPDATE_MANIFEST_URL_ADMIN:-}"
+            echo "UPDATE_MANIFEST_URL="
+            echo "FIREBASE_APPLICATION_ID=${FIREBASE_APPLICATION_ID:-}"
+            echo "FIREBASE_API_KEY=${FIREBASE_API_KEY:-}"
+            echo "FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID:-}"
+          } > .env
+
+      - name: Preparar firma DEV estable
+        if: ${{ steps.scope.outputs.scope != 'none' }}
+        shell: bash
+        env:
+          ANDROID_DEV_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "${ANDROID_DEV_KEYSTORE_BASE64:-}" || { echo "Falta ANDROID_DEV_KEYSTORE_BASE64" >&2; exit 1; }
+          printf '%s' "$ANDROID_DEV_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dev-update.jks"
+          chmod 600 "$RUNNER_TEMP/dev-update.jks"
+
       - name: Make Gradle wrapper executable
         if: ${{ steps.scope.outputs.scope != 'none' }}
         run: chmod +x ./gradlew
 
       - name: Build dev debug Usuario
         if: ${{ steps.scope.outputs.scope == 'user' }}
+        env:
+          ANDROID_DEV_KEYSTORE_PATH: ${{ runner.temp }}/dev-update.jks
+          ANDROID_DEV_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
+          ANDROID_DEV_KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
+          ANDROID_DEV_KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
         run: ./gradlew :app-user:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 
       - name: Build dev debug Admin
         if: ${{ steps.scope.outputs.scope == 'admin' }}
+        env:
+          ANDROID_DEV_KEYSTORE_PATH: ${{ runner.temp }}/dev-update.jks
+          ANDROID_DEV_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
+          ANDROID_DEV_KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
+          ANDROID_DEV_KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
         run: ./gradlew :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 
       - name: Build dev debug ambas apps
         if: ${{ steps.scope.outputs.scope == 'both' }}
+        env:
+          ANDROID_DEV_KEYSTORE_PATH: ${{ runner.temp }}/dev-update.jks
+          ANDROID_DEV_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
+          ANDROID_DEV_KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
+          ANDROID_DEV_KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
         run: ./gradlew :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
+
+      - name: Guardar APK Usuario de prueba
+        if: ${{ steps.scope.outputs.scope == 'user' || steps.scope.outputs.scope == 'both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: glosh-user-dev-debug
+          path: app-user/build/outputs/apk/dev/debug/*.apk
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Guardar APK Admin de prueba
+        if: ${{ steps.scope.outputs.scope == 'admin' || steps.scope.outputs.scope == 'both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: glosh-admin-dev-debug
+          path: app-admin/build/outputs/apk/dev/debug/*.apk
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Calidad Usuario
         if: ${{ steps.scope.outputs.scope == 'user' }}

@@ -7,23 +7,18 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import com.contentfilter.core.ui.GloshColors
 
 @Composable
 internal fun UserSystemBars(darkHeader: Boolean) {
     val activity = LocalContext.current.findComponentActivity() ?: return
     LaunchedEffect(activity, darkHeader) {
-        val statusStyle =
-            if (darkHeader) {
-                SystemBarStyle.dark(UserHomeHeaderTop.toArgb())
-            } else {
-                SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb())
-            }
+        val light = SystemBarStyle.light(GloshColors.Bone.toArgb(), GloshColors.Bone.toArgb())
         activity.enableEdgeToEdge(
-            statusBarStyle = statusStyle,
-            navigationBarStyle = SystemBarStyle.light(Color.White.toArgb(), Color.White.toArgb()),
+            statusBarStyle = light,
+            navigationBarStyle = light,
         )
     }
 }

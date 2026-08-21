@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -23,8 +22,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -47,12 +44,15 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshShapes
+import com.contentfilter.core.ui.GloshSpacing
+import com.contentfilter.core.ui.GloshSurfaceCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductPageHeader
@@ -68,9 +68,7 @@ fun MyAppsRoute(
     onBack: (() -> Unit)? = null,
     viewModel: MyAppsViewModel = hiltViewModel(),
 ) {
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        viewModel.refreshApps()
-    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshApps() }
     val state = viewModel.uiState.collectAsStateWithLifecycle()
     MyAppsScreen(
         state = state.value,
@@ -97,16 +95,11 @@ private fun MyAppsScreen(
     val searchedApps =
         remember(state.apps, state.searchQuery) {
             val query = state.searchQuery.trim().lowercase()
-            if (query.isBlank()) {
-                state.apps
-            } else {
-                state.apps.filter {
-                    it.name.lowercase().contains(query) || it.packageName.lowercase().contains(query)
-                }
+            if (query.isBlank()) state.apps else state.apps.filter {
+                it.name.lowercase().contains(query) || it.packageName.lowercase().contains(query)
             }
         }
-    val ungroupedApps =
-        remember(searchedApps, groupedPackages) { searchedApps.filter { it.packageName !in groupedPackages } }
+    val ungroupedApps = remember(searchedApps, groupedPackages) { searchedApps.filter { it.packageName !in groupedPackages } }
     val visibleApps =
         remember(ungroupedApps, quickFilter) {
             ungroupedApps.filter { app ->
@@ -121,18 +114,19 @@ private fun MyAppsScreen(
                 }
             }
         }
+
     Column(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(Color.White)
+                .background(GloshColors.Bone)
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(horizontal = GloshSpacing.PageHorizontal, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         ProductPageHeader(
             title = "Mis apps",
-            subtitle = "${state.apps.size} apps · permisos y tiempo disponible",
+            subtitle = "${state.apps.size} apps · acceso y tiempo disponible",
             onBack = onBack,
         )
         AppsToolbar(
@@ -153,27 +147,23 @@ private fun MyAppsScreen(
             onRefreshApps = onRefreshApps,
         )
         if (state.isRefreshing) {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = GloshColors.Graphite)
         }
+
         val emptyStateMessage = myAppsEmptyStateMessage(state.apps.isEmpty(), state.isRefreshing)
         if (emptyStateMessage != null) {
-            Text(emptyStateMessage)
+            EmptyAppsCard(emptyStateMessage)
         } else if (quickFilter == MyAppsQuickFilter.InGroup) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                item {
-                    ProductSectionHeader("Apps en grupo", count = state.appGroups.size)
-                }
+                item { ProductSectionHeader("Grupos de apps", count = state.appGroups.size) }
                 items(state.appGroups, key = { it.id }) { group ->
                     MyAppGroupCard(
                         group = group,
                         apps = searchedApps.filter { it.packageName in group.packageNames },
                     )
-                }
-                item {
-                    HorizontalDivider()
                 }
             }
         } else {
@@ -187,6 +177,14 @@ private fun MyAppsScreen(
     }
 }
 
+@Composable
+private fun EmptyAppsCard(text: String) {
+    GloshSurfaceCard {
+        Text("Todavía no hay apps para mostrar", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
+    }
+}
+
 internal fun myAppsEmptyStateMessage(
     appsEmpty: Boolean,
     refreshing: Boolean,
@@ -194,7 +192,7 @@ internal fun myAppsEmptyStateMessage(
     when {
         !appsEmpty -> null
         refreshing -> "Buscando aplicaciones instaladas…"
-        else -> "No hay apps detectadas todavía."
+        else -> "Abrí o actualizá Glosh para detectar las apps instaladas."
     }
 
 @Composable
@@ -214,16 +212,13 @@ private fun AppsToolbar(
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
-    androidx.compose.runtime.LaunchedEffect(searchExpanded) {
+    LaunchedEffect(searchExpanded) {
         if (searchExpanded) {
             focusRequester.requestFocus()
             keyboardController?.show()
         }
     }
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -231,47 +226,39 @@ private fun AppsToolbar(
         ) {
             if (searchExpanded) {
                 OutlinedTextField(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .focusRequester(focusRequester),
+                    modifier = Modifier.weight(1f).focusRequester(focusRequester),
                     value = searchQuery,
                     onValueChange = onSearchChanged,
                     placeholder = { Text("Buscar app") },
-                    leadingIcon = {
-                        ProductGlyph(icon = ProductIcon.Search, color = UserMuted, modifier = Modifier.size(22.dp))
-                    },
+                    leadingIcon = { ProductGlyph(ProductIcon.Search, GloshColors.Muted, Modifier.size(22.dp)) },
                     singleLine = true,
-                    shape = RoundedCornerShape(18.dp),
+                    shape = GloshShapes.Card,
                 )
             } else {
                 Text(
                     text = myAppsRefreshStatus(message, refreshing, lastRefreshedAtEpochMillis),
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (message.isRefreshError()) MaterialTheme.colorScheme.error else UserMuted,
+                    color = if (message.isRefreshError()) GloshColors.Danger else GloshColors.Muted,
                     maxLines = 2,
                 )
             }
             ToolbarCircleButton(onClick = onRefreshApps, enabled = !refreshing) {
                 ProductGlyph(
-                    icon = ProductIcon.Refresh,
-                    color = if (refreshing) UserMuted.copy(alpha = 0.45f) else UserMuted,
-                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Actualizar apps" },
+                    ProductIcon.Refresh,
+                    if (refreshing) GloshColors.Muted.copy(alpha = 0.45f) else GloshColors.Muted,
+                    Modifier.size(22.dp).semantics { contentDescription = "Actualizar apps" },
                 )
             }
             ToolbarCircleButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
                 ProductGlyph(
-                    icon = ProductIcon.Search,
-                    color = UserInk,
-                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Buscar app" },
+                    ProductIcon.Search,
+                    GloshColors.Graphite,
+                    Modifier.size(22.dp).semantics { contentDescription = "Buscar app" },
                 )
             }
         }
-        LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        LazyRow(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(MyAppsQuickFilter.entries) { filter ->
                 AppFilterBanner(
                     filter = filter,
@@ -332,9 +319,9 @@ private fun ToolbarCircleButton(
     Box(
         modifier =
             Modifier
-                .size(48.dp)
+                .size(46.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFF3F6F7).copy(alpha = if (enabled) 1f else 0.72f))
+                .background(GloshColors.Surface.copy(alpha = if (enabled) 1f else 0.72f))
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -342,9 +329,7 @@ private fun ToolbarCircleButton(
                     onClick = onClick,
                 ),
         contentAlignment = Alignment.Center,
-    ) {
-        content()
-    }
+    ) { content() }
 }
 
 @Composable
@@ -355,30 +340,20 @@ private fun AppFilterBanner(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(20.dp)
     val interactionSource = remember { MutableInteractionSource() }
-    Box(
+    Row(
         modifier =
             modifier
                 .height(40.dp)
-                .clip(shape)
-                .background(if (selected) Color(0xFFD6F4F0) else Color(0xFFF3F6F7), shape)
-                .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+                .clip(GloshShapes.Pill)
+                .background(if (selected) GloshColors.Lime else GloshColors.Surface)
+                .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+                .padding(horizontal = 13.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                filter.label,
-                style = MaterialTheme.typography.labelLarge,
-                color = UserInk,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(count.toString(), style = MaterialTheme.typography.labelSmall, color = UserMuted)
-        }
+        Text(filter.label, style = MaterialTheme.typography.labelLarge, color = GloshColors.Graphite, maxLines = 1)
+        Text(count.toString(), style = MaterialTheme.typography.labelSmall, color = GloshColors.Muted)
     }
 }
 
@@ -404,7 +379,7 @@ private val MyAppsQuickFilter.label: String
             MyAppsQuickFilter.All -> "Todas"
             MyAppsQuickFilter.WithTime -> "Con tiempo"
             MyAppsQuickFilter.Blocked -> "Bloqueadas"
-            MyAppsQuickFilter.InGroup -> "Apps en grupo"
+            MyAppsQuickFilter.InGroup -> "En grupos"
         }
 
 @Composable
@@ -413,49 +388,35 @@ private fun MyAppGroupCard(
     apps: List<MyAppItemUiState>,
 ) {
     var expanded by remember(group.id) { mutableStateOf(false) }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = { expanded = !expanded })
-                .padding(vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    GloshSurfaceCard(onClick = { expanded = !expanded }) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(group.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "${group.appCount} apps · reinicia 12 PM",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(group.name, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+                Text("${group.appCount} apps", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             }
-            StatusChip("${group.usedMinutes}/${group.limitMinutes}m", MaterialTheme.colorScheme.primary)
+            StatusChip("${group.usedMinutes}/${group.limitMinutes} min", GloshColors.Warning)
         }
         GroupIconStack(apps = apps, totalCount = group.appCount)
         LinearProgressIndicator(
             progress = { group.progress },
             modifier = Modifier.fillMaxWidth(),
+            color = if (group.progress >= 0.9f) GloshColors.Danger else GloshColors.Graphite,
+            trackColor = GloshColors.SurfaceMuted,
         )
-        Text(group.label, style = MaterialTheme.typography.bodySmall)
+        Text(group.label, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
         if (expanded) {
             if (apps.isEmpty()) {
-                Text(
-                    text = "No se detectaron apps instaladas para este grupo.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Text("No se detectaron apps instaladas para este grupo.", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    apps.forEach { app ->
-                        GroupAppRow(app)
-                    }
+                    apps.forEach { app -> GroupAppRow(app) }
                 }
             }
         }
-        HorizontalDivider(modifier = Modifier.padding(start = 44.dp))
     }
 }
 
@@ -464,25 +425,11 @@ private fun GroupIconStack(
     apps: List<MyAppItemUiState>,
     totalCount: Int,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .height(40.dp),
-        ) {
-            apps.take(5).forEachIndexed { index, app ->
-                Box(modifier = Modifier.offset { IntOffset(index * 34, 0) }) {
-                    AppIcon(app.name, app.iconBase64, size = 34)
-                }
-            }
+    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy((-8).dp)) {
+            apps.take(5).forEach { app -> AppIcon(app.name, app.iconBase64, size = 34) }
         }
-        if (totalCount > 5) {
-            StatusChip("+${totalCount - 5}", MaterialTheme.colorScheme.primary)
-        }
+        if (totalCount > 5) StatusChip("+${totalCount - 5}", GloshColors.Graphite)
     }
 }
 
@@ -495,8 +442,8 @@ private fun GroupAppRow(app: MyAppItemUiState) {
     ) {
         AppIcon(app.name, app.iconBase64, size = 32)
         Column(modifier = Modifier.weight(1f)) {
-            Text(app.name, style = MaterialTheme.typography.bodyMedium)
-            Text(app.limitText, style = MaterialTheme.typography.bodySmall)
+            Text(app.name, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Graphite)
+            Text(app.limitText, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
         }
         StatusLabel(app.status, app.extraTimeRemainingMinutes)
     }
@@ -507,20 +454,7 @@ private fun StatusLabel(
     status: AppAccessStatus,
     extraTimeRemainingMinutes: Int?,
 ) {
-    val color = status.statusColor()
-    Box(
-        modifier =
-            Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(color.copy(alpha = 0.18f))
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-    ) {
-        Text(
-            text = status.displayName(extraTimeRemainingMinutes),
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-        )
-    }
+    StatusChip(status.displayName(extraTimeRemainingMinutes), status.statusColor())
 }
 
 @Composable
@@ -536,9 +470,7 @@ internal fun AppIcon(
                 withContext(Dispatchers.Default) {
                     runCatching {
                         val bytes = Base64.decode(iconBase64, Base64.DEFAULT)
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also { decoded ->
-                            AppIconBitmapCache.put(iconBase64, decoded)
-                        }
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also { decoded -> AppIconBitmapCache.put(iconBase64, decoded) }
                     }.getOrNull()
                 }
         }
@@ -548,10 +480,7 @@ internal fun AppIcon(
         Image(
             bitmap = displayedBitmap.asImageBitmap(),
             contentDescription = null,
-            modifier =
-                Modifier
-                    .size(size.dp)
-                    .clip(CircleShape),
+            modifier = Modifier.size(size.dp).clip(CircleShape),
         )
     } else {
         FallbackIcon(name, size)
@@ -559,10 +488,7 @@ internal fun AppIcon(
 }
 
 private object AppIconBitmapCache : LruCache<String, Bitmap>(8 * 1024 * 1024) {
-    override fun sizeOf(
-        key: String,
-        value: Bitmap,
-    ): Int = value.allocationByteCount
+    override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
 }
 
 @Composable
@@ -571,16 +497,13 @@ private fun FallbackIcon(
     size: Int,
 ) {
     Box(
-        modifier =
-            Modifier
-                .size(size.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier.size(size.dp).clip(CircleShape).background(GloshColors.LimeSoft),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = name.firstOrNull()?.uppercaseChar()?.toString().orEmpty(),
             style = MaterialTheme.typography.titleMedium,
+            color = GloshColors.Graphite,
         )
     }
 }
@@ -590,30 +513,24 @@ private fun AppAccessStatus.displayName(extraTimeRemainingMinutes: Int? = null):
         AppAccessStatus.Allowed -> "Permitida"
         AppAccessStatus.Limited -> "Con límite"
         AppAccessStatus.LimitReached -> "Límite agotado"
-        AppAccessStatus.ExtraTime -> extraTimeRemainingMinutes?.let { "Extra ${it}m" } ?: "Tiempo extra activo"
+        AppAccessStatus.ExtraTime -> extraTimeRemainingMinutes?.let { "Extra ${it}m" } ?: "Tiempo extra"
         AppAccessStatus.Blocked -> "Bloqueada"
-        AppAccessStatus.RequiresAuthorization -> "Requiere autorización"
-        AppAccessStatus.WaitingAuthorization -> "Esperando autorización"
-        AppAccessStatus.WaitingExtraTime -> "Esperando más tiempo"
+        AppAccessStatus.RequiresAuthorization -> "Necesita permiso"
+        AppAccessStatus.WaitingAuthorization -> "Esperando permiso"
+        AppAccessStatus.WaitingExtraTime -> "Esperando tiempo"
     }
 
 private fun AppAccessStatus.statusColor(): Color =
     when (this) {
         AppAccessStatus.Allowed,
         AppAccessStatus.ExtraTime,
-        -> AllowedGreen
+        -> GloshColors.Positive
         AppAccessStatus.Limited,
         AppAccessStatus.LimitReached,
         AppAccessStatus.WaitingExtraTime,
-        -> WarningYellow
+        -> GloshColors.Warning
         AppAccessStatus.Blocked,
         AppAccessStatus.RequiresAuthorization,
         AppAccessStatus.WaitingAuthorization,
-        -> BlockedRed
+        -> GloshColors.Danger
     }
-
-private val AllowedGreen = Color(0xFF2E7D32)
-private val BlockedRed = Color(0xFFC62828)
-private val WarningYellow = Color(0xFFF9A825)
-private val UserInk = Color(0xFF162235)
-private val UserMuted = Color(0xFF68758A)

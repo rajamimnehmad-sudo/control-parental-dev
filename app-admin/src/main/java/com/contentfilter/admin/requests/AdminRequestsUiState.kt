@@ -19,6 +19,7 @@ data class AdminAccessRequestUiState(
     val request: AccessRequest,
     val appName: String,
     val iconBase64: String?,
+    val userName: String,
 ) {
     val id: String = request.id
 }

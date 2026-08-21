@@ -59,7 +59,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 311
+            versionCode = 313
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "true")
         }
