@@ -86,7 +86,6 @@ export default async function CommunityDetailPage({ params, searchParams }: Prop
               <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
                 <SummaryDetail label="Inicio" value={formatShortDate(detail.starts_at, "Inicio sin informar")} />
                 <SummaryDetail label="Vencimiento" value={formatShortDate(detail.expires_at, "Sin vencimiento")} />
-                <SummaryDetail label="DAG" value={detail.dag_entitled ? "Habilitado" : "No habilitado"} />
                 <SummaryDetail label="Notas internas" value={detail.internal_notes || "Sin notas internas"} />
               </dl>
               <SectionLink href={`/communities/${communityId}?section=license`} label="Administrar licencia y límites" icon={CreditCard} />
