@@ -28,14 +28,15 @@ internal class ChromeVisualOverlay(
         return attach(region, state, View(service))
     }
 
-    fun beginBarrier(viewport: ChromeVisualViewport): Boolean {
+    fun beginBarrier(regions: List<ChromeVisualRegion>): Boolean {
+        if (regions.isEmpty()) return false
         val barrier =
             ChromeVisualRegion(
                 id = BarrierRegionId,
-                left = viewport.left,
-                top = viewport.top,
-                right = viewport.right,
-                bottom = viewport.bottom,
+                left = regions.minOf(ChromeVisualRegion::left),
+                top = regions.minOf(ChromeVisualRegion::top),
+                right = regions.maxOf(ChromeVisualRegion::right),
+                bottom = regions.maxOf(ChromeVisualRegion::bottom),
             )
         val shown = show(barrier, ChromeVisualOverlayState.Pending)
         if (shown) retain(setOf(BarrierRegionId))
