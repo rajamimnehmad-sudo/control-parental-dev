@@ -3,15 +3,14 @@ package com.contentfilter.admin.updates
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -23,19 +22,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.BuildConfig
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.PremiumFeedbackBanner
 
 @Composable
 fun AdminUpdatesRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
-        if (state.status == AdminUpdatesStatus.Idle) {
-            viewModel.checkForUpdates()
-        }
+        if (state.status == AdminUpdatesStatus.Idle) viewModel.checkForUpdates()
     }
     AdminUpdatesScreen(
         state = state,
@@ -59,102 +57,70 @@ private fun AdminUpdatesScreen(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        PremiumFeedbackBanner(
-            text = state.status.message(),
-            isError = state.status.isError(),
-        )
+        if (state.status.isError()) {
+            PremiumFeedbackBanner(text = state.status.message(), isError = true)
+        }
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    modifier = Modifier.weight(1f),
-                    text = "Versión instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                TextButton(
-                    enabled = state.manifest != null,
-                    onClick = { showReleaseNotes = !showReleaseNotes },
+            ProductCard {
+                Text("Glosh Administrador", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+                Text(state.status.message(), style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(if (showReleaseNotes) "Ocultar" else "Ver novedades")
-                }
-            }
-            state.manifest?.let { manifest ->
-                if (manifest.versionCode > BuildConfig.VERSION_CODE) {
                     Text(
-                        text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                }
-                if (showReleaseNotes) {
-                    Text(text = "Últimos cambios", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = manifest.releaseNotes.ifBlank { "Sin novedades informadas." },
+                        modifier = Modifier.weight(1f),
+                        text = "Versión ${BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = GloshColors.Graphite,
+                    )
+                    TextButton(enabled = state.manifest != null, onClick = { showReleaseNotes = !showReleaseNotes }) {
+                        Text(if (showReleaseNotes) "Ocultar novedades" else "Ver novedades")
+                    }
+                }
+                state.manifest?.let { manifest ->
+                    if (manifest.versionCode > BuildConfig.VERSION_CODE) {
+                        Text("Disponible: ${manifest.versionName}", style = MaterialTheme.typography.titleMedium)
+                    }
+                    if (showReleaseNotes) {
+                        Text(
+                            manifest.releaseNotes.ifBlank { "Sin novedades informadas." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GloshColors.Muted,
+                        )
+                    }
+                }
+                if (state.status == AdminUpdatesStatus.Downloading) {
+                    LinearProgressIndicator(
+                        progress = { (state.downloadProgressPercent ?: 0) / 100f },
+                        modifier = Modifier.fillMaxWidth(),
                     )
                 }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            when (state.status) {
-                AdminUpdatesStatus.Available,
-                AdminUpdatesStatus.DownloadFailed,
-                AdminUpdatesStatus.ChecksumFailed,
-                -> {
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onDownload,
-                    ) {
-                        Text("Actualizar")
+                when (state.status) {
+                    AdminUpdatesStatus.Available,
+                    AdminUpdatesStatus.DownloadFailed,
+                    AdminUpdatesStatus.ChecksumFailed,
+                    -> Button(modifier = Modifier.fillMaxWidth(), onClick = onDownload) { Text("Actualizar") }
+                    AdminUpdatesStatus.Downloading ->
+                        Button(modifier = Modifier.fillMaxWidth(), enabled = false, onClick = {}) { Text("Actualizando…") }
+                    AdminUpdatesStatus.NeedsInstallPermission -> {
+                        Button(modifier = Modifier.fillMaxWidth(), onClick = onInstallPermission) { Text("Dar permiso de instalación") }
+                        OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onInstall) { Text("Continuar") }
                     }
+                    AdminUpdatesStatus.ReadyToInstall ->
+                        Button(modifier = Modifier.fillMaxWidth(), onClick = onInstall) { Text("Instalar") }
+                    else -> Unit
                 }
-                AdminUpdatesStatus.Downloading -> {
-                    state.downloadProgressPercent?.let { progress ->
-                        Text("Descarga: $progress%", style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = false,
-                        onClick = onDownload,
-                    ) {
-                        Text("Actualizando...")
-                    }
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = state.status != AdminUpdatesStatus.Checking && state.status != AdminUpdatesStatus.Downloading,
+                    onClick = onCheck,
+                ) {
+                    Text("Buscar actualizaciones")
                 }
-                AdminUpdatesStatus.NeedsInstallPermission -> {
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onInstallPermission,
-                    ) {
-                        Text("Permitir instalacion")
-                    }
-                    OutlinedButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onInstall,
-                    ) {
-                        Text("Instalar")
-                    }
-                }
-                AdminUpdatesStatus.ReadyToInstall -> {
-                    Button(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onInstall,
-                    ) {
-                        Text("Instalar")
-                    }
-                }
-                else -> Unit
-            }
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                enabled =
-                    state.status != AdminUpdatesStatus.Checking &&
-                        state.status != AdminUpdatesStatus.Downloading,
-                onClick = onCheck,
-            ) {
-                Text("Buscar actualizacion")
             }
         }
     }
@@ -166,30 +132,22 @@ fun AdminLocalAccessRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
     if (state.showResetConfirmation) {
         AlertDialog(
             onDismissRequest = viewModel::dismissResetLocalAdmin,
-            title = { Text("Borrar cuenta local") },
+            title = { Text("Cambiar administrador") },
             text = {
                 Text(
-                    "Esto borra la cuenta del administrador solamente de este teléfono. La comunidad y sus datos remotos no se borran. Después podrás ingresar un token nuevo desde Login.",
+                    "Se quitará solamente el administrador guardado en este teléfono. La comunidad y sus datos no se borran; después vas a poder ingresar otro token.",
                 )
             },
             confirmButton = {
-                Button(onClick = viewModel::resetLocalAdmin) {
-                    Text("Borrar cuenta")
-                }
+                Button(onClick = viewModel::resetLocalAdmin) { Text("Quitar de este teléfono") }
             },
             dismissButton = {
-                OutlinedButton(onClick = viewModel::dismissResetLocalAdmin) {
-                    Text("Cancelar")
-                }
+                OutlinedButton(onClick = viewModel::dismissResetLocalAdmin) { Text("Cancelar") }
             },
         )
     }
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (state.resetMessage.isNotBlank()) {
@@ -198,47 +156,36 @@ fun AdminLocalAccessRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
                 isError = state.resetMessage.startsWith("No se pudo"),
             )
         }
-        Text(
-            text = "Borrar cuenta del administrador",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = "Elimina la cuenta del administrador guardada en este teléfono. No borra la comunidad ni sus datos remotos.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = viewModel::requestResetLocalAdmin,
-        ) {
-            Text("Borrar cuenta del administrador en este teléfono")
+        ProductCard {
+            Text("Administrador de este teléfono", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text(
+                "Desde acá podés quitar el administrador local para vincular otro. Esto no borra la comunidad ni a sus usuarios.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Muted,
+            )
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = viewModel::requestResetLocalAdmin) {
+                Text("Cambiar administrador")
+            }
         }
     }
 }
 
 private fun AdminUpdatesStatus.message(): String =
     when (this) {
-        AdminUpdatesStatus.Idle -> "Preparando busqueda."
-        AdminUpdatesStatus.Checking -> "Buscando actualizacion."
-        AdminUpdatesStatus.Available -> "Hay una version nueva disponible."
-        AdminUpdatesStatus.UpToDate -> "Ya tenes la ultima version."
-        AdminUpdatesStatus.NotConfigured -> "No hay manifiesto de actualizacion configurado."
-        AdminUpdatesStatus.SearchFailed -> "No se pudo buscar actualizacion."
-        AdminUpdatesStatus.Downloading -> "Actualizando. Descargando y verificando el APK."
-        AdminUpdatesStatus.ReadyToInstall -> "Descarga verificada. Confirma la instalacion en Android."
-        AdminUpdatesStatus.NeedsInstallPermission -> "Android requiere permiso para instalar APKs desde esta app."
-        AdminUpdatesStatus.ChecksumFailed -> "La descarga no paso la verificacion SHA-256."
-        AdminUpdatesStatus.DownloadFailed -> "No se pudo descargar la actualizacion."
+        AdminUpdatesStatus.Idle -> "Preparando comprobación."
+        AdminUpdatesStatus.Checking -> "Buscando actualizaciones…"
+        AdminUpdatesStatus.Available -> "Hay una versión nueva disponible."
+        AdminUpdatesStatus.UpToDate -> "Ya tenés la última versión."
+        AdminUpdatesStatus.NotConfigured -> "Las actualizaciones todavía no están configuradas."
+        AdminUpdatesStatus.SearchFailed -> "No se pudo buscar una actualización."
+        AdminUpdatesStatus.Downloading -> "Descargando y verificando la actualización…"
+        AdminUpdatesStatus.ReadyToInstall -> "La actualización está lista para instalar."
+        AdminUpdatesStatus.NeedsInstallPermission -> "Android necesita permiso para completar la instalación."
+        AdminUpdatesStatus.ChecksumFailed -> "La descarga no pasó la verificación de seguridad."
+        AdminUpdatesStatus.DownloadFailed -> "No se pudo descargar la actualización."
     }
 
 private fun AdminUpdatesStatus.isError(): Boolean =
     this == AdminUpdatesStatus.SearchFailed ||
         this == AdminUpdatesStatus.DownloadFailed ||
         this == AdminUpdatesStatus.ChecksumFailed
-
-private fun AdminUpdatesStatus.versionLabel(): String =
-    when (this) {
-        AdminUpdatesStatus.ReadyToInstall,
-        AdminUpdatesStatus.NeedsInstallPermission,
-        -> "Ultima version descargada"
-        else -> "Version disponible"
-    }
