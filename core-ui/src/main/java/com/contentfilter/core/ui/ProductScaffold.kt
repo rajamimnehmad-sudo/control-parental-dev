@@ -1,24 +1,17 @@
 package com.contentfilter.core.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
 
 @Composable
 fun ProductHeader(
@@ -29,7 +22,7 @@ fun ProductHeader(
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -40,17 +33,17 @@ fun ProductHeader(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(title, style = MaterialTheme.typography.headlineSmall)
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = GloshColors.Graphite)
                 Text(
                     subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = GloshColors.Muted,
                 )
             }
             badge?.let {
-                StatusChip(
+                GloshStatusPill(
                     text = it,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = GloshColors.Positive,
                 )
             }
         }
@@ -63,40 +56,11 @@ fun ProductCard(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(14.dp)
-    val colors =
-        CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        )
-    val elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    if (onClick == null) {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            shape = shape,
-            colors = colors,
-            elevation = elevation,
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                content = content,
-            )
-        }
-    } else {
-        Card(
-            modifier = modifier.fillMaxWidth(),
-            onClick = onClick,
-            shape = shape,
-            colors = colors,
-            elevation = elevation,
-        ) {
-            Column(
-                modifier = Modifier.padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                content = content,
-            )
-        }
-    }
+    GloshSurfaceCard(
+        modifier = modifier,
+        onClick = onClick,
+        content = content,
+    )
 }
 
 @Composable
@@ -113,18 +77,18 @@ fun ProductSectionHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
             count?.let {
                 Text(
                     "$it total",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = GloshColors.Muted,
                 )
             }
         }
         if (actionText != null && onAction != null) {
-            OutlinedButton(onClick = onAction) {
-                Text(actionText)
+            TextButton(onClick = onAction) {
+                Text(actionText, color = GloshColors.Graphite)
             }
         }
     }
@@ -136,15 +100,7 @@ fun StatusChip(
     color: Color,
     modifier: Modifier = Modifier,
 ) {
-    Text(
-        modifier =
-            modifier
-                .background(color.copy(alpha = 0.12f), CircleShape)
-                .padding(horizontal = 10.dp, vertical = 5.dp),
-        text = text,
-        style = MaterialTheme.typography.labelSmall,
-        color = color,
-    )
+    GloshStatusPill(text = text, color = color, modifier = modifier)
 }
 
 @Composable
