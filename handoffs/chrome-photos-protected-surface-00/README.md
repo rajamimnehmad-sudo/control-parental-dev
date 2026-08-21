@@ -6,30 +6,50 @@ Prepared base SHA: `36b7c004f0f19a77439cd90c819b1195ee02cb49`
 
 ## IMPORTANT — canonical artifacts
 
-Ignore these older artifacts in this branch:
+Ignore ALL older transport attempts in this branch:
 
-- `CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.zip`: its first GitHub upload was truncated.
-- `patch-parts/**`: intermediate transport attempt; non-canonical and MUST NOT be used.
+- `CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.zip`
+- `CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch.gz.b64`
+- `patch-parts/**`
+- `canonical-v3/patch.gz.b64.part03`
 
-Use only:
+Use only these verified files:
 
-1. `CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch.gz.b64`
-2. `physical-gate/**`
+- `canonical-v3/patch.gz.b64.part01`
+- `canonical-v3/patch.gz.b64.part02`
+- `canonical-v3/patch.gz.b64.part03a`
+- `canonical-v3/patch.gz.b64.part03b`
+- `physical-gate/**`
+
+## Remote verification
+
+These four canonical transport files were verified against their local Git blob hashes after being committed to GitHub:
+
+- part01 Git blob SHA-1: `a564bd61292cf0d09f9cc5135ef9855671e92a6c`
+- part02 Git blob SHA-1: `983de9096f2a365130fb5e71eae5083e51ae23c4`
+- part03a Git blob SHA-1: `88e8ba1c78d099c41369dba0736486ba9efd1df4`
+- part03b Git blob SHA-1: `703d908f10e18c50fdd4717201be8d84ff3eb4d8`
 
 ## Reconstruct the canonical patch
 
-From the repository root, use Python so the command behaves the same on macOS and Linux:
+From repository root:
 
 ```bash
 python3 - <<'PY'
 from pathlib import Path
 import base64, gzip, hashlib
 
-src = Path('handoffs/chrome-photos-protected-surface-00/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch.gz.b64')
-dst = Path('/tmp/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch')
-encoded = src.read_bytes()
+root = Path('handoffs/chrome-photos-protected-surface-00/canonical-v3')
+parts = [
+    root / 'patch.gz.b64.part01',
+    root / 'patch.gz.b64.part02',
+    root / 'patch.gz.b64.part03a',
+    root / 'patch.gz.b64.part03b',
+]
+encoded = b''.join(p.read_bytes() for p in parts)
 print('transport_sha256=', hashlib.sha256(encoded).hexdigest())
 patch = gzip.decompress(base64.b64decode(encoded))
+dst = Path('/tmp/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch')
 dst.write_bytes(patch)
 print('patch_sha256=', hashlib.sha256(patch).hexdigest())
 print('patch_bytes=', len(patch))
@@ -37,10 +57,10 @@ print('written=', dst)
 PY
 ```
 
-Expected SHA-256 values:
+Expected values:
 
-- canonical base64 transport file: `e21526c7c6d371b31b3e5ea2733cc4b62d406cc90ec0a0adb489f9044c639732`
-- reconstructed patch: `b497f9a0e84b5362d2d13bf529e90ecf5a1ca77e73dfc69e7416373935b08ef6`
+- concatenated transport SHA-256: `860fb889a5183e67b8f32b9b2c99cb1abc2a2c7df28be57cc8534aab8ef62c45`
+- reconstructed patch SHA-256: `b497f9a0e84b5362d2d13bf529e90ecf5a1ca77e73dfc69e7416373935b08ef6`
 - reconstructed patch size: `62400` bytes
 
 If any value differs, STOP without modifying code.
