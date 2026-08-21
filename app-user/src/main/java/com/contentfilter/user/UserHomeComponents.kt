@@ -5,18 +5,20 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -33,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -43,11 +46,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.domain.model.ProtectionLevel
 import com.contentfilter.core.ui.GloshColors
-import com.contentfilter.core.ui.GloshIconBubble
 import com.contentfilter.core.ui.GloshShapes
 import com.contentfilter.core.ui.GloshSpacing
 import com.contentfilter.core.ui.GloshStatusPill
-import com.contentfilter.core.ui.GloshSurfaceCard
 import com.contentfilter.core.ui.GloshWordmark
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
@@ -56,6 +57,7 @@ import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.user.announcements.UserAnnouncementsViewModel
 import com.contentfilter.user.apps.AppIcon
+import com.contentfilter.user.apps.MyAppsUiState
 import com.contentfilter.user.apps.MyAppsViewModel
 import com.contentfilter.user.protection.ProtectionViewModel
 import com.contentfilter.user.updates.UpdatesStatus
@@ -89,7 +91,7 @@ internal fun UserHomeRoute(
 
     LaunchedEffect(Unit) { announcementsViewModel.refresh() }
 
-    val limitItems = remember(appsState) { nearLimitItems(appsState) }
+    val dailyItems = remember(appsState) { dailyUsageItems(appsState) }
     val vpnActive = statusState.vpnState == ActiveStateLabel
     val accessibilityActive = statusState.accessibilityState == ActiveStateLabel
     val deviceAdminActive = statusState.deviceAdminState == ActiveStateLabel
@@ -102,7 +104,8 @@ internal fun UserHomeRoute(
         protectionLevel = statusState.protectionLevel,
         announcementCount = announcementsState.unreadCount,
         pendingRequests = requestsState.pendingCount,
-        limitItems = limitItems,
+        dailyItems = dailyItems,
+        appsLastRefreshedAtEpochMillis = appsState.lastRefreshedAtEpochMillis,
         updateState = updateState,
         vpnActive = vpnActive,
         accessibilityActive = accessibilityActive,
@@ -138,7 +141,8 @@ private fun UserHomeScreen(
     protectionLevel: ProtectionLevel,
     announcementCount: Int,
     pendingRequests: Int,
-    limitItems: List<UserHomeLimitItem>,
+    dailyItems: List<UserHomeLimitItem>,
+    appsLastRefreshedAtEpochMillis: Long?,
     updateState: UpdatesUiState,
     vpnActive: Boolean,
     accessibilityActive: Boolean,
@@ -158,9 +162,18 @@ private fun UserHomeScreen(
     onCancelRemovalAuthorization: () -> Unit,
     onAuthorizedRemoval: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.fillMaxSize().background(GloshColors.Bone),
-    ) {
+    val issues =
+        remember(vpnActive, accessibilityActive, deviceAdminActive, syncHealthy, licenseHealthy) {
+            buildList {
+                if (!vpnActive) add(HomeRepairItem("Protección de Internet", onActivateVpn))
+                if (!accessibilityActive) add(HomeRepairItem("Protección de apps", onActivateAccessibility))
+                if (!deviceAdminActive) add(HomeRepairItem("Protección contra desinstalación", onActivateDeviceAdmin))
+                if (!syncHealthy) add(HomeRepairItem("Conexión con el administrador", onOpenSettings))
+                if (!licenseHealthy) add(HomeRepairItem("Estado de la licencia", onOpenSettings))
+            }
+        }
+
+    Column(modifier = Modifier.fillMaxSize().background(GloshColors.Bone)) {
         UserHomeTopBar(
             greeting = greeting,
             communityName = communityName,
@@ -174,57 +187,80 @@ private fun UserHomeScreen(
                     start = GloshSpacing.PageHorizontal,
                     top = 4.dp,
                     end = GloshSpacing.PageHorizontal,
-                    bottom = 28.dp,
+                    bottom = 30.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(GloshSpacing.Section),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
         ) {
             item {
-                ProtectionOverviewCard(
+                ProtectionHero(
                     protectionLevel = protectionLevel,
-                    vpnActive = vpnActive,
-                    accessibilityActive = accessibilityActive,
-                    deviceAdminActive = deviceAdminActive,
                     syncHealthy = syncHealthy,
                     licenseHealthy = licenseHealthy,
-                    onActivateVpn = onActivateVpn,
-                    onActivateAccessibility = onActivateAccessibility,
-                    onActivateDeviceAdmin = onActivateDeviceAdmin,
-                    onOpenSettings = onOpenSettings,
+                    issues = issues,
                 )
             }
 
-            if (updateState.shouldShowOnHome) {
+            if (dailyItems.isNotEmpty()) {
                 item {
-                    UpdateHomeCard(state = updateState, onUpdateNow = onUpdateNow)
+                    DailyOverview(
+                        items = dailyItems.take(2),
+                        lastRefreshedAtEpochMillis = appsLastRefreshedAtEpochMillis,
+                        onClick = onMyApps,
+                    )
                 }
             }
 
-            if (limitItems.isNotEmpty()) {
+            item {
+                HomeSectionHeader(
+                    title = "Ahora",
+                    action = "Ver todas",
+                    onAction = onMyApps,
+                )
+            }
+            if (dailyItems.isEmpty()) {
                 item {
-                    Text(
-                        "Tu tiempo de hoy",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = GloshColors.Muted,
+                    HomePlainRow(
+                        icon = ProductIcon.Apps,
+                        title = "Tus apps",
+                        subtitle = "Consultá qué podés usar y tus límites de hoy.",
+                        trailing = null,
+                        onClick = onMyApps,
                     )
                 }
-                items(limitItems.take(MaxHomeLimits), key = UserHomeLimitItem::id) { item ->
-                    LimitHomeCard(item = item, onClick = onMyApps)
-                }
-                if (limitItems.size > MaxHomeLimits) {
-                    item {
-                        TextButton(onClick = onMyApps) {
-                            Text("Ver todos los límites", color = GloshColors.Graphite)
-                        }
+            } else {
+                dailyItems.take(MaxHomeLimits).forEach { item ->
+                    item(key = item.id) {
+                        DailyAppRow(item = item, onClick = onMyApps)
                     }
                 }
             }
 
             item {
-                RequestsHomeCard(pendingRequests = pendingRequests, onClick = onRequests)
+                RequestsRow(pendingRequests = pendingRequests, onClick = onRequests)
+            }
+
+            if (announcementCount > 0) {
+                item {
+                    HomePlainRow(
+                        icon = ProductIcon.Bell,
+                        title = "Avisos",
+                        subtitle = "$announcementCount sin leer",
+                        trailing = announcementCount.toString(),
+                        onClick = onAnnouncements,
+                    )
+                }
+            }
+
+            if (updateState.shouldShowOnHome) {
+                item {
+                    HomeSectionHeader(title = "Glosh")
+                    UpdateHomeBlock(state = updateState, onUpdateNow = onUpdateNow)
+                }
             }
 
             if (removalAuthorized) {
                 item {
+                    HomeSectionHeader(title = "Acción autorizada")
                     RemovalAuthorizationCard(
                         message = removalAuthorizationMessage,
                         onCancel = onCancelRemovalAuthorization,
@@ -247,15 +283,14 @@ private fun UserHomeTopBar(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(GloshColors.Bone)
                 .statusBarsPadding()
                 .padding(
                     start = GloshSpacing.PageHorizontal,
                     top = 12.dp,
                     end = GloshSpacing.PageHorizontal,
-                    bottom = 20.dp,
+                    bottom = 16.dp,
                 ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             GloshWordmark(modifier = Modifier.weight(1f))
@@ -268,7 +303,7 @@ private fun UserHomeTopBar(
                             .background(GloshColors.Surface, CircleShape)
                             .semantics { contentDescription = "Abrir avisos" },
                 ) {
-                    ProductGlyph(ProductIcon.Bell, GloshColors.Graphite, Modifier.size(23.dp))
+                    ProductGlyph(ProductIcon.Bell, GloshColors.Graphite, Modifier.size(22.dp))
                 }
                 if (announcementCount > 0) {
                     Box(
@@ -291,90 +326,91 @@ private fun UserHomeTopBar(
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(
                 greeting.ifBlank { "Hola" },
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineLarge,
+                fontWeight = FontWeight.Bold,
                 color = GloshColors.Graphite,
             )
-            if (communityName.isNotBlank()) {
-                Text(communityName, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
-            }
+            Text(
+                if (communityName.isBlank()) "Tu día en Glosh" else communityName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Muted,
+            )
         }
     }
 }
 
 @Composable
-private fun ProtectionOverviewCard(
+private fun ProtectionHero(
     protectionLevel: ProtectionLevel,
-    vpnActive: Boolean,
-    accessibilityActive: Boolean,
-    deviceAdminActive: Boolean,
     syncHealthy: Boolean,
     licenseHealthy: Boolean,
-    onActivateVpn: () -> Unit,
-    onActivateAccessibility: () -> Unit,
-    onActivateDeviceAdmin: () -> Unit,
-    onOpenSettings: () -> Unit,
+    issues: List<HomeRepairItem>,
 ) {
     val visual = protectionVisual(protectionLevel)
-    val issues =
-        buildList {
-            if (!vpnActive) add(HomeRepairItem("Protección de Internet", onActivateVpn))
-            if (!accessibilityActive) add(HomeRepairItem("Protección de apps", onActivateAccessibility))
-            if (!deviceAdminActive) add(HomeRepairItem("Protección contra desinstalación", onActivateDeviceAdmin))
-            if (!syncHealthy) add(HomeRepairItem("Conexión con el administrador", onOpenSettings))
-            if (!licenseHealthy) add(HomeRepairItem("Estado de la licencia", onOpenSettings))
-        }
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = GloshShapes.LargeCard,
-        colors = CardDefaults.cardColors(containerColor = GloshColors.Surface),
-        border = BorderStroke(1.dp, GloshColors.Line),
+        colors = CardDefaults.cardColors(containerColor = GloshColors.Graphite),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Box(
-                    modifier = Modifier.size(52.dp).background(visual.softColor, CircleShape),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    ProductGlyph(visual.icon, visual.color, Modifier.size(29.dp))
-                }
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(visual.title, style = MaterialTheme.typography.titleLarge, color = GloshColors.Graphite)
-                    Text(visual.subtitle, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
-                }
+                Box(modifier = Modifier.size(9.dp).background(visual.accent, CircleShape))
+                Text(
+                    visual.title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = GloshColors.Surface,
+                )
+                Text(
+                    if (syncHealthy) "Sincronización activa" else "Esperando sincronización",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = GloshColors.Surface.copy(alpha = 0.72f),
+                )
             }
-
-            if (issues.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    issues.forEach { issue ->
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .background(GloshColors.WarningSoft, GloshShapes.Small)
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(modifier = Modifier.size(7.dp).background(GloshColors.Warning, CircleShape))
-                            Text(
-                                issue.label,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = GloshColors.Graphite,
-                            )
-                            TextButton(onClick = issue.onRepair) {
-                                Text("Reparar", color = GloshColors.Graphite)
-                            }
-                        }
-                    }
+            Text(
+                visual.headline,
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = GloshColors.Surface,
+            )
+            Text(
+                visual.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Surface.copy(alpha = 0.78f),
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HeroMetaPill(if (licenseHealthy) "Licencia activa" else "Revisar licencia")
+                HeroMetaPill("DEV ${BuildConfig.VERSION_CODE}")
+            }
+            issues.take(2).forEach { issue ->
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(GloshShapes.Small)
+                            .background(GloshColors.Surface.copy(alpha = 0.08f))
+                            .clickable(onClick = issue.onRepair)
+                            .padding(horizontal = 12.dp, vertical = 11.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    ProductGlyph(ProductIcon.ShieldAlert, GloshColors.Lime, Modifier.size(18.dp))
+                    Text(
+                        issue.label,
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GloshColors.Surface,
+                    )
+                    Text("Reparar", style = MaterialTheme.typography.labelMedium, color = GloshColors.Lime)
                 }
             }
         }
@@ -382,88 +418,230 @@ private fun ProtectionOverviewCard(
 }
 
 @Composable
-private fun LimitHomeCard(
+private fun HeroMetaPill(text: String) {
+    Box(
+        modifier =
+            Modifier
+                .clip(GloshShapes.Pill)
+                .background(GloshColors.Surface.copy(alpha = 0.09f))
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = GloshColors.Surface.copy(alpha = 0.88f))
+    }
+}
+
+@Composable
+private fun DailyOverview(
+    items: List<UserHomeLimitItem>,
+    lastRefreshedAtEpochMillis: Long?,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 18.dp, bottom = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            items.forEach { item ->
+                Column(
+                    modifier = Modifier.weight(1f).clickable(onClick = onClick),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                ) {
+                    Text(
+                        item.title,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = GloshColors.Muted,
+                    )
+                    Text(
+                        if (item.remainingMinutes == 0) "Límite alcanzado" else "${item.remainingMinutes} min",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (item.remainingMinutes == 0) GloshColors.Danger else GloshColors.Graphite,
+                    )
+                    Text(
+                        "${item.usedMinutes} de ${item.limitMinutes} min usados",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GloshColors.Muted,
+                    )
+                    LinearProgressIndicator(
+                        progress = { item.progress },
+                        modifier = Modifier.fillMaxWidth().padding(top = 5.dp),
+                        color = usageProgressColor(item.progress),
+                        trackColor = GloshColors.Line,
+                    )
+                }
+            }
+        }
+        Text(
+            homeAppsRefreshLabel(lastRefreshedAtEpochMillis),
+            style = MaterialTheme.typography.labelSmall,
+            color = GloshColors.Muted,
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(GloshColors.Line))
+    }
+}
+
+@Composable
+private fun HomeSectionHeader(
+    title: String,
+    action: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = GloshColors.Graphite,
+        )
+        if (action != null && onAction != null) {
+            TextButton(onClick = onAction) {
+                Text(action, style = MaterialTheme.typography.labelMedium, color = GloshColors.Muted)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DailyAppRow(
     item: UserHomeLimitItem,
     onClick: () -> Unit,
 ) {
-    GloshSurfaceCard(onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val firstIcon = item.icons.firstOrNull()
-            AppIcon(firstIcon?.name ?: item.title, firstIcon?.iconBase64, size = 40)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    item.title,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = GloshColors.Graphite,
-                )
-                Text(
-                    if (item.remainingMinutes == 0) "Límite alcanzado" else "Quedan ${item.remainingMinutes} min",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (item.remainingMinutes == 0) GloshColors.Danger else GloshColors.Muted,
-                )
-            }
+    val icon = item.icons.firstOrNull()
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        AppIcon(icon?.name ?: item.title, icon?.iconBase64, size = 40)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                item.title,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleMedium,
+                color = GloshColors.Graphite,
+            )
+            Text(
+                "${item.usedMinutes} min usados · ${item.remainingMinutes} min disponibles",
+                style = MaterialTheme.typography.bodySmall,
+                color = GloshColors.Muted,
+            )
         }
-        LinearProgressIndicator(
-            progress = { item.progress },
-            modifier = Modifier.fillMaxWidth(),
-            color =
-                when {
-                    item.progress >= 0.90f -> GloshColors.Danger
-                    item.progress >= 0.80f -> GloshColors.Warning
-                    else -> GloshColors.Graphite
-                },
-            trackColor = GloshColors.SurfaceMuted,
+        HomeTrailingPill(
+            text = if (item.remainingMinutes == 0) "Bloqueada" else "${item.remainingMinutes} min",
+            danger = item.remainingMinutes == 0,
         )
     }
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(GloshColors.Line))
 }
 
 @Composable
-private fun RequestsHomeCard(
+private fun RequestsRow(
     pendingRequests: Int,
     onClick: () -> Unit,
 ) {
-    GloshSurfaceCard(onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    HomePlainRow(
+        icon = ProductIcon.Requests,
+        title = if (pendingRequests == 0) "Solicitudes" else "Tenés $pendingRequests pedido${if (pendingRequests == 1) "" else "s"} pendiente${if (pendingRequests == 1) "" else "s"}",
+        subtitle = if (pendingRequests == 0) "No hay nada esperando respuesta." else "Seguí el estado desde acá.",
+        trailing = if (pendingRequests > 0) "Esperando" else null,
+        trailingWarning = pendingRequests > 0,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun HomePlainRow(
+    icon: ProductIcon,
+    title: String,
+    subtitle: String,
+    trailing: String?,
+    trailingWarning: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(42.dp).clip(GloshShapes.Small).background(GloshColors.Surface),
+            contentAlignment = Alignment.Center,
         ) {
-            GloshIconBubble(ProductIcon.Requests)
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("Solicitudes", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
-                Text(
-                    if (pendingRequests == 0) "No tenés pedidos pendientes" else "$pendingRequests esperando respuesta",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GloshColors.Muted,
-                )
-            }
-            if (pendingRequests > 0) {
-                GloshStatusPill(pendingRequests.toString(), GloshColors.Warning)
-            } else {
-                ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(22.dp))
-            }
+            ProductGlyph(icon, GloshColors.Graphite, Modifier.size(21.dp))
         }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
+        }
+        if (trailing != null) {
+            HomeTrailingPill(text = trailing, warning = trailingWarning)
+        } else {
+            ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(21.dp))
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(GloshColors.Line))
+}
+
+@Composable
+private fun HomeTrailingPill(
+    text: String,
+    warning: Boolean = false,
+    danger: Boolean = false,
+) {
+    val background =
+        when {
+            danger -> GloshColors.DangerSoft
+            warning -> GloshColors.WarningSoft
+            else -> GloshColors.PositiveSoft
+        }
+    val foreground =
+        when {
+            danger -> GloshColors.Danger
+            warning -> GloshColors.Warning
+            else -> GloshColors.Positive
+        }
+    Box(
+        modifier =
+            Modifier
+                .clip(GloshShapes.Pill)
+                .background(background)
+                .padding(horizontal = 9.dp, vertical = 6.dp),
+    ) {
+        Text(text, style = MaterialTheme.typography.labelSmall, color = foreground, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-private fun UpdateHomeCard(
+private fun UpdateHomeBlock(
     state: UpdatesUiState,
     onUpdateNow: () -> Unit,
 ) {
-    GloshSurfaceCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            GloshIconBubble(ProductIcon.Update)
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            ProductGlyph(ProductIcon.Update, GloshColors.Graphite, Modifier.size(22.dp))
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Actualización disponible", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
                 Text(state.homeUpdateMessage, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
@@ -473,6 +651,8 @@ private fun UpdateHomeCard(
             LinearProgressIndicator(
                 progress = { (state.downloadProgressPercent ?: 0) / 100f },
                 modifier = Modifier.fillMaxWidth(),
+                color = GloshColors.Graphite,
+                trackColor = GloshColors.Line,
             )
         } else {
             Button(modifier = Modifier.fillMaxWidth(), onClick = onUpdateNow) {
@@ -492,6 +672,7 @@ private fun RemovalAuthorizationCard(
         modifier = Modifier.fillMaxWidth(),
         shape = GloshShapes.Card,
         colors = CardDefaults.cardColors(containerColor = GloshColors.DangerSoft),
+        border = BorderStroke(1.dp, GloshColors.Danger.copy(alpha = 0.18f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(
@@ -504,15 +685,44 @@ private fun RemovalAuthorizationCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = GloshColors.Muted,
             )
-            Button(modifier = Modifier.fillMaxWidth(), onClick = onUninstall) {
-                Text("Desinstalar ahora")
-            }
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCancel) {
-                Text("Cancelar autorización")
-            }
+            Button(modifier = Modifier.fillMaxWidth(), onClick = onUninstall) { Text("Desinstalar ahora") }
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCancel) { Text("Cancelar autorización") }
         }
     }
 }
+
+private fun dailyUsageItems(state: MyAppsUiState): List<UserHomeLimitItem> =
+    state.apps
+        .mapNotNull { app ->
+            val limit = app.dailyLimitMinutes ?: return@mapNotNull null
+            if (limit <= 0) return@mapNotNull null
+            UserHomeLimitItem(
+                id = "app:${app.packageName}",
+                title = app.name,
+                kind = UserHomeLimitKind.App,
+                usedMinutes = app.usedMinutes.coerceAtLeast(0),
+                limitMinutes = limit,
+                icons = listOf(UserHomeAppIcon(app.name, app.iconBase64)),
+            )
+        }
+        .sortedWith(
+            compareByDescending<UserHomeLimitItem> { it.progress }
+                .thenBy { it.remainingMinutes }
+                .thenBy { it.title.lowercase() },
+        )
+
+private fun homeAppsRefreshLabel(lastRefreshedAtEpochMillis: Long?): String {
+    if (lastRefreshedAtEpochMillis == null) return "Apps listas para actualizar"
+    val minutes = ((System.currentTimeMillis() - lastRefreshedAtEpochMillis).coerceAtLeast(0L) / 60_000L)
+    return if (minutes == 0L) "Apps actualizadas ahora" else "Apps actualizadas hace $minutes min"
+}
+
+private fun usageProgressColor(progress: Float) =
+    when {
+        progress >= 0.90f -> GloshColors.Danger
+        progress >= 0.80f -> GloshColors.Warning
+        else -> GloshColors.Graphite
+    }
 
 private data class HomeRepairItem(
     val label: String,
@@ -521,10 +731,9 @@ private data class HomeRepairItem(
 
 private data class ProtectionVisual(
     val title: String,
+    val headline: String,
     val subtitle: String,
-    val color: androidx.compose.ui.graphics.Color,
-    val softColor: androidx.compose.ui.graphics.Color,
-    val icon: ProductIcon,
+    val accent: androidx.compose.ui.graphics.Color,
 )
 
 private fun protectionVisual(level: ProtectionLevel): ProtectionVisual =
@@ -532,26 +741,23 @@ private fun protectionVisual(level: ProtectionLevel): ProtectionVisual =
         ProtectionLevel.Protected ->
             ProtectionVisual(
                 title = "Protección activa",
-                subtitle = "Todo está funcionando correctamente.",
-                color = GloshColors.Positive,
-                softColor = GloshColors.PositiveSoft,
-                icon = ProductIcon.ShieldCheck,
+                headline = "Todo está funcionando bien",
+                subtitle = "Internet, apps y protección están aplicados correctamente.",
+                accent = GloshColors.Lime,
             )
         ProtectionLevel.Warning ->
             ProtectionVisual(
                 title = "Hay algo por revisar",
-                subtitle = "Podés resolverlo desde acá.",
-                color = GloshColors.Warning,
-                softColor = GloshColors.WarningSoft,
-                icon = ProductIcon.ShieldAlert,
+                headline = "Glosh necesita una acción",
+                subtitle = "Podés resolver lo pendiente sin entrar en detalles técnicos.",
+                accent = GloshColors.Warning,
             )
         ProtectionLevel.Unprotected ->
             ProtectionVisual(
                 title = "Protección incompleta",
-                subtitle = "Completá los pasos pendientes para quedar protegido.",
-                color = GloshColors.Danger,
-                softColor = GloshColors.DangerSoft,
-                icon = ProductIcon.ShieldAlert,
+                headline = "Completá la protección",
+                subtitle = "Hay pasos necesarios para volver a quedar protegido.",
+                accent = GloshColors.Danger,
             )
     }
 
