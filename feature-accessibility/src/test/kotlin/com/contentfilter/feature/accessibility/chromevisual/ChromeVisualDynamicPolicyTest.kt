@@ -82,6 +82,16 @@ class ChromeVisualDynamicPolicyTest {
                 AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED,
             ),
         )
+        assertTrue(
+            ChromeVisualAtomicMutationPolicy.requiresGeometryRestart(
+                AccessibilityEvent.TYPE_VIEW_SCROLLED,
+            ),
+        )
+        assertFalse(
+            ChromeVisualAtomicMutationPolicy.requiresGeometryRestart(
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+            ),
+        )
     }
 
     @Test
