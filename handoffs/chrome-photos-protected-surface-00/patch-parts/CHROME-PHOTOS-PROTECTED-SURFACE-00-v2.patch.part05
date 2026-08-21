@@ -1,0 +1,113 @@
++        assertFalse(state.markCommitReady(token))
++        assertFalse(state.markPresented(token))
++    }
++
++    @Test
++    fun `latest capture can stage one complete generation`() {
++        val state = ChromePhotosProtectedSurfaceState()
++        val armed = state.arm(windowId = 7, viewport = viewport)
++
++        assertTrue(state.markSettling(armed.epoch))
++        val token = assertNotNull(state.beginCapture(armed.epoch))
++        assertTrue(state.markCommitReady(token))
++        assertTrue(state.markPresented(token))
++
++        val snapshot = state.snapshot()
++        assertEquals(ChromePhotosProtectedSurfacePhase.Presented, snapshot.phase)
++        assertEquals(token.sequence, snapshot.presentedSequence)
++    }
++
++    @Test
++    fun `window or geometry change invalidates prior authority`() {
++        val state = ChromePhotosProtectedSurfaceState()
++        val armed = state.arm(windowId = 7, viewport = viewport)
++        val token = assertNotNull(state.beginCapture(armed.epoch))
++
++        val changed = state.invalidate(windowId = 8, viewport = viewport.copy(bottom = 2_000), motion = false)
++
++        assertTrue(changed.epoch > token.epoch)
++        assertFalse(state.fail(token))
++        assertEquals(8, changed.windowId)
++    }
++}
++diff --git a/feature-accessibility/src/test/kotlin/com/contentfilter/feature/accessibility/service/AccessibilityEventFilterTest.kt b/feature-accessibility/src/test/kotlin/com/contentfilter/feature/accessibility/service/AccessibilityEventFilterTest.kt
++index 2738814..4b28396 100644
++--- a/feature-accessibility/src/test/kotlin/com/contentfilter/feature/accessibility/service/AccessibilityEventFilterTest.kt
+++++ b/feature-accessibility/src/test/kotlin/com/contentfilter/feature/accessibility/service/AccessibilityEventFilterTest.kt
++@@ -18,11 +18,17 @@ class AccessibilityEventFilterTest {
++         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_CLICKED))
++         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_FOCUSED))
++         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED))
+++    }
+++
+++    @Test
+++    fun `scroll is routed only to chrome visual`() {
+++        assertTrue(AccessibilityEventFilter.isChromeVisualOnly(AccessibilityEvent.TYPE_VIEW_SCROLLED))
++         assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_SCROLLED))
++     }
++ 
++     @Test
++     fun `ignores unrelated events`() {
++-        assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_SCROLLED))
+++        assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))
+++        assertFalse(AccessibilityEventFilter.isChromeVisualOnly(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))
++     }
++ }
++
++diff --git a/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/ProtectorAccessibilityService.kt b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/ProtectorAccessibilityService.kt
++index 04577dc..0000000 100644
++--- a/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/ProtectorAccessibilityService.kt
+++++ b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/ProtectorAccessibilityService.kt
++@@ -128,7 +128,13 @@ class ProtectorAccessibilityService : AccessibilityService() {
++     }
++ 
++     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
++-        if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
+++        if (event == null) return
+++        if (AccessibilityEventFilter.isChromeVisualOnly(event.eventType)) {
+++            chromeVisualProbeController?.onAccessibilityEvent(event)
+++            chromeVisualController?.onAccessibilityEvent(event)
+++            return
+++        }
+++        if (!AccessibilityEventFilter.isHandled(event.eventType)) return
++         chromeVisualProbeController?.onAccessibilityEvent(event)
++         chromeVisualController?.onAccessibilityEvent(event)
++         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
++
++diff --git a/docs/PROJECT_CONTROL.md b/docs/PROJECT_CONTROL.md
++--- a/docs/PROJECT_CONTROL.md
+++++ b/docs/PROJECT_CONTROL.md
++@@ -6,2 +6,13 @@
++ 
+++- `CHROME-PHOTOS-PROTECTED-SURFACE-00` queda **IN PROGRESS** con owner unico
+++  **Proteccion Android** y base limpia
+++  `36b7c004f0f19a77439cd90c819b1195ee02cb49`. El primer gate no conecta
+++  detector ni GloshIA: prueba un unico overlay persistente/opaco, passthrough de
+++  gestos, captura de Chrome por debajo y commit de frames sinteticos seguros. La
+++  revision previa a APK ya corrigio tres riesgos del spike: frame staged viejo
+++  tras epoch nuevo, desmontaje espurio por eventos no-Chrome y scroll entrando al
+++  pipeline general de Accessibility. Sus regresiones sinteticas estan verdes;
+++  faltan Gradle/build y una unica sesion fisica A23 antes de avanzar. DEV-only;
+++  no tocar video/DRM/DAG/modelo ni Production. Documento:
+++  `docs/areas/protection/CHROME-PHOTOS-PROTECTED-SURFACE-00.md`.
++ - `CHROME-GLOSHIA-A23` termino **FAILED** sobre Chrome real en A23/API 34. El
++@@ -28,3 +39,7 @@
++ 
++-1. Validar humanamente DEV 229 en S22: primer y segundo video sin borrar datos,
+++1. Cerrar `CHROME-PHOTOS-PROTECTED-SURFACE-00`: aplicar el lote aislado, ejecutar
+++   gates Gradle y, solo si quedan verdes, una sesion A23 a 60 fps desde
+++   `phase=armed`. No conectar detector/GloshIA ni generar otra iteracion fisica si
+++   este gate de superficie falla.
+++2. Validar humanamente DEV 229 en S22: primer y segundo video sin borrar datos,
++    seek y scroll con controles originales, blur/audio y entrada/salida del
++@@ -32,6 +47,6 @@
++    repetido ya paso sin negro ni `revoke_timeout`.
++-2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
+++3. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
++    dispositivo.
++-3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
++-4. Agregar validacion automatica minima a Super Admin y Edge Functions.
++-5. Clasificar los 5,4 GB de `.codex-tmp` y retirar solo cache reproducible con OK.
+++4. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
+++5. Agregar validacion automatica minima a Super Admin y Edge Functions.
+++6. Clasificar los 5,4 GB de `.codex-tmp` y retirar solo cache reproducible con OK.
