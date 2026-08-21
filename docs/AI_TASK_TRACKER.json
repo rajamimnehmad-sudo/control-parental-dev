@@ -1,15 +1,15 @@
 {
-  "updatedAt": "20 ago 2026 · 22:10",
+  "updatedAt": "20 ago 2026 · 22:18",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
-      "context": "Backend endurecido y reset operativo en cero; desde ahora todo reset preserva evidencia útil para GloshIA",
+      "context": "Backend endurecido y reset operativo en cero; UI/UX se trabaja en otro frente y este chat continúa con seguridad/integración",
       "tasks": [
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
         {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"Estado local relevante preservado en ramas remotas preserve/*.","status":"done","priority":"critical"},
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
-        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. Queda cerrar pairing/device-token dinámico y deuda Auth P1.","status":"in_progress","priority":"critical"},
+        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. activate_device anon cerrado y códigos de activación protegidos contra doble uso. Quedan gate dinámico cross-device y deuda Auth del pairing Admin.","status":"in_progress","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96.","status":"done","priority":"important"},
         {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado.","status":"done","priority":"critical"},
         {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; Codex solo cuando hace falta Mac/local y siempre queda auditado por ChatGPT.","status":"done","priority":"critical"},
@@ -27,36 +27,37 @@
     {
       "id": "security",
       "title": "Seguridad",
-      "context": "Super Admin cerrado a anon: 0 RPC super_admin_* ejecutables anónimamente; todas las RPC autenticadas verificadas con guarda interna",
+      "context": "Super Admin cerrado a anon; activate_device legacy ya no acepta anon; cada activation_code solo puede producir una activación",
       "tasks": [
         {"id":"exact-hosts","title":"Allowlist exacta de Supabase","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"atomic-sync","title":"Sync atómico de políticas","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"backend-security-advisor-audit","title":"Auditar exposición real de RPCs","detail":"DONE sin Codex: se separó exposición legítima por device-token/pairing de grants innecesarios.","status":"done","priority":"critical"},
         {"id":"rpc-permission-matrix","title":"Clasificar permisos reales de RPCs","detail":"DONE. Matriz documentada en docs/RPC_PERMISSION_HARDENING_PLAN.md.","status":"done","priority":"critical"},
-        {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: anon revocado de 4 RPC exclusivas de Super Admin; chequeo global confirma 0 super_admin_* ejecutables por anon y todas usan require/is_super_admin.","status":"done","priority":"critical"},
-        {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"DONE para funciones futuras creadas por postgres en public: anon/authenticated pasan a opt-in; service_role preservado.","status":"done","priority":"critical"},
+        {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: 0 RPC super_admin_* ejecutables por anon; activate_device también dejó de aceptar anon. Flujos device-token/pairing necesarios conservan sus permisos.","status":"done","priority":"critical"},
+        {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"DONE y registrado como migración: funciones futuras creadas por postgres en public quedan opt-in; service_role preservado.","status":"done","priority":"critical"},
+        {"id":"activation-code-single-use","title":"Impedir doble uso de códigos de activación","detail":"DONE en Production: índice único parcial sobre device_activations.activation_code_id evita dos activaciones con el mismo código incluso ante doble toque/reintento concurrente.","status":"done","priority":"critical"},
         {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Código estático listo; falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
         {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"Implementado estáticamente; falta gate dinámico cross-device real.","status":"blocked","priority":"critical"},
-        {"id":"direct-auth-users-write","title":"Eliminar escritura directa en auth.users","detail":"Deuda P1 confirmada en pairing de Admin: función interna crea filas directamente en auth.users/auth.identities.","status":"pending","priority":"important"},
-        {"id":"activate-device-legacy","title":"Retirar permiso legacy de activate_device","detail":"Pendiente identificar consumidor: pg_stat_statements registra 27 llamadas históricas; no se revoca a ciegas.","status":"pending","priority":"important"},
-        {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor sigue indicando Leaked Password Protection desactivada; depende de disponibilidad del plan/configuración Auth.","status":"pending","priority":"important"}
+        {"id":"direct-auth-users-write","title":"Eliminar escritura directa en auth.users","detail":"Deuda P1 confirmada: pair_admin_device_with_password_new_internal crea auth.users/auth.identities manualmente. Reemplazo requiere cambiar el flujo de autenticación de App Admin; no se retira mientras la app actual dependa de él.","status":"blocked","priority":"important"},
+        {"id":"activate-device-legacy","title":"Cerrar acceso anónimo de activate_device legacy","detail":"DONE: anon revocado; authenticated y service_role preservados para no romper el cliente actual mientras se migra al pairing moderno.","status":"done","priority":"important"},
+        {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor sigue indicando Leaked Password Protection desactivada; requiere configuración Auth compatible con el plan.","status":"pending","priority":"important"}
       ]
     },
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "Dirección visual más definida: tipografía Apple/SF-Pro-like, fondos limpios, Graphite como base y Lime como acento puntual; wordmark glosh minúscula y negra; isotipo g propio pendiente sin parecido a Logitech",
+      "context": "UI/UX se trabaja en otro chat; este frente no modifica esa dirección visual",
       "tasks": [
         {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT. Base estructural buena; principales fricciones: densidad en detalle Admin, lenguaje técnico, onboarding de permisos y sistema visual parcialmente fragmentado. No se tocó APK.","status":"done","priority":"important"},
-        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"IN PROGRESS. Se conserva la navegación principal. Dirección visual elegida: composición muy limpia, fondos neutros sin grandes formas decorativas, Graphite dominante y Lime usado como señal/acento; tipografía Apple/SF-Pro-like. Sigue bajar esta identidad a wireframes reales de Usuario y Admin.","status":"in_progress","priority":"important"},
-        {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"IN PROGRESS. Wordmark preferido: glosh en minúscula, negro, limpio y compacto. Isotipo: una g propia con pequeño acento Lime, pero debe rediseñarse para ser inequívocamente Glosh y no parecerse a Logitech.","status":"in_progress","priority":"important"},
+        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"IN PROGRESS en otro chat. No duplicar trabajo desde este frente.","status":"in_progress","priority":"important"},
+        {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"IN PROGRESS en otro chat. No duplicar trabajo desde este frente.","status":"in_progress","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
         {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote.","status":"pending","priority":"normal"},
         {"id":"account-capacity-remaining","title":"Mostrar cupos disponibles","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
         {"id":"user-relink","title":"Reenlazar usuario","detail":"Backend existe; pendiente cierre de seguridad antes de UX final.","status":"pending","priority":"important"},
         {"id":"user-request-history-delete","title":"Borrar historial de pedidos en Usuario","detail":"Pendiente.","status":"pending","priority":"normal"},
-        {"id":"prevent-double-control-actions","title":"Evitar dos controles simultáneos","detail":"Incluido en próximo lote.","status":"pending","priority":"important"}
+        {"id":"prevent-double-control-actions","title":"Evitar dos controles simultáneos","detail":"Backend de activación ya impide doble consumo de códigos; bloqueo visual/otras acciones concurrentes se trabaja en el frente de apps cuando corresponda.","status":"pending","priority":"important"}
       ]
     },
     {
@@ -89,10 +90,10 @@
     {
       "id": "gloshia",
       "title": "GloshIA",
-      "context": "GitHub conserva métricas/calibraciones/final sealed; recuperar material bruto restante requiere inspección local de la Mac",
+      "context": "Evidencia útil preservada en GitHub; recuperación del material local queda pausada hasta volver a tener la Mac",
       "tasks": [
-        {"id":"gloshia-training-data-preservation","title":"Blindar datos de entrenamiento/calibración","detail":"DONE: regla permanente escrita en AI_WORKFLOW. Datasets, muestras, labels, owner reviews, métricas y evidencia quedan fuera de resets operativos.","status":"done","priority":"critical"},
-        {"id":"gloshia-r3-evidence-recovery","title":"Recuperar evidencia GloshIA local/remota","detail":"IN PROGRESS. GitHub conserva métricas de 100 revisiones/800 muestras y final sealed R2.1 de 108 muestras. El material bruto/decisiones estaba en .codex-tmp/local; siguiente gate necesita inspección read-only de la Mac. Tablas R3 remotas recientes quedaron vacías durante el reset.","status":"in_progress","priority":"critical"},
+        {"id":"gloshia-training-data-preservation","title":"Blindar datos de entrenamiento/calibración","detail":"DONE: datasets, muestras, labels, reviews, calibraciones, métricas y evidencia quedan fuera de resets operativos.","status":"done","priority":"critical"},
+        {"id":"gloshia-r3-evidence-recovery","title":"Recuperar evidencia GloshIA local/remota","detail":"BLOCKED por disponibilidad de Mac. Cuando se retome entrenamiento/calibración de GloshIA, pedir primero inventario read-only de .codex-tmp, bancos, labels/outboxes y material local antes de avanzar.","status":"blocked","priority":"critical"},
         {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
         {"id":"gloshia-textual","title":"GloshIA textual","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"Pendiente.","status":"pending","priority":"important"},
