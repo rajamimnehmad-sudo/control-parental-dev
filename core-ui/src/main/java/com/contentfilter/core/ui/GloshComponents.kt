@@ -32,6 +32,7 @@ fun GloshWordmark(modifier: Modifier = Modifier) {
         fontWeight = FontWeight.Bold,
         letterSpacing = (-1.1).sp,
         color = GloshColors.Graphite,
+        maxLines = 1,
     )
 }
 
