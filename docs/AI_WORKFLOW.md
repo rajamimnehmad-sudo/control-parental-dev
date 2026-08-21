@@ -34,9 +34,21 @@ El autorun local queda fuera del flujo normal. No se debe depender de `launchd`,
 - Fuente compartida de verdad para código, ramas, PRs y handoffs.
 - `main` representa estado aprobado/integrado; no trabajar directamente allí sin autorización.
 
+## Separación de verdades
+
+Para evitar fuentes superpuestas:
+
+- **Glosh Central / tracker estructurado:** verdad sobre intención, prioridad, asignación, estado y bloqueos.
+- **GitHub:** verdad sobre código compartido, commits, ramas, PR y evidencia publicada.
+- **Worktree local:** trabajo provisional; no se considera compartido ni cerrado hasta quedar publicado/evidenciado.
+
+Los handoffs explican. GitHub demuestra. Glosh Central coordina.
+
 ## Regla permanente — Glosh Central / Control Center
 
 Glosh Central es el tablero vivo y visible de la ruta del proyecto. **Todo cambio material de ruta debe reflejarse en Glosh Central en el mismo ciclo de trabajo.**
+
+El dato operativo canónico de Glosh Central debe ser **estructurado y pequeño** (actualmente `docs/AI_TASK_TRACKER.json`); la UI lo representa. No usar un documento narrativo grande como tracker concurrente.
 
 Esto incluye como mínimo:
 - tareas nuevas o eliminadas;
@@ -47,12 +59,58 @@ Esto incluye como mínimo:
 - cambio del frente activo o del siguiente lote;
 - cambios del workflow que alteren cómo se trabaja.
 
+“Mismo ciclo” significa:
+1. al crear/asignar/cambiar materialmente una tarea, ChatGPT actualiza Central en ese mismo turno de coordinación;
+2. al auditar un resultado técnico, ChatGPT actualiza su estado final en ese mismo turno;
+3. un `PASS` de Codex no convierte por sí solo una tarea en `done`: queda como evidencia técnica hasta revisión central.
+
 Reglas:
 1. ChatGPT actualiza el tracker/Control Center directamente cuando tenga acceso por GitHub; no abrir una sesión Codex solo para mantener el tablero.
-2. La actualización debe ocurrir en el mismo ciclo en que ChatGPT decide o audita el cambio, no quedar como tarea futura por costumbre.
+2. Codex consulta Central antes de trabajar, pero no lo modifica salvo autorización explícita del ticket.
 3. Glosh Central es de solo lectura para el usuario: refleja la ruta decidida, no ejecuta acciones de producto.
-4. El detalle debe mantenerse compacto: título + contexto breve + estado/prioridad; evidencia larga queda en PR/handoff/documentación correspondiente.
+4. El detalle debe mantenerse compacto; evidencia larga queda en PR/handoff/documentación correspondiente.
 5. Si por una limitación técnica no puede actualizarse el tablero en ese momento, ChatGPT debe decirlo explícitamente y corregirlo en cuanto vuelva a estar disponible.
+
+## Coordinación paralela — contrato mínimo por tarea
+
+Para tareas con escritura de código, el ticket debe incluir cuando corresponda:
+
+- `task_id` inmutable;
+- `coordination_revision` o revisión equivalente;
+- objetivo observable y criterio PASS/FAIL;
+- owner único de escritura;
+- branch y **base SHA exacto** cuando el riesgo de colisión lo justifique;
+- worktree previsto cuando haya trabajo paralelo;
+- rutas/áreas permitidas y, si aporta seguridad, rutas prohibidas;
+- dependencias o bloqueos relevantes;
+- permisos sensibles del ticket (push/PR/deploy/Production/APK/gastos);
+- recursos exclusivos si aplica (S22, A23, emulador, migraciones, Supabase, hotspot compartido).
+
+No convertir cada ticket en una ficha burocrática de 20 campos: usar solo los campos que reducen riesgo real para ese trabajo.
+
+### Reglas de escritura paralela
+
+1. Una tarea tiene un único owner de escritura.
+2. Cada tarea de código debe usar rama propia; con trabajo paralelo o checkout principal sucio, usar worktree propio.
+3. No escribir en el checkout principal si contiene cambios ajenos/no relacionados.
+4. Dos tareas pueden compartir área solo si no comparten archivos/contratos modificables o existe coordinación explícita.
+5. Hotspots compartidos (`settings.gradle.kts`, Gradle raíz/catálogos, contratos/modelos comunes, políticas compartidas, migraciones, versionado y coordinación central) requieren reserva/serialización explícita.
+6. Antes del primer cambio, y de nuevo justo antes de tocar archivos si pasó tiempo relevante, Codex valida **su asignación concreta**: Task ID/revisión, base, owner, rutas, dependencias y autorizaciones. No hace falta releer todo el tablero si cambió una tarea ajena.
+7. Si cambia alcance, base, owner, rutas, dependencia o autorización de su tarea, se detiene y reporta.
+8. Un cambio fuera de las rutas permitidas exige ampliar el ticket antes de editar.
+9. Nunca usar `reset`, `stash`, `rebase`, force-push, limpieza masiva, reformateo global ni revertir cambios desconocidos para despejar el entorno. Si trabajo ajeno interfiere, preservar y reportar.
+10. PR y branch deben incluir el Task ID cuando sea práctico.
+11. Una tarea no puede tener dos owners de escritura activos.
+12. Ramas/reservas abandonadas pueden marcarse vencidas, pero nunca borrarse automáticamente.
+
+### Cantidad de frentes
+
+Default operativo:
+- máximo **2 frentes de escritura** simultáneos;
+- pueden coexistir frentes adicionales de lectura/revisión, CI, benchmark o dispositivo si no pisan recursos/archivos;
+- 3–4 frentes escribiendo solo cuando el aislamiento es inequívoco.
+
+La integración de contratos compartidos se serializa: un único frente/integrador resuelve el cruce final.
 
 ## Regla permanente — Preservar datos útiles para GloshIA
 
@@ -79,8 +137,10 @@ Reglas:
 Cada ticket entregado por ChatGPT debe ser autocontenido y listo para copiar en Codex. Debe incluir, cuando corresponda:
 
 - identificador y objetivo;
-- rama/base o regla para crearla;
-- alcance exacto y áreas permitidas;
+- revisión/asignación si hay trabajo paralelo;
+- rama/base SHA o regla para crearla;
+- worktree cuando sea necesario;
+- alcance exacto y áreas/rutas permitidas;
 - `Esfuerzo Codex`;
 - permisos y prohibiciones;
 - tests/gates mínimos;
@@ -124,13 +184,15 @@ La optimización del runner queda documentada como trabajo experimental previo, 
 Codex debe:
 1. trabajar en rama `review/<ticket>` o la rama indicada;
 2. hacer commits coherentes;
-3. subir la rama;
-4. abrir/actualizar PR cuando corresponda;
+3. subir la rama solo si el ticket autoriza push;
+4. abrir/actualizar PR solo si el ticket lo autoriza;
 5. dejar resumen de archivos/áreas, tests/comandos, resultado, riesgos, branch/commit y pruebas físicas pendientes.
+
+El resultado técnico de Codex se reporta como `PASS`, `BLOCKED` o `FAILED`; **no equivale a aprobación/cierre central**.
 
 ### Ticket read-only / auditoría
 
-Puede actualizar únicamente `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` como excepción de coordinación, sin alterar el estado auditado.
+Puede actualizar únicamente `docs/AI_CODEX_HANDOFF.md` en `coordination/ai-control` como excepción de coordinación, si el ticket lo autoriza, sin alterar el estado auditado.
 
 Todo handoff debe indicar:
 - ticket ejecutado;
