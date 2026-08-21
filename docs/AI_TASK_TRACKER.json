@@ -1,5 +1,5 @@
 {
-  "updatedAt": "21 de ago de 2026 · 10:55",
+  "updatedAt": "21 de ago de 2026 · 12:16",
   "sections": [
     {
       "id": "coordination",
@@ -50,12 +50,12 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "Rediseño Usuario/Admin implementado de punta a punta en rama reversible. Código visual completo y ticket local de cierre preparado; no se declara PASS hasta ejecutar build/tests/lint y revisión física.",
+      "context": "Rediseño Usuario/Admin implementado de punta a punta y ya compilado en APKs DEV/debug desde un snapshot reversible. Build de ambas apps PASS; revisión física del usuario y cierre de calidad siguen pendientes antes de declarar release.",
       "tasks": [
         {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT. Base estructural buena; principales fricciones: densidad en detalle Admin, lenguaje técnico, onboarding de permisos y sistema visual parcialmente fragmentado.","status":"done","priority":"important"},
         {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"DONE. Admin conserva Inicio / Usuarios / Solicitudes / Ajustes; Usuario conserva Inicio / Mis apps / Internet / Ajustes. Tema claro bone/blanco, graphite y lime fijado como dirección vigente.","status":"done","priority":"important"},
-        {"id":"apps-user-admin-ui-implementation-03","title":"Implementar UI/UX profesional Usuario y Admin","detail":"CODE COMPLETE en work/ui-ux-redesign-01 desde 214e7c84. Sistema compartido Glosh, Home Admin/User, Usuarios y detalle Apps/Internet/Seguridad, Solicitudes global-first, Ajustes, activación/onboarding, Mis apps, Internet, actualizaciones, ayuda y branding de Android ya migrados. DOMAIN_ACCESS en Usuario corregido. Old Home Admin queda para rollback. No main/PR/APK/Production. Iconos launcher históricos quedan solo como placeholder porque el isotipo está pausado.","status":"in_progress","priority":"important"},
-        {"id":"apps-user-admin-ui-build-gate-04","title":"Compilar y validar rediseño Usuario/Admin","detail":"READY FOR LOCAL EXECUTION. Ticket exacto en docs/areas/product-design/UI_UX_REDESIGN_BUILD_GATE_04.md de work/ui-ux-redesign-01. Owner de escritura cambia a Codex únicamente durante el gate: build Usuario/Admin + unitarios + ktlint + lint, correcciones mínimas demostradas y smoke visual local; prohibidos main/PR/publicación/Production/versionCode y rutas Chrome/VPN/Accessibility runtime. El CI remoto preparado no fue disparable desde el conector, por eso sigue sin PASS.","status":"blocked","priority":"important"},
+        {"id":"apps-user-admin-ui-implementation-03","title":"Implementar UI/UX profesional Usuario y Admin","detail":"CODE COMPLETE en work/ui-ux-redesign-01 desde 214e7c84. Sistema compartido Glosh, Home Admin/User, Usuarios y detalle Apps/Internet/Seguridad, Solicitudes global-first, Ajustes, activación/onboarding, Mis apps, Internet, actualizaciones, ayuda y branding de Android ya migrados. DOMAIN_ACCESS en Usuario corregido. Old Home Admin queda para rollback. Snapshot de prueba congelado en build/ui-ux-apk-test-01; no se integró Chrome experimental. Iconos launcher históricos siguen como placeholder porque el isotipo está pausado.","status":"in_progress","priority":"important"},
+        {"id":"apps-user-admin-ui-build-gate-04","title":"Compilar y validar rediseño Usuario/Admin","detail":"IN PROGRESS. PR temporal autorizado #99 usó build/ui-ux-apk-test-01 solo como runner y ya fue cerrado sin merge. GitHub Actions run #477 compiló App Usuario + App Admin DEV/debug con PASS y guardó ambos APKs. Durante el gate se corrigieron únicamente tres imports dp faltantes en la rama temporal. El gate de calidad posterior no está en PASS todavía; unitarios/ktlint/lint requieren cierre antes de release. APKs listas para revisión física del usuario; sin publicación, Production ni versionCode.","status":"in_progress","priority":"important"},
         {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"Wordmark glosh en texto aplicado. Isotipo sigue pausado deliberadamente; no inventar G/escudo nuevo sin aprobación. Launcher icons actuales son placeholder.","status":"in_progress","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Backend DONE: vencida/suspendida/futura bloquean nuevas activaciones correctamente. Pendiente definir reacción/UX de apps y recuperación al renovar.","status":"pending","priority":"important"},
@@ -79,9 +79,9 @@
     {
       "id": "delivery",
       "title": "Entrega / APKs",
-      "context": "Pruebas físicas pausadas",
+      "context": "APKs DEV/debug de Usuario y Admin generadas correctamente para prueba física; no publicadas y todavía no son release final.",
       "tasks": [
-        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"No publicar todavía. Rediseño reversible necesita primero build/tests/lint y revisión visual; luego integrar solo cambios funcionales nuevos con gate PASS.","status":"pending","priority":"important"}
+        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"IN PROGRESS. Build de ambos APKs PASS en run #477 y binarios descargados para revisión del usuario. Falta revisión física y cerrar calidad completa antes de integrar/publicar; no merge, no Production.","status":"in_progress","priority":"important"}
       ]
     },
     {
