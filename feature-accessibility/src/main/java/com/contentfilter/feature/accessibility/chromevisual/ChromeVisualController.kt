@@ -203,16 +203,22 @@ internal class ChromeVisualController(
                 viewport = viewport,
                 minimumEdge = minimumEdge,
             )
-        withContext(Dispatchers.Main.immediate) {
-            val initialCoverage = fallbackTiles(viewport)
-            provisional.forEach { overlay.show(it, ChromeVisualOverlayState.Pending) }
-            overlay.retain((provisional + initialCoverage).mapTo(mutableSetOf(), ChromeVisualRegion::id))
-            clipForInputMethod()
+        val fallback = fallbackTiles(viewport)
+        val regions = (provisional + fallback).distinctBy(ChromeVisualRegion::id)
+        val coverageReady =
+            withContext(Dispatchers.Main.immediate) {
+                overlay.handoffBarrierTo(regions).also { clipForInputMethod() }
+            }
+        if (!coverageReady) {
+            Log.i(LogTag, "windowId=${window.id} phase=cover result=failed")
+            markEventAnalysisComplete()
+            scheduleVerification(window.id)
+            return
         }
         Log.i(
             LogTag,
             "windowId=${window.id} phase=cover coverMs=${SystemClock.elapsedRealtime() - eventAt} " +
-                "regions=${provisional.size} result=success",
+                "regions=${regions.size} result=success",
         )
         val startedAt = SystemClock.elapsedRealtime()
         val frame =
@@ -233,21 +239,7 @@ internal class ChromeVisualController(
                 }
             }
         try {
-            val topInset = (FallbackTopInsetDp * metrics.density).toInt()
-            val fallback = ChromeVisualRegionPlanner.fallbackTiles(viewport, topInset)
             lastTileSignatures = ChromeVisualFrameSignature.all(frame.bitmap, viewport, fallback)
-            val regions = (provisional + fallback).distinctBy(ChromeVisualRegion::id)
-            if (regions.isEmpty()) {
-                withContext(Dispatchers.Main.immediate) { overlay.retain(emptySet()) }
-                log(window.id, frame, startedAt, 0, 0, "no_region")
-                markEventAnalysisComplete()
-                scheduleVerification(window.id)
-                return
-            }
-            withContext(Dispatchers.Main.immediate) {
-                overlay.retain(regions.mapTo(mutableSetOf(), ChromeVisualRegion::id))
-                clipForInputMethod()
-            }
             val counts = evaluateRegions(window.id, pageIdentity, frame, viewport, regions, emptySet())
             log(window.id, frame, startedAt, counts.allowed, counts.blocked, "success")
             markEventAnalysisComplete()
@@ -315,6 +307,17 @@ internal class ChromeVisualController(
                 )
                 scheduleVerification(window.id)
                 return
+            }
+            if (replayRevision != null) {
+                val coverageReady =
+                    withContext(Dispatchers.Main.immediate) {
+                        overlay.handoffBarrierTo(changed).also { clipForInputMethod() }
+                    }
+                if (!coverageReady) {
+                    Log.i(LogTag, "windowId=${window.id} phase=replay_cover result=failed")
+                    scheduleVerification(window.id)
+                    return
+                }
             }
             stableVerificationCount = 0
             synchronized(lock) { identityGate.invalidate(window.id) }
@@ -462,10 +465,9 @@ internal class ChromeVisualController(
 
     private fun precover(viewport: ChromeVisualViewport): List<ChromeVisualRegion> {
         val coverage = fallbackTiles(viewport)
-        coverage.forEach { overlay.show(it, ChromeVisualOverlayState.Pending) }
-        overlay.retain(coverage.mapTo(mutableSetOf(), ChromeVisualRegion::id))
+        val shown = overlay.beginBarrier(viewport)
         clipForInputMethod()
-        return coverage
+        return if (shown) coverage else emptyList()
     }
 
     private fun scheduleVerification(windowId: Int) {
