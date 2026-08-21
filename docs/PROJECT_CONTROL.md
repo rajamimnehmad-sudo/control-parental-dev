@@ -1,9 +1,17 @@
 # CONTROL CENTRAL DEL PROYECTO
 
-Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
+Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
+- `CHROME-GLOSHIA-A23` termino **FAILED** sobre Chrome real en A23/API 34. El
+  motor fue GloshIA Visual R3.1 ONNX real: permitio contenido seguro y bloqueo
+  regiones contrastantes, sin crash/ANR. El gate fallo porque scroll/lazy produjo
+  esperas negras de varios segundos, cobertura amplia/desalineada y ausencia de
+  garantia continua; las decisiones iniciales concluyentes tardaron 4,08–7,02 s.
+  No hubo cambio de codigo. No avanzar a video/DRM ni repetir hardware hasta un
+  ticket acotado de cobertura atomica con replay anti-flash. Evidencia:
+  `docs/areas/protection/EVIDENCE_2026-08-21_CHROME-GLOSHIA-A23.md`.
 - Rama: `main`, 32 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.

@@ -1,0 +1,11 @@
+  20% 32077/com.android.chrome: 15% user + 5.4% kernel / faults: 217619 minor 12729 major
+ +0% 18834/com.contentfilter.user.dev: 0% user + 0% kernel
+ +0% 19347/com.sec.android.app.chromecustomizations: 0% user + 0% kernel
+ +0% 19350/com.android.chrome:privileged_process6: 0% user + 0% kernel
+ +0% 19372/com.android.chrome_zygote: 0% user + 0% kernel
+ +0% 19400/com.android.chrome:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:21: 0% user + 0% kernel
+ +0% 19405/com.android.chrome:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:22: 0% user + 0% kernel
+ +0% 19598/com.android.chrome:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:23: 0% user + 0% kernel
+ +0% 20295/com.android.chrome:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:24: 0% user + 0% kernel
+ +0% 20419/com.android.chrome:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:25: 0% user + 0% kernel
+ +0% 20600/com.android.chrome:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:26: 0% user + 0% kernel
