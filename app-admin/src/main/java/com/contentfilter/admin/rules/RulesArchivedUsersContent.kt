@@ -3,7 +3,6 @@ package com.contentfilter.admin.rules
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -18,7 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.unit.dp
+import com.contentfilter.core.ui.GloshColors
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
@@ -41,17 +40,13 @@ internal fun ArchivedUsersContent(
     val filteredUsers =
         remember(state.archivedUsers, searchQuery) {
             val normalized = searchQuery.trim().lowercase()
-            if (normalized.isBlank()) {
-                state.archivedUsers
-            } else {
-                state.archivedUsers.filter { user -> user.name.lowercase().contains(normalized) }
-            }
+            if (normalized.isBlank()) state.archivedUsers else state.archivedUsers.filter { it.name.lowercase().contains(normalized) }
         }
     val bannerText = state.message.ifBlank { if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else "" }
 
     ProductLazyVisualPage(
-        title = "Usuarios anteriores",
-        subtitle = "${state.archivedUsers.size} archivados · búsqueda por nombre",
+        title = "Usuarios archivados",
+        subtitle = "${state.archivedUsers.size} guardados",
         onBack = onBack,
         banner =
             if (bannerText.isNotBlank()) {
@@ -70,8 +65,8 @@ internal fun ArchivedUsersContent(
                 modifier = Modifier.fillMaxWidth(),
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text("Buscar por nombre") },
-                leadingIcon = { ProductGlyph(icon = ProductIcon.Search, color = HeaderInk) },
+                placeholder = { Text("Buscar usuario") },
+                leadingIcon = { ProductGlyph(ProductIcon.Search, GloshColors.Muted) },
                 singleLine = true,
             )
         }
@@ -81,16 +76,16 @@ internal fun ArchivedUsersContent(
                 onClick = onRefresh,
                 enabled = !state.archivedUsersLoading,
             ) {
-                Text(if (state.archivedUsersLoading) "Actualizando..." else "Actualizar")
+                Text(if (state.archivedUsersLoading) "Actualizando…" else "Actualizar")
             }
         }
         if (!state.archivedUsersLoading && filteredUsers.isEmpty()) {
             item(key = "archived-empty") {
                 EmptySectionText(
                     if (state.archivedUsers.isEmpty()) {
-                        "Todavía no hay usuarios archivados desde App Admin."
+                        "Todavía no archivaste ningún usuario."
                     } else {
-                        "No hay usuarios anteriores que coincidan con ese nombre."
+                        "No encontramos usuarios con ese nombre."
                     },
                 )
             }
@@ -109,10 +104,11 @@ internal fun ArchivedUsersContent(
             onDismissRequest = onTokenDismissed,
             title = { Text("Restaurar ${state.restorePairingUserName}") },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(com.contentfilter.core.ui.GloshSpacing.Compact)) {
                     Text(
-                        "Ingresá este token en App Usuario. La configuración se restaurará recién cuando el token se use.",
+                        "Ingresá este token en Glosh Usuario. La configuración se recuperará cuando se complete el vínculo.",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = GloshColors.Muted,
                     )
                     TokenReadyCard(
                         code = state.restorePairingCode,
@@ -126,9 +122,7 @@ internal fun ArchivedUsersContent(
             },
             confirmButton = {},
             dismissButton = {
-                OutlinedButton(onClick = onTokenDismissed) {
-                    Text("Cerrar")
-                }
+                OutlinedButton(onClick = onTokenDismissed) { Text("Cerrar") }
             },
         )
     }
@@ -141,32 +135,33 @@ private fun ArchivedUserCard(
     onRestore: () -> Unit,
 ) {
     ProductCard {
-        Text(user.name, style = MaterialTheme.typography.titleMedium)
+        Text(user.name, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
         Text(
-            "Archivado: ${user.archivedAtLabel}",
+            "Archivado el ${user.archivedAtLabel}",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = GloshColors.Muted,
         )
         if (user.canRestore) {
             Text(
-                "Configuración segura disponible.",
+                "La configuración de este usuario está disponible para restaurar.",
                 style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Muted,
             )
             ProgressActionButton(
                 modifier = Modifier.fillMaxWidth(),
-                text = "Restaurar con token nuevo",
-                loadingText = "Generando token...",
+                text = "Restaurar usuario",
+                loadingText = "Generando token…",
                 successText = "Token listo",
                 onClick = onRestore,
                 loading = restoring,
                 enabled = !restoring,
             )
         } else {
-            StatusChip("Revisión necesaria", PendingYellow)
+            StatusChip("Revisión necesaria", GloshColors.Warning)
             Text(
-                "Este archivo es anterior al respaldo seguro. No se restaurará automáticamente sin una decisión explícita.",
+                "Este archivo es anterior al sistema de restauración segura y necesita revisión manual.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = GloshColors.Muted,
             )
         }
     }
