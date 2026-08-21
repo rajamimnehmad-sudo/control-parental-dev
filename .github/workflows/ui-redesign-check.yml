@@ -1,0 +1,50 @@
+name: UI Redesign Check
+
+on:
+  push:
+    branches:
+      - work/ui-ux-redesign-01
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-redesign-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Build and quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build Usuario and Admin
+        run: ./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
+
+      - name: Unit tests
+        run: ./gradlew --no-daemon :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest -x uploadDevUpdatesToStorage
+
+      - name: Kotlin style
+        run: ./gradlew --no-daemon :core-ui:ktlintCheck :app-user:ktlintCheck :app-admin:ktlintCheck -x uploadDevUpdatesToStorage
+
+      - name: Android lint
+        run: ./gradlew --no-daemon :app-user:lintDevDebug :app-admin:lintDevDebug -x uploadDevUpdatesToStorage
