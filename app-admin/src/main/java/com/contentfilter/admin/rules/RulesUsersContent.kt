@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -43,9 +42,15 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshIconBubble
+import com.contentfilter.core.ui.GloshShapes
+import com.contentfilter.core.ui.GloshSpacing
+import com.contentfilter.core.ui.GloshSurfaceCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
+import com.contentfilter.core.ui.ProductListSurface
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
 import kotlinx.coroutines.delay
@@ -87,13 +92,11 @@ internal fun UsersListContent(
                 }
             }
         }
+
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(Color.White),
+        modifier = Modifier.fillMaxSize().background(GloshColors.Bone),
     ) {
-        UsersGlassHeader(
+        UsersHeader(
             entryMode = entryMode,
             searchQuery = userSearchQuery,
             searchExpanded = searchExpanded,
@@ -109,41 +112,46 @@ internal fun UsersListContent(
             onRefresh = onRefreshDevices,
             onBack = onBack,
         )
+
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-            contentPadding =
-                androidx.compose.foundation.layout.PaddingValues(
-                    start = 16.dp,
-                    top = 0.dp,
-                    end = 16.dp,
-                    bottom = 18.dp,
-                ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(
+                start = GloshSpacing.PageHorizontal,
+                top = 4.dp,
+                end = GloshSpacing.PageHorizontal,
+                bottom = 24.dp,
+            ),
         ) {
             if (filteredDevices.isEmpty()) {
                 item {
-                    EmptySectionText(
-                        if (state.userDevices.isEmpty()) {
-                            "Tocá el botón + para crear el primer token de usuario."
-                        } else {
-                            "No hay usuarios que coincidan con la búsqueda."
-                        },
+                    EmptyUsersState(
+                        text =
+                            if (state.userDevices.isEmpty()) {
+                                "Todavía no hay usuarios vinculados."
+                            } else {
+                                "No encontramos usuarios con esa búsqueda."
+                            },
+                        showCreate = entryMode == RulesEntryMode.ManageUsers && state.userDevices.isEmpty(),
+                        onCreate = { showCreateDialog = true },
                     )
                 }
-            }
-            items(filteredDevices, key = { it.id }) { device ->
-                ProtectedUserCard(
-                    device = device,
-                    onClick = { onDeviceSelected(device.id) },
-                )
+            } else {
+                item {
+                    Text(
+                        "Usuarios",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = GloshColors.Muted,
+                    )
+                }
+                items(filteredDevices, key = { it.id }) { device ->
+                    ProtectedUserCard(device = device, onClick = { onDeviceSelected(device.id) })
+                }
             }
             if (entryMode == RulesEntryMode.ManageUsers) {
                 item(key = "archived-users") {
-                    OutlinedButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = onShowArchivedUsers,
-                    ) {
-                        Text("Ver usuarios anteriores")
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onShowArchivedUsers) {
+                        Text("Usuarios archivados")
                     }
                 }
             }
@@ -165,7 +173,7 @@ internal fun UsersListContent(
 }
 
 @Composable
-private fun UsersGlassHeader(
+private fun UsersHeader(
     entryMode: RulesEntryMode,
     searchQuery: String,
     searchExpanded: Boolean,
@@ -177,57 +185,49 @@ private fun UsersGlassHeader(
     onCreateUser: () -> Unit,
     onRefresh: () -> Unit,
     onBack: (() -> Unit)?,
-    modifier: Modifier = Modifier,
 ) {
+    val title =
+        when (entryMode) {
+            RulesEntryMode.ManageUsers -> "Usuarios"
+            RulesEntryMode.Web -> "Internet"
+            RulesEntryMode.Apps -> "Apps"
+        }
+    val subtitle =
+        when (entryMode) {
+            RulesEntryMode.ManageUsers -> "$totalCount vinculados"
+            RulesEntryMode.Web -> "Elegí un usuario para configurar su Internet"
+            RulesEntryMode.Apps -> "Elegí un usuario para configurar sus apps"
+        }
     Column(
         modifier =
-            modifier
+            Modifier
                 .fillMaxWidth()
-                .background(Color.White)
+                .background(GloshColors.Bone)
                 .statusBarsPadding()
-                .padding(start = 10.dp, top = 18.dp, end = 16.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+                .padding(
+                    start = if (onBack == null) GloshSpacing.PageHorizontal else 8.dp,
+                    top = 16.dp,
+                    end = GloshSpacing.PageHorizontal,
+                    bottom = 18.dp,
+                ),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             onBack?.let {
                 androidx.compose.material3.IconButton(onClick = it) {
-                    ProductGlyph(
-                        icon = ProductIcon.Back,
-                        color = HeaderInk,
-                        contentDescription = "Volver",
-                    )
+                    ProductGlyph(ProductIcon.Back, GloshColors.Graphite, contentDescription = "Volver")
                 }
             }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text =
-                        when (entryMode) {
-                            RulesEntryMode.Web -> "Web"
-                            RulesEntryMode.ManageUsers -> "Administrar usuarios"
-                            RulesEntryMode.Apps -> "Apps"
-                        },
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = HeaderInk,
-                )
-                Text(
-                    text =
-                        when (entryMode) {
-                            RulesEntryMode.Web -> "$totalCount total · elegir usuario para configurar Web"
-                            RulesEntryMode.ManageUsers -> "$totalCount total · ver, agregar o borrar usuarios"
-                            RulesEntryMode.Apps -> "$totalCount total · elegir usuario para configurar apps"
-                        },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HeaderMuted,
-                )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, color = GloshColors.Graphite)
+                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
             }
         }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -238,39 +238,62 @@ private fun UsersGlassHeader(
                     modifier = Modifier.weight(1f),
                     value = searchQuery,
                     onValueChange = onSearchChanged,
-                    placeholder = { Text("Buscar protegido") },
+                    placeholder = { Text("Buscar usuario") },
                     singleLine = true,
                     leadingIcon = {
-                        ProductGlyph(icon = ProductIcon.Search, color = HeaderMuted, modifier = Modifier.size(22.dp))
+                        ProductGlyph(ProductIcon.Search, GloshColors.Muted, Modifier.size(22.dp))
                     },
-                    shape = RoundedCornerShape(18.dp),
+                    shape = GloshShapes.Card,
                 )
             } else {
                 Text(
                     text = refreshStatus,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (refreshStatusIsError) CriticalRed else HeaderMuted,
+                    color = if (refreshStatusIsError) GloshColors.Danger else GloshColors.Muted,
                     maxLines = 2,
                 )
             }
             HeaderIconButton(onClick = onRefresh) {
                 ProductGlyph(
-                    icon = ProductIcon.Refresh,
-                    color = HeaderMuted,
-                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Actualizar" },
+                    ProductIcon.Refresh,
+                    GloshColors.Muted,
+                    Modifier.size(22.dp).semantics { contentDescription = "Actualizar usuarios" },
                 )
             }
             HeaderIconButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
                 ProductGlyph(
-                    icon = ProductIcon.Search,
-                    color = HeaderInk,
-                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Buscar usuario" },
+                    ProductIcon.Search,
+                    GloshColors.Graphite,
+                    Modifier.size(22.dp).semantics { contentDescription = "Buscar usuario" },
                 )
             }
             if (entryMode == RulesEntryMode.ManageUsers) {
                 UserCreateButton(onClick = onCreateUser)
             }
+        }
+    }
+}
+
+@Composable
+private fun EmptyUsersState(
+    text: String,
+    showCreate: Boolean,
+    onCreate: () -> Unit,
+) {
+    GloshSurfaceCard {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            GloshIconBubble(ProductIcon.People)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Sin usuarios", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+                Text(text, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
+            }
+        }
+        if (showCreate) {
+            Button(modifier = Modifier.fillMaxWidth(), onClick = onCreate) { Text("Agregar usuario") }
         }
     }
 }
@@ -291,33 +314,23 @@ private fun NewUserDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (hasToken) "Token de usuario" else "Nuevo usuario") },
+        title = { Text(if (hasToken) "Token listo" else "Agregar usuario") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
                     if (hasToken) {
-                        "Compartí este token para enlazar el celular protegido."
+                        "Compartí este token para vincular el teléfono del usuario."
                     } else {
-                        "Creá un token para enlazar un celular protegido."
+                        "Poné un nombre y generá un token temporal para vincular su teléfono."
                     },
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = GloshColors.Muted,
                 )
                 if (hasToken) {
-                    TokenReadyCard(
-                        code = state.pairingCode,
-                        expiresAt = state.pairingExpiresAt,
-                        onCopy = onCopyToken,
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                    ) {
+                    TokenReadyCard(code = state.pairingCode, expiresAt = state.pairingExpiresAt, onCopy = onCopyToken)
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         Button(
-                            modifier =
-                                Modifier
-                                    .size(52.dp)
-                                    .semantics { contentDescription = "Compartir token por WhatsApp" },
+                            modifier = Modifier.size(52.dp).semantics { contentDescription = "Compartir token por WhatsApp" },
                             shape = CircleShape,
                             contentPadding = PaddingValues(0.dp),
                             onClick = {
@@ -348,17 +361,15 @@ private fun NewUserDialog(
                     onClick = onGeneratePairingCode,
                     enabled = !state.pairingLoading,
                     loading = state.pairingLoading,
-                    loadingText = "Generando...",
+                    loadingText = "Generando…",
                     successText = "Token listo",
-                    text = "Generar",
+                    text = "Generar token",
                     modifier = Modifier,
                 )
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onDismiss) {
-                Text("Cerrar")
-            }
+            OutlinedButton(onClick = onDismiss) { Text("Cerrar") }
         },
     )
 }
@@ -369,28 +380,13 @@ internal fun TokenReadyCard(
     expiresAt: String,
     onCopy: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            StatusChip("Token listo", MaterialTheme.colorScheme.secondary)
-            Text(code, style = MaterialTheme.typography.headlineMedium, color = HeaderInk)
-            if (expiresAt.isNotBlank()) {
-                Text("Vence: $expiresAt", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
-            }
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onCopy,
-            ) {
-                Text("Copiar token")
-            }
+    GloshSurfaceCard {
+        StatusChip("Listo", GloshColors.Positive)
+        Text(code, style = MaterialTheme.typography.headlineMedium, color = GloshColors.Graphite)
+        if (expiresAt.isNotBlank()) {
+            Text("Vence: $expiresAt", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
         }
+        Button(modifier = Modifier.fillMaxWidth(), onClick = onCopy) { Text("Copiar token") }
     }
 }
 
@@ -401,31 +397,39 @@ private fun ProtectedUserCard(
 ) {
     val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
     val attentionLevel = device.securityAttentionLevel()
-    ProductListRow(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        leading = { UserAvatar(name = device.name, color = HeaderInk) },
-        headline = {
-            Text(device.name, style = MaterialTheme.typography.titleMedium, color = HeaderInk)
-        },
-        supporting = {
-            Text(
-                text = device.listSummary(healthy),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (attentionLevel == SecurityAttentionLevel.Critical) CriticalRed else HeaderMuted,
-                maxLines = 2,
-            )
-        },
-        trailing = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SecurityAttentionGlyph(level = attentionLevel)
-                ProductGlyph(icon = ProductIcon.ChevronRight, color = HeaderMuted, modifier = Modifier.size(22.dp))
-            }
-        },
-    )
+    ProductListSurface {
+        ProductListRow(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onClick,
+            leading = {
+                GloshIconBubble(
+                    icon = if (healthy) ProductIcon.Person else ProductIcon.ShieldAlert,
+                    accent = if (healthy) GloshColors.Lime else attentionLevel.color,
+                )
+            },
+            headline = {
+                Text(device.name, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            },
+            supporting = {
+                Text(
+                    text = device.listSummary(healthy),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (attentionLevel == SecurityAttentionLevel.Critical) GloshColors.Danger else GloshColors.Muted,
+                    maxLines = 2,
+                )
+            },
+            trailing = {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SecurityAttentionGlyph(level = attentionLevel)
+                    ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(22.dp))
+                }
+            },
+            showDivider = false,
+        )
+    }
 }
 
 @Composable
@@ -451,23 +455,13 @@ internal fun SecurityAttentionGlyph(
 private fun UserCreateButton(onClick: () -> Unit) {
     Card(
         onClick = onClick,
-        modifier = Modifier.semantics { contentDescription = "Nuevo usuario" },
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = HeaderInk),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        modifier = Modifier.semantics { contentDescription = "Agregar usuario" },
+        shape = CircleShape,
+        colors = CardDefaults.cardColors(containerColor = GloshColors.Lime),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(48.dp)
-                    .padding(10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            ProductGlyph(
-                icon = ProductIcon.UserPlus,
-                color = Color.White,
-                modifier = Modifier.size(28.dp),
-            )
+        Box(modifier = Modifier.size(46.dp), contentAlignment = Alignment.Center) {
+            ProductGlyph(ProductIcon.UserPlus, GloshColors.Graphite, Modifier.size(24.dp))
         }
     }
 }
@@ -480,38 +474,10 @@ internal fun HeaderIconButton(
     Card(
         onClick = onClick,
         shape = CircleShape,
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.92f)),
+        colors = CardDefaults.cardColors(containerColor = GloshColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(42.dp)
-                    .padding(10.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            content()
-        }
-    }
-}
-
-@Composable
-private fun UserAvatar(
-    name: String,
-    color: Color,
-) {
-    Box(
-        modifier =
-            Modifier
-                .size(42.dp)
-                .background(color.copy(alpha = 0.14f), RoundedCornerShape(14.dp)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = name.firstOrNull()?.uppercaseChar()?.toString().orEmpty(),
-            style = MaterialTheme.typography.titleLarge,
-            color = color,
-        )
+        Box(modifier = Modifier.size(42.dp), contentAlignment = Alignment.Center) { content() }
     }
 }
 
@@ -523,7 +489,7 @@ private fun UserDeviceUiState.listSummary(healthy: Boolean): String =
             ?: when (status) {
                 UserDeviceStatus.Unprotected -> "La protección requiere atención"
                 UserDeviceStatus.Inactive -> "Sin comunicación reciente"
-                UserDeviceStatus.Unknown -> "Configuración pendiente"
+                UserDeviceStatus.Unknown -> "Verificando configuración"
                 UserDeviceStatus.Active -> "Falta completar la protección"
             }
     }
@@ -559,10 +525,10 @@ internal fun RulesUiState.deviceRefreshStatusText(nowEpochMillis: Long): String 
 private val UserDeviceStatus.label: String
     get() =
         when (this) {
-            UserDeviceStatus.Active -> "Activo"
-            UserDeviceStatus.Unprotected -> "Protección caída"
-            UserDeviceStatus.Inactive -> "Sin comunicación"
-            UserDeviceStatus.Unknown -> "Pendiente"
+            UserDeviceStatus.Active -> "Protegido"
+            UserDeviceStatus.Unprotected -> "Requiere atención"
+            UserDeviceStatus.Inactive -> "Sin conexión"
+            UserDeviceStatus.Unknown -> "Verificando"
         }
 
 internal enum class SecurityAttentionLevel {
@@ -574,16 +540,15 @@ internal enum class SecurityAttentionLevel {
 internal fun UserDeviceUiState.securityAttentionLevel(): SecurityAttentionLevel =
     when {
         possibleUninstall || confirmedProtectionFailure -> SecurityAttentionLevel.Critical
-        protectionVerificationPending || status == UserDeviceStatus.Inactive || status == UserDeviceStatus.Unknown ->
-            SecurityAttentionLevel.Warning
+        protectionVerificationPending || status == UserDeviceStatus.Inactive || status == UserDeviceStatus.Unknown -> SecurityAttentionLevel.Warning
         else -> SecurityAttentionLevel.None
     }
 
 internal val SecurityAttentionLevel.color: Color
     get() =
         when (this) {
-            SecurityAttentionLevel.Critical -> CriticalRed
-            SecurityAttentionLevel.Warning -> PendingYellow
+            SecurityAttentionLevel.Critical -> GloshColors.Danger
+            SecurityAttentionLevel.Warning -> GloshColors.Warning
             SecurityAttentionLevel.None -> Color.Transparent
         }
 
@@ -591,14 +556,14 @@ internal fun UserDeviceUiState.detailAttentionSummary(): String =
     protectionAlert
         ?: when (status) {
             UserDeviceStatus.Unprotected -> "Hay componentes de protección que requieren atención"
-            UserDeviceStatus.Inactive -> "No hay comunicación reciente con el dispositivo"
+            UserDeviceStatus.Inactive -> "No hay comunicación reciente con el teléfono"
             UserDeviceStatus.Unknown -> "Todavía falta verificar la configuración"
             UserDeviceStatus.Active -> "Falta completar la configuración de protección"
         }
 
-internal val AdminSurface = Color(0xFFF2F8F7)
-internal val HeaderInk = Color(0xFF162235)
-internal val HeaderMuted = Color(0xFF68758A)
-internal val ActiveGreen = Color(0xFF00A650)
-internal val CriticalRed = Color(0xFFB00020)
-internal val PendingYellow = Color(0xFFFFC849)
+internal val AdminSurface = GloshColors.Bone
+internal val HeaderInk = GloshColors.Graphite
+internal val HeaderMuted = GloshColors.Muted
+internal val ActiveGreen = GloshColors.Positive
+internal val CriticalRed = GloshColors.Danger
+internal val PendingYellow = GloshColors.Warning
