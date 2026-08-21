@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { LicenseBadge } from "@/components/Badge";
+import { EmptyState } from "@/components/EmptyState";
 import { listAppRatings, listCommunities, listProtectionAlerts } from "@/lib/data";
 import { getDomainListStatus, protectionState } from "@/lib/domain-list";
 import { compactNumber, formatDate } from "@/lib/utils";
@@ -37,35 +38,44 @@ export default async function DashboardPage() {
         <div>
           <p className="eyebrow">Vista general</p>
           <h1>{greeting()}, Yejiel</h1>
-          <p>Estado de la operación, protección y experiencia de todas las comunidades.</p>
+          <p>Lo importante de la operación en una sola vista.</p>
         </div>
-        <p className="rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-500 shadow-panel">
+        <p className="text-xs font-semibold capitalize text-slate-500">
           {argentinaDate()}
         </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DashboardMetric label="Comunidades activas" value={`${activeCommunities}`} detail={`${communities.length} totales`} icon={Building2} tone="teal" />
-        <DashboardMetric label="Usuarios protegidos" value={compactNumber(users)} detail={`${compactNumber(admins)} administradores`} icon={MonitorSmartphone} tone="blue" />
-        <DashboardMetric label="Alertas abiertas" value={compactNumber(alerts.length)} detail={alerts.length ? "Requieren revisión" : "Todo en orden"} icon={BellRing} tone={alerts.length ? "amber" : "green"} />
-        <DashboardMetric label="Valoración general" value={ratingAverage ? ratingAverage.toFixed(1) : "—"} detail={`${ratings.length} respuestas`} icon={Star} tone="violet" />
+      <section aria-label="Resumen operativo" className="grid grid-cols-2 gap-px overflow-hidden border-y border-line bg-line sm:grid-cols-4 sm:rounded-2xl sm:border">
+        <DashboardMetric label="Comunidades activas" value={`${activeCommunities}`} detail={`${communities.length} totales`} icon={Building2} />
+        <DashboardMetric label="Usuarios protegidos" value={compactNumber(users)} detail={`${compactNumber(admins)} administradores`} icon={MonitorSmartphone} />
+        <DashboardMetric label="Alertas abiertas" value={compactNumber(alerts.length)} detail={alerts.length ? "Requieren revisión" : "Todo en orden"} icon={BellRing} attention={alerts.length > 0} />
+        <DashboardMetric label="Valoración general" value={ratingAverage ? ratingAverage.toFixed(1) : "Sin datos"} detail={ratings.length ? `${ratings.length} respuestas` : "Todavía sin respuestas"} icon={Star} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.75fr)]">
-        <div className="panel">
-          <div className="panel-header">
+      <section className="grid gap-8 border-t border-line pt-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.75fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="section-title">Operación por comunidad</h2>
-              <p className="muted mt-1">Licencias, capacidad y actividad reciente.</p>
+              <p className="muted mt-1">Licencias, capacidad y actividad reciente, sin ruido.</p>
             </div>
-            <Link className="button button-secondary" href="/communities">Ver todas <ArrowRight className="h-4 w-4" /></Link>
+            <Link className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-accent" href="/communities">Ver todas <ArrowRight className="h-4 w-4" /></Link>
           </div>
-          <div className="mt-2 divide-y divide-line">
+          {recentCommunities.length === 0 ? (
+            <div className="mt-5">
+              <EmptyState
+                title="Empezá con la primera comunidad"
+                body="Creá su licencia inicial y después sumá administradores, usuarios y dispositivos desde una operación ordenada."
+                action={<Link className="button button-primary" href="/communities">Crear comunidad <ArrowRight className="h-4 w-4" /></Link>}
+              />
+            </div>
+          ) : (
+            <div className="mt-3 divide-y divide-line border-y border-line">
             {recentCommunities.map((community) => (
-              <Link key={community.community_id} href={`/communities/${community.community_id}`} className="grid gap-3 py-4 transition hover:bg-slate-50/70 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-2">
+              <Link key={community.community_id} href={`/communities/${community.community_id}`} className="grid gap-3 py-4 transition hover:bg-white/70 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:px-2">
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-ink">{community.name}</p>
-                  <p className="mt-1 text-xs text-slate-500">Actualizada {formatDate(community.updated_at)}</p>
+                  <p className="mt-1 text-xs text-slate-500">Actualizada {formatDate(community.updated_at, "sin fecha informada")}</p>
                 </div>
                 <div className="flex gap-5 text-sm text-slate-600">
                   <span><strong className="text-ink">{community.user_device_count}</strong> usuarios</span>
@@ -74,16 +84,16 @@ export default async function DashboardPage() {
                 <LicenseBadge status={community.license_status} />
               </Link>
             ))}
-            {recentCommunities.length === 0 ? <p className="py-8 text-center text-sm text-slate-500">Todavía no hay comunidades.</p> : null}
-          </div>
+            </div>
+          )}
         </div>
 
-        <div className="grid content-start gap-4">
+        <div className="grid content-start gap-6">
           <article className="accent-card">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-teal-200">Protección web</p>
-                <p className="mt-3 text-3xl font-bold tracking-tight">{domains.payload ? compactNumber(domains.payload.totalCount) : "—"}</p>
+                <p className="mt-3 text-3xl font-bold tracking-tight">{domains.payload ? compactNumber(domains.payload.totalCount) : "No disponible"}</p>
                 <p className="mt-1 text-sm text-slate-300">dominios protegidos</p>
               </div>
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10 text-teal-200"><Database className="h-5 w-5" /></span>
@@ -97,9 +107,9 @@ export default async function DashboardPage() {
             </div>
           </article>
 
-          <article className="panel">
+          <article className="border-t border-line pt-5">
             <div className="flex items-center gap-3">
-              <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${attentionCommunities.length ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+              <span className={`flex h-10 w-10 items-center justify-center rounded-full ${attentionCommunities.length ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
                 <ShieldCheck className="h-5 w-5" />
               </span>
               <div>
@@ -108,9 +118,9 @@ export default async function DashboardPage() {
               </div>
             </div>
             {attentionCommunities.length ? (
-              <div className="mt-4 grid gap-2">
+              <div className="mt-4 divide-y divide-line border-y border-line">
                 {attentionCommunities.slice(0, 3).map((community) => (
-                  <Link className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm font-semibold text-ink" href={`/communities/${community.community_id}`} key={community.community_id}>
+                  <Link className="flex min-h-11 items-center justify-between gap-3 py-2.5 text-sm font-semibold text-ink" href={`/communities/${community.community_id}`} key={community.community_id}>
                     <span className="truncate">{community.name}</span><ArrowRight className="h-4 w-4 text-slate-400" />
                   </Link>
                 ))}
@@ -120,7 +130,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="divide-y divide-line border-y border-line md:grid md:grid-cols-3 md:divide-x md:divide-y-0">
         <QuickLink href="/communities" title="Gestionar comunidades" detail="Usuarios, administradores y licencias" icon={UsersRound} />
         <QuickLink href="/alerts" title="Revisar seguridad" detail="Intentos bloqueados y protección" icon={ShieldCheck} />
         <QuickLink href="/ratings" title="Escuchar usuarios" detail="Calificaciones y comentarios" icon={Star} />
@@ -129,28 +139,23 @@ export default async function DashboardPage() {
   );
 }
 
-function DashboardMetric({ label, value, detail, icon: Icon, tone }: { label: string; value: string; detail: string; icon: LucideIcon; tone: "teal" | "blue" | "amber" | "green" | "violet" }) {
-  const tones = {
-    teal: "bg-teal-50 text-teal-700",
-    blue: "bg-sky-50 text-sky-700",
-    amber: "bg-amber-50 text-amber-700",
-    green: "bg-emerald-50 text-emerald-700",
-    violet: "bg-violet-50 text-violet-700",
-  };
+function DashboardMetric({ label, value, detail, icon: Icon, attention = false }: { label: string; value: string; detail: string; icon: LucideIcon; attention?: boolean }) {
   return (
-    <article className="metric-card">
-      <div className="flex items-start justify-between gap-3">
-        <div><p className="metric-label">{label}</p><p className="metric-value">{value}</p><p className="mt-1 text-xs font-medium text-slate-500">{detail}</p></div>
-        <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${tones[tone]}`}><Icon className="h-5 w-5" /></span>
+    <article className="min-w-0 bg-canvas p-4 sm:bg-white sm:p-5">
+      <div className="flex items-center gap-2 text-slate-500">
+        <Icon className={`h-4 w-4 ${attention ? "text-amber-600" : "text-accent"}`} />
+        <p className="truncate text-xs font-semibold">{label}</p>
       </div>
+      <p className="mt-3 truncate text-2xl font-bold tracking-tight text-ink sm:text-3xl">{value}</p>
+      <p className={`mt-1 truncate text-xs font-medium ${attention ? "text-amber-700" : "text-slate-500"}`}>{detail}</p>
     </article>
   );
 }
 
 function QuickLink({ href, title, detail, icon: Icon }: { href: string; title: string; detail: string; icon: LucideIcon }) {
   return (
-    <Link className="group flex items-center gap-4 rounded-2xl border border-line bg-white p-4 shadow-panel transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-soft" href={href}>
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition group-hover:bg-teal-50 group-hover:text-accent"><Icon className="h-5 w-5" /></span>
+    <Link className="group flex min-h-20 items-center gap-4 py-4 transition hover:bg-white/60 md:px-4" href={href}>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm ring-1 ring-line transition group-hover:text-accent"><Icon className="h-5 w-5" /></span>
       <span className="min-w-0 flex-1"><span className="block font-semibold text-ink">{title}</span><span className="mt-0.5 block truncate text-xs text-slate-500">{detail}</span></span>
       <ArrowRight className="h-4 w-4 text-slate-400 transition group-hover:translate-x-0.5 group-hover:text-accent" />
     </Link>
