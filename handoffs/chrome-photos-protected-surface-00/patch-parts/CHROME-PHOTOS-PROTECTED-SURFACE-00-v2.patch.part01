@@ -1,0 +1,291 @@
+diff --git a/app-user/src/dev/res/values/chrome_visual_probe.xml b/app-user/src/dev/res/values/chrome_visual_probe.xml
+index e88f4ad..01c4546 100644
+--- a/app-user/src/dev/res/values/chrome_visual_probe.xml
++++ b/app-user/src/dev/res/values/chrome_visual_probe.xml
+@@ -1,5 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+     <bool name="chrome_visual_probe_enabled">false</bool>
+-    <bool name="chrome_visual_images_enabled">true</bool>
++    <bool name="chrome_visual_images_enabled">false</bool>
++    <bool name="chrome_photos_protected_surface_probe_enabled">true</bool>
+ </resources>
+diff --git a/app-user/src/dev/res/xml/accessibility_service_config.xml b/app-user/src/dev/res/xml/accessibility_service_config.xml
+index 60ec8c0..aaabb06 100644
+--- a/app-user/src/dev/res/xml/accessibility_service_config.xml
++++ b/app-user/src/dev/res/xml/accessibility_service_config.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+-    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged|typeWindowContentChanged|typeViewClicked|typeViewFocused|typeViewTextChanged"
++    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowsChanged|typeWindowContentChanged|typeViewScrolled|typeViewClicked|typeViewFocused|typeViewTextChanged"
+     android:accessibilityFeedbackType="feedbackGeneric"
+     android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+     android:canRetrieveWindowContent="true"
+diff --git a/docs/areas/protection/CHROME-PHOTOS-PROTECTED-SURFACE-00.md b/docs/areas/protection/CHROME-PHOTOS-PROTECTED-SURFACE-00.md
+new file mode 100644
+index 0000000..6c46c51
+--- /dev/null
++++ b/docs/areas/protection/CHROME-PHOTOS-PROTECTED-SURFACE-00.md
+@@ -0,0 +1,109 @@
++# CHROME-PHOTOS-PROTECTED-SURFACE-00
++
++Fecha de inicio: 2026-08-21. Estado: **IN PROGRESS**.
++
++## Identidad y coordinación
++
++- Owner único de escritura: **Protección Android**.
++- Base aprobada para el frente: `36b7c004f0f19a77439cd90c819b1195ee02cb49`.
++- Rama/worktree previsto: `work/chrome-photos-protected-surface-00`.
++- Objetivo: demostrar que Android 14 puede mantener un único
++  `TYPE_ACCESSIBILITY_OVERLAY` opaco sobre Chrome, conservar los gestos hacia la
++  ventana inferior, capturar esa ventana mediante `takeScreenshotOfWindow()` y
++  cambiar un frame seguro completo sin retirar/reagregar el host.
++- Fuera de alcance: detección de fotos, inferencia GloshIA, video, DRM, DAG,
++  Production, distribución y cambios de umbrales/modelo.
++
++PR #97 y el controlador reactivo anterior quedan como evidencia; no son base ni
++owner de este frente. El modo DEV del spike es excluyente: desactiva
++`chrome_visual_images_enabled` y activa solamente
++`chrome_photos_protected_surface_probe_enabled`.
++
++## Invariante del spike
++
++Mientras el host está armado, el usuario sólo puede ver:
++
++1. gris neutral;
++2. el último frame generado y seguro del probe; o
++3. ese frame con una cobertura de análisis.
++
++El bitmap capturado de Chrome se usa únicamente para calcular en memoria si el
++contenido inferior cambió. Nunca se copia al frame presentado, no se guarda y no
++se transmite. Los logs tampoco incluyen hash, URL ni píxeles.
++
++## Implementación preparada
++
++- `ChromePhotosProtectedSurface`: un único host persistente, opaco y
++  `FLAG_NOT_TOUCHABLE`; la geometría cambia con `updateViewLayout()` y sólo se
++  desmonta al salir de Chrome. La superficie conserva un `authorityEpoch` y
++  descarta cualquier frame pendiente de una generación anterior antes de dibujar.
++  En DEV dibuja además un pequeño marcador cian del compositor para demostrar en
++  la grabación que el host protegido estuvo presente en cada frame observado.
++- `ChromePhotosProtectedSurfaceState`: FSM con epoch y secuencia monotónicos; no
++  existe reutilización ABA tras salir y volver a Chrome.
++- `ChromeVisualProbeController`: cobertura inmediata, quiet time, captura de la
++  ventana inferior, firma efímera y staging de un frame sintético seguro. Los
++  eventos no-Chrome sólo desmontan el host si Chrome realmente dejó de ser una
++  ventana activa/inspeccionable; IME y cambios del sistema conservan la sesión.
++- `TYPE_VIEW_SCROLLED` se solicita en DEV, pero queda **enrutado únicamente a
++  Chrome Visual**: no entra al pipeline general de bloqueo de apps, timers ni
++  búsqueda. La entrega global del evento por Accessibility sigue siendo un costo
++  residual del spike DEV y deberá sustituirse por una suscripción dinámica o
++  estrategia equivalente antes de producto.
++- Tests puros cubren epoch monotónico, descarte de captura vieja, commit de la
++  última generación, cambio de ventana/geometría y routing exclusivo de scroll.
++
++## Gates automáticos antes de APK
++
++- Los tests de `feature-accessibility` deben pasar en debug y release.
++- `AccessibilityEventFilterTest` debe confirmar scroll y conservar los eventos
++  previos.
++- El XML DEV debe declarar `typeViewScrolled`, `canTakeScreenshot=true` y
++  `flagRetrieveInteractiveWindows`.
++- La configuración DEV debe demostrar exclusión mutua con Chrome Visual viejo.
++- Revisión estática: el frame capturado no puede llegar a `surface.stage()` ni a
++  `Canvas.drawBitmap()`; sólo el bitmap sintético generado puede presentarse.
++- Regresión de autoridad: si un frame queda staged y llega un epoch nuevo antes
++  del draw, debe reciclarse y `pendingEpoch` volver a vacío antes de presentar.
++- Build DEV de App Usuario, lint, ktlint y detekt verdes.
++- Este spike cubre inicialmente la ventana de Chrome completa para demostrar el
++  mecanismo. Delimitar toolbar/viewport de contenido es trabajo posterior y no
++  puede relajarse con transparencia hacia píxeles crudos.
++- La entrada inicial externa a Chrome sigue siendo un borde separado: los eventos
++  Accessibility son posteriores al render. El gate de cero-frame de este ticket
++  se mide **desde `phase=armed`**; protección estricta también en el primer frame
++  de entrada requerirá una compuerta de lanzamiento Glosh o fallback a DAG.
++
++## Gate físico A23
++
++1. Instalar una única APK DEV del hito, sin borrar datos.
++2. Abrir una fixture por ADB y activar Accessibility.
++3. Confirmar en log una sola `attachmentCount=1` durante toda la sesión.
++4. Hacer scroll lento, diez flings, reversa inmediata, teclado y rotación.
++5. Confirmar `underlayChanged=true` cuando Chrome cambia debajo del host.
++6. Filmar a 60 fps desde `phase=armed`: cero frames de Chrome crudo, cero huecos
++   y cero remove/add durante scroll/cambios visuales. El marcador cian del host
++   debe permanecer presente; la fixture magenta/lima no puede aparecer ni un
++   frame. Registrar por separado el borde de entrada inicial a Chrome, que no
++   forma parte del PASS de este spike.
++7. Confirmar que los gestos llegan a Chrome y que el host sólo acumula
++   `layoutUpdates` cuando cambia la geometría.
++8. Sin crash, ANR ni crecimiento monotónico de memoria.
++
++**PASS:** todos los puntos anteriores. **FAIL:** un solo frame crudo, host
++reagregado durante la sesión, captura imposible bajo el overlay, gesto bloqueado,
++hueco, crash o ANR. **BLOCKED:** Samsung/Android no permite simultáneamente host
++persistente, input passthrough y captura inferior estable; en ese caso Chrome
++estricto queda `dag_required`.
++
++## Estado de ejecución en este ciclo
++
++Se preparó y endureció el lote de código/tests en un workspace aislado. La
++revisión previa a APK encontró y corrigió tres riesgos: frame staged viejo que
++podía dibujarse tras un epoch nuevo, desmontaje espurio por eventos no-Chrome y
++scroll entrando al pipeline general de Accessibility. Las regresiones locales
++correspondientes están verdes. Se agregó una fixture centinela y un analizador
++automático de grabaciones; su self-test detecta correctamente una fuga sintética.
++El entorno de ChatGPT no dispone del checkout Android canónico/SDK/ADB para
++ejecutar Gradle ni el A23; falta ese gate externo.
++No se hizo push, PR, merge, Production ni deploy.
+diff --git a/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromePhotosProtectedSurface.kt b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromePhotosProtectedSurface.kt
+new file mode 100644
+index 0000000..e659720
+--- /dev/null
++++ b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromePhotosProtectedSurface.kt
+@@ -0,0 +1,281 @@
++package com.contentfilter.feature.accessibility.chromevisual
++
++import android.accessibilityservice.AccessibilityService
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.graphics.Color
++import android.graphics.Paint
++import android.graphics.PixelFormat
++import android.graphics.Rect
++import android.os.Looper
++import android.view.Gravity
++import android.view.View
++import android.view.WindowManager
++
++internal data class ChromePhotosProtectedSurfaceStats(
++    val attached: Boolean,
++    val attachmentCount: Int,
++    val layoutUpdateCount: Int,
++    val viewport: ChromeVisualViewport?,
++    val authorityEpoch: Long,
++    val pendingEpoch: Long?,
++    val discardedPendingFrameCount: Int,
++)
++
++/**
++ * One opaque, non-touchable accessibility overlay for the whole protected Chrome viewport.
++ *
++ * The host is attached once and only updated in place until Chrome leaves. It owns every staged
++ * bitmap and never makes itself transparent while armed. A frame swap happens inside one onDraw,
++ * so a draw can only observe the old complete frame or the new complete frame.
++ */
++internal class ChromePhotosProtectedSurface(
++    service: AccessibilityService,
++) : AutoCloseable {
++    private val windowManager = requireNotNull(service.getSystemService(WindowManager::class.java))
++    private val view = ProtectedSurfaceView(service)
++    private var attached = false
++    private var attachmentCount = 0
++    private var layoutUpdateCount = 0
++    private var viewport: ChromeVisualViewport? = null
++
++    fun cover(
++        targetViewport: ChromeVisualViewport,
++        authorityEpoch: Long,
++    ): Boolean {
++        if (!isMainThread() || !ensureAttached(targetViewport)) return false
++        view.cover(authorityEpoch)
++        return true
++    }
++
++    /** Takes ownership of [frame], including when the operation is rejected. */
++    fun stage(
++        targetViewport: ChromeVisualViewport,
++        frame: Bitmap,
++        token: ChromePhotosProtectedSurfaceToken,
++    ): Boolean {
++        if (!isMainThread() || !ensureAttached(targetViewport)) {
++            frame.recycleSafely()
++            return false
++        }
++        return view.stage(frame, token.epoch, token.sequence)
++    }
++
++    fun stats(): ChromePhotosProtectedSurfaceStats =
++        ChromePhotosProtectedSurfaceStats(
++            attached = attached,
++            attachmentCount = attachmentCount,
++            layoutUpdateCount = layoutUpdateCount,
++            viewport = viewport,
++            authorityEpoch = view.authorityEpoch(),
++            pendingEpoch = view.pendingEpoch(),
++            discardedPendingFrameCount = view.discardedPendingFrameCount(),
++        )
++
++    override fun close() {
++        if (!isMainThread()) return
++        if (attached) {
++            runCatching { windowManager.removeViewImmediate(view) }
++            attached = false
++        }
++        viewport = null
++        view.close()
++    }
++
++    private fun ensureAttached(targetViewport: ChromeVisualViewport): Boolean {
++        if (targetViewport.width <= 0 || targetViewport.height <= 0) return false
++        if (!attached) {
++            val added =
++                runCatching {
++                    windowManager.addView(view, layoutParams(targetViewport))
++                    true
++                }.getOrDefault(false)
++            if (!added) return false
++            attached = true
++            attachmentCount += 1
++            viewport = targetViewport
++            return true
++        }
++        if (viewport == targetViewport) return true
++        val updated =
++            runCatching {
++                windowManager.updateViewLayout(view, layoutParams(targetViewport))
++                true
++            }.getOrDefault(false)
++        if (!updated) return false
++        viewport = targetViewport
++        layoutUpdateCount += 1
++        return true
++    }
++
++    private fun layoutParams(targetViewport: ChromeVisualViewport) =
++        WindowManager.LayoutParams(
++            targetViewport.width,
++            targetViewport.height,
++            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
++            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
++                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
++                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
++                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
++            PixelFormat.OPAQUE,
++        ).apply {
++            gravity = Gravity.TOP or Gravity.START
++            x = targetViewport.left
++            y = targetViewport.top
++            title = SurfaceTitle
++        }
++
++    private fun isMainThread(): Boolean = Looper.myLooper() == Looper.getMainLooper()
++
++    private class ProtectedSurfaceView(
++        service: AccessibilityService,
++    ) : View(service), AutoCloseable {
++        private val framePaint = Paint(Paint.FILTER_BITMAP_FLAG)
++        private val statusPaint =
++            Paint(Paint.ANTI_ALIAS_FLAG).apply {
++                color = Color.WHITE
++                textSize = 16f * resources.displayMetrics.scaledDensity
++            }
++        private var frontFrame: Bitmap? = null
++        private var pendingFrame: Bitmap? = null
++        private var covered = true
++        private var minimumEpoch = 0L
++        private var presentedEpoch = 0L
++        private var presentedSequence = 0L
++        private var pendingEpoch = 0L
++        private var pendingSequence = 0L
