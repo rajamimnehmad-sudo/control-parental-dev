@@ -4,6 +4,17 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
+- `GLOSH-DEVICE-OWNER-INSTALLER-00` esta **in_progress**, owner unico
+  Proteccion Android / Codex, en `work/glosh-device-owner-installer-00` sobre
+  `1d45a74c`. Su alcance es crear y ejecutar un asistente macOS seguro para
+  convertir el A23 actual en Device Owner de Glosh mediante la excepcion ADB de
+  laboratorio, sin factory reset ni eliminacion automatica de cuentas, usuarios
+  o datos. El preflight y el checkpoint son read-only; cualquier cuenta debe ser
+  retirada y restaurada manualmente por el usuario. La candidata preservada es
+  DEV 319, SHA-256
+  `ba612fe2f23c5633e7041bf6c233d1ed435db3bcc7f43e6d47dfb03d7b7cf14b`;
+  no se recompila. `CHROME-PHOTOS-DATA-PLANE-00` permanece bloqueado unicamente
+  por Device Owner hasta que este gate termine.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
