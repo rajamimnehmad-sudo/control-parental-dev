@@ -6,6 +6,8 @@ import java.util.LinkedHashMap
 internal data class RegionCounts(
     val allowed: Int,
     val blocked: Int,
+    val completed: Boolean = true,
+    val processedRegionIds: Set<String> = emptySet(),
 )
 
 internal data class ChromeVisualBaselineContext(
@@ -22,6 +24,14 @@ internal class ChromeVisualBaselineCoordinator {
     fun coalesceIfActive(context: ChromeVisualBaselineContext): Boolean {
         if (active != context) return false
         rescanRequested = true
+        return true
+    }
+
+    @Synchronized
+    fun cancelIfActive(context: ChromeVisualBaselineContext): Boolean {
+        if (active != context) return false
+        active = null
+        rescanRequested = false
         return true
     }
 
