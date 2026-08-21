@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 23:58",
+  "updatedAt": "21 ago 2026 · 01:08",
   "sections": [
     {
       "id": "coordination",
@@ -11,7 +11,7 @@
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
         {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. Scope de token cross-device ya tiene gate dinámico PASS. Quedan gate end-to-end de pairing y deuda Auth del pairing Admin.","status":"in_progress","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96.","status":"done","priority":"important"},
-        {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado.","status":"done","priority":"critical"},
+        {"id":"chrome-visual-closure-batch-04","title":"Cerrar Chrome Visual en Chrome real","detail":"Prueba física A23 FAILED: GloshIA R3.1 clasifica bien, pero scroll/lazy expone cobertura lenta y desalineada. Corrección atómica implementada en PR #97; CI en ejecución.","status":"in_progress","priority":"critical"},
         {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; Codex solo cuando hace falta Mac/local y siempre queda auditado por ChatGPT.","status":"done","priority":"critical"},
         {"id":"parallel-coordination-v2","title":"Endurecer coordinación paralela","detail":"DONE tras auditoría crítica de Codex: owner único, revisión de asignación, base SHA/worktree cuando corresponde, rutas permitidas, hotspots exclusivos, separación PASS técnico vs cierre central y prohibición de limpiar/revertir trabajo ajeno. Glosh Central sigue siendo tracker estructurado; no se agrega burocracia innecesaria.","status":"done","priority":"critical"},
         {"id":"ai-auto-handoff-01","title":"Autorun experimental de Codex","detail":"Retirado del flujo normal.","status":"done","priority":"normal"},
@@ -85,11 +85,13 @@
     {
       "id": "chrome-visual",
       "title": "Chrome Visual",
-      "context": "Automático PASS; validación física S22 pausada",
+      "context": "A23 físico FAILED por scroll/lazy-load; GloshIA real sí clasifica. Corrección atómica en PR #97 bajo CI; video y DRM permanecen bloqueados",
       "tasks": [
-        {"id":"chrome-review-local","title":"Separar y revisar Chrome Visual local","detail":"PASS en PR #97.","status":"done","priority":"critical"},
-        {"id":"chrome-video-a23","title":"Revalidar video en hardware","detail":"Pendiente para gate físico posterior.","status":"pending","priority":"critical"},
-        {"id":"chrome-images","title":"Confirmar fotos estáticas en Chrome","detail":"Automático PASS; falta confirmación física posterior.","status":"pending","priority":"important"},
+        {"id":"chrome-review-local","title":"Separar y revisar Chrome Visual local","detail":"PASS automático previo en PR #97; luego la prueba física encontró el defecto de scroll/lazy.","status":"done","priority":"critical"},
+        {"id":"chrome-a23-physical-images","title":"Validar imágenes reales en Chrome sobre A23","detail":"FAILED documentado: clasificación R3.1 real correcta, sin crash/ANR, pero decisiones iniciales 4,08–7,02 s y overlays negros/bordo desalineados durante scroll/lazy.","status":"blocked","priority":"critical"},
+        {"id":"chrome-atomic-scroll-replay","title":"Cobertura atómica de scroll y lazy-load","detail":"IN PROGRESS por ChatGPT en PR #97: suscripción a TYPE_VIEW_SCROLLED, precobertura inmediata, cancelación de análisis stale, replay completo versionado y actualización de overlays in situ sin retirar primero la cobertura segura. CI en ejecución.","status":"in_progress","priority":"critical"},
+        {"id":"chrome-video-a23","title":"Revalidar video en hardware","detail":"Bloqueado hasta aprobar el gate de imágenes/scroll; no avanzar a video ni DRM todavía.","status":"blocked","priority":"critical"},
+        {"id":"chrome-images","title":"Confirmar fotos estáticas en Chrome","detail":"GloshIA detecta/permite/bloquea correctamente; cierre físico pendiente de corregir continuidad y latencia del overlay.","status":"blocked","priority":"important"},
         {"id":"google-ai-field-visible","title":"Evitar que el teclado tape el campo de IA de Google","detail":"Pendiente.","status":"pending","priority":"important"}
       ]
     },
