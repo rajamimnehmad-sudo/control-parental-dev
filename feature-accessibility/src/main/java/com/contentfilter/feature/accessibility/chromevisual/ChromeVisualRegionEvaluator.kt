@@ -70,9 +70,6 @@ internal class ChromeVisualRegionEvaluator(
                         identity = identity,
                         pageIdentity = pageIdentity,
                         viewport = viewport,
-                        region = region,
-                        temporal = temporal,
-                        videoKey = videoKey,
                         decision = decision,
                         fallbackTiles = fallbackTiles,
                     )
@@ -132,17 +129,19 @@ internal class ChromeVisualRegionPresentation(
         identity: ChromeVisualIdentity,
         pageIdentity: Long,
         viewport: ChromeVisualViewport,
-        region: ChromeVisualRegion,
-        temporal: Boolean,
-        videoKey: ChromeVisualVideoRegionKey,
         decision: GloshiaVisualDecision,
         fallbackTiles: List<ChromeVisualRegion>,
     ): Boolean {
         if (!windowStillCurrent(identity.windowId, pageIdentity, viewport)) return false
         if (!synchronized(lock) { identityGate.isCurrent(identity) }) return false
 
-        if (temporal) {
-            presentTemporal(videoKey, region, decision)
+        val region = identity.region
+        if (region.id.startsWith(FallbackRegionPrefix)) {
+            presentTemporal(
+                videoKey = ChromeVisualVideoRegionKey(identity.windowId, pageIdentity, region.id),
+                region = region,
+                decision = decision,
+            )
         } else {
             presentStatic(pageIdentity, region, decision, fallbackTiles)
         }
@@ -200,4 +199,8 @@ internal class ChromeVisualRegionPresentation(
             reason == GloshiaVisualPolicyContract.ModelFilterReason -> ChromeVisualSampleDecision.Block
             else -> ChromeVisualSampleDecision.Unavailable
         }
+
+    private companion object {
+        const val FallbackRegionPrefix = "tile_"
+    }
 }
