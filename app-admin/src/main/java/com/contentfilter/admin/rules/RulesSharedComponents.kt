@@ -29,6 +29,8 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.ui.ActionButtonTone
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshIconBubble
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
@@ -54,11 +56,11 @@ internal fun SelectedDeviceHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(device.name, style = MaterialTheme.typography.titleMedium)
+                Text(device.name, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
                 Text(
                     text = "${device.lastSeenLabel} · ${device.appCount} apps",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = GloshColors.Muted,
                 )
             }
             OutlinedButton(onClick = onBack) {
@@ -68,22 +70,14 @@ internal fun SelectedDeviceHeader(
         StatusChip(device.status.label, device.status.color())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (selectedPanel == DevicePanel.Apps) {
-                Button(onClick = { }) {
-                    Text("Aplicaciones")
-                }
+                Button(onClick = { }) { Text("Apps") }
             } else {
-                OutlinedButton(onClick = { onPanelSelected(DevicePanel.Apps) }) {
-                    Text("Aplicaciones")
-                }
+                OutlinedButton(onClick = { onPanelSelected(DevicePanel.Apps) }) { Text("Apps") }
             }
             if (selectedPanel == DevicePanel.AppGroups) {
-                Button(onClick = { }) {
-                    Text("Apps en grupo")
-                }
+                Button(onClick = { }) { Text("Grupos") }
             } else {
-                OutlinedButton(onClick = { onPanelSelected(DevicePanel.AppGroups) }) {
-                    Text("Apps en grupo")
-                }
+                OutlinedButton(onClick = { onPanelSelected(DevicePanel.AppGroups) }) { Text("Grupos") }
             }
         }
     }
@@ -99,35 +93,26 @@ internal fun UserDeviceCard(
     onDelete: () -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
-    val indicatorColor =
-        when (device.status) {
-            UserDeviceStatus.Active -> Color(0xFF2E7D32)
-            UserDeviceStatus.Unprotected -> MaterialTheme.colorScheme.error
-            UserDeviceStatus.Inactive -> Color(0xFFF9A825)
-            UserDeviceStatus.Unknown -> MaterialTheme.colorScheme.outline
-        }
+    val indicatorColor = device.status.color()
     ProductCard(onClick = onClick) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(indicatorColor),
+            GloshIconBubble(
+                icon = if (device.status == UserDeviceStatus.Active) com.contentfilter.core.ui.ProductIcon.Person else com.contentfilter.core.ui.ProductIcon.ShieldAlert,
+                accent = indicatorColor,
             )
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
-                Text(device.name, style = MaterialTheme.typography.titleSmall)
+                Text(device.name, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
                 Text(
                     text = "${device.lastSeenLabel} · ${device.appCount} apps",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = GloshColors.Muted,
                 )
                 StatusChip(device.status.label, indicatorColor)
             }
@@ -136,15 +121,16 @@ internal fun UserDeviceCard(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = if (selected) "Elegido" else "Ver",
+                    text = if (selected) "Abierto" else "Ver",
                     style = MaterialTheme.typography.labelLarge,
+                    color = GloshColors.Graphite,
                 )
                 if (showDelete) {
                     ProgressActionButton(
                         modifier = Modifier,
-                        text = "Borrar",
-                        loadingText = "Borrando...",
-                        successText = "Borrado",
+                        text = "Archivar",
+                        loadingText = "Archivando…",
+                        successText = "Archivado",
                         onClick = { confirmDelete = true },
                         loading = deleting,
                         enabled = !deleting,
@@ -160,7 +146,7 @@ internal fun UserDeviceCard(
             title = { Text("Archivar usuario") },
             text = {
                 Text(
-                    "El usuario saldrá de la lista activa. Su configuración y auditoría se conservarán para una restauración futura.",
+                    "El usuario saldrá de la lista activa. Su configuración y auditoría quedarán guardadas para poder restaurarlo después.",
                 )
             },
             confirmButton = {
@@ -171,16 +157,14 @@ internal fun UserDeviceCard(
                     },
                     enabled = !deleting,
                     modifier = Modifier,
-                    text = "Archivar usuario",
-                    loadingText = "Archivando...",
+                    text = "Archivar",
+                    loadingText = "Archivando…",
                     successText = "Archivado",
                     tone = ActionButtonTone.Destructive,
                 )
             },
             dismissButton = {
-                OutlinedButton(onClick = { confirmDelete = false }) {
-                    Text("Cancelar")
-                }
+                OutlinedButton(onClick = { confirmDelete = false }) { Text("Cancelar") }
             },
         )
     }
@@ -189,19 +173,19 @@ internal fun UserDeviceCard(
 private val UserDeviceStatus.label: String
     get() =
         when (this) {
-            UserDeviceStatus.Active -> "Activo"
-            UserDeviceStatus.Unprotected -> "Protección caída"
-            UserDeviceStatus.Inactive -> "Desconectado"
-            UserDeviceStatus.Unknown -> "Desconocido"
+            UserDeviceStatus.Active -> "Protegido"
+            UserDeviceStatus.Unprotected -> "Requiere atención"
+            UserDeviceStatus.Inactive -> "Sin conexión"
+            UserDeviceStatus.Unknown -> "Verificando"
         }
 
 @Composable
 private fun UserDeviceStatus.color(): Color =
     when (this) {
-        UserDeviceStatus.Active -> Color(0xFF00A650)
-        UserDeviceStatus.Unprotected -> MaterialTheme.colorScheme.error
-        UserDeviceStatus.Inactive -> Color(0xFFF9A825)
-        UserDeviceStatus.Unknown -> MaterialTheme.colorScheme.outline
+        UserDeviceStatus.Active -> GloshColors.Positive
+        UserDeviceStatus.Unprotected -> GloshColors.Danger
+        UserDeviceStatus.Inactive -> GloshColors.Warning
+        UserDeviceStatus.Unknown -> GloshColors.Muted
     }
 
 @Composable
@@ -210,21 +194,18 @@ internal fun SectionHeader(
     count: Int,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text("$count", style = MaterialTheme.typography.labelLarge)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text("$count", style = MaterialTheme.typography.labelLarge, color = GloshColors.Muted)
         }
-        HorizontalDivider()
+        HorizontalDivider(color = GloshColors.Line)
     }
 }
 
@@ -236,39 +217,34 @@ internal fun SectionActionHeader(
     onAction: () -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("$count", style = MaterialTheme.typography.labelLarge)
-                OutlinedButton(onClick = onAction) {
-                    Text(actionText)
-                }
+                Text("$count", style = MaterialTheme.typography.labelLarge, color = GloshColors.Muted)
+                OutlinedButton(onClick = onAction) { Text(actionText) }
             }
         }
-        HorizontalDivider()
+        HorizontalDivider(color = GloshColors.Line)
     }
 }
 
 @Composable
 internal fun EmptySectionText(text: String) {
     Text(
-        modifier = Modifier.padding(vertical = 4.dp),
+        modifier = Modifier.padding(vertical = 6.dp),
         text = text,
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        color = GloshColors.Muted,
     )
 }
 
@@ -283,9 +259,9 @@ internal fun RuleAction.displayName(): String =
 internal fun RuleScope.displayName(): String =
     when (this) {
         RuleScope.App -> "Aplicación"
-        RuleScope.Domain -> "Dominio"
+        RuleScope.Domain -> "Sitio"
         RuleScope.Category -> "Categoría"
-        RuleScope.Global -> "Global"
+        RuleScope.Global -> "General"
     }
 
 internal val SearchEngineDomainsForUi =
