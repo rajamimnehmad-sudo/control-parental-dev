@@ -1,21 +1,11 @@
 package com.contentfilter.admin.rules
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -24,9 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,19 +25,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.contentfilter.admin.adminMotionDurationMillis
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
@@ -57,16 +41,12 @@ import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.ProtectedBrowserPolicy
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.ui.GloshColors
+import com.contentfilter.core.ui.GloshShapes
+import com.contentfilter.core.ui.GloshSpacing
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductSectionHeader
-import kotlinx.coroutines.launch
-
-private fun lerpDp(
-    start: Dp,
-    end: Dp,
-    fraction: Float,
-): Dp = start + (end - start) * fraction.coerceIn(0f, 1f)
 
 @Composable
 internal fun UserDetailContent(
@@ -106,58 +86,45 @@ internal fun UserDetailContent(
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
-    val motionDuration = adminMotionDurationMillis()
     var appFilter by rememberSaveable(selectedDevice.id) { mutableStateOf(AppQuickFilter.All) }
     var scheduleAppPackage by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
     var scheduleDomain by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
     var searchExpanded by rememberSaveable(selectedDevice.id) { mutableStateOf(state.appSearchQuery.isNotBlank()) }
-    val listState = rememberLazyListState()
-    val scrollHeaderProgress =
-        if (listState.firstVisibleItemIndex > 0) {
-            1f
-        } else {
-            (listState.firstVisibleItemScrollOffset / 72f).coerceIn(0f, 1f)
-        }
-    val headerTargetProgress = if (searchExpanded) 1f else scrollHeaderProgress
-    val headerProgress by animateFloatAsState(
-        targetValue = headerTargetProgress,
-        animationSpec = tween(durationMillis = motionDuration),
-        label = "user-detail-header-progress",
-    )
-    val coroutineScope = rememberCoroutineScope()
     val displayedApps =
         remember(state.appControls, appFilter, state.appSearchQuery) {
             if (state.appSearchQuery.isNotBlank()) {
                 state.appControls
             } else {
-                state.appControls.filter { app -> app.matchesQuickFilter(appFilter) }
+                state.appControls.filter { it.matchesQuickFilter(appFilter) }
             }
         }
+
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(AdminSurface)
+                .background(GloshColors.Bone)
                 .statusBarsPadding()
-                .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(lerpDp(12.dp, 8.dp, headerProgress)),
+                .padding(
+                    start = GloshSpacing.PageHorizontal,
+                    top = 10.dp,
+                    end = GloshSpacing.PageHorizontal,
+                    bottom = 12.dp,
+                ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         UserDetailHeader(
             device = selectedDevice,
             entryMode = entryMode,
             selectedPanel = selectedPanel,
-            collapseProgress = headerProgress,
             onPanelSelected = onPanelSelected,
-            onCompactPanelClick = {
-                coroutineScope.launch {
-                    listState.animateScrollToItem(0)
-                }
-            },
             onBack = onBack,
         )
+
         if (state.message.isNotBlank()) {
             CompactActionBanner(state.message, isError = state.message.startsWith("No se pudo"))
         }
+
         if (selectedPanel == DevicePanel.Apps) {
             AppsToolbar(
                 apps = state.appControls,
@@ -173,20 +140,17 @@ internal fun UserDetailContent(
                 onRefreshApps = onRefreshApps,
             )
         }
+
         LazyColumn(
             modifier = Modifier.weight(1f),
-            state = listState,
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding =
-                androidx.compose.foundation.layout.PaddingValues(
-                    bottom = 18.dp,
-                ),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 18.dp),
         ) {
             when (selectedPanel) {
                 DevicePanel.Apps -> {
                     item {
                         GlobalScheduleButton(
-                            title = "Horario global de aplicaciones",
+                            title = "Horario general de apps",
                             rules =
                                 state.rules.filter {
                                     it.scope == RuleScope.App &&
@@ -207,17 +171,12 @@ internal fun UserDetailContent(
                             },
                         )
                     }
-                    item {
-                        AppSectionSelector(
-                            selectedPanel = selectedPanel,
-                            onPanelSelected = onPanelSelected,
-                        )
-                    }
+                    item { AppSectionSelector(selectedPanel, onPanelSelected) }
                     if (displayedApps.isEmpty()) {
                         item {
                             EmptySectionText(
                                 if (state.appControls.isEmpty()) {
-                                    "Abrí la App Usuario para detectar y sincronizar apps."
+                                    "Abrí Glosh Usuario para detectar y sincronizar las apps."
                                 } else {
                                     "No hay apps en este filtro."
                                 },
@@ -236,8 +195,7 @@ internal fun UserDetailContent(
                                 onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
                                 onLimitSaved = { minutes -> onAppLimitSaved(app.packageName, minutes) },
                                 onScheduleClick = {
-                                    scheduleAppPackage =
-                                        app.packageName.takeUnless { it == scheduleAppPackage }
+                                    scheduleAppPackage = app.packageName.takeUnless { it == scheduleAppPackage }
                                 },
                             )
                             if (scheduleAppPackage == app.packageName) {
@@ -248,32 +206,22 @@ internal fun UserDetailContent(
                                         scheduleSavingKey(selectedDevice.id, RuleScope.App, app.packageName) in
                                             state.scheduleSavingKeys,
                                     onSave = { windows ->
-                                        onAllowedScheduleSaved(
-                                            RuleScope.App,
-                                            app.packageName,
-                                            windows,
-                                        )
+                                        onAllowedScheduleSaved(RuleScope.App, app.packageName, windows)
                                     },
                                 )
                             }
                         }
                     }
                     if (otherRules.isNotEmpty()) {
-                        item {
-                            ProductSectionHeader(title = "Otras reglas", count = otherRules.size)
-                        }
+                        item { ProductSectionHeader(title = "Otras reglas", count = otherRules.size) }
                         items(otherRules, key = { it.id }) { rule ->
                             RuleCard(rule = rule, onToggle = { onToggle(rule) }, onDelete = { onDelete(rule) })
                         }
                     }
                 }
+
                 DevicePanel.AppGroups -> {
-                    item {
-                        AppSectionSelector(
-                            selectedPanel = selectedPanel,
-                            onPanelSelected = onPanelSelected,
-                        )
-                    }
+                    item { AppSectionSelector(selectedPanel, onPanelSelected) }
                     item {
                         OutlinedTextField(
                             modifier = Modifier.fillMaxWidth(),
@@ -296,10 +244,11 @@ internal fun UserDetailContent(
                         )
                     }
                 }
+
                 DevicePanel.Web -> {
                     item {
                         GlobalScheduleButton(
-                            title = "Horario global de Web",
+                            title = "Horario de Internet",
                             rules =
                                 state.rules.filter {
                                     it.scope == RuleScope.Domain &&
@@ -331,9 +280,7 @@ internal fun UserDetailContent(
                             protectedBrowserSaving = state.pendingProtectedBrowserRequired != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             protectedBrowserInstalled =
-                                state.appControls.any {
-                                    ProtectedBrowserPolicy.isProtectedBrowser(it.packageName)
-                                },
+                                state.appControls.any { ProtectedBrowserPolicy.isProtectedBrowser(it.packageName) },
                             alternativeBrowsers =
                                 state.appControls.filter {
                                     ProtectedBrowserPolicy.isKnownAlternativeBrowser(it.packageName)
@@ -362,9 +309,7 @@ internal fun UserDetailContent(
                         }
                     val domainTargets = domainRules.map(PolicyRule::target).distinct().sorted()
                     if (domainTargets.isNotEmpty()) {
-                        item {
-                            ProductSectionHeader(title = "Sitios configurados", count = domainTargets.size)
-                        }
+                        item { ProductSectionHeader(title = "Sitios configurados", count = domainTargets.size) }
                     }
                     items(domainTargets, key = { "domain-$it" }) { target ->
                         val targetRules = domainRules.filter { it.target == target }
@@ -391,9 +336,7 @@ internal fun UserDetailContent(
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = { scheduleDomain = target.takeUnless { it == scheduleDomain } },
                             ) {
-                                Text(
-                                    if (scheduleRules.isEmpty()) "Agregar horario a $target" else "Editar horario de $target",
-                                )
+                                Text(if (scheduleRules.isEmpty()) "Agregar horario" else "Editar horario")
                             }
                             if (scheduleDomain == target) {
                                 AllowedScheduleEditor(
@@ -402,14 +345,13 @@ internal fun UserDetailContent(
                                     saving =
                                         scheduleSavingKey(selectedDevice.id, RuleScope.Domain, target) in
                                             state.scheduleSavingKeys,
-                                    onSave = { windows ->
-                                        onAllowedScheduleSaved(RuleScope.Domain, target, windows)
-                                    },
+                                    onSave = { windows -> onAllowedScheduleSaved(RuleScope.Domain, target, windows) },
                                 )
                             }
                         }
                     }
                 }
+
                 DevicePanel.Protection -> {
                     item {
                         ProtectionPanel(
@@ -444,171 +386,59 @@ private fun UserDetailHeader(
     device: UserDeviceUiState,
     entryMode: RulesEntryMode,
     selectedPanel: DevicePanel,
-    collapseProgress: Float,
     onPanelSelected: (DevicePanel) -> Unit,
-    onCompactPanelClick: () -> Unit,
     onBack: () -> Unit,
 ) {
-    val motionDuration = adminMotionDurationMillis()
-    val attentionLevel = device.securityAttentionLevel()
-    val headerGap = lerpDp(14.dp, 10.dp, collapseProgress)
-    val iconSize = lerpDp(44.dp, 40.dp, collapseProgress)
-    val titleGap = lerpDp(4.dp, 2.dp, collapseProgress)
-    val compactMode = collapseProgress >= 0.52f
-    Column(
-        verticalArrangement = Arrangement.spacedBy(headerGap),
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            androidx.compose.material3.IconButton(
-                modifier = Modifier.size(iconSize),
-                onClick = onBack,
-            ) {
-                ProductGlyph(
-                    icon = ProductIcon.Back,
-                    color = HeaderInk,
-                    contentDescription = "Volver",
+            IconButton(onClick = onBack) {
+                ProductGlyph(ProductIcon.Back, GloshColors.Graphite, contentDescription = "Volver")
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    device.name,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = GloshColors.Graphite,
+                    maxLines = 1,
+                )
+                Text(
+                    "${device.lastSeenLabel} · ${device.appCount} apps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GloshColors.Muted,
                 )
             }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(titleGap),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        modifier = Modifier.weight(1f),
-                        text = device.name,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = HeaderInk,
-                        maxLines = 1,
-                    )
-                    AnimatedVisibility(
-                        visible = compactMode && entryMode != RulesEntryMode.Web,
-                        enter =
-                            expandHorizontally(animationSpec = tween(durationMillis = motionDuration)) +
-                                fadeIn(animationSpec = tween(durationMillis = motionDuration)),
-                        exit =
-                            shrinkHorizontally(animationSpec = tween(durationMillis = motionDuration)) +
-                                fadeOut(animationSpec = tween(durationMillis = motionDuration)),
-                    ) {
-                        CompactPanelChip(
-                            panel = selectedPanel,
-                            attentionLevel =
-                                attentionLevel.takeIf { selectedPanel == DevicePanel.Protection }
-                                    ?: SecurityAttentionLevel.None,
-                            onClick = onCompactPanelClick,
-                        )
-                    }
-                    SecurityAttentionGlyph(level = attentionLevel)
-                }
-                AnimatedVisibility(
-                    visible = !compactMode,
-                    enter = expandVertically(animationSpec = tween(durationMillis = motionDuration)) + fadeIn(animationSpec = tween(durationMillis = motionDuration)),
-                    exit = shrinkVertically(animationSpec = tween(durationMillis = motionDuration)) + fadeOut(animationSpec = tween(durationMillis = motionDuration)),
-                ) {
-                    Text(
-                        text = "${device.lastSeenLabel} · ${device.appCount} apps",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = HeaderMuted,
-                    )
-                }
-            }
+            SecurityAttentionGlyph(level = device.securityAttentionLevel())
         }
         if (entryMode != RulesEntryMode.Web) {
-            AnimatedVisibility(
-                visible = !compactMode,
-                enter =
-                    expandVertically(animationSpec = tween(durationMillis = motionDuration)) +
-                        fadeIn(animationSpec = tween(durationMillis = motionDuration)),
-                exit =
-                    shrinkVertically(animationSpec = tween(durationMillis = motionDuration)) +
-                        fadeOut(animationSpec = tween(durationMillis = motionDuration)),
-            ) {
-                GlassDetailSectionSelector(
-                    device = device,
-                    selectedPanel = selectedPanel,
-                    collapseProgress = collapseProgress,
-                    onPanelSelected = onPanelSelected,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompactPanelChip(
-    panel: DevicePanel,
-    attentionLevel: SecurityAttentionLevel,
-    onClick: () -> Unit,
-) {
-    val label =
-        when (panel) {
-            DevicePanel.Apps, DevicePanel.AppGroups -> "Apps"
-            DevicePanel.Web -> "Web"
-            DevicePanel.Protection -> "Seguridad"
-        }
-    val shape = RoundedCornerShape(16.dp)
-    Row(
-        modifier =
-            Modifier
-                .clip(shape)
-                .background(HeaderInk, shape)
-                .clickable(onClick = onClick)
-                .padding(start = 11.dp, top = 7.dp, end = 7.dp, bottom = 7.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = Color.White,
-            maxLines = 1,
-        )
-        if (attentionLevel != SecurityAttentionLevel.None) {
-            Box(
-                modifier =
-                    Modifier
-                        .padding(start = 4.dp)
-                        .size(7.dp)
-                        .background(attentionLevel.color, CircleShape),
+            DetailSectionSelector(
+                device = device,
+                selectedPanel = selectedPanel,
+                onPanelSelected = onPanelSelected,
             )
+        } else {
+            Text("Internet", style = MaterialTheme.typography.labelLarge, color = GloshColors.Muted)
         }
-        ProductGlyph(
-            icon = ProductIcon.ChevronDown,
-            color = Color.White,
-            contentDescription = "Mostrar secciones",
-            modifier = Modifier.size(17.dp),
-        )
     }
 }
 
 @Composable
-private fun GlassDetailSectionSelector(
+private fun DetailSectionSelector(
     device: UserDeviceUiState,
     selectedPanel: DevicePanel,
-    collapseProgress: Float,
     onPanelSelected: (DevicePanel) -> Unit,
 ) {
     val attentionLevel = device.securityAttentionLevel()
-    val outerRadius = lerpDp(24.dp, 20.dp, collapseProgress)
-    val shape = RoundedCornerShape(outerRadius)
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(shape)
-                .background(Color.White.copy(alpha = 0.7f), shape)
-                .border(1.dp, Color.White.copy(alpha = 0.94f), shape)
-                .padding(5.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
+                .background(GloshColors.SurfaceMuted, GloshShapes.Pill)
+                .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         DetailSegmentButton(
             modifier = Modifier.weight(1f),
@@ -618,7 +448,7 @@ private fun GlassDetailSectionSelector(
         )
         DetailSegmentButton(
             modifier = Modifier.weight(1f),
-            text = "Web",
+            text = "Internet",
             selected = selectedPanel == DevicePanel.Web,
             onClick = { onPanelSelected(DevicePanel.Web) },
         )
@@ -634,24 +464,12 @@ private fun GlassDetailSectionSelector(
 
 @Composable
 private fun DetailSegmentButton(
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
     attentionLevel: SecurityAttentionLevel = SecurityAttentionLevel.None,
 ) {
-    val shape = RoundedCornerShape(18.dp)
-    val motionDuration = adminMotionDurationMillis()
-    val backgroundColor by animateColorAsState(
-        targetValue = if (selected) HeaderInk else Color.White.copy(alpha = 0.42f),
-        animationSpec = tween(durationMillis = motionDuration),
-        label = "detail-segment-background",
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (selected) Color.White else HeaderInk,
-        animationSpec = tween(durationMillis = motionDuration),
-        label = "detail-segment-content",
-    )
     val attentionDescription =
         when (attentionLevel) {
             SecurityAttentionLevel.Critical -> "Error de seguridad"
@@ -662,36 +480,22 @@ private fun DetailSegmentButton(
         modifier =
             modifier
                 .then(
-                    if (attentionDescription == null) {
-                        Modifier
-                    } else {
-                        Modifier.semantics { stateDescription = attentionDescription }
-                    },
+                    if (attentionDescription == null) Modifier else Modifier.semantics { stateDescription = attentionDescription },
                 )
-                .clip(shape)
-                .background(
-                    color = backgroundColor,
-                    shape = shape,
-                ).clickable(onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 11.dp),
+                .background(if (selected) GloshColors.Lime else Color.Transparent, GloshShapes.Pill)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 10.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelLarge,
-            color = contentColor,
-        )
+        Text(text, style = MaterialTheme.typography.labelLarge, color = GloshColors.Graphite)
         if (attentionLevel != SecurityAttentionLevel.None) {
             Box(
                 modifier =
                     Modifier
-                        .padding(start = 7.dp)
+                        .padding(start = 6.dp)
                         .size(7.dp)
-                        .background(
-                            color = attentionLevel.color,
-                            shape = CircleShape,
-                        ),
+                        .background(attentionLevel.color, CircleShape),
             )
         }
     }
@@ -702,32 +506,19 @@ private fun AppSectionSelector(
     selectedPanel: DevicePanel,
     onPanelSelected: (DevicePanel) -> Unit,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (selectedPanel == DevicePanel.AppGroups) {
-            Button(modifier = Modifier.weight(1f), onClick = {}) {
-                Text("Crear grupo de apps")
-            }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (selectedPanel == DevicePanel.Apps) {
+            Button(modifier = Modifier.weight(1f), onClick = {}) { Text("Todas las apps") }
         } else {
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                onClick = { onPanelSelected(DevicePanel.AppGroups) },
-            ) {
-                Text("Crear grupo de apps")
+            OutlinedButton(modifier = Modifier.weight(1f), onClick = { onPanelSelected(DevicePanel.Apps) }) {
+                Text("Todas las apps")
             }
         }
-        if (selectedPanel == DevicePanel.Apps) {
-            Button(modifier = Modifier.weight(1f), onClick = {}) {
-                Text("Todas las apps")
-            }
+        if (selectedPanel == DevicePanel.AppGroups) {
+            Button(modifier = Modifier.weight(1f), onClick = {}) { Text("Grupos") }
         } else {
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                onClick = { onPanelSelected(DevicePanel.Apps) },
-            ) {
-                Text("Todas las apps")
+            OutlinedButton(modifier = Modifier.weight(1f), onClick = { onPanelSelected(DevicePanel.AppGroups) }) {
+                Text("Grupos")
             }
         }
     }
