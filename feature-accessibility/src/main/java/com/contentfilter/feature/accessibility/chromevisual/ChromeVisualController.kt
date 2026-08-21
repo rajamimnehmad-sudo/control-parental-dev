@@ -7,9 +7,6 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.contentfilter.feature.accessibility.ChromeVisualGloshiaEngineProvider
 import com.contentfilter.feature.accessibility.R
-import com.glosh.visual.GloshiaVisualAction
-import com.glosh.visual.GloshiaVisualDecision
-import com.glosh.visual.GloshiaVisualPolicyContract
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,6 +37,22 @@ internal class ChromeVisualController(
     private val baselineCoordinator = ChromeVisualBaselineCoordinator()
     private val atomicReplayCoordinator = ChromeVisualAtomicReplayCoordinator()
     private val regionAnalyzer = ChromeVisualRegionAnalyzer(service)
+    private val regionPresentation =
+        ChromeVisualRegionPresentation(
+            lock = lock,
+            identityGate = identityGate,
+            windowInspector = windowInspector,
+            overlay = overlay,
+            videoPolicy = videoPolicy,
+            pageBlockLedger = pageBlockLedger,
+        )
+    private val regionEvaluator =
+        ChromeVisualRegionEvaluator(
+            service = service,
+            decisionCache = decisionCache,
+            regionAnalyzer = regionAnalyzer,
+            presentation = regionPresentation,
+        )
     private var activeJob: Job? = null
     private var verificationJob: Job? = null
     private var pendingSinceMillis = 0L
@@ -240,7 +253,15 @@ internal class ChromeVisualController(
             }
         try {
             lastTileSignatures = ChromeVisualFrameSignature.all(frame.bitmap, viewport, fallback)
-            val counts = evaluateRegions(window.id, pageIdentity, frame, viewport, regions, emptySet())
+            val counts =
+                regionEvaluator.evaluate(
+                    windowId = window.id,
+                    pageIdentity = pageIdentity,
+                    frame = frame,
+                    viewport = viewport,
+                    regions = regions,
+                    observedChanges = emptySet(),
+                )
             log(window.id, frame, startedAt, counts.allowed, counts.blocked, "success")
             markEventAnalysisComplete()
             scheduleVerification(window.id)
@@ -322,7 +343,15 @@ internal class ChromeVisualController(
             stableVerificationCount = 0
             synchronized(lock) { identityGate.invalidate(window.id) }
             val observedChanges = visuallyChanged.mapTo(mutableSetOf(), ChromeVisualRegion::id)
-            val counts = evaluateRegions(window.id, pageIdentity, frame, viewport, changed, observedChanges)
+            val counts =
+                regionEvaluator.evaluate(
+                    windowId = window.id,
+                    pageIdentity = pageIdentity,
+                    frame = frame,
+                    viewport = viewport,
+                    regions = changed,
+                    observedChanges = observedChanges,
+                )
             lastTileSignatures =
                 ChromeVisualSignatureLedger.advance(
                     previous,
@@ -344,99 +373,6 @@ internal class ChromeVisualController(
         } finally {
             frame.close()
         }
-    }
-
-    private suspend fun evaluateRegions(
-        windowId: Int,
-        pageIdentity: Long,
-        frame: ChromeWindowFrame,
-        viewport: ChromeVisualViewport,
-        regions: List<ChromeVisualRegion>,
-        observedChanges: Set<String>,
-    ): RegionCounts {
-        val captureIdentity = synchronized(lock) { identityGate.nextCapture() }
-        var blocked = 0
-        var allowed = 0
-        var completed = true
-        val processedRegionIds = mutableSetOf<String>()
-        val fallbackTiles = fallbackTiles(viewport)
-        for (region in regions) {
-            val temporal = region.id.startsWith(FallbackRegionPrefix)
-            val videoKey = ChromeVisualVideoRegionKey(windowId, pageIdentity, region.id)
-            if (
-                temporal &&
-                videoPolicy.beforeSample(videoKey, region, region.id in observedChanges) ==
-                ChromeVisualPresentation.Covered
-            ) {
-                withContext(Dispatchers.Main.immediate) {
-                    overlay.show(region, ChromeVisualOverlayState.Pending)
-                    clipForInputMethod()
-                }
-            }
-            val frameRegion = ChromeVisualGeometryMapper.toFrame(region, viewport, frame.width, frame.height)
-            if (frameRegion == null) {
-                completed = false
-                continue
-            }
-            val signature = ChromeVisualFrameSignature.one(frame.bitmap, frameRegion, region)
-            if (signature == null) {
-                completed = false
-                continue
-            }
-            val identity =
-                ChromeVisualIdentity(
-                    windowId = windowId,
-                    contentEpoch = captureIdentity.first,
-                    captureSequence = captureIdentity.second,
-                    regionId = region.id,
-                    region = region,
-                    visualSignature = signature,
-                )
-            val decision =
-                decisionCache[signature] ?: regionAnalyzer.analyze(frame.bitmap, frameRegion).also {
-                    decisionCache[signature] = it
-                }
-            val applied =
-                withContext(Dispatchers.Main.immediate) {
-                    val windowStillCurrent =
-                        windowInspector.find(windowId)?.let {
-                            windowInspector.pageIdentity(it) == pageIdentity && windowInspector.viewport(it) == viewport
-                        } == true
-                    val identityStillCurrent = synchronized(lock) { identityGate.isCurrent(identity) }
-                    if (!windowStillCurrent || !identityStillCurrent) {
-                        false
-                    } else {
-                        if (temporal) {
-                            when (videoPolicy.record(videoKey, decision.toSampleDecision())) {
-                                ChromeVisualPresentation.Visible -> overlay.remove(region.id)
-                                ChromeVisualPresentation.Covered ->
-                                    overlay.show(region, ChromeVisualOverlayState.Blocked)
-                            }
-                        } else {
-                            when (decision.action) {
-                                GloshiaVisualAction.Allow ->
-                                    if (pageBlockLedger.mustRemainBlocked(pageIdentity, region.id)) {
-                                        overlay.show(region, ChromeVisualOverlayState.Blocked)
-                                    } else {
-                                        overlay.remove(region.id)
-                                    }
-                                GloshiaVisualAction.Block -> {
-                                    pageBlockLedger.recordBlocked(pageIdentity, region, fallbackTiles)
-                                    overlay.show(region, ChromeVisualOverlayState.Blocked)
-                                }
-                            }
-                        }
-                        clipForInputMethod()
-                        true
-                    }
-                }
-            if (!applied) {
-                return RegionCounts(allowed, blocked, completed = false, processedRegionIds = processedRegionIds)
-            }
-            processedRegionIds += region.id
-            if (decision.action == GloshiaVisualAction.Block) blocked++ else allowed++
-        }
-        return RegionCounts(allowed, blocked, completed, processedRegionIds)
     }
 
     private fun clipForInputMethod() {
@@ -495,13 +431,6 @@ internal class ChromeVisualController(
         }
     }
 
-    private fun GloshiaVisualDecision.toSampleDecision(): ChromeVisualSampleDecision =
-        when {
-            action == GloshiaVisualAction.Allow -> ChromeVisualSampleDecision.Allow
-            reason == GloshiaVisualPolicyContract.ModelFilterReason -> ChromeVisualSampleDecision.Block
-            else -> ChromeVisualSampleDecision.Unavailable
-        }
-
     private fun markEventAnalysisComplete() {
         synchronized(lock) { pendingSinceMillis = 0L }
     }
@@ -551,7 +480,6 @@ internal class ChromeVisualController(
         const val MinimumRegionDp = 48
         const val FallbackTopInsetDp = 96
         const val MaxDecisionCacheEntries = 128
-        const val FallbackRegionPrefix = "tile_"
         const val LogTag = "ChromeVisual"
     }
 }
