@@ -1,7 +1,10 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
+import android.view.accessibility.AccessibilityEvent
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ChromeVisualDynamicPolicyTest {
@@ -13,6 +16,17 @@ class ChromeVisualDynamicPolicyTest {
         assertTrue(coordinator.startIfIdle(context))
         repeat(20) { assertTrue(coordinator.coalesceIfActive(context)) }
         assertTrue(coordinator.finish(context))
+        assertFalse(coordinator.finish(context))
+        assertTrue(coordinator.startIfIdle(context))
+    }
+
+    @Test
+    fun `atomic mutation cancels a stale baseline`() {
+        val coordinator = ChromeVisualBaselineCoordinator()
+        val context = ChromeVisualBaselineContext(7, 10L, ChromeVisualViewport(0, 0, 1_080, 2_400))
+
+        assertTrue(coordinator.startIfIdle(context))
+        assertTrue(coordinator.cancelIfActive(context))
         assertFalse(coordinator.finish(context))
         assertTrue(coordinator.startIfIdle(context))
     }
@@ -34,6 +48,82 @@ class ChromeVisualDynamicPolicyTest {
             ChromeVisualEventModePolicy.requiresBaseline(false, 7, 7, viewport, viewport.copy(bottom = 1_080), true),
         )
         assertTrue(ChromeVisualEventModePolicy.requiresBaseline(true, 7, 7, viewport, viewport, true))
+    }
+
+    @Test
+    fun `scroll and visible content mutations require atomic replay`() {
+        assertTrue(
+            ChromeVisualAtomicMutationPolicy.requiresReplay(
+                AccessibilityEvent.TYPE_VIEW_SCROLLED,
+                AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED,
+            ),
+        )
+        assertTrue(
+            ChromeVisualAtomicMutationPolicy.requiresReplay(
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED,
+            ),
+        )
+        assertTrue(
+            ChromeVisualAtomicMutationPolicy.requiresReplay(
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE,
+            ),
+        )
+        assertFalse(
+            ChromeVisualAtomicMutationPolicy.requiresReplay(
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT,
+            ),
+        )
+        assertFalse(
+            ChromeVisualAtomicMutationPolicy.requiresReplay(
+                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+                AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED,
+            ),
+        )
+    }
+
+    @Test
+    fun `newer replay revision cannot be completed by stale work`() {
+        val coordinator = ChromeVisualAtomicReplayCoordinator()
+        val first = coordinator.request()
+        val second = coordinator.request()
+
+        assertFalse(coordinator.complete(first))
+        assertEquals(second, coordinator.currentRevision())
+        assertTrue(coordinator.complete(second))
+        assertNull(coordinator.currentRevision())
+    }
+
+    @Test
+    fun `atomic replay evaluates every fallback tile`() {
+        val fallback =
+            listOf(
+                ChromeVisualRegion("tile_0", 0, 0, 100, 100),
+                ChromeVisualRegion("tile_1", 100, 0, 200, 100),
+            )
+        val changed = listOf(fallback.first())
+        val confirmation = listOf(fallback.last())
+
+        assertEquals(
+            fallback,
+            ChromeVisualReplayRegionPolicy.select(
+                replayActive = true,
+                fallbackTiles = fallback,
+                visuallyChanged = changed,
+                confirmations = emptyList(),
+            ),
+        )
+        assertEquals(
+            fallback,
+            ChromeVisualReplayRegionPolicy.select(
+                replayActive = false,
+                fallbackTiles = fallback,
+                visuallyChanged = changed,
+                confirmations = confirmation,
+            ),
+        )
     }
 
     @Test
