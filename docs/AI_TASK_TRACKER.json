@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 23:22",
+  "updatedAt": "20 ago 2026 · 23:56",
   "sections": [
     {
       "id": "coordination",
@@ -50,11 +50,11 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "UI/UX se trabaja en otro chat; backend de licencia ya está validado y este frente no modifica la dirección visual",
+      "context": "UI/UX se trabaja en este chat con una regla vigente: conservar el flujo real de App Usuario y App Admin; el rediseño cambia jerarquía, lenguaje y estilo, no inventa una app nueva",
       "tasks": [
         {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT. Base estructural buena; principales fricciones: densidad en detalle Admin, lenguaje técnico, onboarding de permisos y sistema visual parcialmente fragmentado. No se tocó APK.","status":"done","priority":"important"},
-        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"IN PROGRESS en otro chat. No duplicar trabajo desde este frente.","status":"in_progress","priority":"important"},
-        {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"IN PROGRESS en otro chat. No duplicar trabajo desde este frente.","status":"in_progress","priority":"important"},
+        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"IN PROGRESS. Corrección de rumbo: todo mockup parte del flujo real. Admin conserva Inicio / Usuarios / Solicitudes / Ajustes. Usuario conserva Inicio / Mis apps / Internet / Ajustes. No agregar Dispositivos, Reglas, Actividad o Menú como pestañas nuevas ni funciones inexistentes. Los cambios UX se limitan a simplificar orden, lenguaje y cantidad de pasos, con aprobación previa.","status":"in_progress","priority":"important"},
+        {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"IN PROGRESS. Dirección vigente: usar por ahora solo el wordmark glosh en texto; la búsqueda del isotipo G queda pausada hasta que la UI esté mejor definida.","status":"in_progress","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Backend DONE: vencida/suspendida/futura bloquean nuevas activaciones correctamente. Pendiente definir reacción/UX de apps y recuperación al renovar.","status":"pending","priority":"important"},
         {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote.","status":"pending","priority":"normal"},
