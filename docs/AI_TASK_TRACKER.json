@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 22:34",
+  "updatedAt": "20 ago 2026 · 22:59",
   "sections": [
     {
       "id": "coordination",
@@ -27,7 +27,7 @@
     {
       "id": "security",
       "title": "Seguridad",
-      "context": "Super Admin y legado innecesario cerrados; superficie pública revisada; scope de token cross-device validado dinámicamente",
+      "context": "Super Admin y legado innecesario cerrados; superficie pública revisada; scope de token cross-device validado dinámicamente; lógica de licencia validada con gates transaccionales",
       "tasks": [
         {"id":"exact-hosts","title":"Allowlist exacta de Supabase","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
         {"id":"atomic-sync","title":"Sync atómico de políticas","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
@@ -37,9 +37,11 @@
         {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: 0 RPC super_admin_* ejecutables por anon; activate_device también dejó de aceptar anon. Flujos device-token/pairing necesarios conservan sus permisos.","status":"done","priority":"critical"},
         {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"DONE y registrado como migración: funciones futuras creadas por postgres en public quedan opt-in; service_role preservado.","status":"done","priority":"critical"},
         {"id":"activation-code-single-use","title":"Impedir doble uso de códigos de activación","detail":"DONE en Production: índice único parcial sobre device_activations.activation_code_id evita dos activaciones con el mismo código incluso ante doble toque/reintento concurrente.","status":"done","priority":"critical"},
+        {"id":"license-backend-gates","title":"Validar reglas backend de licencias","detail":"DONE con transacciones + ROLLBACK: active permite; expired, suspended y starts_at futuro bloquean; cupo user/admin lleno bloquea; rol inválido bloquea. Una sola licencia por comunidad garantizada por índice único y estados restringidos a active/suspended/expired.","status":"done","priority":"critical"},
         {"id":"pairing-hardening","title":"Hardening de pairing","detail":"Internas *_internal cerradas a anon/authenticated, código nuevo usa FOR UPDATE y DB impide doble activación. Gate end-to-end transaccional preparado pero el conector lo bloqueó antes de ejecutar; no se declara PASS todavía.","status":"blocked","priority":"critical"},
         {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"DONE: gate dinámico transaccional A/B en Supabase PASS. Token A solo validó dispositivo/cuenta/rol A; B solo B; rol, cuenta y token incorrectos fueron rechazados. ROLLBACK confirmado con 0 residuos. RPCs sensibles delegan en esta guarda.","status":"done","priority":"critical"},
         {"id":"direct-auth-users-write","title":"Eliminar escritura directa en auth.users","detail":"Deuda P1 confirmada: pair_admin_device_with_password_new_internal crea auth.users/auth.identities manualmente. Reemplazo requiere cambiar el flujo de autenticación de App Admin; no se retira mientras la app actual dependa de él.","status":"blocked","priority":"important"},
+        {"id":"pairing-rate-limit","title":"Agregar rate-limit específico al pairing","detail":"Pendiente: códigos son hasheados, temporales y de un solo uso, pero no existe aún un límite específico de intentos fallidos de pairing.","status":"pending","priority":"important"},
         {"id":"activate-device-legacy","title":"Cerrar acceso anónimo de activate_device legacy","detail":"DONE: anon revocado; authenticated y service_role preservados para no romper el cliente actual mientras se migra al pairing moderno.","status":"done","priority":"important"},
         {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Supabase Advisor sigue indicando Leaked Password Protection desactivada. El conector actual no expone escritura de configuración Auth; queda pendiente sin workaround inseguro.","status":"pending","priority":"important"}
       ]
@@ -47,15 +49,15 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "UI/UX se trabaja en otro chat; este frente no modifica esa dirección visual",
+      "context": "UI/UX se trabaja en otro chat; backend de licencia ya está validado y este frente no modifica la dirección visual",
       "tasks": [
         {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT. Base estructural buena; principales fricciones: densidad en detalle Admin, lenguaje técnico, onboarding de permisos y sistema visual parcialmente fragmentado. No se tocó APK.","status":"done","priority":"important"},
         {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"IN PROGRESS en otro chat. No duplicar trabajo desde este frente.","status":"in_progress","priority":"important"},
         {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"IN PROGRESS en otro chat. No duplicar trabajo desde este frente.","status":"in_progress","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
-        {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
+        {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Backend DONE: vencida/suspendida/futura bloquean nuevas activaciones correctamente. Pendiente definir reacción/UX de apps y recuperación al renovar.","status":"pending","priority":"important"},
         {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote.","status":"pending","priority":"normal"},
-        {"id":"account-capacity-remaining","title":"Mostrar cupos disponibles","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
+        {"id":"account-capacity-remaining","title":"Mostrar cupos disponibles","detail":"Backend de límites validado para User/Admin. RPC de entitlement actual devuelve estado/fechas/DAG pero todavía no devuelve cupos restantes; pendiente ampliar contrato y mostrarlo en apps.","status":"pending","priority":"important"},
         {"id":"user-relink","title":"Reenlazar usuario","detail":"Backend existe; pendiente cierre de seguridad antes de UX final.","status":"pending","priority":"important"},
         {"id":"user-request-history-delete","title":"Borrar historial de pedidos en Usuario","detail":"Pendiente.","status":"pending","priority":"normal"},
         {"id":"prevent-double-control-actions","title":"Evitar dos controles simultáneos","detail":"Backend de activación ya impide doble consumo de códigos; bloqueo visual/otras acciones concurrentes se trabaja en el frente de apps cuando corresponda.","status":"pending","priority":"important"}
@@ -67,7 +69,7 @@
       "context": "UX aprobada; RPC Super Admin cerradas a anon y con guardas verificadas",
       "tasks": [
         {"id":"super-admin-data-cleanup","title":"Actualizar y limpiar datos del Super Admin","detail":"PASS en PR #96.","status":"done","priority":"important"},
-        {"id":"license-management-review","title":"Revisar sistema completo de licencias","detail":"PASS funcional en PR #96.","status":"done","priority":"important"},
+        {"id":"license-management-review","title":"Revisar sistema completo de licencias","detail":"PASS funcional en PR #96; reglas backend además validadas dinámicamente en Supabase.","status":"done","priority":"important"},
         {"id":"super-admin-ux-ui","title":"Mejorar UX/UI del Super Admin","detail":"PASS en PR #96.","status":"done","priority":"important"}
       ]
     },
@@ -75,7 +77,9 @@
       "id": "delivery",
       "title": "Entrega / APKs",
       "context": "Pruebas físicas pausadas",
-      "tasks": [{"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Envío físico al S22 pausado.","status":"pending","priority":"important"}]
+      "tasks": [
+        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Envío físico al S22 pausado.","status":"pending","priority":"important"}
+      ]
     },
     {
       "id": "chrome-visual",
