@@ -1,5 +1,5 @@
 {
-  "updatedAt": "21 de ago de 2026 · 12:16",
+  "updatedAt": "21 de ago de 2026 · 16:21",
   "sections": [
     {
       "id": "coordination",
@@ -19,7 +19,7 @@
         {"id":"workflow-cost-optimization","title":"Optimizar workflow para bajar costos","detail":"Contexto mínimo, lotes coherentes, tests estrechos y Codex solo cuando hace falta.","status":"done","priority":"important"},
         {"id":"control-center-sync-rule","title":"Sincronizar siempre Glosh Central","detail":"Todo cambio de ruta, prioridad, estado, tarea, bloqueo, cierre o workflow se refleja aquí en el mismo ciclo.","status":"done","priority":"critical"},
         {"id":"gloshia-data-preservation-rule","title":"Preservar evidencia útil para GloshIA","detail":"Regla permanente: reset operativo nunca borra datasets, muestras, etiquetas, reviews, calibraciones, métricas ni evidencia reutilizable para entrenar/evaluar GloshIA salvo autorización explícita separada.","status":"done","priority":"critical"},
-        {"id":"apps-account-product-batch-07","title":"Próximo lote Apps / cuentas","detail":"Reservado detrás del cierre backend crítico.","status":"pending","priority":"important"},
+        {"id":"apps-account-product-batch-07","title":"Próximo lote Apps / cuentas","detail":"Prioridad explícita cambiada por el usuario: App Usuario UX V4 pasa a frente activo en ChatGPT; Admin V4 queda pausado hasta cerrar Usuario. Rama aislada work/user-ux-v4-01 desde 5baa4824; no colisiona con Chrome Visual.","status":"in_progress","priority":"important"},
         {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Datos operativos en cero; se preservan únicamente Super Admin/Auth raíz. Regla futura: evidencia de IA queda excluida de resets operativos.","status":"done","priority":"important"},
         {"id":"control-center-v2","title":"Control Center V2","detail":"UI simplificada: Vista general eliminada, resumen de estados siempre visible, estados monocromos por círculo y prioridad rojo/amarillo/verde. APK compilada con éxito en GitHub Actions.","status":"done","priority":"normal"},
         {"id":"pro-audit","title":"Auditoría Pro y mapa técnico","detail":"Auditoría integral completada; hallazgos se cierran por lotes auditables.","status":"done","priority":"important"}
@@ -50,12 +50,13 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "Rediseño Usuario/Admin implementado de punta a punta y ya compilado en APKs DEV/debug desde un snapshot reversible. Build de ambas apps PASS; revisión física del usuario y cierre de calidad siguen pendientes antes de declarar release.",
+      "context": "La primera implementación UI fue funcional y compilable pero la revisión física del usuario la rechazó como reskin insuficiente. Usuario V4 es ahora la dirección aprobada: más limpio sin quedar vacío, menos tarjetas, jerarquía por tareas y estados reales preservados. Admin queda pausado hasta cerrar Usuario.",
       "tasks": [
         {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT. Base estructural buena; principales fricciones: densidad en detalle Admin, lenguaje técnico, onboarding de permisos y sistema visual parcialmente fragmentado.","status":"done","priority":"important"},
-        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"DONE. Admin conserva Inicio / Usuarios / Solicitudes / Ajustes; Usuario conserva Inicio / Mis apps / Internet / Ajustes. Tema claro bone/blanco, graphite y lime fijado como dirección vigente.","status":"done","priority":"important"},
-        {"id":"apps-user-admin-ui-implementation-03","title":"Implementar UI/UX profesional Usuario y Admin","detail":"CODE COMPLETE en work/ui-ux-redesign-01 desde 214e7c84. Sistema compartido Glosh, Home Admin/User, Usuarios y detalle Apps/Internet/Seguridad, Solicitudes global-first, Ajustes, activación/onboarding, Mis apps, Internet, actualizaciones, ayuda y branding de Android ya migrados. DOMAIN_ACCESS en Usuario corregido. Old Home Admin queda para rollback. Snapshot de prueba congelado en build/ui-ux-apk-test-01; no se integró Chrome experimental. Iconos launcher históricos siguen como placeholder porque el isotipo está pausado.","status":"in_progress","priority":"important"},
-        {"id":"apps-user-admin-ui-build-gate-04","title":"Compilar y validar rediseño Usuario/Admin","detail":"IN PROGRESS. PR temporal autorizado #99 usó build/ui-ux-apk-test-01 solo como runner y ya fue cerrado sin merge. GitHub Actions run #477 compiló App Usuario + App Admin DEV/debug con PASS y guardó ambos APKs. Durante el gate se corrigieron únicamente tres imports dp faltantes en la rama temporal. El gate de calidad posterior no está en PASS todavía; unitarios/ktlint/lint requieren cierre antes de release. APKs listas para revisión física del usuario; sin publicación, Production ni versionCode.","status":"in_progress","priority":"important"},
+        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"DONE para primera dirección. La revisión física posterior obligó a profundizar Usuario; la V4 interactiva fue aprobada como nueva referencia antes de continuar Admin.","status":"done","priority":"important"},
+        {"id":"apps-user-admin-ui-implementation-03","title":"Implementar UI/UX profesional Usuario y Admin","detail":"Primera implementación preservada en work/ui-ux-redesign-01 y snapshot build/ui-ux-apk-test-01. Funciona técnicamente pero queda SUPERSEDED como cierre visual: el usuario confirmó que seguía demasiado parecida a la app anterior. No borrar; sirve de rollback/base técnica. Admin no se rediseña de nuevo hasta cerrar Usuario V4.","status":"in_progress","priority":"important"},
+        {"id":"user-ux-v4-05","title":"Rediseñar App Usuario UX V4","detail":"IN PROGRESS por ChatGPT en rama aislada work/user-ux-v4-01 desde base 5baa4824. Maqueta V4 aprobada. Home reconstruido con una sola hero de protección + límites/estado/pedidos/avisos reales; Internet rejerarquizado con estado plano + protecciones/acceso; Ajustes convertido a navegación plana y honesta sin switches ficticios. Mis apps conserva lista nativa plana, búsqueda, filtros y estado relativo porque ya coincide con la dirección. Unitario de empty-state actualizado al copy vigente. Pendiente build/unitarios/ktlint/lint y smoke físico; no main, no PR, no publicación, no Chrome/VPN/Accessibility runtime.","status":"in_progress","priority":"important"},
+        {"id":"apps-user-admin-ui-build-gate-04","title":"Compilar y validar rediseño Usuario/Admin","detail":"El run #477 validó únicamente el snapshot anterior y generó APKs funcionales; no valida Usuario V4. El fallo unitario conocido de MyApps era expectativa de copy obsoleta y ya fue corregido en work/user-ux-v4-01. V4 requiere un gate nuevo antes de APK/prueba física; no declarar PASS todavía.","status":"in_progress","priority":"important"},
         {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"Wordmark glosh en texto aplicado. Isotipo sigue pausado deliberadamente; no inventar G/escudo nuevo sin aprobación. Launcher icons actuales son placeholder.","status":"in_progress","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Backend DONE: vencida/suspendida/futura bloquean nuevas activaciones correctamente. Pendiente definir reacción/UX de apps y recuperación al renovar.","status":"pending","priority":"important"},
@@ -79,9 +80,9 @@
     {
       "id": "delivery",
       "title": "Entrega / APKs",
-      "context": "APKs DEV/debug de Usuario y Admin generadas correctamente para prueba física; no publicadas y todavía no son release final.",
+      "context": "APKs anteriores demostraron funcionamiento técnico pero no representan la dirección visual aprobada. Usuario V4 todavía no tiene APK validada; Admin queda sin nueva iteración hasta cerrar Usuario.",
       "tasks": [
-        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"IN PROGRESS. Build de ambos APKs PASS en run #477 y binarios descargados para revisión del usuario. Falta revisión física y cerrar calidad completa antes de integrar/publicar; no merge, no Production.","status":"in_progress","priority":"important"}
+        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"IN PROGRESS. Run #477/build anterior queda como evidencia histórica. Próximo gate debe compilar work/user-ux-v4-01, correr unitarios/ktlint/lint y luego prueba física del Usuario V4. No integrar/publicar ni retomar Admin V4 antes de esa revisión.","status":"in_progress","priority":"important"}
       ]
     },
     {
