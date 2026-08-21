@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.util.Base64
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,10 +39,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +66,6 @@ private const val AUTO_REFRESH_MILLIS = 5 * 60 * 1000L
 private enum class AppView(val label: String) {
     Priority("Prioridad"),
     Sections("Secciones"),
-    Overview("Vista general"),
 }
 
 private enum class TaskState(val wire: String, val label: String) {
@@ -86,15 +90,8 @@ private data class TaskSection(
     val tasks: List<TaskItem>,
 )
 
-private data class Tracker(
-    val updatedAt: String,
-    val sections: List<TaskSection>,
-)
-
-private data class RoutedTask(
-    val section: TaskSection,
-    val task: TaskItem,
-)
+private data class Tracker(val updatedAt: String, val sections: List<TaskSection>)
+private data class RoutedTask(val section: TaskSection, val task: TaskItem)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -123,9 +120,7 @@ private fun ControlCenterApp() {
                     tracker = it
                     lastSyncLabel = "ahora · ${clockNow()}"
                 }
-                .onFailure {
-                    lastSyncLabel = "sin conexión · ${clockNow()}"
-                }
+                .onFailure { lastSyncLabel = "sin conexión · ${clockNow()}" }
             refreshing = false
         }
     }
@@ -153,17 +148,13 @@ private fun ControlCenterApp() {
                 modifier = Modifier.fillMaxSize(),
             ) {
                 Column(Modifier.fillMaxSize()) {
-                    Header(
-                        tracker = tracker,
-                        lastSyncLabel = lastSyncLabel,
-                        refreshing = refreshing,
-                        onRefresh = ::refresh,
-                    )
-                    ViewSelector(current = currentView) { selected ->
+                    Header(tracker, lastSyncLabel, refreshing, ::refresh)
+                    ViewSelector(currentView) { selected ->
                         currentView = selected
                         expandedTaskId = null
                         expandedSectionId = null
                     }
+                    StatusSummary(tracker.sections.flatMap { it.tasks })
                     when (currentView) {
                         AppView.Priority -> PriorityScreen(
                             tracker = tracker,
@@ -175,11 +166,6 @@ private fun ControlCenterApp() {
                             expandedSectionId = expandedSectionId,
                             expandedTaskId = expandedTaskId,
                             onSection = { id -> expandedSectionId = if (expandedSectionId == id) null else id },
-                            onTask = { id -> expandedTaskId = if (expandedTaskId == id) null else id },
-                        )
-                        AppView.Overview -> OverviewScreen(
-                            tracker = tracker,
-                            expandedTaskId = expandedTaskId,
                             onTask = { id -> expandedTaskId = if (expandedTaskId == id) null else id },
                         )
                     }
@@ -215,9 +201,7 @@ private fun Header(
             )
         }
         Surface(
-            modifier = Modifier
-                .size(42.dp)
-                .clickable(enabled = !refreshing, onClick = onRefresh),
+            modifier = Modifier.size(42.dp).clickable(enabled = !refreshing, onClick = onRefresh),
             shape = CircleShape,
             color = Page,
         ) {
@@ -240,9 +224,7 @@ private fun ViewSelector(current: AppView, onSelect: (AppView) -> Unit) {
     ) {
         AppView.entries.forEach { view ->
             Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onSelect(view) },
+                modifier = Modifier.weight(1f).clickable { onSelect(view) },
                 shape = RoundedCornerShape(9.dp),
                 color = if (current == view) Ink else Color.Transparent,
             ) {
@@ -277,19 +259,18 @@ private fun PriorityScreen(
                 .thenBy { if (it.task.state == TaskState.Blocked) 1 else 0 }
                 .thenBy { it.task.title },
         )
-    val doneCount = routed.count { it.task.state == TaskState.Done }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item { ListHeading("Ahora", "Lo que está activo") }
         if (active.isEmpty()) {
             item { EmptyLine("Nada en progreso ahora") }
         } else {
-            items(active, key = { it.task.id }) { item ->
+            items(active, key = { it.task.id }) { routedTask ->
                 TaskRow(
-                    task = item.task,
-                    sectionTitle = item.section.title,
-                    expanded = expandedTaskId == item.task.id,
-                    onClick = { onTask(item.task.id) },
+                    task = routedTask.task,
+                    sectionTitle = routedTask.section.title,
+                    expanded = expandedTaskId == routedTask.task.id,
+                    onClick = { onTask(routedTask.task.id) },
                 )
             }
         }
@@ -298,23 +279,12 @@ private fun PriorityScreen(
         if (next.isEmpty()) {
             item { EmptyLine("No quedan tareas pendientes") }
         } else {
-            items(next, key = { it.task.id }) { item ->
+            items(next, key = { it.task.id }) { routedTask ->
                 TaskRow(
-                    task = item.task,
-                    sectionTitle = item.section.title,
-                    expanded = expandedTaskId == item.task.id,
-                    onClick = { onTask(item.task.id) },
-                )
-            }
-        }
-
-        if (doneCount > 0) {
-            item {
-                Text(
-                    "$doneCount tareas terminadas",
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp),
-                    fontSize = 12.sp,
-                    color = Muted,
+                    task = routedTask.task,
+                    sectionTitle = routedTask.section.title,
+                    expanded = expandedTaskId == routedTask.task.id,
+                    onClick = { onTask(routedTask.task.id) },
                 )
             }
         }
@@ -334,7 +304,7 @@ private fun SectionsScreen(
         item { Spacer(Modifier.height(10.dp)) }
         items(tracker.sections, key = { it.id }) { section ->
             val expanded = expandedSectionId == section.id
-            SectionRow(section = section, expanded = expanded, onClick = { onSection(section.id) })
+            SectionRow(section, expanded) { onSection(section.id) }
             if (expanded) {
                 section.tasks
                     .sortedWith(compareBy<TaskItem> { stateRank(it.state) }.thenBy { priorityRank(it.priority) })
@@ -354,47 +324,16 @@ private fun SectionsScreen(
 }
 
 @Composable
-private fun OverviewScreen(
-    tracker: Tracker,
-    expandedTaskId: String?,
-    onTask: (String) -> Unit,
-) {
-    val all = tracker.sections.flatMap { it.tasks }
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item { StatusSummary(all) }
-        tracker.sections.forEach { section ->
-            item { ListHeading(section.title, section.context) }
-            items(section.tasks, key = { it.id }) { task ->
-                TaskRow(
-                    task = task,
-                    sectionTitle = null,
-                    expanded = expandedTaskId == task.id,
-                    onClick = { onTask(task.id) },
-                )
-            }
-        }
-        item { Spacer(Modifier.height(28.dp)) }
-    }
-}
-
-@Composable
 private fun ListHeading(title: String, context: String) {
     Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp)) {
         Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Ink)
-        if (context.isNotBlank()) {
-            Text(context, fontSize = 12.sp, color = Muted)
-        }
+        if (context.isNotBlank()) Text(context, fontSize = 12.sp, color = Muted)
     }
 }
 
 @Composable
 private fun EmptyLine(text: String) {
-    Text(
-        text,
-        modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
-        fontSize = 13.sp,
-        color = Muted,
-    )
+    Text(text, Modifier.padding(horizontal = 20.dp, vertical = 16.dp), fontSize = 13.sp, color = Muted)
 }
 
 @Composable
@@ -431,19 +370,19 @@ private fun SectionRow(section: TaskSection, expanded: Boolean, onClick: () -> U
 @Composable
 private fun MiniCounts(tasks: List<TaskItem>) {
     Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-        MiniCount(tasks.count { it.state == TaskState.Pending }, PendingRed)
-        MiniCount(tasks.count { it.state == TaskState.InProgress }, ProgressAmber)
-        MiniCount(tasks.count { it.state == TaskState.Done }, DoneGreen)
+        MiniStateCount(TaskState.Pending, tasks.count { it.state == TaskState.Pending })
+        MiniStateCount(TaskState.InProgress, tasks.count { it.state == TaskState.InProgress })
+        MiniStateCount(TaskState.Done, tasks.count { it.state == TaskState.Done })
         if (tasks.any { it.state == TaskState.Blocked }) {
-            MiniCount(tasks.count { it.state == TaskState.Blocked }, BlockedGray)
+            MiniStateCount(TaskState.Blocked, tasks.count { it.state == TaskState.Blocked })
         }
     }
 }
 
 @Composable
-private fun MiniCount(count: Int, color: Color) {
+private fun MiniStateCount(state: TaskState, count: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        Box(Modifier.size(7.dp).background(color, CircleShape))
+        TaskStateIcon(state, 10.dp)
         Text(count.toString(), fontSize = 11.sp, color = Muted)
     }
 }
@@ -467,7 +406,7 @@ private fun TaskRow(
             ),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(9.dp).background(stateColor(task.state), CircleShape))
+                TaskStateIcon(task.state, 16.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(task.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Ink)
@@ -476,14 +415,8 @@ private fun TaskRow(
                         Text(sectionTitle, fontSize = 11.sp, color = Muted)
                     }
                 }
-                if (priority != "Normal") {
-                    Text(
-                        priority,
-                        fontSize = 10.sp,
-                        color = if (priority == "Crítico") PendingRed else ProgressAmber,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                }
+                PriorityIndicator(task.priority)
+                Spacer(Modifier.width(10.dp))
                 Text(if (expanded) "⌃" else "›", fontSize = 17.sp, color = Muted)
             }
 
@@ -492,7 +425,7 @@ private fun TaskRow(
                 if (task.detail.isNotBlank()) {
                     Text(
                         task.detail,
-                        modifier = Modifier.padding(start = 21.dp),
+                        modifier = Modifier.padding(start = 28.dp),
                         fontSize = 12.sp,
                         lineHeight = 17.sp,
                         color = Secondary,
@@ -502,50 +435,111 @@ private fun TaskRow(
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier.padding(start = 21.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(start = 28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(task.state.label, fontSize = 11.sp, color = stateColor(task.state))
-                    Text(priority, fontSize = 11.sp, color = Muted)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    ) {
+                        TaskStateIcon(task.state, 12.dp)
+                        Text(task.state.label, fontSize = 11.sp, color = Ink)
+                    }
+                    Text(priority, fontSize = 11.sp, color = priorityColor(task.priority))
                 }
             }
         }
     }
-    HorizontalDivider(
-        modifier = Modifier.padding(start = if (inset) 34.dp else 20.dp),
-        color = Divider,
-    )
+    HorizontalDivider(Modifier.padding(start = if (inset) 34.dp else 20.dp), color = Divider)
+}
+
+@Composable
+private fun PriorityIndicator(priority: String) {
+    val color = priorityColor(priority)
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(Modifier.size(7.dp).background(color, CircleShape))
+        Text(priorityLabel(priority), fontSize = 10.sp, color = color)
+    }
 }
 
 @Composable
 private fun StatusSummary(tasks: List<TaskItem>) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.White)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        modifier = Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 13.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        SummaryText("Pendientes", tasks.count { it.state == TaskState.Pending }, PendingRed)
-        SummaryText("En progreso", tasks.count { it.state == TaskState.InProgress }, ProgressAmber)
-        SummaryText("Hechas", tasks.count { it.state == TaskState.Done }, DoneGreen)
-        SummaryText("Bloqueadas", tasks.count { it.state == TaskState.Blocked }, BlockedGray)
+        SummaryItem(TaskState.Pending, "Pendientes", tasks.count { it.state == TaskState.Pending }, Modifier.weight(1f))
+        SummaryItem(
+            TaskState.InProgress,
+            "En proceso",
+            tasks.count { it.state == TaskState.InProgress },
+            Modifier.weight(1f),
+        )
+        SummaryItem(TaskState.Done, "Hechas", tasks.count { it.state == TaskState.Done }, Modifier.weight(1f))
+        SummaryItem(TaskState.Blocked, "Bloqueadas", tasks.count { it.state == TaskState.Blocked }, Modifier.weight(1f))
+    }
+    HorizontalDivider(color = Divider)
+}
+
+@Composable
+private fun SummaryItem(state: TaskState, label: String, count: Int, modifier: Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            TaskStateIcon(state, 14.dp)
+            Text(count.toString(), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
+        }
+        Spacer(Modifier.height(2.dp))
+        Text(label, fontSize = 10.sp, color = Muted, maxLines = 1)
     }
 }
 
 @Composable
-private fun SummaryText(label: String, count: Int, color: Color) {
-    Column {
-        Text(count.toString(), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = color)
-        Text(label, fontSize = 10.sp, color = Muted)
+private fun TaskStateIcon(state: TaskState, iconSize: Dp) {
+    Canvas(modifier = Modifier.size(iconSize)) {
+        val diameter = size.minDimension
+        val strokeWidth = (diameter * 0.13f).coerceAtLeast(1.5f)
+        when (state) {
+            TaskState.Done -> {
+                drawCircle(Ink)
+                drawLine(
+                    Color.White,
+                    Offset(diameter * 0.27f, diameter * 0.52f),
+                    Offset(diameter * 0.44f, diameter * 0.69f),
+                    strokeWidth,
+                    StrokeCap.Round,
+                )
+                drawLine(
+                    Color.White,
+                    Offset(diameter * 0.44f, diameter * 0.69f),
+                    Offset(diameter * 0.75f, diameter * 0.34f),
+                    strokeWidth,
+                    StrokeCap.Round,
+                )
+            }
+            TaskState.InProgress -> repeat(8) { segment ->
+                drawArc(
+                    Ink,
+                    startAngle = -90f + segment * 45f,
+                    sweepAngle = 25f,
+                    useCenter = false,
+                    style = Stroke(strokeWidth, cap = StrokeCap.Round),
+                )
+            }
+            TaskState.Pending -> drawCircle(Ink, style = Stroke(strokeWidth))
+            TaskState.Blocked -> {
+                drawCircle(Ink, style = Stroke(strokeWidth))
+                drawLine(
+                    Ink,
+                    Offset(diameter * 0.31f, diameter * 0.50f),
+                    Offset(diameter * 0.69f, diameter * 0.50f),
+                    strokeWidth,
+                    StrokeCap.Round,
+                )
+            }
+        }
     }
-}
-
-private fun stateColor(state: TaskState): Color = when (state) {
-    TaskState.Pending -> PendingRed
-    TaskState.InProgress -> ProgressAmber
-    TaskState.Done -> DoneGreen
-    TaskState.Blocked -> BlockedGray
 }
 
 private fun stateRank(state: TaskState): Int = when (state) {
@@ -565,6 +559,12 @@ private fun priorityLabel(priority: String): String = when (priorityRank(priorit
     0 -> "Crítico"
     1 -> "Importante"
     else -> "Normal"
+}
+
+private fun priorityColor(priority: String): Color = when (priorityRank(priority)) {
+    0 -> CriticalRed
+    1 -> ImportantAmber
+    else -> NormalGreen
 }
 
 private fun clockNow(): String = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
@@ -621,89 +621,17 @@ private fun parseTracker(raw: String): Tracker {
             )
         }
     }
-    return Tracker(
-        updatedAt = root.optString("updatedAt", "sin fecha"),
-        sections = sections,
-    )
+    return Tracker(root.optString("updatedAt", "sin fecha"), sections)
 }
 
-private val DEFAULT_TRACKER_JSON = """
-{
-  "updatedAt": "hoy",
-  "sections": [
-    {
-      "id": "coordination",
-      "title": "Coordinación",
-      "context": "Estado local y ruta de trabajo",
-      "tasks": [
-        {
-          "id": "codex-local-inventory",
-          "title": "Inventario local completo con Codex",
-          "detail": "Reconciliar cambios locales, ramas y migraciones antes de nuevos tickets.",
-          "status": "pending",
-          "priority": "critical"
-        },
-        {
-          "id": "control-center-v3",
-          "title": "Control Center V3",
-          "detail": "Tablero compacto, solo lectura y sincronizado con la ruta técnica.",
-          "status": "in_progress",
-          "priority": "normal"
-        }
-      ]
-    },
-    {
-      "id": "chrome-visual",
-      "title": "Chrome Visual",
-      "context": "Filtrado directo en Chrome",
-      "tasks": [
-        {
-          "id": "chrome-video-a23",
-          "title": "Revalidar video en A23",
-          "detail": "Confirmar físicamente estabilidad de video y overlays.",
-          "status": "pending",
-          "priority": "critical"
-        },
-        {
-          "id": "chrome-images",
-          "title": "Confirmar fotos estáticas en Chrome",
-          "detail": "Verificar imágenes, scroll y overlays localizados.",
-          "status": "pending",
-          "priority": "important"
-        }
-      ]
-    },
-    {
-      "id": "security",
-      "title": "Seguridad",
-      "context": "Tokens, permisos y hardening",
-      "tasks": [
-        {
-          "id": "spark-review",
-          "title": "Revisar cambios acumulados",
-          "detail": "Reconstruir y validar cambios candidatos antes de continuar.",
-          "status": "pending",
-          "priority": "critical"
-        },
-        {
-          "id": "device-token-scope",
-          "title": "Scope de token por dispositivo",
-          "detail": "Restringir escrituras por dispositivo.",
-          "status": "pending",
-          "priority": "important"
-        }
-      ]
-    }
-  ]
-}
-""".trimIndent()
+private const val DEFAULT_TRACKER_JSON =
+    """{"updatedAt":"hoy","sections":[{"id":"coordination","title":"Coordinación","context":"Estado y ruta de trabajo","tasks":[{"id":"control-center-v3","title":"Control Center","detail":"Tablero compacto sincronizado con la ruta técnica.","status":"in_progress","priority":"important"}]},{"id":"delivery","title":"Entrega","context":"Próximos gates","tasks":[{"id":"apk-release-gates","title":"Gate de APK","detail":"Pendiente de validación.","status":"pending","priority":"normal"}]}]}"""
 
 private val Page = Color(0xFFF7F7F8)
 private val Ink = Color(0xFF202123)
 private val Secondary = Color(0xFF4B5563)
 private val Muted = Color(0xFF8A8F98)
 private val Divider = Color(0xFFE7E7E8)
-private val PendingRed = Color(0xFFE5484D)
-private val ProgressAmber = Color(0xFFF59E0B)
-private val DoneGreen = Color(0xFF30A46C)
-private val BlockedGray = Color(0xFF7D828A)
+private val CriticalRed = Color(0xFFE5484D)
+private val ImportantAmber = Color(0xFFF59E0B)
+private val NormalGreen = Color(0xFF30A46C)
