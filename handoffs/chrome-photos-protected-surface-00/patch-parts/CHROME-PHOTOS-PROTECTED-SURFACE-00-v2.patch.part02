@@ -1,0 +1,372 @@
++        private var discardedPendingFrameCount = 0
++
++        init {
++            importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
++            isClickable = false
++            isFocusable = false
++            setBackgroundColor(NeutralColor)
++        }
++
++        fun cover(authorityEpoch: Long) {
++            if (authorityEpoch > minimumEpoch) minimumEpoch = authorityEpoch
++            discardPendingFrameBelowMinimumEpoch()
++            covered = true
++            postInvalidateOnAnimation()
++        }
++
++        fun stage(
++            frame: Bitmap,
++            epoch: Long,
++            sequence: Long,
++        ): Boolean {
++            if (
++                frame.isRecycled ||
++                epoch < minimumEpoch ||
++                epoch < presentedEpoch ||
++                (epoch == presentedEpoch && sequence <= presentedSequence) ||
++                epoch < pendingEpoch ||
++                (epoch == pendingEpoch && sequence <= pendingSequence)
++            ) {
++                frame.recycleSafely()
++                return false
++            }
++            pendingFrame?.recycleSafely()
++            pendingFrame = frame
++            pendingEpoch = epoch
++            pendingSequence = sequence
++            covered = false
++            postInvalidateOnAnimation()
++            return true
++        }
++
++        override fun onDraw(canvas: Canvas) {
++            discardPendingFrameBelowMinimumEpoch()
++            val staged = pendingFrame
++            if (staged != null) {
++                val retired = frontFrame
++                frontFrame = staged
++                pendingFrame = null
++                presentedEpoch = pendingEpoch
++                presentedSequence = pendingSequence
++                pendingEpoch = 0L
++                pendingSequence = 0L
++                retired?.recycleSafely()
++            }
++
++            canvas.drawColor(NeutralColor)
++            frontFrame?.takeUnless { it.isRecycled }?.let { frame ->
++                canvas.drawBitmap(frame, null, Rect(0, 0, width, height), framePaint)
++            }
++            if (covered) {
++                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), CoverPaint)
++                canvas.drawText(
++                    PendingMessage,
++                    HorizontalPaddingPx,
++                    height - VerticalPaddingPx,
++                    statusPaint,
++                )
++            }
++            // DEV-only compositor marker. A physical recording can verify that the protected host
++            // itself remained in the composed output for every sampled frame.
++            canvas.drawRect(
++                MarkerInsetPx,
++                MarkerInsetPx,
++                MarkerInsetPx + MarkerSizePx,
++                MarkerInsetPx + MarkerSizePx,
++                SurfaceMarkerPaint,
++            )
++        }
++
++        fun authorityEpoch(): Long = minimumEpoch
++
++        fun pendingEpoch(): Long? = pendingFrame?.let { pendingEpoch }
++
++        fun discardedPendingFrameCount(): Int = discardedPendingFrameCount
++
++        override fun close() {
++            pendingFrame?.recycleSafely()
++            pendingFrame = null
++            frontFrame?.recycleSafely()
++            frontFrame = null
++            covered = true
++            minimumEpoch = 0L
++            presentedEpoch = 0L
++            presentedSequence = 0L
++            pendingEpoch = 0L
++            pendingSequence = 0L
++            discardedPendingFrameCount = 0
++        }
++
++        private fun discardPendingFrameBelowMinimumEpoch() {
++            val stale = pendingFrame ?: return
++            if (pendingEpoch >= minimumEpoch) return
++            stale.recycleSafely()
++            pendingFrame = null
++            pendingEpoch = 0L
++            pendingSequence = 0L
++            discardedPendingFrameCount += 1
++        }
++
++        private companion object {
++            const val HorizontalPaddingPx = 32f
++            const val VerticalPaddingPx = 40f
++            const val PendingMessage = "Analizando contenido nuevo…"
++            const val NeutralColor = 0xFF202124.toInt()
++            const val MarkerInsetPx = 8f
++            const val MarkerSizePx = 32f
++            val SurfaceMarkerPaint =
++                Paint().apply {
++                    color = 0xFF00C8FF.toInt()
++                }
++            val CoverPaint =
++                Paint().apply {
++                    color = 0xB31F2328.toInt()
++                }
++        }
++    }
++
++    private companion object {
++        const val SurfaceTitle = "ChromePhotosProtectedSurface"
++    }
++}
++
++private fun Bitmap?.recycleSafely() {
++    if (this != null && !isRecycled) recycle()
++}
++diff --git a/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromePhotosProtectedSurfaceState.kt b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromePhotosProtectedSurfaceState.kt
++new file mode 100644
++index 0000000..d48d7a8
++--- /dev/null
+++++ b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromePhotosProtectedSurfaceState.kt
++@@ -0,0 +1,164 @@
+++package com.contentfilter.feature.accessibility.chromevisual
+++
+++internal enum class ChromePhotosProtectedSurfacePhase {
+++    Inactive,
+++    Covered,
+++    Motion,
+++    Settling,
+++    Capturing,
+++    CommitReady,
+++    Presented,
+++}
+++
+++internal data class ChromePhotosProtectedSurfaceToken(
+++    val epoch: Long,
+++    val windowId: Int,
+++    val sequence: Long,
+++    val viewport: ChromeVisualViewport,
+++)
+++
+++internal data class ChromePhotosProtectedSurfaceSnapshot(
+++    val phase: ChromePhotosProtectedSurfacePhase,
+++    val epoch: Long,
+++    val windowId: Int,
+++    val viewport: ChromeVisualViewport?,
+++    val activeSequence: Long,
+++    val presentedSequence: Long,
+++) {
+++    val isActive: Boolean get() = phase != ChromePhotosProtectedSurfacePhase.Inactive
+++}
+++
+++/**
+++ * Monotonic authority for the DEV protected-surface spike.
+++ *
+++ * Epochs and capture sequences are never reset, including after disarm. This deliberately avoids
+++ * ABA reuse: work created before a Chrome exit can never become current after a later re-entry.
+++ */
+++internal class ChromePhotosProtectedSurfaceState {
+++    private var phase = ChromePhotosProtectedSurfacePhase.Inactive
+++    private var epoch = 0L
+++    private var nextSequence = 0L
+++    private var activeSequence = 0L
+++    private var presentedSequence = 0L
+++    private var windowId = InvalidWindowId
+++    private var viewport: ChromeVisualViewport? = null
+++
+++    @Synchronized
+++    fun arm(
+++        windowId: Int,
+++        viewport: ChromeVisualViewport,
+++    ): ChromePhotosProtectedSurfaceSnapshot {
+++        if (
+++            phase == ChromePhotosProtectedSurfacePhase.Inactive ||
+++            this.windowId != windowId ||
+++            this.viewport != viewport
+++        ) {
+++            epoch += 1L
+++            this.windowId = windowId
+++            this.viewport = viewport
+++            activeSequence = 0L
+++            phase = ChromePhotosProtectedSurfacePhase.Covered
+++        }
+++        return snapshotLocked()
+++    }
+++
+++    @Synchronized
+++    fun invalidate(
+++        windowId: Int,
+++        viewport: ChromeVisualViewport,
+++        motion: Boolean,
+++    ): ChromePhotosProtectedSurfaceSnapshot {
+++        epoch += 1L
+++        this.windowId = windowId
+++        this.viewport = viewport
+++        activeSequence = 0L
+++        phase =
+++            if (motion) {
+++                ChromePhotosProtectedSurfacePhase.Motion
+++            } else {
+++                ChromePhotosProtectedSurfacePhase.Covered
+++            }
+++        return snapshotLocked()
+++    }
+++
+++    @Synchronized
+++    fun markSettling(expectedEpoch: Long): Boolean {
+++        if (!matchesEpoch(expectedEpoch)) return false
+++        phase = ChromePhotosProtectedSurfacePhase.Settling
+++        return true
+++    }
+++
+++    @Synchronized
+++    fun beginCapture(expectedEpoch: Long): ChromePhotosProtectedSurfaceToken? {
+++        val currentViewport = viewport ?: return null
+++        if (!matchesEpoch(expectedEpoch)) return null
+++        nextSequence += 1L
+++        activeSequence = nextSequence
+++        phase = ChromePhotosProtectedSurfacePhase.Capturing
+++        return ChromePhotosProtectedSurfaceToken(
+++            epoch = epoch,
+++            windowId = windowId,
+++            sequence = activeSequence,
+++            viewport = currentViewport,
+++        )
+++    }
+++
+++    @Synchronized
+++    fun markCommitReady(token: ChromePhotosProtectedSurfaceToken): Boolean {
+++        if (!isCurrent(token)) return false
+++        phase = ChromePhotosProtectedSurfacePhase.CommitReady
+++        return true
+++    }
+++
+++    @Synchronized
+++    fun markPresented(token: ChromePhotosProtectedSurfaceToken): Boolean {
+++        if (!isCurrent(token) || phase != ChromePhotosProtectedSurfacePhase.CommitReady) return false
+++        presentedSequence = token.sequence
+++        phase = ChromePhotosProtectedSurfacePhase.Presented
+++        return true
+++    }
+++
+++    @Synchronized
+++    fun fail(token: ChromePhotosProtectedSurfaceToken): Boolean {
+++        if (!isCurrent(token)) return false
+++        phase = ChromePhotosProtectedSurfacePhase.Covered
+++        return true
+++    }
+++
+++    @Synchronized
+++    fun disarm(): ChromePhotosProtectedSurfaceSnapshot {
+++        if (phase != ChromePhotosProtectedSurfacePhase.Inactive) epoch += 1L
+++        phase = ChromePhotosProtectedSurfacePhase.Inactive
+++        windowId = InvalidWindowId
+++        viewport = null
+++        activeSequence = 0L
+++        return snapshotLocked()
+++    }
+++
+++    @Synchronized
+++    fun snapshot(): ChromePhotosProtectedSurfaceSnapshot = snapshotLocked()
+++
+++    private fun matchesEpoch(expectedEpoch: Long): Boolean =
+++        phase != ChromePhotosProtectedSurfacePhase.Inactive && epoch == expectedEpoch
+++
+++    private fun isCurrent(token: ChromePhotosProtectedSurfaceToken): Boolean =
+++        phase != ChromePhotosProtectedSurfacePhase.Inactive &&
+++            token.epoch == epoch &&
+++            token.windowId == windowId &&
+++            token.sequence == activeSequence &&
+++            token.viewport == viewport
+++
+++    private fun snapshotLocked() =
+++        ChromePhotosProtectedSurfaceSnapshot(
+++            phase = phase,
+++            epoch = epoch,
+++            windowId = windowId,
+++            viewport = viewport,
+++            activeSequence = activeSequence,
+++            presentedSequence = presentedSequence,
+++        )
+++
+++    private companion object {
+++        const val InvalidWindowId = -1
+++    }
+++}
++diff --git a/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromeVisualProbeController.kt b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromeVisualProbeController.kt
++index 1aae4e9..8685cc3 100644
++--- a/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromeVisualProbeController.kt
+++++ b/feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromeVisualProbeController.kt
++@@ -2,267 +2,387 @@ package com.contentfilter.feature.accessibility.chromevisual
++ 
++ import android.accessibilityservice.AccessibilityService
++ import android.graphics.Bitmap
++-import android.graphics.Rect
+++import android.graphics.Canvas
+++import android.graphics.Color
+++import android.graphics.Paint
+++import android.graphics.Typeface
++ import android.os.Build
++-import android.os.SystemClock
+++import android.os.Looper
++ import android.util.Log
++ import android.view.accessibility.AccessibilityEvent
++-import android.view.accessibility.AccessibilityWindowInfo
++ import com.contentfilter.feature.accessibility.R
++ import kotlinx.coroutines.CoroutineScope
++ import kotlinx.coroutines.Dispatchers
++ import kotlinx.coroutines.Job
++-import kotlinx.coroutines.NonCancellable
++ import kotlinx.coroutines.delay
++ import kotlinx.coroutines.launch
++-import kotlinx.coroutines.suspendCancellableCoroutine
++ import kotlinx.coroutines.withContext
++-import kotlin.coroutines.resume
++ 
+++/**
+++ * DEV-only feasibility probe for CHROME-PHOTOS-PROTECTED-SURFACE-00.
+++ *
+++ * It deliberately never presents captured Chrome pixels. The single persistent host stays opaque,
+++ * captures the Chrome window underneath, derives only an in-memory change signature and atomically
+++ * stages a generated proof frame. This isolates the platform question before photo detection or
+++ * GloshIA decisions are connected.
+++ */
++ internal class ChromeVisualProbeController(
++     private val service: AccessibilityService,
++     private val scope: CoroutineScope,
++ ) : AutoCloseable {
++-    private val enabled = service.resources.getBoolean(R.bool.chrome_visual_probe_enabled)
++-    private val stateLock = Any()
+++    private val enabled =
+++        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+++            service.resources.getBoolean(R.bool.chrome_photos_protected_surface_probe_enabled)
+++    private val capture = ChromeWindowCapture(service)
+++    private val windowInspector = ChromeVisualWindowInspector(service)
+++    private val state = ChromePhotosProtectedSurfaceState()
+++    private val surface = ChromePhotosProtectedSurface(service)
+++    private val jobLock = Any()
++     private var activeJob: Job? = null
++-    private var lastWindowId = InvalidWindowId
++-    private var lastCompletedAtMillis = 0L
+++
+++    @Volatile
+++    private var lastUnderlaySignature: Long? = null
++ 
++     fun onAccessibilityEvent(event: AccessibilityEvent) {
++-        if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
++-        if (event.packageName?.toString() != ChromePackageName) return
++-        val requestedWindowId = event.windowId.takeIf { it != InvalidWindowId } ?: return
++-        val now = SystemClock.elapsedRealtime()
++-        synchronized(stateLock) {
++-            if (activeJob?.isActive == true) return
++-            if (requestedWindowId == lastWindowId && now - lastCompletedAtMillis < ProbeCooldownMillis) return
