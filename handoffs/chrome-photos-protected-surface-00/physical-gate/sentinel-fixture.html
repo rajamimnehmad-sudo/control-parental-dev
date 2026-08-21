@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Glosh Chrome Photos Surface Sentinel</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #111; font-family: sans-serif; }
+  .panel { min-height: 92vh; padding: 24px; display: grid; place-items: center; }
+  .magenta { background: #ff00ff; color: #111; }
+  .lime { background: #00ff00; color: #111; }
+  .checker {
+    min-height: 92vh;
+    background:
+      linear-gradient(45deg, #ff00ff 25%, transparent 25%) 0 0/96px 96px,
+      linear-gradient(45deg, transparent 75%, #ff00ff 75%) 0 0/96px 96px,
+      linear-gradient(45deg, transparent 75%, #00ff00 75%) 48px -48px/96px 96px,
+      linear-gradient(45deg, #00ff00 25%, #111 25%) 48px -48px/96px 96px;
+  }
+  .card { max-width: 780px; padding: 32px; background: rgba(255,255,255,.90); border: 8px solid #111; font-size: 28px; }
+  #lazy { min-height: 184vh; background: #222; padding: 24px; }
+  .lazy-band { min-height: 85vh; display: grid; place-items: center; font-size: 34px; font-weight: 700; }
+</style>
+</head>
+<body>
+  <section class="panel magenta"><div class="card">RAW SENTINEL A — MAGENTA</div></section>
+  <section class="panel lime"><div class="card">RAW SENTINEL B — LIME</div></section>
+  <section class="checker"><div class="card">RAW SENTINEL C — CHECKER</div></section>
+  <section id="lazy"><div class="card">Scroll here. Lazy sentinel bands are inserted below.</div></section>
+<script>
+  const lazy = document.querySelector('#lazy');
+  let inserted = false;
+  const insertLazy = () => {
+    if (inserted) return;
+    inserted = true;
+    for (let i = 0; i < 4; i += 1) {
+      const band = document.createElement('div');
+      band.className = 'lazy-band';
+      band.style.background = i % 2 === 0 ? '#ff00ff' : '#00ff00';
+      band.textContent = `LAZY RAW SENTINEL ${i + 1}`;
+      lazy.appendChild(band);
+    }
+  };
+  new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting)) setTimeout(insertLazy, 120);
+  }, { rootMargin: '400px' }).observe(lazy);
+</script>
+</body>
+</html>
