@@ -465,7 +465,7 @@ internal class ChromeVisualController(
 
     private fun precover(viewport: ChromeVisualViewport): List<ChromeVisualRegion> {
         val coverage = fallbackTiles(viewport)
-        val shown = overlay.beginBarrier(viewport)
+        val shown = overlay.beginBarrier(coverage)
         clipForInputMethod()
         return if (shown) coverage else emptyList()
     }
