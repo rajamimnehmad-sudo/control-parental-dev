@@ -1,6 +1,5 @@
 package com.contentfilter.admin
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,17 +19,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.announcements.AdminAnnouncementsViewModel
@@ -40,13 +36,10 @@ import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.ui.GloshColors
 import com.contentfilter.core.ui.GloshShapes
 import com.contentfilter.core.ui.GloshSpacing
+import com.contentfilter.core.ui.GloshWordmark
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 
-/**
- * Nuevo Home Admin. Vive separado del Home anterior mientras la dirección visual
- * esté en revisión, para poder volver atrás sin reconstruir la pantalla previa.
- */
 @Composable
 internal fun RedesignedHomeTab(
     onCreateUser: () -> Unit,
@@ -61,17 +54,16 @@ internal fun RedesignedHomeTab(
 
     LaunchedEffect(Unit) { announcementsViewModel.refresh() }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .background(GloshColors.Bone),
-    ) {
-        GloshAdminHeader(
+    val affectedCount = dashboardState.protectedUsers.count(ProtectedUserHealthUiState::hasConfirmedProblem)
+    val pendingVerification = dashboardState.protectedUsers.count(ProtectedUserHealthUiState::requiresVerification)
+    val possibleUninstall = dashboardState.protectedUsers.count(ProtectedUserHealthUiState::possibleUninstall)
+    val attentionCount = (affectedCount + pendingVerification + possibleUninstall).coerceAtMost(dashboardState.protectedUsers.size)
+    val healthy = attentionCount == 0 && dashboardState.licenseState.isOperational()
+
+    Column(modifier = Modifier.fillMaxSize().background(GloshColors.Bone)) {
+        AdminV4Header(
             administratorName = dashboardState.guideName.ifBlank { "Administrador" },
             communityName = dashboardState.communityName,
-            licenseState = dashboardState.licenseState,
-            licenseExpiresAtEpochMillis = dashboardState.licenseExpiresAtEpochMillis,
             announcementCount = announcementsState.unreadCount,
             onAnnouncements = onAnnouncements,
         )
@@ -83,155 +75,104 @@ internal fun RedesignedHomeTab(
                     .verticalScroll(rememberScrollState())
                     .padding(
                         start = GloshSpacing.PageHorizontal,
-                        top = 8.dp,
+                        top = 4.dp,
                         end = GloshSpacing.PageHorizontal,
                         bottom = 28.dp,
                     ),
-            verticalArrangement = Arrangement.spacedBy(GloshSpacing.Section),
         ) {
-            Text(
-                text = "Resumen",
-                style = MaterialTheme.typography.labelLarge,
-                color = GloshColors.Muted,
-            )
-
-            GloshProtectionCard(
-                users = dashboardState.protectedUsers,
+            AdminProtectionHero(
+                healthy = healthy,
+                totalUsers = dashboardState.activeUserCount,
+                attentionCount = attentionCount,
                 licenseState = dashboardState.licenseState,
                 onClick = onProtectionStatus,
             )
 
-            GloshActionCard(
-                title = "Agregar usuario",
-                subtitle = "Crear y vincular un nuevo usuario",
-                onClick = onCreateUser,
+            AdminMetricsLine(
+                activeUsers = dashboardState.activeUserCount,
+                pendingRequests = dashboardState.pendingRequests,
+                onRequests = onRequests,
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                GloshMetricCard(
-                    value = dashboardState.activeUserCount.toString(),
-                    label = "Usuarios activos",
-                    modifier = Modifier.weight(1f),
-                )
-                GloshMetricCard(
-                    value = dashboardState.pendingRequests.toString(),
-                    label = "Solicitudes",
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .clickable(onClick = onRequests),
-                    emphasized = dashboardState.pendingRequests > 0,
-                )
-            }
+            AdminSectionHeader("Ahora")
+            AdminActionRow(
+                icon = ProductIcon.Person,
+                title = "Agregar usuario",
+                subtitle = "Crear y vincular un nuevo usuario",
+                trailing = null,
+                onClick = onCreateUser,
+            )
+            AdminActionRow(
+                icon = ProductIcon.Requests,
+                title = if (dashboardState.pendingRequests == 0) "Solicitudes" else "${dashboardState.pendingRequests} solicitudes esperando",
+                subtitle = if (dashboardState.pendingRequests == 0) "No hay decisiones pendientes" else "Resolver pedidos sin entrar usuario por usuario",
+                trailing = if (dashboardState.pendingRequests > 0) "Revisar" else null,
+                warning = dashboardState.pendingRequests > 0,
+                onClick = onRequests,
+            )
+            AdminActionRow(
+                icon = if (healthy) ProductIcon.ShieldCheck else ProductIcon.ShieldAlert,
+                title = if (healthy) "Protección estable" else "Protección por revisar",
+                subtitle =
+                    when {
+                        attentionCount > 0 -> "$attentionCount usuario${if (attentionCount == 1) "" else "s"} necesita${if (attentionCount == 1) "" else "n"} atención"
+                        !dashboardState.licenseState.isOperational() -> "La licencia necesita revisión"
+                        else -> "Todos los usuarios responden correctamente"
+                    },
+                trailing = if (healthy) "OK" else "Revisar",
+                warning = !healthy,
+                onClick = onProtectionStatus,
+            )
 
-            if (dashboardState.pendingRequests > 0) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onRequests,
-                    shape = GloshShapes.Card,
-                    colors = CardDefaults.cardColors(containerColor = GloshColors.LimeSoft),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        ProductGlyph(
-                            icon = ProductIcon.Requests,
-                            color = GloshColors.Graphite,
-                            modifier = Modifier.size(24.dp),
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Hay solicitudes esperando",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = GloshColors.Graphite,
-                            )
-                            Text(
-                                text = "Revisalas desde Solicitudes",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GloshColors.GraphiteSoft,
-                            )
-                        }
-                        ProductGlyph(
-                            icon = ProductIcon.ChevronRight,
-                            color = GloshColors.Graphite,
-                            modifier = Modifier.size(22.dp),
-                        )
-                    }
-                }
+            AdminSectionHeader("Cuenta")
+            AdminFlatInfoRow(
+                label = "Licencia",
+                value = dashboardState.licenseState.adminLabel(),
+                warning = !dashboardState.licenseState.isOperational(),
+            )
+            if (dashboardState.communityName.isNotBlank()) {
+                AdminFlatInfoRow(label = "Comunidad", value = dashboardState.communityName)
             }
         }
     }
 }
 
 @Composable
-private fun GloshAdminHeader(
+private fun AdminV4Header(
     administratorName: String,
     communityName: String,
-    licenseState: LicenseState,
-    licenseExpiresAtEpochMillis: Long?,
     announcementCount: Int,
     onAnnouncements: () -> Unit,
 ) {
-    val licenseAccent = licenseAccent(licenseState)
-
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(GloshColors.Bone)
                 .statusBarsPadding()
                 .padding(
                     start = GloshSpacing.PageHorizontal,
                     top = 12.dp,
                     end = GloshSpacing.PageHorizontal,
-                    bottom = 20.dp,
+                    bottom = 16.dp,
                 ),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "glosh",
-                modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = (-1.1).sp,
-                color = GloshColors.Graphite,
-            )
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            GloshWordmark(modifier = Modifier.weight(1f))
             Box {
                 IconButton(
                     onClick = onAnnouncements,
-                    modifier =
-                        Modifier
-                            .size(44.dp)
-                            .background(GloshColors.Surface, CircleShape)
-                            .semantics { contentDescription = "Abrir avisos" },
+                    modifier = Modifier.size(44.dp).background(GloshColors.Surface, CircleShape),
                 ) {
-                    ProductGlyph(
-                        icon = ProductIcon.Bell,
-                        color = GloshColors.Graphite,
-                        modifier = Modifier.size(23.dp),
-                    )
+                    ProductGlyph(ProductIcon.Bell, GloshColors.Graphite, Modifier.size(22.dp))
                 }
                 if (announcementCount > 0) {
                     Box(
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopEnd)
-                                .size(18.dp)
-                                .background(GloshColors.Lime, CircleShape),
+                        modifier = Modifier.align(Alignment.TopEnd).size(18.dp).background(GloshColors.Lime, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = announcementCount.coerceAtMost(99).toString(),
+                            announcementCount.coerceAtMost(99).toString(),
                             style = MaterialTheme.typography.labelSmall,
                             color = GloshColors.Graphite,
                         )
@@ -239,207 +180,196 @@ private fun GloshAdminHeader(
                 }
             }
         }
-
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                text = "Hola, $administratorName",
+                "Hola, $administratorName",
                 style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
                 color = GloshColors.Graphite,
             )
             if (communityName.isNotBlank()) {
-                Text(
-                    text = communityName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GloshColors.Muted,
-                )
+                Text(communityName, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
             }
         }
-
-        Text(
-            modifier =
-                Modifier
-                    .background(licenseAccent.copy(alpha = 0.10f), GloshShapes.Pill)
-                    .padding(horizontal = 12.dp, vertical = 7.dp),
-            text = licenseSummary(licenseState, licenseExpiresAtEpochMillis),
-            style = MaterialTheme.typography.labelMedium,
-            color = licenseAccent,
-        )
     }
 }
 
 @Composable
-private fun GloshProtectionCard(
-    users: List<ProtectedUserHealthUiState>,
+private fun AdminProtectionHero(
+    healthy: Boolean,
+    totalUsers: Int,
+    attentionCount: Int,
     licenseState: LicenseState,
     onClick: () -> Unit,
 ) {
-    val affectedCount = users.count(ProtectedUserHealthUiState::hasConfirmedProblem)
-    val pendingCount = users.count(ProtectedUserHealthUiState::requiresVerification)
-    val criticalCount = users.count(ProtectedUserHealthUiState::possibleUninstall)
-    val cardState =
-        protectionCardState(
-            licenseState = licenseState,
-            userCount = users.size,
-            affectedCount = affectedCount,
-            pendingCount = pendingCount,
-            criticalCount = criticalCount,
-        )
-    val accent = protectionAccent(cardState)
-    val needsAttention = cardState != ProtectionCardState.Healthy
-
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
         shape = GloshShapes.LargeCard,
-        colors = CardDefaults.cardColors(containerColor = GloshColors.Surface),
-        border = BorderStroke(1.dp, GloshColors.Line),
+        colors = CardDefaults.cardColors(containerColor = GloshColors.Graphite),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(52.dp)
-                        .background(accent.copy(alpha = 0.12f), CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                ProductGlyph(
-                    icon = if (needsAttention) ProductIcon.ShieldAlert else ProductIcon.ShieldCheck,
-                    color = accent,
-                    modifier = Modifier.size(30.dp),
-                )
-            }
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    text = protectionTitle(cardState),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = GloshColors.Graphite,
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(9.dp)
+                            .background(if (healthy) GloshColors.Lime else GloshColors.Warning, CircleShape),
                 )
                 Text(
-                    text = cardState.summary,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GloshColors.Muted,
+                    if (healthy) "Protección estable" else "Necesita atención",
+                    modifier = Modifier.padding(start = 9.dp).weight(1f),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = GloshColors.Surface,
+                )
+                Text(
+                    licenseState.adminLabel(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = GloshColors.Surface.copy(alpha = 0.72f),
                 )
             }
-            ProductGlyph(
-                icon = ProductIcon.ChevronRight,
-                color = GloshColors.Muted,
-                modifier = Modifier.size(22.dp),
+            Text(
+                if (healthy) "$totalUsers usuario${if (totalUsers == 1) "" else "s"} protegido${if (totalUsers == 1) "" else "s"}" else "$attentionCount por revisar",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = GloshColors.Surface,
+            )
+            Text(
+                if (healthy) "No hay problemas importantes ahora." else "Entrá para ver exactamente quién necesita una acción.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GloshColors.Surface.copy(alpha = 0.78f),
             )
         }
     }
 }
 
 @Composable
-private fun GloshActionCard(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
+private fun AdminMetricsLine(
+    activeUsers: Int,
+    pendingRequests: Int,
+    onRequests: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        shape = GloshShapes.Card,
-        colors = CardDefaults.cardColors(containerColor = GloshColors.Surface),
-        border = BorderStroke(1.dp, GloshColors.Line),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(24.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier.size(46.dp).background(GloshColors.LimeSoft, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                ProductGlyph(
-                    icon = ProductIcon.Person,
-                    color = GloshColors.Graphite,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
-            }
-            ProductGlyph(
-                icon = ProductIcon.ChevronRight,
-                color = GloshColors.Muted,
-                modifier = Modifier.size(22.dp),
-            )
-        }
+        AdminMetric(value = activeUsers.toString(), label = "usuarios activos", modifier = Modifier.weight(1f))
+        AdminMetric(
+            value = pendingRequests.toString(),
+            label = "solicitudes",
+            modifier = Modifier.weight(1f).clickable(onClick = onRequests),
+            emphasized = pendingRequests > 0,
+        )
     }
 }
 
 @Composable
-private fun GloshMetricCard(
+private fun AdminMetric(
     value: String,
     label: String,
     modifier: Modifier = Modifier,
     emphasized: Boolean = false,
 ) {
-    Column(
-        modifier =
-            modifier
-                .background(
-                    color = if (emphasized) GloshColors.LimeSoft else GloshColors.Surface,
-                    shape = GloshShapes.Card,
-                )
-                .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text(
-            text = value,
-            style = MaterialTheme.typography.headlineSmall,
-            color = GloshColors.Graphite,
+            value,
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = if (emphasized) GloshColors.Warning else GloshColors.Graphite,
         )
+        Text(label, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
+    }
+}
+
+@Composable
+private fun AdminSectionHeader(title: String) {
+    Text(
+        title,
+        modifier = Modifier.fillMaxWidth().padding(top = 26.dp, bottom = 8.dp),
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.Bold,
+        color = GloshColors.Graphite,
+    )
+}
+
+@Composable
+private fun AdminActionRow(
+    icon: ProductIcon,
+    title: String,
+    subtitle: String,
+    trailing: String?,
+    warning: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(
+            modifier = Modifier.size(42.dp).background(GloshColors.Surface, GloshShapes.Small),
+            contentAlignment = Alignment.Center,
+        ) {
+            ProductGlyph(icon, GloshColors.Graphite, Modifier.size(21.dp))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
+        }
+        if (trailing != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .background(if (warning) GloshColors.WarningSoft else GloshColors.PositiveSoft, GloshShapes.Pill)
+                        .padding(horizontal = 9.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    trailing,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (warning) GloshColors.Warning else GloshColors.Positive,
+                )
+            }
+        } else {
+            ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(21.dp))
+        }
+    }
+    Box(modifier = Modifier.fillMaxWidth().size(height = 1.dp, width = 1.dp).background(GloshColors.Line))
+}
+
+@Composable
+private fun AdminFlatInfoRow(
+    label: String,
+    value: String,
+    warning: Boolean = false,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
         Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = GloshColors.Muted,
+            value,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (warning) GloshColors.Warning else GloshColors.Graphite,
         )
     }
 }
 
-private fun protectionTitle(state: ProtectionCardState): String =
-    when (state) {
-        ProtectionCardState.Healthy -> "Protección activa"
-        ProtectionCardState.Critical -> "Atención inmediata"
-        ProtectionCardState.NeedsAttention -> "Requiere atención"
-        ProtectionCardState.PendingVerification -> "Verificando protección"
-        ProtectionCardState.LicenseBlocked -> "Protección suspendida"
-        ProtectionCardState.NoUsers -> "Empezá agregando un usuario"
-    }
+private fun LicenseState.isOperational(): Boolean =
+    this == LicenseState.Active || this == LicenseState.ExpiringSoon || this == LicenseState.GracePeriod
 
-private fun protectionAccent(state: ProtectionCardState): Color =
-    when (state) {
-        ProtectionCardState.Healthy -> GloshColors.Positive
-        ProtectionCardState.PendingVerification,
-        ProtectionCardState.NoUsers,
-        -> GloshColors.Warning
-        ProtectionCardState.Critical,
-        ProtectionCardState.NeedsAttention,
-        ProtectionCardState.LicenseBlocked,
-        -> GloshColors.Danger
-    }
-
-private fun licenseAccent(state: LicenseState): Color =
-    when (state) {
-        LicenseState.Active -> GloshColors.Positive
-        LicenseState.ExpiringSoon,
-        LicenseState.GracePeriod,
-        LicenseState.Scheduled,
-        -> GloshColors.Warning
-        LicenseState.Expired,
-        LicenseState.Suspended,
-        LicenseState.PendingActivation,
-        -> GloshColors.Danger
+private fun LicenseState.adminLabel(): String =
+    when (this) {
+        LicenseState.Active -> "Licencia activa"
+        LicenseState.Scheduled -> "Licencia programada"
+        LicenseState.ExpiringSoon -> "Licencia por vencer"
+        LicenseState.PendingActivation -> "Activación pendiente"
+        LicenseState.Expired -> "Licencia vencida"
+        LicenseState.GracePeriod -> "Período de gracia"
+        LicenseState.Suspended -> "Licencia suspendida"
     }
