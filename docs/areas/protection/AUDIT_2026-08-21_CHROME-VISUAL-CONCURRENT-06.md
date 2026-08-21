@@ -24,9 +24,14 @@ Fecha: 2026-08-21. Resultado de auditoria: **PASS**.
 - Abierto y Draft; GitHub lo informo `MERGEABLE` pero `UNSTABLE`.
 - Sin reviews ni threads tecnicos. Los comentarios existentes son el bloqueo
   fisico S22 anterior y el bot de Vercel.
-- Android CI y el gate de navegador estaban en curso para el HEAD observado;
-  Vercel fallaba en `web-super-admin`, area no modificada por este lote. Esta
-  auditoria no interpreta checks pendientes como seguridad visual aprobada.
+- El gate `Verificar navegador protegido` termino en failure porque
+  `:verifyDagDiagnosticUploadConfig` rechazo empaquetar una APK diagnostica sin
+  `DAG_DIAGNOSTIC_UPLOAD_TOKEN`. Es un bloqueo de configuracion del workflow:
+  no demuestra fallo ni PASS de los cambios Chrome y deja el gate integral sin
+  aprobar. `Build, tests, lint, detekt` seguia pendiente al ultimo control.
+- Vercel fallaba en `web-super-admin`, area no modificada por este lote. Esta
+  auditoria no interpreta checks pendientes o bloqueados por configuracion como
+  seguridad visual aprobada.
 - El body del PR sigue declarando HEAD de producto `88ca10f6` y un Controller de
   exactamente 500 lineas; ambos datos quedaron desactualizados por los commits
   concurrentes posteriores.

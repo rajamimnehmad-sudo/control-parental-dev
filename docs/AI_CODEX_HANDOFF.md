@@ -13,6 +13,11 @@
   build, APK, ADB, A23, Production, merge ni cambios en Control Center.
 - PR #97 continuo recibiendo commits durante la auditoria. No se modifico ni se
   mezclo ese trabajo; la evidencia documental se aisla desde `36b7c004`.
+- El gate `Verificar navegador protegido` fallo en
+  `:verifyDagDiagnosticUploadConfig` por ausencia de
+  `DAG_DIAGNOSTIC_UPLOAD_TOKEN`; es un bloqueo de configuracion, no evidencia
+  funcional a favor o en contra de Chrome. El gate integral no quedo verde y
+  `Build, tests, lint, detekt` seguia pendiente al ultimo control.
 
 ### Resultado
 
