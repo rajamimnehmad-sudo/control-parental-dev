@@ -38,6 +38,7 @@ internal class ChromeVisualController(
     private val pageBlockLedger = ChromeVisualPageBlockLedger()
     private val videoPolicy = ChromeVisualVideoPolicy()
     private val baselineCoordinator = ChromeVisualBaselineCoordinator()
+    private val atomicReplayCoordinator = ChromeVisualAtomicReplayCoordinator()
     private val regionAnalyzer = ChromeVisualRegionAnalyzer(service)
     private var activeJob: Job? = null
     private var verificationJob: Job? = null
@@ -83,8 +84,21 @@ internal class ChromeVisualController(
                 return
             }
         val currentContext = ChromeVisualBaselineContext(windowId, windowInspector.pageIdentity(window), viewport)
-        if (baselineCoordinator.coalesceIfActive(currentContext)) return
         val pageChanged = beginPage(currentContext.pageIdentity)
+        val atomicMutation = ChromeVisualAtomicMutationPolicy.requiresReplay(event)
+        if (atomicMutation) {
+            atomicReplayCoordinator.request()
+            synchronized(lock) {
+                activeJob?.cancel()
+                activeJob = null
+                verificationJob?.cancel()
+                verificationJob = null
+                identityGate.invalidate(windowId)
+            }
+            baselineCoordinator.cancelIfActive(currentContext)
+        } else if (baselineCoordinator.coalesceIfActive(currentContext)) {
+            return
+        }
         val requiresBaseline =
             ChromeVisualEventModePolicy.requiresBaseline(
                 pageChanged,
@@ -98,7 +112,7 @@ internal class ChromeVisualController(
         lastViewport = viewport
         stableVerificationCount = 0
         val eventAt = SystemClock.elapsedRealtime()
-        val coverageTiles = if (requiresBaseline) precover(viewport) else emptyList()
+        val coverageTiles = if (requiresBaseline || atomicMutation) precover(viewport) else emptyList()
         var startsBurst = false
         synchronized(lock) {
             verificationJob?.cancel()
@@ -123,11 +137,12 @@ internal class ChromeVisualController(
                     }
                 }
         }
-        if (startsBurst && requiresBaseline) {
+        if (startsBurst && coverageTiles.isNotEmpty()) {
             Log.i(
                 LogTag,
                 "windowId=$windowId phase=precover coverMs=${SystemClock.elapsedRealtime() - eventAt} " +
-                    "regions=${coverageTiles.size} result=success",
+                    "regions=${coverageTiles.size} trigger=${if (requiresBaseline) "baseline" else "atomic_replay"} " +
+                    "result=success",
             )
         }
     }
@@ -149,6 +164,7 @@ internal class ChromeVisualController(
             activeWindowId = AnyWindowId
             lastViewport = null
             baselineCoordinator.clear()
+            atomicReplayCoordinator.clear()
         }
         overlay.close()
         decisionCache.clear()
@@ -247,6 +263,7 @@ internal class ChromeVisualController(
             runBaseline(context, SystemClock.elapsedRealtime(), 0L)
             return
         }
+        val replayRevision = atomicReplayCoordinator.currentRevision()
         val frame =
             when (val result = capture.capture(window.id)) {
                 is ChromeWindowCaptureResult.Captured -> result.frame
@@ -274,7 +291,13 @@ internal class ChromeVisualController(
                     current,
                 )
             val confirmations = videoPolicy.regionsNeedingConfirmation(window.id, pageIdentity, tiles)
-            val changed = (visuallyChanged + confirmations).distinctBy(ChromeVisualRegion::id)
+            val changed =
+                ChromeVisualReplayRegionPolicy.select(
+                    replayActive = replayRevision != null,
+                    fallbackTiles = tiles,
+                    visuallyChanged = visuallyChanged,
+                    confirmations = confirmations,
+                )
             if (changed.isEmpty()) {
                 lastTileSignatures = current
                 stableVerificationCount += 1
@@ -293,12 +316,18 @@ internal class ChromeVisualController(
                 ChromeVisualSignatureLedger.advance(
                     previous,
                     current,
-                    changed.mapTo(mutableSetOf(), ChromeVisualRegion::id),
+                    counts.processedRegionIds,
                 )
+            val replayCompleted =
+                replayRevision?.let { revision ->
+                    counts.completed && atomicReplayCoordinator.complete(revision)
+                } == true
             Log.i(
                 LogTag,
                 "windowId=${window.id} phase=verify captureMs=${frame.latencyMillis} changed=${changed.size} " +
-                    "allowed=${counts.allowed} blocked=${counts.blocked} result=updated",
+                    "allowed=${counts.allowed} blocked=${counts.blocked} " +
+                    "replay=${if (replayRevision == null) "none" else if (replayCompleted) "complete" else "pending"} " +
+                    "result=updated",
             )
             scheduleVerification(window.id)
         } finally {
@@ -317,6 +346,8 @@ internal class ChromeVisualController(
         val captureIdentity = synchronized(lock) { identityGate.nextCapture() }
         var blocked = 0
         var allowed = 0
+        var completed = true
+        val processedRegionIds = mutableSetOf<String>()
         val fallbackTiles = fallbackTiles(viewport)
         for (region in regions) {
             val temporal = region.id.startsWith(FallbackRegionPrefix)
@@ -331,8 +362,16 @@ internal class ChromeVisualController(
                     clipForInputMethod()
                 }
             }
-            val frameRegion = ChromeVisualGeometryMapper.toFrame(region, viewport, frame.width, frame.height) ?: continue
-            val signature = ChromeVisualFrameSignature.one(frame.bitmap, frameRegion, region) ?: continue
+            val frameRegion = ChromeVisualGeometryMapper.toFrame(region, viewport, frame.width, frame.height)
+            if (frameRegion == null) {
+                completed = false
+                continue
+            }
+            val signature = ChromeVisualFrameSignature.one(frame.bitmap, frameRegion, region)
+            if (signature == null) {
+                completed = false
+                continue
+            }
             val identity =
                 ChromeVisualIdentity(
                     windowId = windowId,
@@ -353,7 +392,7 @@ internal class ChromeVisualController(
                     } == true
                 }
             if (!windowStillCurrent || !synchronized(lock) { identityGate.isCurrent(identity) }) {
-                return RegionCounts(allowed, blocked)
+                return RegionCounts(allowed, blocked, completed = false, processedRegionIds = processedRegionIds)
             }
             withContext(Dispatchers.Main.immediate) {
                 if (temporal) {
@@ -377,9 +416,10 @@ internal class ChromeVisualController(
                 }
                 clipForInputMethod()
             }
+            processedRegionIds += region.id
             if (decision.action == GloshiaVisualAction.Block) blocked++ else allowed++
         }
-        return RegionCounts(allowed, blocked)
+        return RegionCounts(allowed, blocked, completed, processedRegionIds)
     }
 
     private fun clipForInputMethod() {
@@ -393,6 +433,7 @@ internal class ChromeVisualController(
             decisionCache.clear()
             lastTileSignatures = emptyMap()
             stableVerificationCount = 0
+            atomicReplayCoordinator.clear()
         }
         return changed
     }
