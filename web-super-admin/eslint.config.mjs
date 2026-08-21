@@ -14,6 +14,6 @@ export default [
     },
   },
   {
-    ignores: [".next/**", "next-env.d.ts"],
+    ignores: [".next/**", ".open-next/**", "next-env.d.ts"],
   },
 ];
