@@ -1,0 +1,11 @@
+{
+  "video": "/mnt/data/chrome-photos-protected-surface-00/physical-gate/synthetic-pass.mp4",
+  "fps": 30.0,
+  "checked_frames": 60,
+  "skip_seconds": 0.0,
+  "sentinel_exposure_frames": 0,
+  "surface_marker_missing_frames": 0,
+  "first_sentinel_failures": [],
+  "first_marker_failures": [],
+  "result": "PASS"
+}
