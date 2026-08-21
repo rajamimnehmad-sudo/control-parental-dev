@@ -20,6 +20,8 @@ internal data class ChromePhotosProtectedSurfaceStats(
     val authorityEpoch: Long,
     val pendingEpoch: Long?,
     val discardedPendingFrameCount: Int,
+    val transparent: Boolean,
+    val transparencyGrantCount: Int,
 )
 
 internal enum class ChromePhotosProtectedSurfaceCoverResult {
@@ -34,8 +36,10 @@ internal enum class ChromePhotosProtectedSurfaceCoverResult {
  * The SurfaceControl host is attached to Chrome's own window so it inherits that window's rotation
  * transition instead of receiving the independent fade applied to TYPE_ACCESSIBILITY_OVERLAY
  * windows. The host has an empty touchable region and a rotation-invariant square extent. It owns
- * every staged bitmap and never makes itself transparent while armed. A frame swap happens inside
- * one onDraw, so a draw can only observe the old complete frame or the new complete frame.
+ * every staged bitmap. It may become compositor-transparent only for a current, explicit DEV
+ * data-plane lease; the opaque buffer remains resident underneath and is restored fail-closed.
+ * A frame swap happens inside one onDraw, so a draw can only observe the old complete frame or the
+ * new complete frame.
  */
 internal class ChromePhotosProtectedSurface(
     private val service: AccessibilityService,
@@ -49,11 +53,14 @@ internal class ChromePhotosProtectedSurface(
     private var attachedWindowId: Int? = null
     private var hostExtent = 0
     private var viewport: ChromeVisualViewport? = null
+    private val presentationPolicy = ChromePhotosDataPlanePresentationPolicy()
+    private var transparencyGrantCount = 0
 
     fun cover(
         targetWindowId: Int,
         targetViewport: ChromeVisualViewport,
         authorityEpoch: Long,
+        onOpaqueCommitted: (Long) -> Unit = {},
     ): ChromePhotosProtectedSurfaceCoverResult {
         if (!isMainThread()) return ChromePhotosProtectedSurfaceCoverResult.Failed
         val result = ensureAttached(targetWindowId, targetViewport)
@@ -61,7 +68,45 @@ internal class ChromePhotosProtectedSurface(
             return ChromePhotosProtectedSurfaceCoverResult.Failed
         }
         view?.cover(authorityEpoch) ?: return ChromePhotosProtectedSurfaceCoverResult.Failed
+        presentationPolicy.cover(authorityEpoch)
+        if (result == ChromePhotosProtectedSurfaceHostResult.Ready) {
+            val currentHost = host ?: return ChromePhotosProtectedSurfaceCoverResult.Failed
+            val accepted =
+                currentHost.presentOpaque {
+                    if (view?.authorityEpoch() != authorityEpoch) return@presentOpaque
+                    if (!presentationPolicy.markOpaqueCommitted(authorityEpoch)) return@presentOpaque
+                    onOpaqueCommitted(authorityEpoch)
+                }
+            if (!accepted) return ChromePhotosProtectedSurfaceCoverResult.Failed
+        }
         return result.toCoverResult()
+    }
+
+    fun presentTransparent(lease: ChromePhotosDataPlaneLease): Boolean {
+        if (!isMainThread() || !attached) return false
+        val hostedView = view ?: return false
+        val currentHost = host ?: return false
+        if (
+            hostedView.authorityEpoch() != lease.epoch ||
+            currentHost.windowId != lease.windowId ||
+            viewport != lease.viewport ||
+            !presentationPolicy.canPresent(lease)
+        ) {
+            return false
+        }
+        if (!currentHost.presentTransparent()) return false
+        if (!presentationPolicy.markTransparent(lease)) {
+            currentHost.presentOpaque {}
+            return false
+        }
+        transparencyGrantCount += 1
+        return true
+    }
+
+    fun revokeTransparency() {
+        if (!isMainThread()) return
+        presentationPolicy.revoke()
+        host?.presentOpaque {}
     }
 
     /** Takes ownership of [frame], including when the operation is rejected. */
@@ -97,12 +142,15 @@ internal class ChromePhotosProtectedSurface(
             authorityEpoch = view?.authorityEpoch() ?: 0L,
             pendingEpoch = view?.pendingEpoch(),
             discardedPendingFrameCount = view?.discardedPendingFrameCount() ?: 0,
+            transparent = presentationPolicy.isTransparent,
+            transparencyGrantCount = transparencyGrantCount,
         )
 
     override fun close() {
         if (!isMainThread()) return
         detachAndReleaseHost()
         viewport = null
+        presentationPolicy.reset()
     }
 
     private fun ensureAttached(
@@ -166,6 +214,7 @@ internal class ChromePhotosProtectedSurface(
         attached = false
         attachedWindowId = null
         hostExtent = 0
+        presentationPolicy.reset()
     }
 
     private fun isMainThread(): Boolean = Looper.myLooper() == Looper.getMainLooper()

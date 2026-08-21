@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
+import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -37,11 +38,16 @@ internal class ChromeVisualProbeController(
     private val windowInspector = ChromeVisualWindowInspector(service)
     private val state = ChromePhotosProtectedSurfaceState()
     private val surface = ChromePhotosProtectedSurface(service, ::onHostPublicationChanged)
+    private val attestationReader = ChromePhotosDataPlaneAttestationReader(service)
+    private val leaseAuthority = ChromePhotosDataPlaneLeaseAuthority()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val jobLock = Any()
     private var activeJob: Job? = null
     private var pendingTrigger: String? = null
     private var pendingMotion = false
     private var lastArmedEpoch = 0L
+    private var activeLease: ChromePhotosDataPlaneLease? = null
+    private val leaseWatchdog = Runnable(::verifyLeaseOnMain)
 
     @Volatile
     private var lastUnderlaySignature: Long? = null
@@ -94,11 +100,13 @@ internal class ChromeVisualProbeController(
         }
         val rawViewport =
             windowInspector.viewport(window) ?: run {
+                revokeLeaseOnMain("geometry_unavailable")
                 log("geometry", window.id, "unavailable")
                 return
             }
         val viewport =
             rawViewport.clippedAt(inputMethodTop) ?: run {
+                revokeLeaseOnMain("geometry_fully_clipped")
                 log("geometry", window.id, "fully_clipped")
                 return
             }
@@ -114,6 +122,8 @@ internal class ChromeVisualProbeController(
                 )
         if (!contextChanged && !eventInvalidates) return
 
+        revokeLeaseOnMain(if (contextChanged) "context_changed" else "epoch_invalidated")
+
         val motion = chromeEvent && signal.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED
         val snapshot =
             if (!current.isActive) {
@@ -122,7 +132,11 @@ internal class ChromeVisualProbeController(
                 state.invalidate(window.id, viewport, motion)
             }
         val trigger = ChromePhotosProtectedSurfaceEventPolicy.label(signal.eventType)
-        when (surface.cover(window.id, viewport, snapshot.epoch)) {
+        when (
+            surface.cover(window.id, viewport, snapshot.epoch) {
+                onOpaqueCommitted(snapshot)
+            }
+        ) {
             ChromePhotosProtectedSurfaceCoverResult.Failed -> {
                 failSurface(window.id)
                 return
@@ -146,7 +160,11 @@ internal class ChromeVisualProbeController(
         val snapshot = state.snapshot()
         val viewport = snapshot.viewport ?: return
         if (!snapshot.isActive) return
-        when (surface.cover(snapshot.windowId, viewport, snapshot.epoch)) {
+        when (
+            surface.cover(snapshot.windowId, viewport, snapshot.epoch) {
+                onOpaqueCommitted(snapshot)
+            }
+        ) {
             ChromePhotosProtectedSurfaceCoverResult.Failed -> failSurface(snapshot.windowId)
             ChromePhotosProtectedSurfaceCoverResult.Pending -> Unit
             ChromePhotosProtectedSurfaceCoverResult.Ready ->
@@ -185,6 +203,7 @@ internal class ChromeVisualProbeController(
 
     private fun failSurface(windowId: Int) {
         log("surface", windowId, "attach_or_cover_failed")
+        revokeLeaseOnMain("surface_failed")
         state.disarm()
         surface.close()
         pendingTrigger = null
@@ -221,6 +240,9 @@ internal class ChromeVisualProbeController(
         when (val result = capture.capture(token.windowId)) {
             is ChromeWindowCaptureResult.Failed -> {
                 state.fail(token)
+                withContext(Dispatchers.Main.immediate) {
+                    revokeLeaseOnMain("capture_failed")
+                }
                 Log.i(
                     LogTag,
                     "phase=capture windowId=${token.windowId} epoch=${token.epoch} " +
@@ -284,6 +306,7 @@ internal class ChromeVisualProbeController(
             activeJob = null
         }
         val wasActive = state.snapshot().isActive || surface.stats().attached
+        revokeLeaseOnMain(reason)
         state.disarm()
         surface.close()
         lastUnderlaySignature = null
@@ -291,6 +314,105 @@ internal class ChromeVisualProbeController(
         pendingMotion = false
         lastArmedEpoch = 0L
         if (wasActive) Log.i(LogTag, "phase=disarm reason=$reason rawPresented=false result=success")
+    }
+
+    private fun onOpaqueCommitted(snapshot: ChromePhotosProtectedSurfaceSnapshot) {
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            service.mainExecutor.execute { onOpaqueCommitted(snapshot) }
+            return
+        }
+        val current = state.snapshot()
+        val viewport = snapshot.viewport ?: return
+        if (
+            !current.isActive ||
+            current.epoch != snapshot.epoch ||
+            current.windowId != snapshot.windowId ||
+            current.viewport != viewport
+        ) {
+            return
+        }
+        val leaseContext = snapshot.toLeaseContext(viewport)
+        val attestation = attestationReader.read()
+        val lease = leaseAuthority.mint(attestation, leaseContext)
+        if (lease == null || !leaseAuthority.isValid(lease, attestationReader.read(), leaseContext)) {
+            surface.revokeTransparency()
+            logLease("denied", snapshot, "attestation_invalid")
+            return
+        }
+        if (!surface.presentTransparent(lease)) {
+            leaseAuthority.revoke()
+            surface.revokeTransparency()
+            logLease("denied", snapshot, "surface_rejected")
+            return
+        }
+        activeLease = lease
+        scheduleLeaseWatchdog()
+        logLease("granted", snapshot, "healthy")
+    }
+
+    private fun verifyLeaseOnMain() {
+        val lease = activeLease ?: return
+        val snapshot = state.snapshot()
+        val viewport = snapshot.viewport
+        if (viewport == null) {
+            revokeLeaseOnMain("context_absent")
+            return
+        }
+        val context = snapshot.toLeaseContext(viewport)
+        val attestation = attestationReader.read()
+        if (!leaseAuthority.isValid(lease, attestation, context)) {
+            revokeLeaseOnMain("expired_or_unhealthy")
+            return
+        }
+        if (lease.validUntilElapsed - android.os.SystemClock.elapsedRealtime() <= LeaseRenewalLeadMillis) {
+            val renewed = leaseAuthority.mint(attestation, context)
+            if (renewed == null) {
+                revokeLeaseOnMain("renewal_denied")
+                return
+            }
+            activeLease = renewed
+        }
+        scheduleLeaseWatchdog()
+    }
+
+    private fun scheduleLeaseWatchdog() {
+        mainHandler.removeCallbacks(leaseWatchdog)
+        mainHandler.postDelayed(leaseWatchdog, LeaseWatchdogMillis)
+    }
+
+    private fun revokeLeaseOnMain(reason: String) {
+        mainHandler.removeCallbacks(leaseWatchdog)
+        val lease = activeLease
+        val wasTransparent = surface.stats().transparent
+        activeLease = null
+        leaseAuthority.revoke()
+        surface.revokeTransparency()
+        if (lease != null || wasTransparent) {
+            val snapshot = state.snapshot()
+            logLease("revoked", snapshot, reason)
+        }
+    }
+
+    private fun ChromePhotosProtectedSurfaceSnapshot.toLeaseContext(currentViewport: ChromeVisualViewport) =
+        ChromePhotosDataPlaneLeaseContext(
+            packageName = ChromePackageName,
+            windowId = windowId,
+            epoch = epoch,
+            viewport = currentViewport,
+        )
+
+    private fun logLease(
+        action: String,
+        snapshot: ChromePhotosProtectedSurfaceSnapshot,
+        reason: String,
+    ) {
+        val stats = surface.stats()
+        Log.i(
+            LogTag,
+            "phase=data_plane_lease action=$action reason=$reason windowId=${snapshot.windowId} " +
+                "epoch=${snapshot.epoch} transparent=${stats.transparent} " +
+                "attachmentCount=${stats.attachmentCount} rawPresented=false",
+        )
     }
 
     private fun log(
@@ -326,6 +448,9 @@ internal class ChromeVisualProbeController(
         const val MotionQuietMillis = 180L
         const val ContentQuietMillis = 90L
         const val HostReadyTrigger = "HOST_READY"
+        const val ChromePackageName = "com.android.chrome"
+        const val LeaseWatchdogMillis = 50L
+        const val LeaseRenewalLeadMillis = 150L
         const val LogTag = "ChromePhotosSurfaceProbe"
     }
 }

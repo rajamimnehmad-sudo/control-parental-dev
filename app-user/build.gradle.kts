@@ -59,7 +59,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 318
+            versionCode = 319
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "true")
         }
@@ -111,6 +111,9 @@ android {
     }
 
     packaging {
+        resources {
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
         jniLibs {
             // Keep the app and the existing TFLite image model compatible with
             // ARM32. The much larger neural text runtime is ARM64-only; ARM32
@@ -179,6 +182,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.litertlm.android)
     implementation(libs.okhttp)
+    add("devImplementation", "org.bouncycastle:bcpkix-jdk18on:1.84")
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)

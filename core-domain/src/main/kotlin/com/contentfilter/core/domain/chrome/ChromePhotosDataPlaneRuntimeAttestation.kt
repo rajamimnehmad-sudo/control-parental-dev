@@ -1,0 +1,104 @@
+package com.contentfilter.core.domain.chrome
+
+/**
+ * Process-local health attestation for the DEV lab. A process restart clears it fail-closed.
+ * This is evidence used to mint a scoped lease; it is not itself a presentation capability.
+ */
+data class ChromePhotosDataPlaneRuntimeSnapshot(
+    val sessionId: String = "",
+    val proxyHealthy: Boolean = false,
+    val policyConfirmed: Boolean = false,
+    val vpnConfirmed: Boolean = false,
+    val vpnSessionId: String = "",
+    val fixtureConfirmed: Boolean = false,
+    val fixtureHeartbeatElapsed: Long = 0L,
+    val heartbeatElapsed: Long = 0L,
+    val validUntilElapsed: Long = 0L,
+)
+
+object ChromePhotosDataPlaneRuntimeAttestation {
+    private var state = ChromePhotosDataPlaneRuntimeSnapshot()
+
+    @Synchronized
+    fun beginSession(sessionId: String) {
+        state = ChromePhotosDataPlaneRuntimeSnapshot(sessionId = sessionId)
+    }
+
+    @Synchronized
+    fun markProxyHealthy(
+        sessionId: String,
+        healthy: Boolean,
+    ) = update(sessionId) { copy(proxyHealthy = healthy) }
+
+    @Synchronized
+    fun markPolicyConfirmed(
+        sessionId: String,
+        confirmed: Boolean,
+    ) = update(sessionId) { copy(policyConfirmed = confirmed) }
+
+    @Synchronized
+    fun markVpnConfirmed(
+        sessionId: String,
+        confirmed: Boolean,
+    ) = update(sessionId) {
+        copy(
+            vpnConfirmed = confirmed,
+            vpnSessionId = if (confirmed) sessionId else "",
+        )
+    }
+
+    @Synchronized
+    fun markFixtureConfirmed(
+        sessionId: String,
+        confirmed: Boolean,
+        heartbeatElapsed: Long = 0L,
+    ) = update(sessionId) {
+        copy(
+            fixtureConfirmed = confirmed,
+            fixtureHeartbeatElapsed = if (confirmed) heartbeatElapsed else 0L,
+        )
+    }
+
+    @Synchronized
+    fun publishHeartbeat(
+        sessionId: String,
+        elapsed: Long,
+        validUntilElapsed: Long,
+    ) = update(sessionId) {
+        copy(
+            heartbeatElapsed = elapsed,
+            validUntilElapsed = validUntilElapsed,
+        )
+    }
+
+    @Synchronized
+    fun failClosed(sessionId: String) =
+        update(sessionId) {
+            copy(
+                proxyHealthy = false,
+                policyConfirmed = false,
+                vpnConfirmed = false,
+                vpnSessionId = "",
+                fixtureConfirmed = false,
+                fixtureHeartbeatElapsed = 0L,
+                heartbeatElapsed = 0L,
+                validUntilElapsed = 0L,
+            )
+        }
+
+    @Synchronized
+    fun snapshot(): ChromePhotosDataPlaneRuntimeSnapshot = state
+
+    @Synchronized
+    fun clear() {
+        state = ChromePhotosDataPlaneRuntimeSnapshot()
+    }
+
+    private inline fun update(
+        sessionId: String,
+        transform: ChromePhotosDataPlaneRuntimeSnapshot.() -> ChromePhotosDataPlaneRuntimeSnapshot,
+    ) {
+        if (sessionId.isBlank() || state.sessionId != sessionId) return
+        state = state.transform()
+    }
+}

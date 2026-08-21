@@ -22,6 +22,11 @@ object VpnController {
         context.startService(serviceIntent(context, FilterVpnService.ActionStop))
     }
 
+    fun refreshDevLabRoutes(context: Context) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(serviceIntent(context, FilterVpnService.ActionDevLabRoutesChanged))
+    }
+
     fun disableDevProtection(context: Context) {
         DevProtectionMode.setProtectionDisabled(context, true)
         stop(context)

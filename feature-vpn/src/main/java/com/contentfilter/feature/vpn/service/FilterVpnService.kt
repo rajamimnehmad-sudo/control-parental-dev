@@ -116,6 +116,7 @@ class FilterVpnService : VpnService() {
         when (intent?.action ?: ActionStart) {
             ActionStop -> stopVpn(StopReasonApp)
             ActionReconnect -> reconnectVpn(intent?.getStringExtra(ExtraReconnectKey))
+            ActionDevLabRoutesChanged -> refreshDevLabRoutes()
             else -> startVpn()
         }
         return START_STICKY
@@ -168,6 +169,10 @@ class FilterVpnService : VpnService() {
                     )
                     val establishedInterface = requireNotNull(establishVpn()) { "VPN establish returned null." }
                     vpnInterface = establishedInterface
+                    ChromePhotosDataPlaneLabVpnPolicy.markTunnelState(
+                        this@FilterVpnService,
+                        established = true,
+                    )
                     connectionBarrier?.close()
                     appliedVpnReconnectKey = initialState.vpnReconnectKey
                     appliedDomainListVersion = webDomainListStore.version
@@ -216,6 +221,12 @@ class FilterVpnService : VpnService() {
             cleanup()
             startVpn()
         }
+    }
+
+    private fun refreshDevLabRoutes() {
+        if (!DevProtectionMode.isAvailable(this)) return
+        cleanup()
+        startVpn()
     }
 
     @Synchronized
@@ -316,6 +327,7 @@ class FilterVpnService : VpnService() {
                 enforceEncryptedDns = encryptedDnsEnforcementMode,
                 blockedDestinations = blockedDestinationRoutes.activeRoutes(),
             )
+            .applyChromePhotosDataPlaneLabRoute()
             .allowBrowserApps()
             .setMtu(DefaultMtu)
             .setBlocking(true)
@@ -340,6 +352,13 @@ class FilterVpnService : VpnService() {
                     .hostRoutes(upstreamServers, enforceEncryptedDns, blockedDestinations)
                     .forEach { route -> addRoute(route.address, route.prefixLength) }
             }
+        }
+
+    private fun Builder.applyChromePhotosDataPlaneLabRoute(): Builder =
+        apply {
+            ChromePhotosDataPlaneLabVpnPolicy
+                .routes(ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService))
+                .forEach { route -> addRoute(route.address, route.prefixLength) }
         }
 
     private fun observeVpnReconnectPolicy(scope: CoroutineScope) {
@@ -493,6 +512,22 @@ class FilterVpnService : VpnService() {
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
         val domain = question.domain.normalizedDomain()
+        if (ChromePhotosDataPlaneLabVpnPolicy.isFixtureDomain(
+                active = ChromePhotosDataPlaneLabVpnPolicy.isActive(this),
+                normalizedDomain = domain,
+            )
+        ) {
+            val addresses = ChromePhotosDataPlaneLabVpnPolicy.fixtureAddresses(question.type)
+            val packet =
+                if (addresses.isEmpty()) {
+                    responseFactory.noDataPacket(question)
+                } else {
+                    responseFactory.safeSearchAddressPacket(question, addresses)
+                }
+            writeResponse(output, outputMutex, packet)
+            Log.i(LogTag, "Chrome Photos DEV fixture DNS mapped type=${question.type} localOnly=true")
+            return
+        }
         val state = snapshotProvider.current()
         val searchEngine = SearchEngineCatalog.engineForDomain(domain)
         when (val decision = policyEvaluator.evaluate(domain, state.snapshot, state.health)) {
@@ -784,6 +819,7 @@ class FilterVpnService : VpnService() {
         diagnostic: VpnPacketDiagnostic,
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
+        if (ChromePhotosDataPlaneLabVpnPolicy.recordControlledTransportAttempt(this, diagnostic)) return
         val key =
             "${diagnostic.reason}:${diagnostic.ipVersion}:${diagnostic.protocol}:" +
                 "${diagnostic.sourcePort ?: "none"}:${diagnostic.destinationPort ?: "none"}"
@@ -803,6 +839,7 @@ class FilterVpnService : VpnService() {
     }
 
     private fun cleanup(cancelConnectionInvalidation: Boolean = true) {
+        ChromePhotosDataPlaneLabVpnPolicy.markTunnelState(this, established = false)
         if (cancelConnectionInvalidation) {
             connectionInvalidationJob?.cancel()
             connectionInvalidationJob = null
@@ -828,6 +865,7 @@ class FilterVpnService : VpnService() {
         const val ActionStart = "com.contentfilter.feature.vpn.START"
         const val ActionStop = "com.contentfilter.feature.vpn.STOP"
         const val ActionReconnect = "com.contentfilter.feature.vpn.RECONNECT"
+        const val ActionDevLabRoutesChanged = "com.contentfilter.feature.vpn.DEV_LAB_ROUTES_CHANGED"
         private const val ExtraReconnectKey = "vpn_reconnect_key"
 
         private const val DefaultMtu = 1500

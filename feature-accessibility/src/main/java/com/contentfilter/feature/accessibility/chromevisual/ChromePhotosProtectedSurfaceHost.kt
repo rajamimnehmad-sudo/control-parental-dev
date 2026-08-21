@@ -29,6 +29,10 @@ internal interface ChromePhotosProtectedSurfaceHost : AutoCloseable {
         targetWindowId: Int,
         viewport: ChromeVisualViewport,
     ): ChromePhotosProtectedSurfaceHostResult
+
+    fun presentOpaque(onCommitted: () -> Unit): Boolean
+
+    fun presentTransparent(): Boolean
 }
 
 internal object ChromePhotosProtectedSurfaceHostFactory {
@@ -106,6 +110,10 @@ private class ChromePhotosWindowAttachedSurfaceHost private constructor(
         return ChromePhotosProtectedSurfaceHostResult.Ready
     }
 
+    override fun presentOpaque(onCommitted: () -> Unit): Boolean = applyAlpha(OpaqueAlpha, onCommitted)
+
+    override fun presentTransparent(): Boolean = applyAlpha(TransparentAlpha, onCommitted = null)
+
     override fun close() {
         closed = true
         pendingDrawListener?.let { listener ->
@@ -122,6 +130,27 @@ private class ChromePhotosWindowAttachedSurfaceHost private constructor(
         }
         runCatching { surfacePackage.release() }
         runCatching { viewHost.release() }
+    }
+
+    private fun applyAlpha(
+        alpha: Float,
+        onCommitted: (() -> Unit)?,
+    ): Boolean {
+        if (closed || publicationResult != ChromePhotosProtectedSurfaceHostResult.Ready) return false
+        val transaction = SurfaceControl.Transaction()
+        return try {
+            transaction.setAlpha(surfaceControl, alpha)
+            if (onCommitted != null) {
+                transaction.addTransactionCommittedListener(service.mainExecutor, onCommitted)
+            }
+            transaction.apply()
+            true
+        } catch (error: RuntimeException) {
+            Log.w(LogTag, "phase=alpha result=failed", error)
+            false
+        } finally {
+            transaction.close()
+        }
     }
 
     companion object {
@@ -206,6 +235,8 @@ private class ChromePhotosWindowAttachedSurfaceHost private constructor(
         }
 
         private const val LogTag = "ChromePhotosSurfaceHost"
+        private const val OpaqueAlpha = 1f
+        private const val TransparentAlpha = 0f
     }
 
     private fun beginPublication(view: View) {
