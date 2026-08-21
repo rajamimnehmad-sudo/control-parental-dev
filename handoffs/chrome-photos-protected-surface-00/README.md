@@ -1,36 +1,49 @@
 # CHROME-PHOTOS-PROTECTED-SURFACE-00 v2
 
-This branch carries a temporary handoff package for Codex. It is intentionally isolated from main and does not authorize merge, PR, publication, Production, or destructive actions.
+Temporary Codex handoff branch. It is isolated from `main` and does NOT authorize PR, merge, publication, Production, destructive actions, or changes outside the ticket.
 
 Prepared base SHA: `36b7c004f0f19a77439cd90c819b1195ee02cb49`
 
-IMPORTANT: ignore the old ZIP in this branch. Its GitHub upload was truncated. Use only the uncompressed text artifacts below.
+## IMPORTANT — canonical artifacts
 
-## Patch
+Ignore these older artifacts in this branch:
 
-The canonical patch is stored as five plain-text parts under:
+- `CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.zip`: its first GitHub upload was truncated.
+- `patch-parts/**`: intermediate transport attempt; non-canonical and MUST NOT be used.
 
-`handoffs/chrome-photos-protected-surface-00/patch-parts/`
+Use only:
 
-Reassemble from repository root with:
+1. `CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch.gz.b64`
+2. `physical-gate/**`
+
+## Reconstruct the canonical patch
+
+From the repository root, use Python so the command behaves the same on macOS and Linux:
 
 ```bash
-cat handoffs/chrome-photos-protected-surface-00/patch-parts/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch.part{01,02,03,04,05} \
-  > /tmp/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch
-sha256sum /tmp/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch
+python3 - <<'PY'
+from pathlib import Path
+import base64, gzip, hashlib
+
+src = Path('handoffs/chrome-photos-protected-surface-00/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch.gz.b64')
+dst = Path('/tmp/CHROME-PHOTOS-PROTECTED-SURFACE-00-v2.patch')
+encoded = src.read_bytes()
+print('transport_sha256=', hashlib.sha256(encoded).hexdigest())
+patch = gzip.decompress(base64.b64decode(encoded))
+dst.write_bytes(patch)
+print('patch_sha256=', hashlib.sha256(patch).hexdigest())
+print('patch_bytes=', len(patch))
+print('written=', dst)
+PY
 ```
 
-Expected final patch SHA-256:
+Expected SHA-256 values:
 
-`b497f9a0e84b5362d2d13bf529e90ecf5a1ca77e73dfc69e7416373935b08ef6`
+- canonical base64 transport file: `e21526c7c6d371b31b3e5ea2733cc4b62d406cc90ec0a0adb489f9044c639732`
+- reconstructed patch: `b497f9a0e84b5362d2d13bf529e90ecf5a1ca77e73dfc69e7416373935b08ef6`
+- reconstructed patch size: `62400` bytes
 
-Expected part SHA-256 values:
-
-- part01: `2b1ccff97f07b27440253176775221f0167d28e50fcbffa89994fbe87e5393d9`
-- part02: `05b856d7c97f59ba9bba55b93b93e446358de2c2fa8d8d0cabfd8c182c6eadf9`
-- part03: `2f8f9362eb9a374bb2ab05f3f244094031f6e795fd68a5edec8aa06b2357d87a`
-- part04: `ae98a880db9fcc73dbfeb5b0b49e3626bb00a9d58e1f4ccc6ddf13d679974183`
-- part05: `55a45f5c2ca41b28bde6912fe3ab19aef0ac6cf09a7414625373a0ada0c5db7f`
+If any value differs, STOP without modifying code.
 
 ## Physical gate
 
@@ -46,4 +59,10 @@ Expected SHA-256:
 - `synthetic-leak.json`: `81ee1c3a4292a38dd46f4fe346a001d5557f3386d5f1d72cbc71311f41d37cb5`
 - `synthetic-pass.json`: `68eb61897a09e2797644696a42d9ae401071cdb0576baad156aed4f83e4aca95`
 
-Codex must verify these hashes before using the artifacts, compare the reconstructed patch with the current canonical local repo and Glosh Central/Control Center, and port only the safe intent. Do not apply blindly if the local base has moved.
+## Codex execution rule
+
+Before applying anything, compare the reconstructed patch with the CURRENT canonical local repository and the CURRENT Glosh Central / Control Center. The prepared SHA is context, not permission to overwrite newer local work.
+
+Port only the safe intent when the local base has moved. Respect the current owner, allowed paths, dependencies, and concurrent work. If there is a real collision, stop and report it.
+
+This ticket remains photos/protected-surface only: no DAG, video, DRM, model/threshold changes, PR, push, merge, publication or Production.
