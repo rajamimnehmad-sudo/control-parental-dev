@@ -1,5 +1,5 @@
 {
-  "updatedAt": "20 ago 2026 · 20:50",
+  "updatedAt": "20 ago 2026 · 22:02",
   "sections": [
     {
       "id": "coordination",
@@ -45,10 +45,11 @@
     {
       "id": "apps-account-ux",
       "title": "Apps / cuentas",
-      "context": "Auditoría cerrada y dirección visual iniciada: navegación principal se conserva; tipografía base aprobada con estética Apple/SF-Pro-like; sigue definir color, superficies, iconografía y wireframes",
+      "context": "Dirección visual más definida: tipografía Apple/SF-Pro-like, fondos limpios, Graphite como base y Lime como acento puntual; wordmark glosh minúscula y negra; isotipo g propio pendiente sin parecido a Logitech",
       "tasks": [
         {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT. Base estructural buena; principales fricciones: densidad en detalle Admin, lenguaje técnico, onboarding de permisos y sistema visual parcialmente fragmentado. No se tocó APK.","status":"done","priority":"important"},
-        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"IN PROGRESS. Dirección tipográfica aprobada: estética Apple/SF-Pro-like, limpia, premium y muy legible; títulos fuertes y texto normal liviano. Siguiente decisión: paleta y sistema de superficies; luego wireframes y maquetas visuales.","status":"in_progress","priority":"important"},
+        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"IN PROGRESS. Se conserva la navegación principal. Dirección visual elegida: composición muy limpia, fondos neutros sin grandes formas decorativas, Graphite dominante y Lime usado como señal/acento; tipografía Apple/SF-Pro-like. Sigue bajar esta identidad a wireframes reales de Usuario y Admin.","status":"in_progress","priority":"important"},
+        {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"IN PROGRESS. Wordmark preferido: glosh en minúscula, negro, limpio y compacto. Isotipo: una g propia con pequeño acento Lime, pero debe rediseñarse para ser inequívocamente Glosh y no parecerse a Logitech.","status":"in_progress","priority":"important"},
         {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
         {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Incluido en próximo lote.","status":"pending","priority":"important"},
         {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"Incluido en próximo lote.","status":"pending","priority":"normal"},
