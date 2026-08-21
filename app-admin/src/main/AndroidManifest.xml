@@ -11,7 +11,7 @@
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@drawable/admin_fish_icon"
-        android:label="Content Filter Admin"
+        android:label="Glosh Admin"
         android:roundIcon="@drawable/admin_fish_icon"
         android:theme="@style/AppTheme">
         <activity
