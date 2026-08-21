@@ -14,7 +14,12 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   DEV 319, SHA-256
   `ba612fe2f23c5633e7041bf6c233d1ed435db3bcc7f43e6d47dfb03d7b7cf14b`;
   no se recompila. `CHROME-PHOTOS-DATA-PLANE-00` permanece bloqueado unicamente
-  por Device Owner hasta que este gate termine.
+  por Device Owner hasta que este gate termine. El asistente modular y sus siete
+  pruebas de seguridad estan verdes. El preflight real A23 confirmo un unico
+  usuario 0, ningun owner, Glosh DEV 318 como Device Admin y 16 cuentas; genero
+  un checkpoint redactado con proveedores y conteos. La ejecucion espera que el
+  usuario retire esas cuentas manualmente; todavia no instalo DEV 319 ni intento
+  `set-device-owner`.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
