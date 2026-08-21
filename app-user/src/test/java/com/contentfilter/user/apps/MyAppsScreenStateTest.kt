@@ -21,7 +21,7 @@ class MyAppsScreenStateTest {
     @Test
     fun `finished empty inventory shows the actual empty result`() {
         assertEquals(
-            "No hay apps detectadas todavía.",
+            "Abrí o actualizá Glosh para detectar las apps instaladas.",
             myAppsEmptyStateMessage(appsEmpty = true, refreshing = false),
         )
     }
