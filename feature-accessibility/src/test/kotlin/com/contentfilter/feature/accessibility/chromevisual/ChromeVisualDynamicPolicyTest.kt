@@ -95,6 +95,38 @@ class ChromeVisualDynamicPolicyTest {
     }
 
     @Test
+    fun `lazy content mutations reuse an active analysis but scroll restarts it`() {
+        assertTrue(
+            ChromeVisualAtomicMutationPolicy.shouldCoalesceIntoActiveAnalysis(
+                replayRequired = true,
+                geometryRestart = false,
+                analysisActive = true,
+            ),
+        )
+        assertFalse(
+            ChromeVisualAtomicMutationPolicy.shouldCoalesceIntoActiveAnalysis(
+                replayRequired = true,
+                geometryRestart = true,
+                analysisActive = true,
+            ),
+        )
+        assertFalse(
+            ChromeVisualAtomicMutationPolicy.shouldCoalesceIntoActiveAnalysis(
+                replayRequired = true,
+                geometryRestart = false,
+                analysisActive = false,
+            ),
+        )
+        assertFalse(
+            ChromeVisualAtomicMutationPolicy.shouldCoalesceIntoActiveAnalysis(
+                replayRequired = false,
+                geometryRestart = false,
+                analysisActive = true,
+            ),
+        )
+    }
+
+    @Test
     fun `newer replay revision cannot be completed by stale work`() {
         val coordinator = ChromeVisualAtomicReplayCoordinator()
         val first = coordinator.request()
