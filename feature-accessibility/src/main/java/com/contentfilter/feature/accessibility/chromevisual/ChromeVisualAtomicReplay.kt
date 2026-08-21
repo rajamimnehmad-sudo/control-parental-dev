@@ -22,6 +22,12 @@ internal object ChromeVisualAtomicMutationPolicy {
     fun requiresGeometryRestart(eventType: Int): Boolean =
         eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED
 
+    fun shouldCoalesceIntoActiveAnalysis(
+        replayRequired: Boolean,
+        geometryRestart: Boolean,
+        analysisActive: Boolean,
+    ): Boolean = replayRequired && !geometryRestart && analysisActive
+
     private val VisualContentChangeMask =
         AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE or
             AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION or
