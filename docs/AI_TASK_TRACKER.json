@@ -1,10 +1,10 @@
 {
-  "updatedAt": "20 ago 2026 · 22:59",
+  "updatedAt": "20 ago 2026 · 23:22",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
-      "context": "Backend endurecido y reset operativo en cero; UI/UX se trabaja en otro frente y este chat continúa con seguridad/integración",
+      "context": "Workflow paralelo endurecido: Glosh Central coordina, GitHub demuestra y los worktrees son provisionales; default máximo 2 frentes de escritura",
       "tasks": [
         {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario terminado sin modificar el proyecto.","status":"done","priority":"critical"},
         {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"Estado local relevante preservado en ramas remotas preserve/*.","status":"done","priority":"critical"},
@@ -13,6 +13,7 @@
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96.","status":"done","priority":"important"},
         {"id":"chrome-visual-closure-batch-04","title":"Cierre automático Chrome Visual","detail":"PASS automático en PR #97. Gate físico S22 pausado.","status":"done","priority":"critical"},
         {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"Modo oficial: ChatGPT hace todo lo posible; Codex solo cuando hace falta Mac/local y siempre queda auditado por ChatGPT.","status":"done","priority":"critical"},
+        {"id":"parallel-coordination-v2","title":"Endurecer coordinación paralela","detail":"DONE tras auditoría crítica de Codex: owner único, revisión de asignación, base SHA/worktree cuando corresponde, rutas permitidas, hotspots exclusivos, separación PASS técnico vs cierre central y prohibición de limpiar/revertir trabajo ajeno. Glosh Central sigue siendo tracker estructurado; no se agrega burocracia innecesaria.","status":"done","priority":"critical"},
         {"id":"ai-auto-handoff-01","title":"Autorun experimental de Codex","detail":"Retirado del flujo normal.","status":"done","priority":"normal"},
         {"id":"codex-effort-routing","title":"Elegir esfuerzo Codex por cada ticket","detail":"ChatGPT elige el menor esfuerzo suficiente.","status":"done","priority":"important"},
         {"id":"workflow-cost-optimization","title":"Optimizar workflow para bajar costos","detail":"Contexto mínimo, lotes coherentes, tests estrechos y Codex solo cuando hace falta.","status":"done","priority":"important"},
