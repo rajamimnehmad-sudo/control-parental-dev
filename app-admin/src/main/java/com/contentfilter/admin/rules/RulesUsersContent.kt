@@ -3,6 +3,7 @@ package com.contentfilter.admin.rules
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +21,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,8 +51,6 @@ import com.contentfilter.core.ui.GloshSpacing
 import com.contentfilter.core.ui.GloshSurfaceCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
-import com.contentfilter.core.ui.ProductListRow
-import com.contentfilter.core.ui.ProductListSurface
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
 import kotlinx.coroutines.delay
@@ -93,9 +93,7 @@ internal fun UsersListContent(
             }
         }
 
-    Column(
-        modifier = Modifier.fillMaxSize().background(GloshColors.Bone),
-    ) {
+    Column(modifier = Modifier.fillMaxSize().background(GloshColors.Bone)) {
         UsersHeader(
             entryMode = entryMode,
             searchQuery = userSearchQuery,
@@ -115,13 +113,13 @@ internal fun UsersListContent(
 
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(
-                start = GloshSpacing.PageHorizontal,
-                top = 4.dp,
-                end = GloshSpacing.PageHorizontal,
-                bottom = 24.dp,
-            ),
+            contentPadding =
+                PaddingValues(
+                    start = GloshSpacing.PageHorizontal,
+                    top = 2.dp,
+                    end = GloshSpacing.PageHorizontal,
+                    bottom = 24.dp,
+                ),
         ) {
             if (filteredDevices.isEmpty()) {
                 item {
@@ -139,18 +137,22 @@ internal fun UsersListContent(
             } else {
                 item {
                     Text(
-                        "Usuarios",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = GloshColors.Muted,
+                        text = if (entryMode == RulesEntryMode.ManageUsers) "Activos" else "Elegí un usuario",
+                        modifier = Modifier.padding(top = 4.dp, bottom = 6.dp),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = GloshColors.Graphite,
                     )
                 }
                 items(filteredDevices, key = { it.id }) { device ->
-                    ProtectedUserCard(device = device, onClick = { onDeviceSelected(device.id) })
+                    ProtectedUserRow(device = device, onClick = { onDeviceSelected(device.id) })
                 }
             }
             if (entryMode == RulesEntryMode.ManageUsers) {
                 item(key = "archived-users") {
-                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onShowArchivedUsers) {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth().padding(top = 20.dp),
+                        onClick = onShowArchivedUsers,
+                    ) {
                         Text("Usuarios archivados")
                     }
                 }
@@ -208,9 +210,9 @@ private fun UsersHeader(
                     start = if (onBack == null) GloshSpacing.PageHorizontal else 8.dp,
                     top = 16.dp,
                     end = GloshSpacing.PageHorizontal,
-                    bottom = 18.dp,
+                    bottom = 16.dp,
                 ),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(13.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -222,7 +224,7 @@ private fun UsersHeader(
                     ProductGlyph(ProductIcon.Back, GloshColors.Graphite, contentDescription = "Volver")
                 }
             }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Text(title, style = MaterialTheme.typography.headlineSmall, color = GloshColors.Graphite)
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted)
             }
@@ -391,45 +393,39 @@ internal fun TokenReadyCard(
 }
 
 @Composable
-private fun ProtectedUserCard(
+private fun ProtectedUserRow(
     device: UserDeviceUiState,
     onClick: () -> Unit,
 ) {
     val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
     val attentionLevel = device.securityAttentionLevel()
-    ProductListSurface {
-        ProductListRow(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onClick,
-            leading = {
-                GloshIconBubble(
-                    icon = if (healthy) ProductIcon.Person else ProductIcon.ShieldAlert,
-                    accent = if (healthy) GloshColors.Lime else attentionLevel.color,
-                )
-            },
-            headline = {
-                Text(device.name, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
-            },
-            supporting = {
-                Text(
-                    text = device.listSummary(healthy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (attentionLevel == SecurityAttentionLevel.Critical) GloshColors.Danger else GloshColors.Muted,
-                    maxLines = 2,
-                )
-            },
-            trailing = {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SecurityAttentionGlyph(level = attentionLevel)
-                    ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(22.dp))
-                }
-            },
-            showDivider = false,
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        GloshIconBubble(
+            icon = if (healthy) ProductIcon.Person else ProductIcon.ShieldAlert,
+            accent = if (healthy) GloshColors.Lime else attentionLevel.color,
         )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(device.name, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text(
+                text = device.listSummary(healthy),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (attentionLevel == SecurityAttentionLevel.Critical) GloshColors.Danger else GloshColors.Muted,
+                maxLines = 2,
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SecurityAttentionGlyph(level = attentionLevel)
+            ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(22.dp))
+        }
     }
+    HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = GloshColors.Line)
 }
 
 @Composable
@@ -487,10 +483,10 @@ private fun UserDeviceUiState.listSummary(healthy: Boolean): String =
     } else {
         protectionAlert
             ?: when (status) {
-                UserDeviceStatus.Unprotected -> "La protección requiere atención"
-                UserDeviceStatus.Inactive -> "Sin comunicación reciente"
-                UserDeviceStatus.Unknown -> "Verificando configuración"
-                UserDeviceStatus.Active -> "Falta completar la protección"
+                UserDeviceStatus.Unprotected -> "La protección requiere atención · $lastSeenLabel"
+                UserDeviceStatus.Inactive -> "Sin comunicación reciente · $lastSeenLabel"
+                UserDeviceStatus.Unknown -> "Verificando configuración · $lastSeenLabel"
+                UserDeviceStatus.Active -> "Falta completar la protección · $lastSeenLabel"
             }
     }
 
