@@ -1,12 +1,18 @@
 package com.contentfilter.admin.rules
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -24,6 +30,7 @@ import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.GloshColors
 import com.contentfilter.core.ui.GloshIconBubble
+import com.contentfilter.core.ui.GloshShapes
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
@@ -50,14 +57,14 @@ internal fun ProtectionPanel(
                 color = GloshColors.Muted,
             )
             Text("Qué hacer", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
-            Text("1. Revisá si Glosh Usuario sigue instalado en el teléfono.", style = MaterialTheme.typography.bodyMedium)
+            Text("1. Revisá si Glosh Usuario sigue instalado.", style = MaterialTheme.typography.bodyMedium)
             Text("2. Si falta, reinstalá la APK oficial.", style = MaterialTheme.typography.bodyMedium)
             Text("3. Abrí Más opciones → Volver a enlazar y generá un token nuevo.", style = MaterialTheme.typography.bodyMedium)
-            Text("4. En el teléfono, completá nuevamente los pasos de protección.", style = MaterialTheme.typography.bodyMedium)
+            Text("4. Completá nuevamente los pasos de protección.", style = MaterialTheme.typography.bodyMedium)
         }
     }
 
-    ProductCard {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -73,7 +80,11 @@ internal fun ProtectionPanel(
                     style = MaterialTheme.typography.titleLarge,
                     color = GloshColors.Graphite,
                 )
-                Text("Última conexión: ${device.lastSeenLabel}", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
+                Text(
+                    "Última conexión: ${device.lastSeenLabel}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GloshColors.Muted,
+                )
             }
             StatusChip(
                 if (attention == SecurityAttentionLevel.None) "Correcto" else "Atención",
@@ -81,46 +92,53 @@ internal fun ProtectionPanel(
             )
         }
 
+        HorizontalDivider(color = GloshColors.Line)
         ProtectionComponentLine(
             label = "Internet protegido",
             active = device.vpnState == ActiveStateLabel,
         )
+        HorizontalDivider(modifier = Modifier.padding(start = 28.dp), color = GloshColors.Line)
         ProtectionComponentLine(
-            label = "Bloqueo de apps activo",
+            label = "Bloqueo de apps",
             active = device.accessibilityState == ActiveStateLabel,
         )
+        HorizontalDivider(modifier = Modifier.padding(start = 28.dp), color = GloshColors.Line)
         ProtectionComponentLine(
             label = "Protección contra desinstalación",
             active = device.deviceAdminState == ActiveStateLabel,
         )
     }
 
-    ProductCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+    HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp), color = GloshColors.Line)
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(42.dp).background(GloshColors.Surface, GloshShapes.Small),
+            contentAlignment = Alignment.Center,
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("Protección reforzada", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
-                Text(
-                    if (control?.armed == true) {
-                        "Activa y obligatoria en este usuario."
-                    } else {
-                        "Todavía falta activarla."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GloshColors.Muted,
-                )
-            }
-            StatusChip(
-                if (control?.armed == true) "Activa" else "Pendiente",
-                if (control?.armed == true) GloshColors.Positive else GloshColors.Warning,
+            ProductGlyph(ProductIcon.ShieldCheck, GloshColors.Graphite, Modifier.size(21.dp))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text("Protección reforzada", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text(
+                if (control?.armed == true) {
+                    "Activa y obligatoria en este usuario."
+                } else {
+                    "Todavía falta activarla."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = GloshColors.Muted,
             )
         }
-        if (control?.armed != true) {
-            Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onArmProtection) {
-                Text("Completar protección")
+        if (control?.armed == true) {
+            StatusChip("Activa", GloshColors.Positive)
+        } else {
+            Button(enabled = !loading, onClick = onArmProtection) {
+                Text("Completar")
             }
         }
     }
@@ -132,7 +150,7 @@ private fun ProtectionComponentLine(
     active: Boolean,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
         horizontalArrangement = Arrangement.spacedBy(9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -171,27 +189,34 @@ internal fun AdvancedUserOptions(
     val control = state.protectionControls[device.id]
     val loading = device.id in state.protectionLoadingDeviceIds
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ProductCard(onClick = { expanded = !expanded }) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded }
+                    .padding(vertical = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier.size(42.dp).background(GloshColors.Surface, GloshShapes.Small),
+                contentAlignment = Alignment.Center,
             ) {
-                GloshIconBubble(ProductIcon.Settings)
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Más opciones", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
-                    Text(
-                        "Reenlace, desinstalación temporal, recuperación y archivo",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GloshColors.Muted,
-                    )
-                }
-                ProductGlyph(
-                    icon = ProductIcon.ChevronRight,
+                ProductGlyph(ProductIcon.Settings, GloshColors.Graphite, Modifier.size(21.dp))
+            }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Más opciones", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+                Text(
+                    "Reenlace, desinstalación temporal, recuperación y archivo",
+                    style = MaterialTheme.typography.bodySmall,
                     color = GloshColors.Muted,
-                    contentDescription = if (expanded) "Cerrar más opciones" else "Abrir más opciones",
                 )
             }
+            ProductGlyph(
+                icon = ProductIcon.ChevronRight,
+                color = GloshColors.Muted,
+                contentDescription = if (expanded) "Cerrar más opciones" else "Abrir más opciones",
+            )
         }
         AnimatedVisibility(visible = expanded) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
