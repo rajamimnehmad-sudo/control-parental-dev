@@ -1,6 +1,7 @@
 package com.contentfilter.admin
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -25,6 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -32,6 +35,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.dashboard.DashboardViewModel
 import com.contentfilter.core.ui.GloshColors
 import com.contentfilter.core.ui.GloshIconBubble
+import com.contentfilter.core.ui.GloshShapes
 import com.contentfilter.core.ui.GloshSpacing
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductGlyph
@@ -64,56 +68,69 @@ internal fun SettingsTab(
                 .verticalScroll(rememberScrollState())
                 .statusBarsPadding()
                 .padding(horizontal = GloshSpacing.PageHorizontal, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         PageHeader(title = "Ajustes", subtitle = "Cuenta, soporte y opciones de la app")
-        ProductListSurface {
-            SettingsNavigationRow(
-                icon = ProductIcon.People,
-                title = "Cuenta y comunidad",
-                subtitle = state.communityName.ifBlank { "Identidad y licencia" },
-                onClick = onAccount,
-            )
-            SettingsNavigationRow(
-                icon = ProductIcon.Bell,
-                title = "Contacto",
-                subtitle = "Mail y número para comunicaciones importantes",
-                onClick = onContact,
-            )
-            SettingsNavigationRow(
-                icon = ProductIcon.Update,
-                title = "Actualizaciones",
-                subtitle = "Versión ${BuildConfig.VERSION_NAME}",
-                onClick = onUpdates,
-                showAttentionDot = hasPendingUpdate,
-            )
-            SettingsNavigationRow(
-                icon = ProductIcon.Search,
-                title = "Ayuda",
-                subtitle = "Respuestas y asistencia sobre Glosh",
-                onClick = onHelp,
-            )
-            SettingsNavigationRow(
-                icon = ProductIcon.Star,
-                title = "Tu opinión",
-                subtitle = "Contanos cómo podemos mejorar",
-                onClick = onFeedback,
-            )
-            SettingsNavigationRow(
-                icon = ProductIcon.Panel,
-                title = "Estado y diagnóstico",
-                subtitle = "Información avanzada para soporte",
-                onClick = onPanel,
-            )
-            SettingsNavigationRow(
-                icon = ProductIcon.ShieldAlert,
-                title = "Administrador de este teléfono",
-                subtitle = "Cambiar el administrador vinculado localmente",
-                onClick = onLocalAdmin,
-                showDivider = false,
-            )
-        }
+
+        SettingsSectionHeader("Cuenta")
+        SettingsNavigationRow(
+            icon = ProductIcon.People,
+            title = "Cuenta y comunidad",
+            subtitle = state.communityName.ifBlank { "Identidad y licencia" },
+            onClick = onAccount,
+        )
+        SettingsNavigationRow(
+            icon = ProductIcon.Bell,
+            title = "Contacto",
+            subtitle = "Mail y número para comunicaciones importantes",
+            onClick = onContact,
+        )
+
+        SettingsSectionHeader("Glosh")
+        SettingsNavigationRow(
+            icon = ProductIcon.Update,
+            title = "Actualizaciones",
+            subtitle = "Versión ${BuildConfig.VERSION_NAME}",
+            onClick = onUpdates,
+            showAttentionDot = hasPendingUpdate,
+        )
+        SettingsNavigationRow(
+            icon = ProductIcon.Search,
+            title = "Ayuda",
+            subtitle = "Respuestas y asistencia sobre Glosh",
+            onClick = onHelp,
+        )
+        SettingsNavigationRow(
+            icon = ProductIcon.Star,
+            title = "Tu opinión",
+            subtitle = "Contanos cómo podemos mejorar",
+            onClick = onFeedback,
+        )
+
+        SettingsSectionHeader("Avanzado")
+        SettingsNavigationRow(
+            icon = ProductIcon.Panel,
+            title = "Estado y diagnóstico",
+            subtitle = "Información técnica para soporte",
+            onClick = onPanel,
+        )
+        SettingsNavigationRow(
+            icon = ProductIcon.ShieldAlert,
+            title = "Administrador de este teléfono",
+            subtitle = "Cambiar el administrador vinculado localmente",
+            onClick = onLocalAdmin,
+            showDivider = false,
+        )
     }
+}
+
+@Composable
+private fun SettingsSectionHeader(title: String) {
+    Text(
+        title,
+        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 7.dp),
+        style = MaterialTheme.typography.titleSmall,
+        color = GloshColors.Graphite,
+    )
 }
 
 @Composable
@@ -289,17 +306,29 @@ private fun SettingsNavigationRow(
     showDivider: Boolean = true,
     showAttentionDot: Boolean = false,
 ) {
-    ProductListRow(
-        leading = { GloshIconBubble(icon) },
-        headline = { Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite) },
-        supporting = { Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = GloshColors.Muted) },
-        trailing = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (showAttentionDot) Box(modifier = Modifier.size(8.dp).background(GloshColors.Lime, CircleShape))
-                ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(22.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 14.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(42.dp).background(GloshColors.Surface, GloshShapes.Small),
+            contentAlignment = Alignment.Center,
+        ) {
+            ProductGlyph(icon, GloshColors.Graphite, Modifier.size(21.dp))
+        }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (showAttentionDot) {
+                Box(modifier = Modifier.size(8.dp).background(GloshColors.Lime, CircleShape))
             }
-        },
-        onClick = onClick,
-        showDivider = showDivider,
-    )
+            ProductGlyph(ProductIcon.ChevronRight, GloshColors.Muted, Modifier.size(22.dp))
+        }
+    }
+    if (showDivider) {
+        HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = GloshColors.Line)
+    }
 }
