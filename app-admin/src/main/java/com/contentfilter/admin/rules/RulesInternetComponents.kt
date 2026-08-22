@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -21,7 +22,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,7 +37,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.ui.GloshColors
-import com.contentfilter.core.ui.GloshIconBubble
 import com.contentfilter.core.ui.GloshShapes
 import com.contentfilter.core.ui.GloshSurfaceCard
 import com.contentfilter.core.ui.ProductGlyph
@@ -53,8 +55,8 @@ internal fun RuleCard(
     var confirmDelete by remember { mutableStateOf(false) }
     val content: @Composable () -> Unit = {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -69,13 +71,17 @@ internal fun RuleCard(
                         color = GloshColors.Muted,
                     )
                 }
-                Switch(checked = rule.enabled, enabled = enabled, onCheckedChange = { onToggle() })
+                GloshV4Switch(
+                    checked = rule.enabled,
+                    enabled = enabled,
+                    onCheckedChange = { onToggle() },
+                )
             }
             dailyLimitMinutes?.let {
                 Text("Límite diario: $it min", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             }
-            OutlinedButton(onClick = { confirmDelete = true }, enabled = enabled) {
-                Text("Eliminar")
+            TextButton(onClick = { confirmDelete = true }, enabled = enabled) {
+                Text("Eliminar regla", color = GloshColors.Danger)
             }
         }
     }
@@ -126,7 +132,7 @@ internal fun DomainRuleEditor(
     GloshSurfaceCard {
         Text("Permitir un sitio", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
         Text(
-            "Agregá un sitio permitido. Si querés, también podés ponerle un límite diario aproximado.",
+            "Agregá una excepción. El límite diario es opcional.",
             style = MaterialTheme.typography.bodyMedium,
             color = GloshColors.Muted,
         )
@@ -143,7 +149,7 @@ internal fun DomainRuleEditor(
             value = minutes,
             onValueChange = onMinutesChanged,
             label = { Text("Límite diario opcional") },
-            supportingText = { Text("El tiempo web es estimado y puede no coincidir exactamente con el tiempo de lectura.") },
+            supportingText = { Text("El tiempo web es estimado.") },
             singleLine = true,
         )
         Button(
@@ -176,7 +182,7 @@ internal fun WebNavigationPanel(
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("Acceso a Internet", style = MaterialTheme.typography.titleLarge, color = GloshColors.Graphite)
             Text(
-                "Elegí si este usuario puede navegar ahora.",
+                "Primero elegí si puede navegar. Después ajustá el nivel de protección.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = GloshColors.Muted,
             )
@@ -187,11 +193,14 @@ internal fun WebNavigationPanel(
             onBlockedChanged = onBlockedChanged,
         )
 
-        GloshSurfaceCard {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
             Text(presentation.headline, style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
             Text(
                 if (blocked) {
-                    "Internet está pausado. La configuración se conserva para cuando vuelvas a habilitarlo."
+                    "Internet está pausado. La configuración queda guardada para cuando lo abras de nuevo."
                 } else {
                     "La navegación segura se aplica automáticamente."
                 },
@@ -201,29 +210,27 @@ internal fun WebNavigationPanel(
         }
 
         AnimatedVisibility(visible = presentation.showLayers) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Nivel de protección", style = MaterialTheme.typography.labelLarge, color = GloshColors.Muted)
-                GloshSurfaceCard {
-                    WebSwitchRow(
-                        icon = ProductIcon.Search,
-                        title = "Solo resultados de búsqueda",
-                        description = "Permite buscar, pero evita abrir sitios externos desde los resultados.",
-                        checked = onlyResultsEnabled,
-                        enabled = !onlyResultsSaving,
-                        saving = onlyResultsSaving,
-                        onCheckedChange = onOnlyResultsChanged,
-                    )
-                    HorizontalDivider(color = GloshColors.Line)
-                    WebSwitchRow(
-                        icon = ProductIcon.ShieldCheck,
-                        title = "Navegador protegido",
-                        description = "Hace obligatorio el navegador de Glosh que revisa el contenido visual antes de mostrarlo.",
-                        checked = protectedBrowserRequired,
-                        enabled = !protectedBrowserSaving,
-                        saving = protectedBrowserSaving,
-                        onCheckedChange = onProtectedBrowserRequiredChanged,
-                    )
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Nivel de protección", style = MaterialTheme.typography.titleSmall, color = GloshColors.Graphite)
+                WebSwitchRow(
+                    icon = ProductIcon.Search,
+                    title = "Solo resultados de búsqueda",
+                    description = "Permite buscar, pero limita la apertura de sitios externos.",
+                    checked = onlyResultsEnabled,
+                    enabled = !onlyResultsSaving,
+                    saving = onlyResultsSaving,
+                    onCheckedChange = onOnlyResultsChanged,
+                )
+                HorizontalDivider(modifier = Modifier.padding(start = 54.dp), color = GloshColors.Line)
+                WebSwitchRow(
+                    icon = ProductIcon.ShieldCheck,
+                    title = "Navegador protegido",
+                    description = "Hace obligatorio el navegador de Glosh para contenido visual.",
+                    checked = protectedBrowserRequired,
+                    enabled = !protectedBrowserSaving,
+                    saving = protectedBrowserSaving,
+                    onCheckedChange = onProtectedBrowserRequiredChanged,
+                )
 
                 AnimatedVisibility(visible = protectedBrowserRequired) {
                     ProtectedBrowserSetup(
@@ -237,7 +244,7 @@ internal fun WebNavigationPanel(
 
         if (!protectionActive) {
             FeedbackBanner(
-                "La protección del teléfono necesita atención. Revisá Seguridad antes de dar por terminada la configuración.",
+                "La protección del teléfono necesita atención. Revisá Seguridad antes de terminar.",
                 isError = true,
             )
         }
@@ -250,7 +257,14 @@ private fun ProtectedBrowserSetup(
     protectedBrowserInstalled: Boolean,
     alternativeBrowsers: List<AppControlUiState>,
 ) {
-    GloshSurfaceCard {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(GloshColors.SurfaceMuted, GloshShapes.Card)
+                .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         Text("Para terminar", style = MaterialTheme.typography.titleMedium, color = GloshColors.Graphite)
         SetupStatusLine(
             complete = protectedBrowserInstalled,
@@ -262,7 +276,7 @@ private fun ProtectedBrowserSetup(
         )
         SetupStatusLine(
             complete = false,
-            text = "Elegir el navegador protegido como predeterminado en el teléfono",
+            text = "Elegir el navegador protegido como predeterminado",
         )
         Text(
             if (alternativeBrowsers.isEmpty()) {
@@ -395,11 +409,16 @@ private fun WebSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().background(GloshColors.Surface).padding(vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        GloshIconBubble(icon = icon)
+        Box(
+            modifier = Modifier.size(42.dp).background(GloshColors.Surface, GloshShapes.Small),
+            contentAlignment = Alignment.Center,
+        ) {
+            ProductGlyph(icon = icon, color = GloshColors.Graphite, modifier = Modifier.size(21.dp))
+        }
         Column(
             modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -410,6 +429,34 @@ private fun WebSwitchRow(
                 Text("Guardando…", style = MaterialTheme.typography.bodySmall, color = GloshColors.Muted)
             }
         }
-        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
+        GloshV4Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange,
+        )
     }
+}
+
+@Composable
+internal fun GloshV4Switch(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Switch(
+        checked = checked,
+        enabled = enabled,
+        onCheckedChange = onCheckedChange,
+        colors =
+            SwitchDefaults.colors(
+                checkedThumbColor = GloshColors.Lime,
+                checkedTrackColor = GloshColors.Graphite,
+                checkedBorderColor = GloshColors.Graphite,
+                uncheckedThumbColor = GloshColors.Surface,
+                uncheckedTrackColor = GloshColors.SurfaceMuted,
+                uncheckedBorderColor = GloshColors.Line,
+                disabledCheckedThumbColor = GloshColors.Lime.copy(alpha = 0.55f),
+                disabledCheckedTrackColor = GloshColors.Graphite.copy(alpha = 0.45f),
+            ),
+    )
 }
