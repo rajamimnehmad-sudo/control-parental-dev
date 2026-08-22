@@ -21,7 +21,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -110,7 +109,7 @@ internal fun AppControlCard(
                 ) {
                     ClockIcon(tint = GloshColors.Graphite, modifier = Modifier.size(20.dp))
                 }
-                Switch(
+                GloshV4Switch(
                     checked = app.allowed,
                     enabled = !app.isUpdating,
                     onCheckedChange = onAllowedChanged,
