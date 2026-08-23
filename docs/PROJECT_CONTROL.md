@@ -23,9 +23,18 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   desinstalada y Android no expone una eliminacion ADB segura para ese registro;
   cerrar Samsung ahora causaria perdida temporal sin alcanzar cuenta cero. DEV
   319 no fue instalada y `set-device-owner` no fue intentado. Siguiente paso
-  seguro: reinstalar Mi Argentina desde su fuente oficial, autenticar y cerrar
-  sesion para que su propio authenticator retire el registro; si persiste, usar
-  otro telefono laboratorio o autorizar reprovisionamiento.
+  seguro inicialmente intentado: reinstalar Mi Argentina desde su fuente
+  oficial. La version vigente no registra el authenticator legado y la cuenta
+  persiste. Se verifico fuera del telefono Mi Argentina 5.17.3 (182): package
+  exacto, certificado SHA-256 oficial `223bc7c7...f59e6a`, servicio
+  `AuthenticatorService` y accountType legado exacto. El unico intento
+  `adb install -r -d` fue rechazado antes de modificar estado con
+  `INSTALL_FAILED_VERSION_DOWNGRADE`; la app permanece 7.21.0 (295), con el
+  mismo `ceDataInode`, y la cuenta huerfana persiste. No se intento
+  desinstalacion, limpieza, reset ni `set-device-owner`. Siguiente paso seguro:
+  usar otro telefono laboratorio sin cuentas o autorizar reprovisionamiento del
+  A23 despues de respaldar; Android 14 no ofrece una ruta ADB no destructiva
+  para completar este downgrade/eliminar la cuenta huerfana.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
