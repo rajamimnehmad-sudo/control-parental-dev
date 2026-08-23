@@ -153,7 +153,6 @@ public final class RelayClient implements Closeable {
             if (!isCurrent(socketGeneration, webSocket)) {
                 return;
             }
-            authenticated = false;
             fail(socketGeneration, webSocket, "Se perdió la conexión con el relay.", t);
         }
 
@@ -162,9 +161,8 @@ public final class RelayClient implements Closeable {
             if (!isCurrent(socketGeneration, webSocket)) {
                 return;
             }
-            authenticated = false;
-            destroyActiveDescriptor(socketGeneration);
             Listener current = listener;
+            terminateCurrent(socketGeneration, webSocket);
             if (current != null) {
                 current.onClosed();
             }
@@ -380,16 +378,19 @@ public final class RelayClient implements Closeable {
         return current;
     }
 
-    private synchronized void destroyActiveDescriptor(long expectedGeneration) {
-        if (expectedGeneration != generation) {
+    private synchronized void terminateCurrent(long expectedGeneration, WebSocket expectedSocket) {
+        if (expectedGeneration != generation || expectedSocket == null || expectedSocket != socket) {
             return;
         }
+        authenticated = false;
+        challengeNonce = null;
+        socket = null;
         JoinDescriptor current = descriptor;
         descriptor = null;
         if (current != null) {
             current.destroy();
         }
-        socket = null;
+        generation++;
     }
 
     private void notifyState(String state) {
@@ -403,8 +404,8 @@ public final class RelayClient implements Closeable {
         if (!isCurrent(expectedGeneration, failingSocket)) {
             return;
         }
-        authenticated = false;
         Listener current = listener;
+        terminateCurrent(expectedGeneration, failingSocket);
         if (current != null) {
             current.onError(message, error);
         }
