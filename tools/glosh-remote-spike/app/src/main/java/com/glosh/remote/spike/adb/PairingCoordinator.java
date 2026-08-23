@@ -107,10 +107,18 @@ public final class PairingCoordinator implements AutoCloseable {
     }
 
     public void disconnect() {
+        if (executor.isShutdown()) {
+            safeDisconnect();
+            return;
+        }
         executor.execute(this::safeDisconnect);
     }
 
     public void revokeIdentity() {
+        if (executor.isShutdown()) {
+            AdbConnectionManager.resetIdentity(context);
+            return;
+        }
         executor.execute(() -> AdbConnectionManager.resetIdentity(context));
     }
 
@@ -123,6 +131,8 @@ public final class PairingCoordinator implements AutoCloseable {
 
     @Override
     public void close() {
+        // Fail closed: no ADB shell connection may outlive the UI/session lifecycle.
+        safeDisconnect();
         executor.shutdownNow();
     }
 }
