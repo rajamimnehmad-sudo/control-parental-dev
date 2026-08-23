@@ -4,6 +4,8 @@
 This is intentionally a lab tool. It binds only to localhost and asks cloudflared
 for an outbound Quick Tunnel. Commands are allowlisted action names and their
 payloads/results are encrypted end-to-end with a one-time 256-bit session key.
+
+Python 3.9+.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ import time
 import urllib.parse
 import uuid
 from dataclasses import dataclass
+from typing import Dict, Optional, Tuple, Union
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from websockets.legacy.server import WebSocketServerProtocol, serve
@@ -85,7 +88,7 @@ class AgentInfo:
     model: str = "?"
     device: str = "?"
     android: str = "?"
-    sdk: int | str = "?"
+    sdk: Union[int, str] = "?"
 
     @classmethod
     def from_dict(cls, value: dict) -> "AgentInfo":
@@ -103,13 +106,13 @@ class RemoteSession:
         self.sid = b64u(os.urandom(18))
         self.key = os.urandom(32)
         self.expires_at = time.monotonic() + minutes * 60
-        self.agent: WebSocketServerProtocol | None = None
-        self.agent_info: AgentInfo | None = None
+        self.agent: Optional[WebSocketServerProtocol] = None
+        self.agent_info: Optional[AgentInfo] = None
         self.agent_ready = asyncio.Event()
         self.stop_event = asyncio.Event()
         self.claim_lock = asyncio.Lock()
         self.send_lock = asyncio.Lock()
-        self.pending: dict[str, asyncio.Future] = {}
+        self.pending: Dict[str, asyncio.Future] = {}
         self.server_seq = 0
         self.agent_seq = 0
 
@@ -238,7 +241,7 @@ class RemoteSession:
         self.key = b"\x00" * len(self.key)
 
 
-async def start_cloudflared(port: int) -> tuple[asyncio.subprocess.Process, str]:
+async def start_cloudflared(port: int) -> Tuple[asyncio.subprocess.Process, str]:
     executable = shutil.which("cloudflared")
     if not executable:
         raise RuntimeError(
@@ -365,7 +368,7 @@ async def expire_session(session: RemoteSession) -> None:
 
 async def async_main(args: argparse.Namespace) -> int:
     session = RemoteSession(args.session_minutes)
-    tunnel_process: asyncio.subprocess.Process | None = None
+    tunnel_process: Optional[asyncio.subprocess.Process] = None
 
     async with serve(
         session.handler,
