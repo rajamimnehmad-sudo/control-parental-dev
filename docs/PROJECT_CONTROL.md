@@ -49,8 +49,13 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   dos entradas del mismo Samsung account (`com.osp.app.signin` y
   `com.samsung.android.mobileservice`), 549 paquetes y ningun owner. El gate esta
   detenido antes de cerrar Samsung porque el telefono advierte que desactivara
-  Samsung Cloud, Find My Mobile y Samsung Pass localmente; requiere confirmacion
-  explicita antes de continuar a cuentas cero, DEV 319 y `set-device-owner`.
+  Samsung Cloud, Find My Mobile y Samsung Pass localmente. El usuario autorizo
+  explicitamente cerrar esa cuenta. Se marco `Mantener el perfil` y se concedio
+  el permiso de Contactos necesario para preservar el perfil local. Antes de
+  completar, Samsung advirtio que el futuro acceso requerira un codigo enviado
+  al numero enmascarado terminado en `4168`; la pantalla de confirmacion queda
+  detenida hasta que el usuario confirme acceso a ese numero. Solo tras cuentas
+  cero puede continuar DEV 319 y el unico intento de `set-device-owner`.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
