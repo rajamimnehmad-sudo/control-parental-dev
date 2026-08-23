@@ -1,0 +1,41 @@
+CHROME-PHOTOS-DATA-PLANE-00 - FINAL GATES
+Date: 2026-08-23
+Status: PASS physical DEV
+
+AUTOMATED GATES
+- app-user:testDevDebugUnitTest --tests com.contentfilter.user.chromedataplane.*: PASS
+- ChromePhotosEphemeralTlsTest (CA, hostname, TLS handshake): PASS
+- app-user:ktlintDevSourceSetCheck: PASS
+- app-user:ktlintTestDevSourceSetCheck: PASS
+- app-user:lintDevDebug: PASS
+- app-user:assembleDevDebug (R8 minified, DEV signed): PASS
+- Global ktlintCheck: unrelated pre-existing main-source violations; directed ticket gates PASS
+
+APK
+- package: com.contentfilter.user.dev
+- versionCode: 320
+- versionName: 1.0.1-dev
+- SHA-256: 878c8b5e5f066fab85539c77c25b791ea753932498d7569333a1973c639e8882
+- install: in-place Success; application data inode preserved
+
+PHYSICAL GATE - SAMSUNG A23 / ANDROID 14 API 34 / CHROME 151.0.7922.137
+- SAFE-A: PASS; 6768 input bytes, 6768 output bytes, safe decision, original visible
+- SENTINEL-BLOCK: PASS; 5237 input bytes, 6303 output bytes, block decision, no raw sentinel pixels
+- LAZY SENTINEL: PASS; block decision after scroll, cache hit
+- VPN TCP/QUIC: PASS; 12 direct TCP attempts observed and dropped, QUIC attempts 0
+- Lease/revocation: PASS; explicit fresh lease, chrome_absent revocation, no lease reuse after re-entry
+- errorCode=3: 8 captures; every occurrence revoked transparency and kept fail-closed coverage; recovery used a new epoch
+- rawPresented=true: 0
+- stale commits: 0
+- attachmentCount: 1 in the initial Chrome session; cumulative 2 only after exit/re-entry; never simultaneous
+- crash: 0
+- ANR: 0
+
+ROLLBACK
+- fail_closed executed before teardown
+- proxy stopped and cache cleared
+- Chrome ProxySettings removed
+- ephemeral CA uninstalled
+- VPN attestation revoked
+- chrome://policy after Chrome restart: no policies set
+- Device Owner and Accessibility remained active
