@@ -30,6 +30,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     private var healthJob: Job? = null
     private var proxy: ChromePhotosHttpsProxy? = null
     private var currentSessionId = ""
+    private var vpnRollbackCompleted = false
     private lateinit var policyController: ChromePhotosLabPolicyController
 
     override fun onCreate() {
@@ -60,7 +61,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         runCatching { proxy?.close() }
         proxy = null
         runCatching { policyController.rollbackOwnedPolicyAndCa() }
-        runCatching { VpnController.refreshDevLabRoutes(this) }
+        runCatching { restoreVpnStateAfterLab() }
         operation?.cancel()
         serviceScope?.cancel()
         serviceScope = null
@@ -79,6 +80,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                 val preferences = labPreferences()
                 try {
                     lifecycle.begin()
+                    val vpnWasRunningBeforeLab = VpnController.isRunning(this@ChromePhotosDataPlaneLabService)
+                    vpnRollbackCompleted = false
+                    policyController.verifyOwnerAndCleanOrphanedState()
                     val sessionId = UUID.randomUUID().toString()
                     currentSessionId = sessionId
                     ChromePhotosDataPlaneRuntimeAttestation.beginSession(sessionId)
@@ -92,8 +96,8 @@ class ChromePhotosDataPlaneLabService : Service() {
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyVpnConfirmed, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyFixtureConfirmed, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
+                        .putBoolean(KeyVpnWasRunningBeforeLab, vpnWasRunningBeforeLab)
                         .commit()
-                    policyController.verifyOwnerAndCleanOrphanedState()
                     val routeAddresses =
                         ChromePhotosRealWebRouteResolver().resolve(ChromePhotosRealWebLabConfig.realHosts)
                     preferences.edit()
@@ -141,7 +145,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                     proxy?.close()
                     proxy = null
                     runCatching { policyController.rollbackOwnedPolicyAndCa() }
-                    runCatching { VpnController.refreshDevLabRoutes(this@ChromePhotosDataPlaneLabService) }
+                    runCatching { restoreVpnStateAfterLab() }
                     Log.e(LogTag, "phase=start_failed error=${error.javaClass.simpleName}")
                 }
             }
@@ -157,7 +161,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                 proxy?.close()
                 proxy = null
                 policyController.rollbackOwnedPolicyAndCa()
-                VpnController.refreshDevLabRoutes(this@ChromePhotosDataPlaneLabService)
+                restoreVpnStateAfterLab()
                 lifecycle.stop()
                 currentSessionId = ""
                 ChromePhotosDataPlaneRuntimeAttestation.clear()
@@ -293,6 +297,23 @@ class ChromePhotosDataPlaneLabService : Service() {
         )
     }
 
+    private fun restoreVpnStateAfterLab() {
+        if (vpnRollbackCompleted) return
+        val preferences = labPreferences()
+        if (!preferences.contains(KeyVpnWasRunningBeforeLab)) return
+        val action =
+            chromePhotosVpnRollbackAction(
+                vpnWasRunningBeforeLab = preferences.getBoolean(KeyVpnWasRunningBeforeLab, false),
+            )
+        when (action) {
+            ChromePhotosVpnRollbackAction.RefreshRoutes -> VpnController.refreshDevLabRoutes(this)
+            ChromePhotosVpnRollbackAction.Stop -> VpnController.stop(this)
+        }
+        preferences.edit().remove(KeyVpnWasRunningBeforeLab).commit()
+        vpnRollbackCompleted = true
+        Log.i(LogTag, "rollback=vpn_restored action=${action.logValue}")
+    }
+
     private fun labPreferences() =
         getSharedPreferences(
             ChromePhotosDataPlaneLabContract.PreferencesName,
@@ -327,6 +348,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         private const val FingerprintLogLength = 16
         private const val SessionLogLength = 8
         private const val MaxFailureLength = 80
+        private const val KeyVpnWasRunningBeforeLab = "vpn_was_running_before_lab"
         private const val HealthCheckMillis = 100L
         private const val AttestationLifetimeMillis = 400L
         private const val FixtureHeartbeatMaximumAgeMillis = 700L
@@ -337,3 +359,13 @@ class ChromePhotosDataPlaneLabService : Service() {
             )
     }
 }
+
+internal enum class ChromePhotosVpnRollbackAction(
+    val logValue: String,
+) {
+    RefreshRoutes("refresh_routes"),
+    Stop("stop"),
+}
+
+internal fun chromePhotosVpnRollbackAction(vpnWasRunningBeforeLab: Boolean): ChromePhotosVpnRollbackAction =
+    if (vpnWasRunningBeforeLab) ChromePhotosVpnRollbackAction.RefreshRoutes else ChromePhotosVpnRollbackAction.Stop
