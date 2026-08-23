@@ -4,18 +4,24 @@ Actualizado: 2026-08-23. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- `CHROME-PHOTOS-PRESENTATION-INDEPENDENCE-01` esta **IN PROGRESS**, owner unico
-  Proteccion Android / Codex. Parte de
-  `25d326914496f2874989211f4bf891c2c0fea7ab` en el worktree/rama aislado
-  `work/chrome-photos-presentation-independence-01`. Su objetivo es eliminar
-  `takeScreenshotOfWindow` del camino normal de presentacion cuando el data-plane
-  DEV esta sano, conservando la superficie unica como fail-safe opaco ante perdida
-  de proxy, politica, VPN, heartbeat, contexto, viewport o lease. El alcance queda
-  limitado a Chrome, fixture controlada y presentation/lease/surface; no modifica
-  proxy, TLS, transformacion, routing VPN, GloshIA, DAG, Production ni web real.
-  El precheck read-only A23 confirmo Device Owner y Accessibility activos, DEV 320
-  instalada con `ceDataInode=1239519` y sin VPN Glosh activa despues del rollback
-  anterior. No existe otro owner de escritura sobre las rutas permitidas.
+- `CHROME-PHOTOS-PRESENTATION-INDEPENDENCE-01` esta **PASS CODEX, pendiente de
+  revision final ChatGPT**, owner unico Proteccion Android / Codex. Parte de
+  `25d326914496f2874989211f4bf891c2c0fea7ab`; commit funcional
+  `993528b17be60ed38d6221d347a019000e2b57ce` y evidencia local
+  `0a23ac02` en `work/chrome-photos-presentation-independence-01`. DEV 321,
+  SHA-256 `48c751b0b11542fa52e2001bf2640b4a6fab39a7e28d0301309d370918fca586`,
+  se instalo in-place preservando `ceDataInode=1239519`, Device Owner y
+  Accessibility. Los gates automaticos pasaron. El gate A23 registro 1632 eventos
+  `TYPE_VIEW_SCROLLED` durante dos minutos con data-plane sano y obtuvo cero
+  solicitudes de captura despues de `presentation_ready`, cero `errorCode=3`,
+  cero exposicion cruda, cero stale, un host simultaneo, cero crash y cero ANR.
+  SAFE siguio visible; sentinel y lazy-sentinel siguieron bloqueados. El STOP
+  controlado restauro opacidad en 19 ms; la sesion y lease nuevas no reutilizaron
+  la anterior, y salida/reentrada revoco y genero capability nueva. Rollback final
+  completo: proxy, CA y cache del lab retirados, cero VPN activa y
+  `chrome://policy` sin politicas establecidas. No se modificaron proxy, TLS,
+  transformacion, routing VPN, GloshIA, DAG, Production ni web real. No avanzar a
+  otro ticket hasta la revision final.
 - `GLOSH-DEVICE-OWNER-INSTALLER-00` esta **PASS**, owner unico
   Proteccion Android / Codex, en `work/glosh-device-owner-installer-00` sobre
   `1d45a74c`. Su alcance es crear y ejecutar un asistente macOS seguro para
