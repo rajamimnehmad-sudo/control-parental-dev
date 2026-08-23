@@ -3,12 +3,12 @@ package com.glosh.remote.spike;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Typeface;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.text.InputType;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -36,9 +36,9 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         pairingCoordinator = new PairingCoordinator(getApplicationContext());
         setContentView(buildUi());
-        consumeDeepLink(getIntent());
 
         appendLog("Dispositivo: " + Build.MANUFACTURER + " " + Build.MODEL
                 + " · Android " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ")");
@@ -51,19 +51,13 @@ public final class MainActivity extends Activity {
     }
 
     @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        setIntent(intent);
-        consumeDeepLink(intent);
-    }
-
-    @Override
     protected void onDestroy() {
         if (relayClient != null) {
             relayClient.close();
             relayClient = null;
         }
         pairingCoordinator.close();
+        clearSensitiveFields();
         super.onDestroy();
     }
 
@@ -93,11 +87,10 @@ public final class MainActivity extends Activity {
         statusView.setPadding(0, 0, 0, dp(18));
         root.addView(statusView);
 
-        TextView step1 = heading("1 · Activar Depuración inalámbrica");
-        root.addView(step1);
-
-        TextView help1 = body("Abrí Opciones de desarrollador → Depuración inalámbrica → Emparejar dispositivo con código. Dejá visible esa pantalla, recordá el código de 6 dígitos y volvé acá.");
-        root.addView(help1);
+        root.addView(heading("1 · Activar Depuración inalámbrica"));
+        root.addView(body(
+                "Abrí Opciones de desarrollador → Depuración inalámbrica. Para que el código siga válido mientras lo escribís acá, "
+                        + "usá pantalla dividida: dejá Ajustes con “Emparejar dispositivo con código” visible en una mitad y Glosh Remote en la otra."));
 
         Button settingsButton = new Button(this);
         settingsButton.setText("Abrir Opciones de desarrollador");
@@ -106,7 +99,9 @@ public final class MainActivity extends Activity {
 
         pairingCodeView = new EditText(this);
         pairingCodeView.setHint("Código de 6 dígitos");
-        pairingCodeView.setInputType(InputType.TYPE_CLASS_NUMBER);
+        pairingCodeView.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+        pairingCodeView.setSaveEnabled(false);
+        pairingCodeView.setAutofillHints((String[]) null);
         root.addView(pairingCodeView);
 
         pairButton = new Button(this);
@@ -116,12 +111,16 @@ public final class MainActivity extends Activity {
 
         root.addView(spacer());
         root.addView(heading("2 · Unir esta sesión con tu Mac"));
-        root.addView(body("Pegá el enlace gloshremote:// que genera la herramienta de Mac. La clave queda sólo en memoria y los comandos viajan cifrados extremo a extremo."));
+        root.addView(body(
+                "Pegá el enlace temporal que genera la herramienta de Mac. Contiene una clave secreta de una sola sesión: "
+                        + "no se guarda, no se acepta por deep-link en esta V0 y los comandos/resultados viajan cifrados extremo a extremo."));
 
         joinUriView = new EditText(this);
         joinUriView.setHint("gloshremote://join?...");
         joinUriView.setMinLines(3);
         joinUriView.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        joinUriView.setSaveEnabled(false);
+        joinUriView.setAutofillHints((String[]) null);
         root.addView(joinUriView);
 
         relayButton = new Button(this);
@@ -202,6 +201,7 @@ public final class MainActivity extends Activity {
                     adbReady = true;
                     pairButton.setEnabled(true);
                     relayButton.setEnabled(true);
+                    pairingCodeView.setText("");
                     setStatus("ADB local listo. Ya podés unir la sesión con tu Mac.");
                     appendLog("ADB canary: " + canaryOutput.trim());
                     ensureRelayClient();
@@ -214,6 +214,7 @@ public final class MainActivity extends Activity {
                     adbReady = false;
                     pairButton.setEnabled(true);
                     relayButton.setEnabled(false);
+                    pairingCodeView.setText("");
                     setStatus("Pairing falló: " + message);
                     appendLog("ERROR pairing: " + message);
                 });
@@ -228,7 +229,8 @@ public final class MainActivity extends Activity {
         }
         try {
             ensureRelayClient();
-            relayClient.connect(joinUriView.getText().toString().trim(), new RelayClient.Listener() {
+            final String descriptor = joinUriView.getText().toString().trim();
+            relayClient.connect(descriptor, new RelayClient.Listener() {
                 @Override
                 public void onState(String state) {
                     ui(() -> {
@@ -239,12 +241,16 @@ public final class MainActivity extends Activity {
 
                 @Override
                 public void onAuthenticated() {
-                    ui(() -> appendLog("Mac autenticada. Allowlist remota activa."));
+                    ui(() -> {
+                        joinUriView.setText("");
+                        appendLog("Mac autenticada. Allowlist remota activa.");
+                    });
                 }
 
                 @Override
                 public void onError(String message, Throwable error) {
                     ui(() -> {
+                        joinUriView.setText("");
                         setStatus(message);
                         appendLog("ERROR relay: " + message);
                     });
@@ -256,6 +262,7 @@ public final class MainActivity extends Activity {
                 }
             });
         } catch (Throwable error) {
+            joinUriView.setText("");
             setStatus("Enlace inválido: " + error.getMessage());
             appendLog("ERROR descriptor: " + error.getMessage());
         }
@@ -268,6 +275,7 @@ public final class MainActivity extends Activity {
         pairingCoordinator.disconnect();
         adbReady = false;
         relayButton.setEnabled(false);
+        clearSensitiveFields();
         setStatus("Sesión cerrada. No quedan comandos remotos activos.");
         appendLog("Sesión remota y conexión ADB cerradas.");
     }
@@ -280,8 +288,18 @@ public final class MainActivity extends Activity {
         pairingCoordinator.revokeIdentity();
         adbReady = false;
         relayButton.setEnabled(false);
+        clearSensitiveFields();
         setStatus("Identidad ADB temporal revocada. Para otra sesión habrá que emparejar de nuevo.");
         appendLog("Clave/certificado ADB locales eliminados.");
+    }
+
+    private void clearSensitiveFields() {
+        if (pairingCodeView != null) {
+            pairingCodeView.setText("");
+        }
+        if (joinUriView != null) {
+            joinUriView.setText("");
+        }
     }
 
     private void ensureRelayClient() {
@@ -293,16 +311,6 @@ public final class MainActivity extends Activity {
             relayClient = new RelayClient(shell);
         } catch (Exception e) {
             throw new IllegalStateException("No se pudo abrir el cliente remoto.", e);
-        }
-    }
-
-    private void consumeDeepLink(Intent intent) {
-        if (intent == null || joinUriView == null) {
-            return;
-        }
-        Uri data = intent.getData();
-        if (data != null && "gloshremote".equalsIgnoreCase(data.getScheme())) {
-            joinUriView.setText(data.toString());
         }
     }
 
