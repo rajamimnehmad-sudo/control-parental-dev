@@ -52,7 +52,9 @@ public final class PairingCoordinator implements AutoCloseable {
                         context,
                         AdbMdns.SERVICE_TYPE_TLS_PAIRING,
                         (InetAddress address, int discoveredPort) -> {
-                            if (address != null && discoveredPort > 0 && host.compareAndSet(null, address.getHostAddress())) {
+                            if (address != null
+                                    && discoveredPort > 0
+                                    && host.compareAndSet(null, address.getHostAddress())) {
                                 port.set(discoveredPort);
                                 latch.countDown();
                             }
@@ -61,12 +63,15 @@ public final class PairingCoordinator implements AutoCloseable {
 
                 if (!latch.await(DISCOVERY_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                     throw new IllegalStateException(
-                            "No apareció el puerto de pairing. Dejá abierta la pantalla “Emparejar dispositivo con código”.");
+                            "No apareció el puerto de pairing. Mantené visible “Emparejar dispositivo con código” usando pantalla dividida.");
                 }
 
                 listener.onStatus("Emparejando con ADB local…");
                 AdbConnectionManager manager = AdbConnectionManager.getInstance(context);
-                manager.pair(host.get(), port.get(), pairingCode);
+                boolean paired = manager.pair(host.get(), port.get(), pairingCode);
+                if (!paired) {
+                    throw new IllegalStateException("Android rechazó el emparejamiento ADB.");
+                }
 
                 listener.onStatus("Pairing correcto. Conectando al canal TLS de ADB…");
                 boolean connected = manager.connectTls(context, CONNECT_TIMEOUT_MS);
@@ -76,9 +81,15 @@ public final class PairingCoordinator implements AutoCloseable {
 
                 AdbShell shell = new AdbShell(manager);
                 String canary = shell.execute("whoami");
+                if (canary == null || canary.trim().isEmpty()) {
+                    throw new IllegalStateException("ADB conectó pero el canario id no devolvió salida.");
+                }
                 listener.onConnected(canary);
             } catch (Throwable error) {
-                listener.onError(error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage(), error);
+                safeDisconnect();
+                listener.onError(
+                        error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage(),
+                        error);
             } finally {
                 if (pairingDiscovery != null) {
                     pairingDiscovery.stop();
@@ -96,16 +107,18 @@ public final class PairingCoordinator implements AutoCloseable {
     }
 
     public void disconnect() {
-        executor.execute(() -> {
-            try {
-                AdbConnectionManager.getInstance(context).disconnect();
-            } catch (Exception ignored) {
-            }
-        });
+        executor.execute(this::safeDisconnect);
     }
 
     public void revokeIdentity() {
         executor.execute(() -> AdbConnectionManager.resetIdentity(context));
+    }
+
+    private void safeDisconnect() {
+        try {
+            AdbConnectionManager.getInstance(context).disconnect();
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
