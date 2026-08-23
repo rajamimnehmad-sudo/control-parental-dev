@@ -20,14 +20,47 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
                 Context.MODE_PRIVATE,
             ).getBoolean(ChromePhotosDataPlaneLabContract.KeyActive, false)
 
-    fun routes(active: Boolean): List<ChromePhotosLabVpnRoute> =
+    fun routes(context: Context): List<ChromePhotosLabVpnRoute> {
+        val preferences =
+            context.getSharedPreferences(
+                ChromePhotosDataPlaneLabContract.PreferencesName,
+                Context.MODE_PRIVATE,
+            )
+        return routes(
+            active = isActive(context),
+            resolvedAddresses =
+                preferences.getStringSet(
+                    ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
+                    emptySet(),
+                ).orEmpty(),
+        )
+    }
+
+    fun routes(
+        active: Boolean,
+        resolvedAddresses: Collection<String> = emptySet(),
+    ): List<ChromePhotosLabVpnRoute> =
         if (active) {
-            listOf(
+            val fixture =
                 ChromePhotosLabVpnRoute(
                     ChromePhotosDataPlaneLabContract.FixtureIpv4,
                     Ipv4HostPrefixLength,
-                ),
-            )
+                )
+            val realRoutes =
+                resolvedAddresses
+                    .asSequence()
+                    .mapNotNull { address -> runCatching { InetAddress.getByName(address) }.getOrNull() }
+                    .filter { address -> !address.isAnyLocalAddress && !address.isLoopbackAddress }
+                    .distinctBy(InetAddress::getHostAddress)
+                    .take(MaximumResolvedRoutes)
+                    .map { address ->
+                        ChromePhotosLabVpnRoute(
+                            address = address.hostAddress.substringBefore('%'),
+                            prefixLength = if (address.address.size == Ipv4ByteCount) Ipv4HostPrefixLength else Ipv6HostPrefixLength,
+                        )
+                    }
+                    .toList()
+            listOf(fixture) + realRoutes
         } else {
             emptyList()
         }
@@ -99,7 +132,7 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
         preferences.edit().putLong(key, count).commit()
         Log.i(
             LogTag,
-            "transport=${diagnostic.protocol.lowercase()} destination=fixture port=$HttpsPort action=dropped count=$count",
+            "transport=${diagnostic.protocol.lowercase()} destination=controlled port=$HttpsPort action=dropped count=$count",
         )
         return true
     }
@@ -107,6 +140,9 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
     private const val DnsTypeA = 1
     private const val HttpsPort = 443
     private const val Ipv4HostPrefixLength = 32
+    private const val Ipv6HostPrefixLength = 128
+    private const val Ipv4ByteCount = 4
+    private const val MaximumResolvedRoutes = 32
     private const val SessionLogLength = 8
     private const val LogTag = "ChromePhotosDataPlane"
 }

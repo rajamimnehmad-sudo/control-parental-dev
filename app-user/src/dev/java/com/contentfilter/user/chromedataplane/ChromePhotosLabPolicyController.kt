@@ -83,6 +83,7 @@ internal class ChromePhotosLabPolicyController(
         preferences.edit()
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyActive, false)
+            .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
             .commit()
 
         if (devicePolicyManager.isDeviceOwnerApp(appContext.packageName)) {
@@ -111,6 +112,7 @@ internal class ChromePhotosLabPolicyController(
         preferences.edit()
             .remove(ChromePhotosDataPlaneLabContract.KeyInstalledCaDer)
             .remove(ChromePhotosDataPlaneLabContract.KeyCaFingerprint)
+            .remove(ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses)
             .apply()
         Log.i(LogTag, "rollback=complete proxy=cleared ca=removed")
     }

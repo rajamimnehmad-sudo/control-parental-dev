@@ -187,8 +187,7 @@ internal object ChromePhotosEphemeralTls {
     fun create(
         now: Instant = Instant.now(),
         maximumLeafCertificates: Int = DefaultMaximumLeafCertificates,
-    ): ChromePhotosEphemeralTlsMaterial =
-        ChromePhotosEphemeralTlsMaterial.create(now, maximumLeafCertificates)
+    ): ChromePhotosEphemeralTlsMaterial = ChromePhotosEphemeralTlsMaterial.create(now, maximumLeafCertificates)
 }
 
 private fun JcaX509v3CertificateBuilder.signWith(signerKeyPair: KeyPair): X509Certificate {

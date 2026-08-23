@@ -12,6 +12,8 @@ data class ChromePhotosDataPlaneRuntimeSnapshot(
     val vpnSessionId: String = "",
     val fixtureConfirmed: Boolean = false,
     val fixtureHeartbeatElapsed: Long = 0L,
+    val realWebScopeConfirmed: Boolean = false,
+    val realWebScopeHeartbeatElapsed: Long = 0L,
     val heartbeatElapsed: Long = 0L,
     val validUntilElapsed: Long = 0L,
 )
@@ -60,6 +62,18 @@ object ChromePhotosDataPlaneRuntimeAttestation {
     }
 
     @Synchronized
+    fun markRealWebScopeConfirmed(
+        sessionId: String,
+        confirmed: Boolean,
+        heartbeatElapsed: Long = 0L,
+    ) = update(sessionId) {
+        copy(
+            realWebScopeConfirmed = confirmed,
+            realWebScopeHeartbeatElapsed = if (confirmed) heartbeatElapsed else 0L,
+        )
+    }
+
+    @Synchronized
     fun publishHeartbeat(
         sessionId: String,
         elapsed: Long,
@@ -81,6 +95,8 @@ object ChromePhotosDataPlaneRuntimeAttestation {
                 vpnSessionId = "",
                 fixtureConfirmed = false,
                 fixtureHeartbeatElapsed = 0L,
+                realWebScopeConfirmed = false,
+                realWebScopeHeartbeatElapsed = 0L,
                 heartbeatElapsed = 0L,
                 validUntilElapsed = 0L,
             )

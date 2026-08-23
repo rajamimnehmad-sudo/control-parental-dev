@@ -83,6 +83,19 @@ class ChromePhotosEphemeralTlsTest {
         assertEquals(0, material.cachedLeafCount())
     }
 
+    @Test
+    fun `new session creates a new CA and cannot reuse previous leaf cache`() {
+        val first = ChromePhotosEphemeralTls.create()
+        val second = ChromePhotosEphemeralTls.create()
+        first.serverMaterialFor(ChromePhotosRealWebLabConfig.HttpBingoHost)
+
+        assertNotEquals(first.caFingerprint, second.caFingerprint)
+        assertEquals(1, first.cachedLeafCount())
+        assertEquals(0, second.cachedLeafCount())
+        first.close()
+        second.close()
+    }
+
     private fun clientContext(ca: X509Certificate): SSLContext {
         val trustStore = KeyStore.getInstance(KeyStore.getDefaultType()).apply { load(null) }
         trustStore.setCertificateEntry("ca", ca)

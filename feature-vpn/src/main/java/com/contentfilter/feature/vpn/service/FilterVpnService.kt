@@ -357,7 +357,7 @@ class FilterVpnService : VpnService() {
     private fun Builder.applyChromePhotosDataPlaneLabRoute(): Builder =
         apply {
             ChromePhotosDataPlaneLabVpnPolicy
-                .routes(ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService))
+                .routes(this@FilterVpnService)
                 .forEach { route -> addRoute(route.address, route.prefixLength) }
         }
 

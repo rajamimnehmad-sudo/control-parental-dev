@@ -25,10 +25,12 @@ internal class ChromePhotosResourceTransformer(
     safeBytes: Collection<ByteArray>,
     blockedBytes: Collection<ByteArray>,
     private val placeholderBytes: ByteArray,
+    safeContentHashes: Collection<String> = emptySet(),
+    blockedContentHashes: Collection<String> = emptySet(),
     private val maximumEntries: Int = DefaultMaximumEntries,
 ) {
-    private val safeHashes = safeBytes.mapTo(mutableSetOf(), ::sha256)
-    private val blockedHashes = blockedBytes.mapTo(mutableSetOf(), ::sha256)
+    private val safeHashes = safeBytes.mapTo(mutableSetOf(), ::sha256).apply { addAll(safeContentHashes) }
+    private val blockedHashes = blockedBytes.mapTo(mutableSetOf(), ::sha256).apply { addAll(blockedContentHashes) }
     private val cache =
         object : LinkedHashMap<String, ChromePhotosResourceDecision>(maximumEntries, LoadFactor, true) {
             override fun removeEldestEntry(
@@ -39,6 +41,7 @@ internal class ChromePhotosResourceTransformer(
     init {
         require(maximumEntries > 0)
         require(placeholderBytes.isNotEmpty())
+        require((safeHashes + blockedHashes).all { hash -> hash.matches(Sha256Pattern) })
         require(safeHashes.intersect(blockedHashes).isEmpty())
     }
 
@@ -93,6 +96,7 @@ internal class ChromePhotosResourceTransformer(
     private companion object {
         const val DefaultMaximumEntries = 32
         const val LoadFactor = 0.75f
+        val Sha256Pattern = Regex("[0-9a-f]{64}")
     }
 }
 

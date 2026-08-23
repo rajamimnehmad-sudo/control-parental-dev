@@ -53,6 +53,17 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
     }
 
     @Test
+    fun `verified real web scope can mint without fixture script heartbeat`() {
+        val lease =
+            authority.mint(
+                attestation(fixtureConfirmed = false, realWebScopeConfirmed = true),
+                context(),
+            )
+
+        assertNotNull(lease)
+    }
+
+    @Test
     fun `healthy renewal replaces capability without reusing the old lease`() {
         val first = assertNotNull(authority.mint(attestation(), context()))
         now += 350L
@@ -144,6 +155,7 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         vpnConfirmed: Boolean = true,
         vpnSessionId: String = SessionId,
         fixtureConfirmed: Boolean = true,
+        realWebScopeConfirmed: Boolean = false,
         heartbeatElapsed: Long = now,
         validUntilElapsed: Long = now + 1_000L,
     ) = ChromePhotosDataPlaneAttestation(
@@ -155,6 +167,7 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         vpnConfirmed = vpnConfirmed,
         vpnSessionId = vpnSessionId,
         fixtureConfirmed = fixtureConfirmed,
+        realWebScopeConfirmed = realWebScopeConfirmed,
         heartbeatElapsed = heartbeatElapsed,
         validUntilElapsed = validUntilElapsed,
     )

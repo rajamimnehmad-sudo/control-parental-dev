@@ -61,6 +61,31 @@ class ChromePhotosResourceTransformerTest {
         assertEquals(0, transformer.cacheSize())
     }
 
+    @Test
+    fun `public hash registry handles PNG JPEG WebP and AVIF by bytes not URL`() {
+        val png = "png-public".toByteArray()
+        val webp = "webp-public".toByteArray()
+        val transformer =
+            ChromePhotosResourceTransformer(
+                safeBytes = emptyList(),
+                blockedBytes = emptyList(),
+                placeholderBytes = placeholder,
+                safeContentHashes = setOf(sha256(png)),
+                blockedContentHashes = setOf(sha256(webp)),
+            )
+
+        assertEquals(ChromePhotosResourceDecision.Safe, transformer.transform("image/png", png).decision)
+        assertEquals(ChromePhotosResourceDecision.Block, transformer.transform("image/webp", webp).decision)
+        assertEquals(
+            ChromePhotosResourceDecision.Unknown,
+            transformer.transform("image/jpeg", "jpeg".toByteArray()).decision,
+        )
+        assertEquals(
+            ChromePhotosResourceDecision.Unknown,
+            transformer.transform("image/avif", "avif".toByteArray()).decision,
+        )
+    }
+
     private fun transformer() =
         ChromePhotosResourceTransformer(
             safeBytes = listOf(safe),

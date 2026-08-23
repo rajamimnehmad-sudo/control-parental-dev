@@ -11,9 +11,11 @@ object ChromePhotosDataPlaneLabContract {
     const val KeyVpnConfirmed = "vpn_confirmed"
     const val KeyVpnSessionId = "vpn_session_id"
     const val KeyFixtureConfirmed = "fixture_confirmed"
+    const val KeyRealWebScopeConfirmed = "real_web_scope_confirmed"
     const val KeyQuicAttempts = "quic_attempts"
     const val KeyDirectTcpAttempts = "direct_tcp_attempts"
     const val KeyLastFailure = "last_failure"
+    const val KeyResolvedRouteAddresses = "resolved_route_addresses"
     const val KeyInstalledCaDer = "installed_ca_der"
     const val KeyCaFingerprint = "ca_fingerprint"
 

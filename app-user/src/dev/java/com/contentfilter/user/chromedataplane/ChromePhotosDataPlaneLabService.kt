@@ -91,8 +91,17 @@ class ChromePhotosDataPlaneLabService : Service() {
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyPolicyConfirmed, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyVpnConfirmed, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyFixtureConfirmed, false)
+                        .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
                         .commit()
                     policyController.verifyOwnerAndCleanOrphanedState()
+                    val routeAddresses =
+                        ChromePhotosRealWebRouteResolver().resolve(ChromePhotosRealWebLabConfig.realHosts)
+                    preferences.edit()
+                        .putStringSet(
+                            ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
+                            routeAddresses,
+                        )
+                        .commit()
                     val tls = ChromePhotosEphemeralTls.create()
                     val origin = ChromePhotosFixtureOrigin()
                     val startedProxy =
@@ -123,7 +132,8 @@ class ChromePhotosDataPlaneLabService : Service() {
                         LogTag,
                         "phase=active owner=device_owner scope=chrome_only session=${sessionId.take(SessionLogLength)} " +
                             "ca=${policy.caFingerprint.take(FingerprintLogLength)} " +
-                            "fixture=controlled privacy=memory_only",
+                            "fixture=controlled realHosts=${ChromePhotosRealWebLabConfig.realHosts.size} " +
+                            "routes=${routeAddresses.size} privacy=public_only_memory_only",
                     )
                 } catch (error: Throwable) {
                     lifecycle.fail()
@@ -183,6 +193,7 @@ class ChromePhotosDataPlaneLabService : Service() {
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyPolicyConfirmed, false)
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyVpnConfirmed, false)
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyFixtureConfirmed, false)
+            .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
             .putString(ChromePhotosDataPlaneLabContract.KeyLastFailure, reason.take(MaxFailureLength))
             .commit()
         Log.i(LogTag, "phase=fail_closed reason=${reason.take(MaxFailureLength)}")
@@ -198,7 +209,14 @@ class ChromePhotosDataPlaneLabService : Service() {
                 while (currentSessionId == sessionId && lifecycle.current() in ActivePhases) {
                     val proxyHealthy = proxy?.isHealthy() == true
                     val policyConfirmed =
-                        runCatching { policyController.isApplied(caCertificateDer) }.getOrDefault(false)
+                        runCatching {
+                            policyController.isApplied(caCertificateDer) &&
+                                labPreferences()
+                                    .getStringSet(
+                                        ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
+                                        emptySet(),
+                                    ).orEmpty().isNotEmpty()
+                        }.getOrDefault(false)
                     ChromePhotosDataPlaneRuntimeAttestation.markProxyHealthy(sessionId, proxyHealthy)
                     ChromePhotosDataPlaneRuntimeAttestation.markPolicyConfirmed(sessionId, policyConfirmed)
                     val runtime = ChromePhotosDataPlaneRuntimeAttestation.snapshot()
@@ -214,7 +232,31 @@ class ChromePhotosDataPlaneLabService : Service() {
                             .apply()
                         Log.i(LogTag, "phase=fixture_scope_lost action=lease_revoked")
                     }
-                    if (proxyHealthy && policyConfirmed && runtime.vpnConfirmed && fixtureFresh) {
+                    val realWebScopeConfirmed = proxyHealthy && policyConfirmed && runtime.vpnConfirmed
+                    ChromePhotosDataPlaneRuntimeAttestation.markRealWebScopeConfirmed(
+                        sessionId = sessionId,
+                        confirmed = realWebScopeConfirmed,
+                        heartbeatElapsed = now,
+                    )
+                    val wasRealWebReady =
+                        labPreferences().getBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed,
+                            false,
+                        )
+                    if (realWebScopeConfirmed && !wasRealWebReady) {
+                        lifecycle.presentationReady()
+                        labPreferences().edit()
+                            .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, true)
+                            .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, true)
+                            .commit()
+                        Log.i(LogTag, "phase=presentation_ready scope=real_web failSafe=armed")
+                    } else if (!realWebScopeConfirmed && wasRealWebReady) {
+                        labPreferences().edit()
+                            .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
+                            .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
+                            .commit()
+                    }
+                    if (realWebScopeConfirmed || fixtureFresh) {
                         ChromePhotosDataPlaneRuntimeAttestation.publishHeartbeat(
                             sessionId = sessionId,
                             elapsed = now,

@@ -96,16 +96,21 @@ internal class ChromePhotosFixtureOrigin {
         </head>
         <body>
           <section class="status" id="fixture-marker">
-            <h1>CHROME-PHOTOS-DATA-PLANE-00</h1>
-            <p>HTTPS controlado · recursos individuales · decisión por SHA-256</p>
+            <h1>CHROME-PHOTOS-REAL-WEB-BATCH-01</h1>
+            <p>HTTPS real · hosts exactos · decisión por identidad</p>
           </section>
           <main class="grid">
-            <article class="card"><h2>SAFE-A</h2><img src="/safe-a.png?copy=1" alt="SAFE-A"></article>
-            <article class="card"><h2>SENTINEL-BLOCK</h2><img src="/sentinel-block.png" alt="SENTINEL-BLOCK"></article>
-            <article class="card"><h2>SAFE repetida 2</h2><img src="/safe-a.png?copy=2" alt="SAFE repeat 2"></article>
-            <article class="card"><h2>SAFE repetida 3</h2><img src="/safe-a.png?copy=3" alt="SAFE repeat 3"></article>
+            <article class="card"><h2>SAFE PNG real</h2><img src="${ChromePhotosRealWebLabConfig.SafePngUrl}" alt="SAFE PNG"></article>
+            <article class="card"><h2>BLOCK WebP real</h2><img src="${ChromePhotosRealWebLabConfig.BlockWebpUrl}" alt="BLOCK WebP"></article>
+            <article class="card"><h2>UNKNOWN JPEG</h2><img src="${ChromePhotosRealWebLabConfig.UnknownJpegUrl}" alt="UNKNOWN JPEG"></article>
+            <article class="card"><h2>UNKNOWN WebP</h2><img src="${ChromePhotosRealWebLabConfig.UnknownWebpUrl}" alt="UNKNOWN WebP"></article>
+            <article class="card"><h2>BLOCK repetida</h2><img src="${ChromePhotosRealWebLabConfig.BlockWebpUrl}" alt="BLOCK repeat"></article>
+            <article class="card"><h2>AVIF redirect permitido</h2><img src="${ChromePhotosRealWebLabConfig.AllowedRedirectUrl}" alt="AVIF redirect"></article>
+            <article class="card"><h2>UNKNOWN AVIF directa</h2><img src="${ChromePhotosRealWebLabConfig.UnknownAvifUrl}" alt="UNKNOWN AVIF"></article>
             <div class="spacer">Deslizá para activar lazy-load</div>
-            <article class="card" id="lazy-card"><h2>LAZY SENTINEL</h2><img loading="lazy" src="/lazy-sentinel.png" alt="Lazy sentinel"></article>
+            <article class="card" id="lazy-card"><h2>LAZY BLOCK real</h2><img loading="lazy" src="${ChromePhotosRealWebLabConfig.BlockWebpUrl}" alt="Lazy block"></article>
+            <article class="card"><a href="${ChromePhotosRealWebLabConfig.PublicHtmlUrl}">HTTPS remoto real</a></article>
+            <article class="card"><a href="${ChromePhotosRealWebLabConfig.DisallowedRedirectUrl}">Redirect no permitido</a></article>
             <article class="card"><a href="/second">Probar adelante / atrás</a></article>
           </main>
           ${ChromePhotosFixtureLeaseContract.ScriptTag}

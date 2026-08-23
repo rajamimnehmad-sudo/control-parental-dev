@@ -18,6 +18,21 @@ class ChromePhotosDataPlaneLabVpnPolicyTest {
     }
 
     @Test
+    fun `lab routes every bounded resolved IPv4 and IPv6 address exactly`() {
+        assertEquals(
+            listOf(
+                ChromePhotosLabVpnRoute(ChromePhotosDataPlaneLabContract.FixtureIpv4, 32),
+                ChromePhotosLabVpnRoute("203.0.113.8", 32),
+                ChromePhotosLabVpnRoute("2001:db8:0:0:0:0:0:8", 128),
+            ),
+            ChromePhotosDataPlaneLabVpnPolicy.routes(
+                active = true,
+                resolvedAddresses = listOf("203.0.113.8", "2001:db8::8", "203.0.113.8"),
+            ),
+        )
+    }
+
+    @Test
     fun `fixture DNS match is exact and gated`() {
         assertTrue(
             ChromePhotosDataPlaneLabVpnPolicy.isFixtureDomain(
