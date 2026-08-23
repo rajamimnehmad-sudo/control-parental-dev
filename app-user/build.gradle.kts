@@ -182,6 +182,7 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.litertlm.android)
     implementation(libs.okhttp)
+    add("devImplementation", project(":gloshia-visual-core"))
     add("devImplementation", "org.bouncycastle:bcpkix-jdk18on:1.84")
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
