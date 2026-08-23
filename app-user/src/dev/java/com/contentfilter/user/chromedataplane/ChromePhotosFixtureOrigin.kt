@@ -15,13 +15,21 @@ internal data class ChromePhotosFixtureResponse(
     val statusText: String = "OK",
 )
 
-/** In-memory controlled origin. No intercepted bytes are written to disk. */
-internal class ChromePhotosFixtureOrigin {
-    val safeImageBytes: ByteArray = createImage(VisualKind.Safe)
-    val sentinelImageBytes: ByteArray = createImage(VisualKind.Sentinel)
-    val placeholderImageBytes: ByteArray = createImage(VisualKind.Placeholder)
+internal interface ChromePhotosFixtureSource {
+    val safeImageBytes: ByteArray
+    val sentinelImageBytes: ByteArray
+    val placeholderImageBytes: ByteArray
 
-    fun responseFor(requestTarget: String): ChromePhotosFixtureResponse {
+    fun responseFor(requestTarget: String): ChromePhotosFixtureResponse
+}
+
+/** In-memory controlled origin. No intercepted bytes are written to disk. */
+internal class ChromePhotosFixtureOrigin : ChromePhotosFixtureSource {
+    override val safeImageBytes: ByteArray = createImage(VisualKind.Safe)
+    override val sentinelImageBytes: ByteArray = createImage(VisualKind.Sentinel)
+    override val placeholderImageBytes: ByteArray = createImage(VisualKind.Placeholder)
+
+    override fun responseFor(requestTarget: String): ChromePhotosFixtureResponse {
         val path = requestTarget.substringBefore('?').substringBefore('#')
         return when (path) {
             "/", "/index.html" -> htmlResponse("fixture-index", fixtureHtml())

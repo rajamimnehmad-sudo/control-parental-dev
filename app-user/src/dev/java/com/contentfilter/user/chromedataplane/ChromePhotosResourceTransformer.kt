@@ -100,6 +100,15 @@ internal class ChromePhotosResourceTransformer(
     }
 }
 
+internal fun chromePhotosDeterministicTransformer(origin: ChromePhotosFixtureSource): ChromePhotosResourceTransformer =
+    ChromePhotosResourceTransformer(
+        safeBytes = listOf(origin.safeImageBytes),
+        blockedBytes = listOf(origin.sentinelImageBytes),
+        placeholderBytes = origin.placeholderImageBytes,
+        safeContentHashes = ChromePhotosRealWebLabConfig.safeHashes,
+        blockedContentHashes = ChromePhotosRealWebLabConfig.blockedHashes,
+    )
+
 internal fun sha256(bytes: ByteArray): String =
     MessageDigest
         .getInstance("SHA-256")

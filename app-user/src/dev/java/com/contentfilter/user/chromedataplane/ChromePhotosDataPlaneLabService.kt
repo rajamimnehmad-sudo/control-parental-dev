@@ -115,8 +115,8 @@ class ChromePhotosDataPlaneLabService : Service() {
                             onFixtureHeartbeat = ::markFixtureHeartbeat,
                             onFatalFailure = ::markFailClosed,
                         )
-                    startedProxy.start()
                     proxy = startedProxy
+                    startedProxy.start()
                     ChromePhotosDataPlaneRuntimeAttestation.markProxyHealthy(sessionId, true)
                     lifecycle.proxyReady()
                     val policy = policyController.apply(tls)

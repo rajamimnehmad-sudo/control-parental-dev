@@ -33,20 +33,14 @@ internal data class ChromePhotosProxyMetrics(
 
 internal class ChromePhotosHttpsProxy(
     private val tls: ChromePhotosEphemeralTlsMaterial,
-    private val origin: ChromePhotosFixtureOrigin,
+    private val origin: ChromePhotosFixtureSource,
     private val onFixtureHeartbeat: () -> Unit,
     private val onFatalFailure: (String) -> Unit,
     private val upstream: ChromePhotosUpstream = ChromePhotosRealUpstream(),
+    private val transformer: ChromePhotosResourceTransformer = chromePhotosDeterministicTransformer(origin),
+    private val lifecycleLog: (String, Throwable?) -> Unit = ::logProxyLifecycle,
 ) : AutoCloseable {
     private val hostAllowlist = ChromePhotosHostAllowlist(ChromePhotosRealWebLabConfig.allowedHosts)
-    private val transformer =
-        ChromePhotosResourceTransformer(
-            safeBytes = listOf(origin.safeImageBytes),
-            blockedBytes = listOf(origin.sentinelImageBytes),
-            placeholderBytes = origin.placeholderImageBytes,
-            safeContentHashes = ChromePhotosRealWebLabConfig.safeHashes,
-            blockedContentHashes = ChromePhotosRealWebLabConfig.blockedHashes,
-        )
     private val responseSanitizer =
         ChromePhotosRealResponseSanitizer(
             transformer = transformer,
@@ -54,6 +48,9 @@ internal class ChromePhotosHttpsProxy(
             placeholderBytes = origin.placeholderImageBytes,
         )
     private val running = AtomicBoolean(false)
+    private val lifecycleLock = Any()
+    private var terminal = false
+    private var cleanupComplete = false
     private val executor: ExecutorService = Executors.newFixedThreadPool(WorkerCount)
     private var serverSocket: ServerSocket? = null
     private var acceptThread: Thread? = null
@@ -70,34 +67,43 @@ internal class ChromePhotosHttpsProxy(
     private val deliveredBytes = AtomicLong()
 
     fun start() {
-        check(running.compareAndSet(false, true)) { "Proxy already started" }
-        val socket =
-            ServerSocket(
-                ChromePhotosDataPlaneLabContract.ProxyPort,
-                SocketBacklog,
-                InetAddress.getByName(ChromePhotosDataPlaneLabContract.ProxyHost),
-            ).apply { reuseAddress = true }
-        serverSocket = socket
-        acceptThread =
-            Thread(
-                {
-                    try {
-                        while (running.get()) {
-                            val client = socket.accept()
-                            connections.incrementAndGet()
-                            executor.execute { handleClient(client) }
-                        }
-                    } catch (error: SocketException) {
-                        if (running.get()) fatal(error)
-                    } catch (error: Throwable) {
-                        fatal(error)
+        synchronized(lifecycleLock) {
+            check(!terminal && !cleanupComplete) { "Proxy lifecycle is terminal" }
+            check(running.compareAndSet(false, true)) { "Proxy already started" }
+            try {
+                val socket =
+                    ServerSocket(
+                        ChromePhotosDataPlaneLabContract.ProxyPort,
+                        SocketBacklog,
+                        InetAddress.getByName(ChromePhotosDataPlaneLabContract.ProxyHost),
+                    ).apply { reuseAddress = true }
+                serverSocket = socket
+                acceptThread =
+                    Thread(
+                        {
+                            try {
+                                while (running.get()) {
+                                    val client = socket.accept()
+                                    connections.incrementAndGet()
+                                    executor.execute { handleClient(client) }
+                                }
+                            } catch (error: SocketException) {
+                                if (running.get()) fatal(error)
+                            } catch (error: Throwable) {
+                                fatal(error)
+                            }
+                        },
+                        "chrome-photos-proxy-accept",
+                    ).apply {
+                        isDaemon = true
+                        start()
                     }
-                },
-                "chrome-photos-proxy-accept",
-            ).apply {
-                isDaemon = true
-                start()
+            } catch (error: Throwable) {
+                running.set(false)
+                terminal = true
+                throw error
             }
+        }
         Log.i(LogTag, "phase=proxy_ready bind=loopback port=${ChromePhotosDataPlaneLabContract.ProxyPort}")
     }
 
@@ -119,16 +125,31 @@ internal class ChromePhotosHttpsProxy(
     fun isHealthy(): Boolean = running.get() && serverSocket?.isClosed == false
 
     override fun close() {
-        if (!running.compareAndSet(true, false)) return
-        runCatching { serverSocket?.close() }
-        acceptThread?.interrupt()
+        val resources =
+            synchronized(lifecycleLock) {
+                if (cleanupComplete) return
+                running.set(false)
+                terminal = true
+                cleanupComplete = true
+                ProxyResources(serverSocket, acceptThread).also {
+                    serverSocket = null
+                    acceptThread = null
+                }
+            }
+        runCatching { resources.serverSocket?.close() }
+        resources.acceptThread?.interrupt()
         executor.shutdownNow()
-        transformer.clear()
-        upstream.close()
-        tls.close()
-        serverSocket = null
-        acceptThread = null
-        Log.i(LogTag, "phase=proxy_stopped cacheEntries=${transformer.cacheSize()}")
+        val cleanupFailure =
+            listOf(
+                runCatching { transformer.clear() },
+                runCatching { upstream.close() },
+                runCatching { tls.close() },
+            ).firstNotNullOfOrNull { result -> result.exceptionOrNull() }
+        lifecycleLog(
+            "phase=proxy_stopped cacheEntries=${transformer.cacheSize()} " +
+                "cleanup=${if (cleanupFailure == null) "complete" else "partial_failure"}",
+            cleanupFailure,
+        )
     }
 
     private fun handleClient(client: Socket) {
@@ -329,12 +350,24 @@ internal class ChromePhotosHttpsProxy(
         }
     }
 
-    private fun fatal(error: Throwable) {
+    internal fun fatal(error: Throwable) {
+        val transitioned =
+            synchronized(lifecycleLock) {
+                if (terminal) {
+                    false
+                } else {
+                    terminal = true
+                    running.set(false)
+                    true
+                }
+            }
+        if (!transitioned) return
         failures.incrementAndGet()
-        running.set(false)
-        Log.e(LogTag, "phase=proxy_fatal error=${error.javaClass.simpleName}")
+        lifecycleLog("phase=proxy_fatal error=${error.javaClass.simpleName}", error)
         onFatalFailure(error.javaClass.simpleName)
     }
+
+    internal fun cleanupCompleted(): Boolean = synchronized(lifecycleLock) { cleanupComplete }
 
     private fun consumeHeaders(input: InputStream): Boolean {
         var closeRequested = false
@@ -397,6 +430,11 @@ internal class ChromePhotosHttpsProxy(
         const val LogTag = "ChromePhotosDataPlane"
         val FixturePresenceResourceIds = setOf(FixtureHeartbeatId)
     }
+
+    private data class ProxyResources(
+        val serverSocket: ServerSocket?,
+        val acceptThread: Thread?,
+    )
 }
 
 internal data class ChromePhotosProxyRequest(
@@ -423,6 +461,13 @@ private fun String?.safeLogContentType(): String =
         ?.filter { character -> character.isLetterOrDigit() || character in "/+.-" }
         ?.take(64)
         .orEmpty()
+
+private fun logProxyLifecycle(
+    message: String,
+    error: Throwable?,
+) {
+    if (error == null) Log.i("ChromePhotosDataPlane", message) else Log.e("ChromePhotosDataPlane", message, error)
+}
 
 internal object ChromePhotosClientResponseHeaderPolicy {
     val invalidatedEntityHeaders: Set<String> =
