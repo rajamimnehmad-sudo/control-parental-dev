@@ -4,7 +4,7 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- `GLOSH-DEVICE-OWNER-INSTALLER-00` esta **in_progress**, owner unico
+- `GLOSH-DEVICE-OWNER-INSTALLER-00` esta **blocked**, owner unico
   Proteccion Android / Codex, en `work/glosh-device-owner-installer-00` sobre
   `1d45a74c`. Su alcance es crear y ejecutar un asistente macOS seguro para
   convertir el A23 actual en Device Owner de Glosh mediante la excepcion ADB de
@@ -17,9 +17,15 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   por Device Owner hasta que este gate termine. El asistente modular y sus siete
   pruebas de seguridad estan verdes. El preflight real A23 confirmo un unico
   usuario 0, ningun owner, Glosh DEV 318 como Device Admin y 16 cuentas; genero
-  un checkpoint redactado con proveedores y conteos. La ejecucion espera que el
-  usuario retire esas cuentas manualmente; todavia no instalo DEV 319 ni intento
-  `set-device-owner`.
+  un checkpoint redactado con proveedores y conteos. Una excepcion puntual del
+  usuario permitio retirar cuentas desde la UI oficial: quedan tres registros,
+  dos de Samsung y uno huerfano de Mi Argentina. La app Mi Argentina fue
+  desinstalada y Android no expone una eliminacion ADB segura para ese registro;
+  cerrar Samsung ahora causaria perdida temporal sin alcanzar cuenta cero. DEV
+  319 no fue instalada y `set-device-owner` no fue intentado. Siguiente paso
+  seguro: reinstalar Mi Argentina desde su fuente oficial, autenticar y cerrar
+  sesion para que su propio authenticator retire el registro; si persiste, usar
+  otro telefono laboratorio o autorizar reprovisionamiento.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
