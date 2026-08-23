@@ -1,5 +1,3 @@
-rootProject.name = "GloshRemoteSpike"
-
 pluginManagement {
     repositories {
         google()
@@ -17,4 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
+rootProject.name = "GloshRemoteSpike"
 include(":app")
