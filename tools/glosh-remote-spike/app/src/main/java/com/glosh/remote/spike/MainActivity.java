@@ -1,11 +1,14 @@
 package com.glosh.remote.spike;
 
+import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -18,69 +21,78 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.glosh.remote.spike.adb.AdbConnectionManager;
-import com.glosh.remote.spike.adb.AdbShell;
-import com.glosh.remote.spike.adb.PairingCoordinator;
-import com.glosh.remote.spike.relay.RelayClient;
+import com.glosh.remote.spike.protocol.JoinDescriptor;
 
+/**
+ * Minimal consent/onboarding screen for REMOTE-INSTALL-CONNECTION-00.
+ *
+ * Normal client flow:
+ *   open one-time link -> tap Connect -> Android Developer options ->
+ *   Pair device with pairing code -> enter six digits in notification -> done.
+ */
 public final class MainActivity extends Activity {
-    private PairingCoordinator pairingCoordinator;
-    private RelayClient relayClient;
+    private static final int REQUEST_NOTIFICATIONS = 9001;
 
     private TextView statusView;
-    private TextView logView;
-    private EditText pairingCodeView;
     private EditText joinUriView;
-    private Button pairButton;
-    private Button relayButton;
-
-    private volatile boolean adbReady;
+    private Button connectButton;
+    private String pendingJoinUri;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
-        pairingCoordinator = new PairingCoordinator(getApplicationContext());
         setContentView(buildUi());
+        consumeJoinIntent(getIntent());
 
-        appendLog("Dispositivo: " + Build.MANUFACTURER + " " + Build.MODEL
-                + " · Android " + Build.VERSION.RELEASE + " (SDK " + Build.VERSION.SDK_INT + ")");
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-            setStatus("Este spike requiere Android 11 o superior.");
-            pairButton.setEnabled(false);
-        } else {
-            setStatus("Listo para emparejar ADB local.");
+            setStatus("Este prototipo requiere Android 11 o superior.");
+            connectButton.setEnabled(false);
+        } else if (pendingJoinUri == null) {
+            setStatus("Abrí el enlace temporal que te envió soporte.");
         }
     }
 
     @Override
-    protected void onDestroy() {
-        if (relayClient != null) {
-            relayClient.close();
-            relayClient = null;
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        consumeJoinIntent(intent);
+    }
+
+    @Override
+    protected void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode != REQUEST_NOTIFICATIONS) {
+            return;
         }
-        pairingCoordinator.close();
-        clearSensitiveFields();
-        super.onDestroy();
+        if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            String raw = pendingJoinUri;
+            if (raw != null) {
+                startSupportSession(raw);
+            }
+        } else {
+            setStatus("Necesitamos notificaciones para que puedas escribir el código sin salir de Ajustes.");
+        }
     }
 
     private View buildUi() {
         ScrollView scroll = new ScrollView(this);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(20);
+        int pad = dp(22);
         root.setPadding(pad, pad, pad, pad);
         scroll.addView(root);
 
         TextView title = new TextView(this);
-        title.setText("Glosh Remote · Spike");
-        title.setTextSize(26);
+        title.setText("Glosh Remote");
+        title.setTextSize(28);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
 
-        TextView subtitle = new TextView(this);
-        subtitle.setText("Prueba temporal de conexión remota sin PC del cliente. No instala Glosh ni Device Owner todavía.");
-        subtitle.setTextSize(16);
+        TextView subtitle = body(
+                "Conexión temporal para que soporte pueda preparar este Android a distancia. "
+                        + "No instala Device Owner ni modifica Glosh en esta primera prueba.");
         subtitle.setPadding(0, dp(8), 0, dp(18));
         root.addView(subtitle);
 
@@ -90,220 +102,138 @@ public final class MainActivity extends Activity {
         statusView.setPadding(0, 0, 0, dp(18));
         root.addView(statusView);
 
-        root.addView(heading("1 · Activar Depuración inalámbrica"));
+        root.addView(heading("Conexión rápida"));
         root.addView(body(
-                "Abrí Opciones de desarrollador → Depuración inalámbrica. Para que el código siga válido mientras lo escribís acá, "
-                        + "usá pantalla dividida: dejá Ajustes con “Emparejar dispositivo con código” visible en una mitad y Glosh Remote en la otra."));
-
-        Button settingsButton = new Button(this);
-        settingsButton.setText("Abrir Opciones de desarrollador");
-        settingsButton.setOnClickListener(v -> openDeveloperSettings());
-        root.addView(settingsButton);
-
-        pairingCodeView = new EditText(this);
-        pairingCodeView.setHint("Código de 6 dígitos");
-        pairingCodeView.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
-        pairingCodeView.setSaveEnabled(false);
-        pairingCodeView.setAutofillHints((String[]) null);
-        root.addView(pairingCodeView);
-
-        pairButton = new Button(this);
-        pairButton.setText("Emparejar ADB local");
-        pairButton.setOnClickListener(v -> startPairing());
-        root.addView(pairButton);
-
-        root.addView(spacer());
-        root.addView(heading("2 · Unir esta sesión con tu Mac"));
-        root.addView(body(
-                "Pegá el enlace temporal que genera la herramienta de Mac. Contiene una clave secreta de una sola sesión: "
-                        + "no se guarda, no se acepta por deep-link en esta V0 y los comandos/resultados viajan cifrados extremo a extremo."));
+                "1. Tocá “Conectar con soporte”.\n"
+                        + "2. Activá Depuración inalámbrica.\n"
+                        + "3. Tocá “Emparejar dispositivo con código”.\n"
+                        + "4. Bajá la notificación de Glosh Remote y escribí los 6 números.\n\n"
+                        + "No hace falta volver a esta app: después del código, la conexión con la Mac es automática."));
 
         joinUriView = new EditText(this);
-        joinUriView.setHint("gloshremote://join?...");
-        joinUriView.setMinLines(3);
-        joinUriView.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        joinUriView.setHint("Enlace temporal de soporte (si no se abrió automáticamente)");
+        joinUriView.setMinLines(2);
         joinUriView.setSaveEnabled(false);
         joinUriView.setAutofillHints((String[]) null);
+        joinUriView.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         root.addView(joinUriView);
 
-        relayButton = new Button(this);
-        relayButton.setText("Conectar con Mac");
-        relayButton.setEnabled(false);
-        relayButton.setOnClickListener(v -> startRelay());
-        root.addView(relayButton);
+        connectButton = new Button(this);
+        connectButton.setText("Conectar con soporte");
+        connectButton.setOnClickListener(v -> requestConnection());
+        root.addView(connectButton);
 
-        Button closeButton = new Button(this);
-        closeButton.setText("Cerrar sesión remota");
-        closeButton.setOnClickListener(v -> closeRemoteSession());
-        root.addView(closeButton);
-
-        Button revokeButton = new Button(this);
-        revokeButton.setText("Revocar identidad ADB temporal");
-        revokeButton.setOnClickListener(v -> revokeIdentity());
-        root.addView(revokeButton);
+        Button cancelButton = new Button(this);
+        cancelButton.setText("Cancelar conexión");
+        cancelButton.setOnClickListener(v -> cancelConnection());
+        root.addView(cancelButton);
 
         root.addView(spacer());
-        root.addView(heading("Registro local"));
-        logView = new TextView(this);
-        logView.setTextSize(13);
-        logView.setTypeface(Typeface.MONOSPACE);
-        logView.setTextIsSelectable(true);
-        root.addView(logView);
+        root.addView(heading("Seguridad"));
+        root.addView(body(
+                "La sesión es temporal. ADB queda sólo dentro del teléfono; no se publica el puerto 5555. "
+                        + "La identidad ADB vive únicamente en memoria y desaparece al cerrar la sesión o el proceso. "
+                        + "Desde la Mac, esta V0 sólo acepta un conjunto pequeño de diagnósticos permitidos."));
+
+        TextView device = body(
+                "Este teléfono: " + Build.MANUFACTURER + " " + Build.MODEL
+                        + " · Android " + Build.VERSION.RELEASE + " · SDK " + Build.VERSION.SDK_INT);
+        device.setTextIsSelectable(true);
+        root.addView(device);
 
         return scroll;
     }
 
-    private TextView heading(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(19);
-        view.setTypeface(Typeface.DEFAULT_BOLD);
-        view.setPadding(0, dp(10), 0, dp(6));
-        return view;
+    private void requestConnection() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            setStatus("Android 11 o superior es obligatorio para este método.");
+            return;
+        }
+
+        String raw = pendingJoinUri;
+        if (raw == null || raw.trim().isEmpty()) {
+            raw = joinUriView.getText().toString().trim();
+        }
+
+        try {
+            JoinDescriptor check = JoinDescriptor.parse(raw);
+            check.destroy();
+        } catch (Throwable error) {
+            setStatus("El enlace de soporte no es válido.");
+            return;
+        }
+
+        pendingJoinUri = raw;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+            return;
+        }
+        startSupportSession(raw);
     }
 
-    private TextView body(String text) {
-        TextView view = new TextView(this);
-        view.setText(text);
-        view.setTextSize(15);
-        view.setPadding(0, 0, 0, dp(10));
-        return view;
+    private void startSupportSession(String raw) {
+        Intent service = new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_START)
+                .putExtra(RemotePairingService.EXTRA_JOIN_URI, raw);
+        startForegroundService(service);
+
+        clearClipboardIfMatches(raw);
+        pendingJoinUri = null;
+        joinUriView.setText("");
+        if (getIntent() != null) {
+            getIntent().setData(null);
+        }
+
+        setStatus("Ahora activá Depuración inalámbrica y tocá “Emparejar dispositivo con código”. Después mirá la notificación de Glosh Remote.");
+        openDeveloperSettings();
     }
 
-    private View spacer() {
-        View view = new View(this);
-        view.setMinimumHeight(dp(18));
-        return view;
+    private void cancelConnection() {
+        Intent service = new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_STOP);
+        try {
+            startService(service);
+        } catch (Throwable ignored) {
+            // If the service no longer exists there is nothing left to revoke.
+        }
+        pendingJoinUri = null;
+        joinUriView.setText("");
+        setStatus("Conexión cancelada.");
+    }
+
+    private void consumeJoinIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        Uri data = intent.getData();
+        if (data == null || !"gloshremote".equalsIgnoreCase(data.getScheme())) {
+            return;
+        }
+        try {
+            JoinDescriptor check = JoinDescriptor.parse(data.toString());
+            check.destroy();
+            pendingJoinUri = data.toString();
+            if (joinUriView != null) {
+                joinUriView.setText("");
+            }
+            if (statusView != null) {
+                setStatus("Enlace de soporte cargado. Tocá “Conectar con soporte”.");
+            }
+        } catch (Throwable error) {
+            pendingJoinUri = null;
+            if (statusView != null) {
+                setStatus("El enlace recibido no es válido.");
+            }
+        }
     }
 
     private void openDeveloperSettings() {
         try {
             startActivity(new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
-        } catch (Exception e) {
+        } catch (Throwable error) {
             startActivity(new Intent(Settings.ACTION_SETTINGS));
         }
-    }
-
-    private void startPairing() {
-        String code = pairingCodeView.getText().toString().trim();
-        pairButton.setEnabled(false);
-        setStatus("Preparando pairing…");
-
-        pairingCoordinator.pairAndConnect(code, new PairingCoordinator.Listener() {
-            @Override
-            public void onStatus(String status) {
-                ui(() -> {
-                    setStatus(status);
-                    appendLog(status);
-                });
-            }
-
-            @Override
-            public void onConnected(String canaryOutput) {
-                ui(() -> {
-                    adbReady = true;
-                    pairButton.setEnabled(true);
-                    relayButton.setEnabled(true);
-                    pairingCodeView.setText("");
-                    setStatus("ADB local listo. Ya podés unir la sesión con tu Mac.");
-                    appendLog("ADB canary: " + canaryOutput.trim());
-                    ensureRelayClient();
-                });
-            }
-
-            @Override
-            public void onError(String message, Throwable error) {
-                ui(() -> {
-                    adbReady = false;
-                    pairButton.setEnabled(true);
-                    relayButton.setEnabled(false);
-                    pairingCodeView.setText("");
-                    setStatus("Pairing falló: " + message);
-                    appendLog("ERROR pairing: " + message);
-                });
-            }
-        });
-    }
-
-    private void startRelay() {
-        if (!adbReady || !pairingCoordinator.isConnected()) {
-            setStatus("Primero hay que completar el pairing ADB local.");
-            return;
-        }
-        try {
-            ensureRelayClient();
-            final String descriptor = joinUriView.getText().toString().trim();
-            relayClient.connect(descriptor, new RelayClient.Listener() {
-                @Override
-                public void onState(String state) {
-                    ui(() -> {
-                        setStatus(state);
-                        appendLog(state);
-                    });
-                }
-
-                @Override
-                public void onAuthenticated() {
-                    ui(() -> {
-                        clearClipboardIfMatches(descriptor);
-                        joinUriView.setText("");
-                        setStatus("Sesión remota autenticada. Tu Mac ya puede ejecutar sólo las acciones permitidas.");
-                        appendLog("Mac autenticada. Allowlist remota activa.");
-                    });
-                }
-
-                @Override
-                public void onError(String message, Throwable error) {
-                    ui(() -> failClosedRemoteSession("ERROR relay: " + message));
-                }
-
-                @Override
-                public void onClosed() {
-                    ui(() -> failClosedRemoteSession("Relay cerrado."));
-                }
-            });
-        } catch (Throwable error) {
-            joinUriView.setText("");
-            pairingCoordinator.disconnect();
-            adbReady = false;
-            relayButton.setEnabled(false);
-            setStatus("Enlace inválido: " + error.getMessage());
-            appendLog("ERROR descriptor: " + error.getMessage());
-        }
-    }
-
-    private void failClosedRemoteSession(String logLine) {
-        pairingCoordinator.disconnect();
-        adbReady = false;
-        relayButton.setEnabled(false);
-        clearSensitiveFields();
-        setStatus("Sesión remota cerrada. ADB local también se está cerrando.");
-        appendLog(logLine);
-    }
-
-    private void closeRemoteSession() {
-        if (relayClient != null) {
-            relayClient.disconnect();
-        }
-        pairingCoordinator.disconnect();
-        adbReady = false;
-        relayButton.setEnabled(false);
-        clearSensitiveFields();
-        setStatus("Sesión cerrada. No quedan comandos remotos activos.");
-        appendLog("Sesión remota y conexión ADB cerradas.");
-    }
-
-    private void revokeIdentity() {
-        if (relayClient != null) {
-            relayClient.close();
-            relayClient = null;
-        }
-        pairingCoordinator.revokeIdentity();
-        adbReady = false;
-        relayButton.setEnabled(false);
-        clearSensitiveFields();
-        setStatus("Identidad ADB temporal revocada. Para otra sesión habrá que emparejar de nuevo.");
-        appendLog("Clave/certificado ADB locales programados para eliminación.");
     }
 
     private void clearClipboardIfMatches(String secret) {
@@ -326,46 +256,37 @@ public final class MainActivity extends Activity {
                 } else {
                     clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
                 }
-                appendLog("Portapapeles temporal limpiado.");
             }
         } catch (Throwable ignored) {
-            // Clipboard cleanup is best effort; session security does not rely on it.
+            // Best effort only.
         }
     }
 
-    private void clearSensitiveFields() {
-        if (pairingCodeView != null) {
-            pairingCodeView.setText("");
-        }
-        if (joinUriView != null) {
-            joinUriView.setText("");
-        }
+    private TextView heading(String text) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextSize(19);
+        view.setTypeface(Typeface.DEFAULT_BOLD);
+        view.setPadding(0, dp(10), 0, dp(7));
+        return view;
     }
 
-    private void ensureRelayClient() {
-        if (relayClient != null) {
-            return;
-        }
-        try {
-            AdbShell shell = new AdbShell(AdbConnectionManager.getInstance(getApplicationContext()));
-            relayClient = new RelayClient(shell);
-        } catch (Exception e) {
-            throw new IllegalStateException("No se pudo abrir el cliente remoto.", e);
-        }
+    private TextView body(String text) {
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextSize(15);
+        view.setPadding(0, 0, 0, dp(12));
+        return view;
+    }
+
+    private View spacer() {
+        View view = new View(this);
+        view.setMinimumHeight(dp(16));
+        return view;
     }
 
     private void setStatus(String text) {
         statusView.setText(text);
-    }
-
-    private void appendLog(String line) {
-        String existing = logView.getText().toString();
-        String next = existing.isEmpty() ? line : existing + "\n" + line;
-        logView.setText(next);
-    }
-
-    private void ui(Runnable runnable) {
-        runOnUiThread(runnable);
     }
 
     private int dp(int value) {
