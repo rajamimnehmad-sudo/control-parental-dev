@@ -37,6 +37,7 @@ internal class ChromePhotosHttpsProxy(
     private val onFixtureHeartbeat: () -> Unit,
     private val onFatalFailure: (String) -> Unit,
 ) : AutoCloseable {
+    private val hostAllowlist = ChromePhotosHostAllowlist(ChromePhotosRealWebLabConfig.allowedHosts)
     private val transformer =
         ChromePhotosResourceTransformer(
             safeBytes = listOf(origin.safeImageBytes),
@@ -114,6 +115,7 @@ internal class ChromePhotosHttpsProxy(
         acceptThread?.interrupt()
         executor.shutdownNow()
         transformer.clear()
+        tls.close()
         serverSocket = null
         acceptThread = null
         Log.i(LogTag, "phase=proxy_stopped cacheEntries=${transformer.cacheSize()}")
@@ -125,14 +127,15 @@ internal class ChromePhotosHttpsProxy(
                 socket.soTimeout = SocketTimeoutMillis
                 val requestLine = socket.getInputStream().readAsciiLine(MaxLineBytes) ?: return
                 consumeHeaders(socket.getInputStream())
-                if (!requestLine.isFixtureConnect()) {
-                    writePlainError(socket.getOutputStream(), 502, "Fixture only")
-                    Log.i(LogTag, "decision=fail_closed scope=non_fixture")
+                val connectTarget = ChromePhotosConnectTarget.parse(requestLine, hostAllowlist)
+                if (connectTarget == null) {
+                    writePlainError(socket.getOutputStream(), 502, "Host not allowed")
+                    Log.i(LogTag, "decision=fail_closed scope=connect_not_allowed")
                     return
                 }
                 socket.getOutputStream().writeAscii("HTTP/1.1 200 Connection Established\r\n\r\n")
                 socket.getOutputStream().flush()
-                handleTlsTunnel(socket)
+                handleTlsTunnel(socket, connectTarget)
             }.onFailure { error ->
                 failures.incrementAndGet()
                 Log.w(LogTag, "phase=connection_failed error=${error.javaClass.simpleName}")
@@ -140,11 +143,15 @@ internal class ChromePhotosHttpsProxy(
         }
     }
 
-    private fun handleTlsTunnel(client: Socket) {
+    private fun handleTlsTunnel(
+        client: Socket,
+        connectTarget: ChromePhotosConnectTarget,
+    ) {
+        val serverMaterial = tls.serverMaterialFor(connectTarget.host)
         val tlsSocket =
-            tls.sslContext.socketFactory.createSocket(
+            serverMaterial.sslContext.socketFactory.createSocket(
                 client,
-                ChromePhotosDataPlaneLabContract.FixtureHost,
+                connectTarget.host,
                 HttpsPort,
                 false,
             ) as SSLSocket
@@ -155,7 +162,11 @@ internal class ChromePhotosHttpsProxy(
             }
         tlsSocket.startHandshake()
         val protocol = tlsSocket.applicationProtocol.ifBlank { Http11 }
-        Log.i(LogTag, "phase=tls_ready protocol=$protocol ca=${tls.caFingerprint.take(FingerprintLogLength)}")
+        Log.i(
+            LogTag,
+            "phase=tls_ready host=${connectTarget.host} clientProtocol=$protocol " +
+                "ca=${tls.caFingerprint.take(FingerprintLogLength)}",
+        )
 
         val input = tlsSocket.inputStream
         val output = BufferedOutputStream(tlsSocket.outputStream)
@@ -168,7 +179,12 @@ internal class ChromePhotosHttpsProxy(
                 writePlainError(output, 405, "Method not allowed")
                 break
             }
-            serveFixtureRequest(request, protocol, output)
+            if (connectTarget.host == ChromePhotosDataPlaneLabContract.FixtureHost) {
+                serveFixtureRequest(request, protocol, output)
+            } else {
+                writePlainError(output, 502, "Real upstream not ready")
+                break
+            }
             if (closeRequested) break
         }
     }
@@ -256,14 +272,6 @@ internal class ChromePhotosHttpsProxy(
         error("Too many headers")
     }
 
-    private fun String.isFixtureConnect(): Boolean {
-        val parts = trim().split(' ')
-        return parts.size == 3 &&
-            parts[0].equals(Connect, ignoreCase = true) &&
-            parts[1].equals("${ChromePhotosDataPlaneLabContract.FixtureHost}:$HttpsPort", ignoreCase = true) &&
-            parts[2].startsWith("HTTP/1.")
-    }
-
     private fun InputStream.readAsciiLine(maximumBytes: Int): String? {
         val bytes = ArrayList<Byte>()
         while (bytes.size < maximumBytes) {
@@ -306,7 +314,6 @@ internal class ChromePhotosHttpsProxy(
         const val EndOfStream = -1
         const val NewLine = 10
         const val CarriageReturn = 13
-        const val Connect = "CONNECT"
         const val Head = "HEAD"
         const val Http11 = "http/1.1"
         const val FixtureHeartbeatId = "fixture-heartbeat"
