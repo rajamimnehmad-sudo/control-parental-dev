@@ -4,6 +4,18 @@ Actualizado: 2026-08-23. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
+- `CHROME-PHOTOS-PRESENTATION-INDEPENDENCE-01` esta **IN PROGRESS**, owner unico
+  Proteccion Android / Codex. Parte de
+  `25d326914496f2874989211f4bf891c2c0fea7ab` en el worktree/rama aislado
+  `work/chrome-photos-presentation-independence-01`. Su objetivo es eliminar
+  `takeScreenshotOfWindow` del camino normal de presentacion cuando el data-plane
+  DEV esta sano, conservando la superficie unica como fail-safe opaco ante perdida
+  de proxy, politica, VPN, heartbeat, contexto, viewport o lease. El alcance queda
+  limitado a Chrome, fixture controlada y presentation/lease/surface; no modifica
+  proxy, TLS, transformacion, routing VPN, GloshIA, DAG, Production ni web real.
+  El precheck read-only A23 confirmo Device Owner y Accessibility activos, DEV 320
+  instalada con `ceDataInode=1239519` y sin VPN Glosh activa despues del rollback
+  anterior. No existe otro owner de escritura sobre las rutas permitidas.
 - `GLOSH-DEVICE-OWNER-INSTALLER-00` esta **PASS**, owner unico
   Proteccion Android / Codex, en `work/glosh-device-owner-installer-00` sobre
   `1d45a74c`. Su alcance es crear y ejecutar un asistente macOS seguro para
