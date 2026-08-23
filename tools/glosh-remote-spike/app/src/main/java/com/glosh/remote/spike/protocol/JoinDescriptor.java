@@ -2,6 +2,7 @@ package com.glosh.remote.spike.protocol;
 
 import java.net.URI;
 import java.net.URLDecoder;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
@@ -13,6 +14,7 @@ public final class JoinDescriptor {
     private final String websocketUrl;
     private final String sessionId;
     private final byte[] sessionKey;
+    private boolean destroyed;
 
     private JoinDescriptor(String websocketUrl, String sessionId, byte[] sessionKey) {
         this.websocketUrl = websocketUrl;
@@ -52,10 +54,13 @@ public final class JoinDescriptor {
             throw new IllegalArgumentException("Clave de sesión inválida.", e);
         }
         if (key.length != 32) {
+            Arrays.fill(key, (byte) 0);
             throw new IllegalArgumentException("La clave de sesión debe tener 256 bits.");
         }
 
-        return new JoinDescriptor(websocketUrl, sessionId, key);
+        JoinDescriptor descriptor = new JoinDescriptor(websocketUrl, sessionId, key);
+        Arrays.fill(key, (byte) 0);
+        return descriptor;
     }
 
     private static Map<String, String> parseQuery(String rawQuery) {
@@ -92,19 +97,36 @@ public final class JoinDescriptor {
     }
 
     public String websocketUrl() {
+        ensureAlive();
         return websocketUrl;
     }
 
     public String sessionId() {
+        ensureAlive();
         return sessionId;
     }
 
-    public byte[] sessionKey() {
+    public synchronized byte[] sessionKey() {
+        ensureAlive();
         return sessionKey.clone();
     }
 
+    public synchronized void destroy() {
+        if (!destroyed) {
+            Arrays.fill(sessionKey, (byte) 0);
+            destroyed = true;
+        }
+    }
+
+    private synchronized void ensureAlive() {
+        if (destroyed) {
+            throw new IllegalStateException("Descriptor de sesión destruido.");
+        }
+    }
+
     @Override
-    public String toString() {
-        return "JoinDescriptor{sessionId='" + sessionId + "', websocketUrl='" + websocketUrl + "'}";
+    public synchronized String toString() {
+        return "JoinDescriptor{sessionId='" + sessionId + "', websocketUrl='" + websocketUrl
+                + "', destroyed=" + destroyed + "}";
     }
 }
