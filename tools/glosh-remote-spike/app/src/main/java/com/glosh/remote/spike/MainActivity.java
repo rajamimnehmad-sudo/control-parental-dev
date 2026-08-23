@@ -1,6 +1,9 @@
 package com.glosh.remote.spike;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Typeface;
 import android.os.Build;
@@ -242,30 +245,40 @@ public final class MainActivity extends Activity {
                 @Override
                 public void onAuthenticated() {
                     ui(() -> {
+                        clearClipboardIfMatches(descriptor);
                         joinUriView.setText("");
+                        setStatus("Sesión remota autenticada. Tu Mac ya puede ejecutar sólo las acciones permitidas.");
                         appendLog("Mac autenticada. Allowlist remota activa.");
                     });
                 }
 
                 @Override
                 public void onError(String message, Throwable error) {
-                    ui(() -> {
-                        joinUriView.setText("");
-                        setStatus(message);
-                        appendLog("ERROR relay: " + message);
-                    });
+                    ui(() -> failClosedRemoteSession("ERROR relay: " + message));
                 }
 
                 @Override
                 public void onClosed() {
-                    ui(() -> appendLog("Relay cerrado."));
+                    ui(() -> failClosedRemoteSession("Relay cerrado."));
                 }
             });
         } catch (Throwable error) {
             joinUriView.setText("");
+            pairingCoordinator.disconnect();
+            adbReady = false;
+            relayButton.setEnabled(false);
             setStatus("Enlace inválido: " + error.getMessage());
             appendLog("ERROR descriptor: " + error.getMessage());
         }
+    }
+
+    private void failClosedRemoteSession(String logLine) {
+        pairingCoordinator.disconnect();
+        adbReady = false;
+        relayButton.setEnabled(false);
+        clearSensitiveFields();
+        setStatus("Sesión remota cerrada. ADB local también se está cerrando.");
+        appendLog(logLine);
     }
 
     private void closeRemoteSession() {
@@ -290,7 +303,34 @@ public final class MainActivity extends Activity {
         relayButton.setEnabled(false);
         clearSensitiveFields();
         setStatus("Identidad ADB temporal revocada. Para otra sesión habrá que emparejar de nuevo.");
-        appendLog("Clave/certificado ADB locales eliminados.");
+        appendLog("Clave/certificado ADB locales programados para eliminación.");
+    }
+
+    private void clearClipboardIfMatches(String secret) {
+        if (secret == null || secret.isEmpty()) {
+            return;
+        }
+        try {
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            if (clipboard == null || !clipboard.hasPrimaryClip()) {
+                return;
+            }
+            ClipData clip = clipboard.getPrimaryClip();
+            if (clip == null || clip.getItemCount() == 0) {
+                return;
+            }
+            CharSequence current = clip.getItemAt(0).coerceToText(this);
+            if (current != null && secret.contentEquals(current)) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    clipboard.clearPrimaryClip();
+                } else {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""));
+                }
+                appendLog("Portapapeles temporal limpiado.");
+            }
+        } catch (Throwable ignored) {
+            // Clipboard cleanup is best effort; session security does not rely on it.
+        }
     }
 
     private void clearSensitiveFields() {
