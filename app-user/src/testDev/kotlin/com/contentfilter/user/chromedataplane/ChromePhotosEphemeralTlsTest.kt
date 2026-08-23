@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class ChromePhotosEphemeralTlsTest {
     @Test
     fun `ephemeral CA signs a hostname-valid TLS server without persisted private material`() {
-        val material = ChromePhotosEphemeralTls.create(Instant.parse("2026-08-21T12:00:00Z"))
+        val material = ChromePhotosEphemeralTls.create(Instant.now())
         val ca =
             CertificateFactory.getInstance("X.509").generateCertificate(
                 ByteArrayInputStream(material.caCertificateDer),

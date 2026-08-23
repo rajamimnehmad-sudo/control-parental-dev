@@ -12,7 +12,6 @@ import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509ExtensionUtils
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import java.math.BigInteger
 import java.security.KeyPair
@@ -35,7 +34,6 @@ internal data class ChromePhotosEphemeralTlsMaterial(
 /** Creates an in-memory CA and leaf key. Private keys are never persisted. */
 internal object ChromePhotosEphemeralTls {
     fun create(now: Instant = Instant.now()): ChromePhotosEphemeralTlsMaterial {
-        val provider = BouncyCastleProvider()
         val random = SecureRandom()
         val caKeyPair = rsaKeyPair(random)
         val leafKeyPair = rsaKeyPair(random)
@@ -65,7 +63,7 @@ internal object ChromePhotosEphemeralTls {
                     extensions.createSubjectKeyIdentifier(caKeyPair.public),
                 )
             }
-        val caCertificate = caBuilder.signWith(caKeyPair, provider)
+        val caCertificate = caBuilder.signWith(caKeyPair)
 
         val leafName = X500Name("CN=${ChromePhotosDataPlaneLabContract.FixtureHost},O=Glosh DEV Lab")
         val leafBuilder =
@@ -104,7 +102,7 @@ internal object ChromePhotosEphemeralTls {
                     extensions.createAuthorityKeyIdentifier(caCertificate),
                 )
             }
-        val leafCertificate = leafBuilder.signWith(caKeyPair, provider)
+        val leafCertificate = leafBuilder.signWith(caKeyPair)
         leafCertificate.verify(caCertificate.publicKey)
 
         val password = CharArray(0)
@@ -128,15 +126,11 @@ internal object ChromePhotosEphemeralTls {
         )
     }
 
-    private fun JcaX509v3CertificateBuilder.signWith(
-        signerKeyPair: KeyPair,
-        provider: BouncyCastleProvider,
-    ): X509Certificate {
+    private fun JcaX509v3CertificateBuilder.signWith(signerKeyPair: KeyPair): X509Certificate {
         val signer =
             JcaContentSignerBuilder(SignatureAlgorithm)
-                .setProvider(provider)
                 .build(signerKeyPair.private)
-        return JcaX509CertificateConverter().setProvider(provider).getCertificate(build(signer))
+        return JcaX509CertificateConverter().getCertificate(build(signer))
     }
 
     private fun rsaKeyPair(random: SecureRandom): KeyPair =
