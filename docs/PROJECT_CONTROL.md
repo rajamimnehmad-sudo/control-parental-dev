@@ -1,6 +1,6 @@
 # CONTROL CENTRAL DEL PROYECTO
 
-Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
+Actualizado: 2026-08-23. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
@@ -65,25 +65,23 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
-- `CHROME-PHOTOS-DATA-PLANE-00` esta **in_progress**, owner unico Proteccion
-  Android / Codex, en `work/chrome-photos-data-plane-00` sobre `2b01280f`. La
-  arquitectura inicial usa proxy HTTPS loopback aplicado solo a Chrome, CA/hoja
-  efimeras en memoria, regla por SHA-256, cache efimero y ruta VPN exclusiva
-  para medir/bloquear bypass de la fixture. Unitarios iniciales App Usuario DEV
-  y feature-vpn verdes. Se autorizo una excepcion exclusiva del spike DEV: una
-  lease de presentacion efimera, no persistente, ligada a sesion/Chrome/fixture/
-  ventana/viewport/epoch y condicionada a proxy, VPN y politica administrada
-  saludables. El host unico sigue adjunto y `NOT_TOUCHABLE`; vencimiento, error,
-  perdida de atestacion o cambio de contexto revocan la lease y restauran la
-  cobertura opaca. Nunca habilita screenshots crudos, Production ni fallback.
-  Unitarios, ktlint, lint y build App Usuario DEV estan verdes; existe una unica
-  candidata local DEV 319 (`ba612fe2f23c5633e7041bf6c233d1ed435db3bcc7f43e6d47dfb03d7b7cf14b`).
-  El gate fisico se detuvo antes de instalar: el A23 conectado es SM-A235M,
-  Android 14/API 34 y Chrome 151.0.7922.137, pero `dpm list-owners` responde
-  `no owners`. Glosh figura solo como Device Admin. El contrato exige Device
-  Owner y este ticket no autoriza reprovisionar/factory reset. La precondicion ya
-  fue restaurada: DEV 319 esta instalada y Glosh es Device Owner; corresponde
-  reanudar el gate fisico CA/VPN/proxy/SAFE/sentinel sin recompilar.
+- `CHROME-PHOTOS-DATA-PLANE-00` quedo **PASS fisico DEV**, owner unico
+  Proteccion Android / Codex, en `work/chrome-photos-data-plane-00`. DEV 319
+  revelo en A23 un `OperatorCreationException` antes de abrir el proxy: la APK
+  R8 no pudo crear `SHA256withRSA` con una instancia forzada de Bouncy Castle.
+  DEV 320 delega firma/conversion X.509 a JCA de plataforma; suite data-plane,
+  ktlint DEV, lint y assemble R8 quedaron verdes. APK local DEV 320 SHA-256
+  `878c8b5e5f066fab85539c77c25b791ea753932498d7569333a1973c639e8882`.
+  En A23/API 34/Chrome 151, Device Owner y Accessibility siguieron activos;
+  Chrome confirmo `ProxySettings` obligatorio y valido. SAFE-A paso
+  byte-identica, sentinel y lazy-sentinel fueron reemplazadas, la VPN descarto
+  12 intentos TCP directos y no hubo QUIC. Hubo cero `rawPresented=true`, cero
+  stale, cero crash y cero ANR. Salida/reentrada revoco y creo leases nuevas; el
+  host fue unico por sesion. Ocho capturas recibieron el limite Android
+  `errorCode=3`: todas quedaron opacas y recuperaron solo con epoch nuevo, riesgo
+  de usabilidad residual sin exposicion. El rollback retiro proxy, CA y cache;
+  `chrome://policy` termino sin politicas. No extender esta excepcion DEV a
+  Production ni avanzar automaticamente a otro ticket.
 - `CHROME-GLOSHIA-A23` termino **FAILED** sobre Chrome real en A23/API 34. El
   motor fue GloshIA Visual R3.1 ONNX real: permitio contenido seguro y bloqueo
   regiones contrastantes, sin crash/ANR. El gate fallo porque scroll/lazy produjo
