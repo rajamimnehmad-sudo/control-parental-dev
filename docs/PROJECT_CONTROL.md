@@ -33,8 +33,16 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   mismo `ceDataInode`, y la cuenta huerfana persiste. No se intento
   desinstalacion, limpieza, reset ni `set-device-owner`. Siguiente paso seguro:
   usar otro telefono laboratorio sin cuentas o autorizar reprovisionamiento del
-  A23 despues de respaldar; Android 14 no ofrece una ruta ADB no destructiva
-  para completar este downgrade/eliminar la cuenta huerfana.
+  A23 despues de respaldar. La recuperacion `uninstall -k` autorizada se ejecuto
+  limitada a Mi Argentina 7.21.0 (295), pero PackageManager conservo el
+  versionCode junto con los datos y rechazo nuevamente 5.17.3 (182) con
+  `INSTALL_FAILED_VERSION_DOWNGRADE`. Se restauro inmediatamente la copia 7.21.0
+  firmada del propio A23: instalacion `Success`, mismo `ceDataInode=1211472`,
+  cuatro cuentas intactas y ningun owner. No se limpiaron datos ni se tocaron
+  fotos u otras aplicaciones. La unica variante local restante requiere
+  autorizacion nueva para desinstalacion completa de Mi Argentina (perderia solo
+  sus datos internos) antes de instalar el authenticator legado; de lo contrario
+  usar otro telefono laboratorio o reprovisionar con respaldo.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
