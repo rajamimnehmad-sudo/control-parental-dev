@@ -41,8 +41,16 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   cuatro cuentas intactas y ningun owner. No se limpiaron datos ni se tocaron
   fotos u otras aplicaciones. La unica variante local restante requiere
   autorizacion nueva para desinstalacion completa de Mi Argentina (perderia solo
-  sus datos internos) antes de instalar el authenticator legado; de lo contrario
-  usar otro telefono laboratorio o reprovisionar con respaldo.
+  sus datos internos) antes de instalar el authenticator legado. El usuario
+  autorizo explicitamente esa perdida puntual. La desinstalacion completa
+  permitio instalar 5.17.3, registrar el authenticator legado y retirar con exito
+  la cuenta huerfana; luego se restauro 7.21.0 (295) con `Success`. La cuenta
+  Google temporal tambien fue retirada mediante Ajustes. Permanecen exactamente
+  dos entradas del mismo Samsung account (`com.osp.app.signin` y
+  `com.samsung.android.mobileservice`), 549 paquetes y ningun owner. El gate esta
+  detenido antes de cerrar Samsung porque el telefono advierte que desactivara
+  Samsung Cloud, Find My Mobile y Samsung Pass localmente; requiere confirmacion
+  explicita antes de continuar a cuentas cero, DEV 319 y `set-device-owner`.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
