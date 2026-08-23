@@ -3,24 +3,13 @@ package com.glosh.remote.spike.adb;
 import android.content.Context;
 import android.os.Build;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
-import java.security.cert.CertificateFactory;
-import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
 import java.util.Date;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
 import android.sun.security.x509.AlgorithmId;
@@ -41,16 +30,14 @@ import android.sun.security.x509.X509CertInfo;
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
 
 /**
- * ADB identity used only by the temporary Glosh Remote spike.
+ * Ephemeral ADB identity for REMOTE-INSTALL-CONNECTION-00.
  *
- * The key never leaves app-private storage. Resetting the identity deletes both
- * the private key and certificate so an old Android pairing cannot be reused.
+ * Nothing is written to disk: if this process dies or the session is revoked,
+ * the private key disappears and Android must be paired again. That is the
+ * intended product behavior for the temporary bootstrap bridge.
  */
 public final class AdbConnectionManager extends AbsAdbConnectionManager {
-    private static final String KEY_FILE = "remote-adb-private.key";
-    private static final String CERT_FILE = "remote-adb-cert.pem";
-    private static final long CERT_LIFETIME_MS = TimeUnit.HOURS.toMillis(24);
-
+    private static final long CERT_LIFETIME_MS = TimeUnit.HOURS.toMillis(2);
     private static AdbConnectionManager instance;
 
     public static synchronized AdbConnectionManager getInstance(Context context) throws Exception {
@@ -60,16 +47,19 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         return instance;
     }
 
-    public static synchronized void resetIdentity(Context context) {
+    public static synchronized void resetIdentity() {
         if (instance != null) {
             try {
-                instance.disconnect();
-            } catch (IOException ignored) {
+                instance.close();
+            } catch (Exception ignored) {
+                try {
+                    instance.disconnect();
+                } catch (Exception ignoredAgain) {
+                    // Best effort. Dropping the singleton still makes the identity unreachable.
+                }
             }
             instance = null;
         }
-        new File(context.getFilesDir(), KEY_FILE).delete();
-        new File(context.getFilesDir(), CERT_FILE).delete();
     }
 
     private final PrivateKey privateKey;
@@ -80,20 +70,9 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         setTimeout(15, TimeUnit.SECONDS);
         setThrowOnUnauthorised(true);
 
-        PrivateKey storedKey = readPrivateKey(context);
-        Certificate storedCert = readCertificate(context);
-        if (storedKey == null || storedCert == null) {
-            new File(context.getFilesDir(), KEY_FILE).delete();
-            new File(context.getFilesDir(), CERT_FILE).delete();
-            GeneratedIdentity generated = generateIdentity();
-            privateKey = generated.privateKey;
-            certificate = generated.certificate;
-            writePrivateKey(context, privateKey);
-            writeCertificate(context, certificate);
-        } else {
-            privateKey = storedKey;
-            certificate = storedCert;
-        }
+        GeneratedIdentity generated = generateIdentity();
+        privateKey = generated.privateKey;
+        certificate = generated.certificate;
     }
 
     @Override
@@ -108,18 +87,19 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
 
     @Override
     protected String getDeviceName() {
-        return "Glosh Remote Spike";
+        return "Glosh Remote";
     }
 
     private static GeneratedIdentity generateIdentity() throws Exception {
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        keyPairGenerator.initialize(2048, SecureRandom.getInstance("SHA1PRNG"));
-        KeyPair pair = keyPairGenerator.generateKeyPair();
+        SecureRandom random = new SecureRandom();
+        KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
+        generator.initialize(2048, random);
+        KeyPair pair = generator.generateKeyPair();
         PublicKey publicKey = pair.getPublic();
         PrivateKey privateKey = pair.getPrivate();
 
         String algorithmName = "SHA512withRSA";
-        X500Name x500Name = new X500Name("CN=Glosh Remote Spike");
+        X500Name x500Name = new X500Name("CN=Glosh Remote");
         Date notBefore = new Date();
         Date notAfter = new Date(System.currentTimeMillis() + CERT_LIFETIME_MS);
 
@@ -131,7 +111,7 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
 
         X509CertInfo info = new X509CertInfo();
         info.set("version", new CertificateVersion(2));
-        info.set("serialNumber", new CertificateSerialNumber(new Random().nextInt() & Integer.MAX_VALUE));
+        info.set("serialNumber", new CertificateSerialNumber(random.nextInt() & Integer.MAX_VALUE));
         info.set("algorithmID", new CertificateAlgorithmId(AlgorithmId.get(algorithmName)));
         info.set("subject", new CertificateSubjectName(x500Name));
         info.set("key", new CertificateX509Key(publicKey));
@@ -142,55 +122,6 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         X509CertImpl certificate = new X509CertImpl(info);
         certificate.sign(privateKey, algorithmName);
         return new GeneratedIdentity(privateKey, certificate);
-    }
-
-    private static PrivateKey readPrivateKey(Context context) {
-        File file = new File(context.getFilesDir(), KEY_FILE);
-        if (!file.isFile()) {
-            return null;
-        }
-        try (FileInputStream input = new FileInputStream(file)) {
-            byte[] bytes = readAll(input);
-            return KeyFactory.getInstance("RSA").generatePrivate(new PKCS8EncodedKeySpec(bytes));
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static Certificate readCertificate(Context context) {
-        File file = new File(context.getFilesDir(), CERT_FILE);
-        if (!file.isFile()) {
-            return null;
-        }
-        try (FileInputStream input = new FileInputStream(file)) {
-            return CertificateFactory.getInstance("X.509").generateCertificate(input);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static void writePrivateKey(Context context, PrivateKey key) throws IOException {
-        try (FileOutputStream output = new FileOutputStream(new File(context.getFilesDir(), KEY_FILE))) {
-            output.write(key.getEncoded());
-        }
-    }
-
-    private static void writeCertificate(Context context, Certificate certificate) throws Exception {
-        String body = Base64.getMimeEncoder(64, new byte[] {'\n'}).encodeToString(certificate.getEncoded());
-        String pem = "-----BEGIN CERTIFICATE-----\n" + body + "\n-----END CERTIFICATE-----\n";
-        try (FileOutputStream output = new FileOutputStream(new File(context.getFilesDir(), CERT_FILE))) {
-            output.write(pem.getBytes(StandardCharsets.US_ASCII));
-        }
-    }
-
-    private static byte[] readAll(FileInputStream input) throws IOException {
-        ByteArrayOutputStream output = new ByteArrayOutputStream();
-        byte[] buffer = new byte[4096];
-        int read;
-        while ((read = input.read(buffer)) != -1) {
-            output.write(buffer, 0, read);
-        }
-        return output.toByteArray();
     }
 
     private static final class GeneratedIdentity {
