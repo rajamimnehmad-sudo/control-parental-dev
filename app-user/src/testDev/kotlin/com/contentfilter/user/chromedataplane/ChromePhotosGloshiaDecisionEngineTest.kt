@@ -41,14 +41,26 @@ class ChromePhotosGloshiaDecisionEngineTest {
     }
 
     @Test
-    fun `analyzer unavailable maps to UNKNOWN`() {
+    fun `individual model execution failure maps to UNKNOWN without declaring engine unhealthy`() {
         val analyzer = GloshiaVisualAnalyzer { GloshiaVisualAnalysisResult.Unavailable("model_execution_failed") }
-        val result =
-            ChromePhotosGloshiaDecisionEngine(analyzer, preprocessor(preparedResult("image/webp")))
-                .decide("webp".toByteArray(), "image/webp")
+        val engine = ChromePhotosGloshiaDecisionEngine(analyzer, preprocessor(preparedResult("image/webp")))
+        val result = engine.decide("webp".toByteArray(), "image/webp")
 
         assertEquals(ChromePhotoDecision.Unknown, result.decision)
         assertEquals("model_execution_failed", result.reason)
+        assertEquals(ChromePhotoDecisionSource.Error, result.source)
+        assertTrue(engine.isHealthy())
+    }
+
+    @Test
+    fun `systemic analyzer unavailable marks engine unhealthy`() {
+        val analyzer = GloshiaVisualAnalyzer { GloshiaVisualAnalysisResult.Unavailable("analyzer_unavailable") }
+        val engine = ChromePhotosGloshiaDecisionEngine(analyzer, preprocessor(preparedResult("image/png")))
+
+        val result = engine.decide("png".toByteArray(), "image/png")
+
+        assertEquals(ChromePhotoDecision.Unknown, result.decision)
+        assertTrue(!engine.isHealthy())
     }
 
     @Test

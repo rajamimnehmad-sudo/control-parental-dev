@@ -21,6 +21,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.Locale
 import java.util.UUID
 
 class ChromePhotosDataPlaneLabService : Service() {
@@ -29,6 +30,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     private var operation: Job? = null
     private var healthJob: Job? = null
     private var proxy: ChromePhotosHttpsProxy? = null
+    private var modelLoadMs = 0.0
     private var currentSessionId = ""
     private var vpnRollbackCompleted = false
     private lateinit var policyController: ChromePhotosLabPolicyController
@@ -108,12 +110,30 @@ class ChromePhotosDataPlaneLabService : Service() {
                         .commit()
                     val tls = ChromePhotosEphemeralTls.create()
                     val origin = ChromePhotosFixtureOrigin()
-                    val startedProxy =
+                    val gloshia =
+                        when (val creation = ChromePhotosGloshiaEngineFactory.create(this@ChromePhotosDataPlaneLabService)) {
+                            is ChromePhotosGloshiaEngineCreation.Ready -> creation
+                            is ChromePhotosGloshiaEngineCreation.Unavailable ->
+                                error("gloshia_${creation.reason}")
+                        }
+                    modelLoadMs = gloshia.modelLoadMs
+                    val modelIdentity = gloshia.engine.identity
+                    lateinit var startedProxy: ChromePhotosHttpsProxy
+                    val decisionSession =
+                        ChromePhotosBoundedDecisionSession(
+                            engine = gloshia.engine,
+                            onSystemicFailure = { reason ->
+                                startedProxy.fatal(IllegalStateException("gloshia_$reason"))
+                            },
+                        )
+                    val transformer = chromePhotosGloshiaTransformer(decisionSession, origin)
+                    startedProxy =
                         ChromePhotosHttpsProxy(
                             tls = tls,
                             origin = origin,
                             onFixtureHeartbeat = ::markFixtureHeartbeat,
                             onFatalFailure = ::markFailClosed,
+                            transformer = transformer,
                         )
                     proxy = startedProxy
                     startedProxy.start()
@@ -136,6 +156,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                         LogTag,
                         "phase=active owner=device_owner scope=chrome_only session=${sessionId.take(SessionLogLength)} " +
                             "ca=${policy.caFingerprint.take(FingerprintLogLength)} " +
+                            "model=${modelIdentity.modelVersion} modelSha=${modelIdentity.modelSha256} " +
+                            "policy=${modelIdentity.policyVersion} " +
+                            "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
                             "fixture=controlled realHosts=${ChromePhotosRealWebLabConfig.realHosts.size} " +
                             "routes=${routeAddresses.size} privacy=public_only_memory_only",
                     )
@@ -281,6 +304,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     private fun logStatus() {
         val preferences = labPreferences()
         val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val decisions = metrics.decisionSession
         Log.i(
             LogTag,
             "phase=status lifecycle=${lifecycle.current()} active=${preferences.getBoolean(
@@ -292,6 +316,15 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "passthrough=${metrics.passthroughResponses} cacheHits=${metrics.cacheHits} " +
                 "cacheMisses=${metrics.cacheMisses} failures=${metrics.failures} " +
                 "bytesIn=${metrics.originalBytes} bytesOut=${metrics.deliveredBytes} " +
+                "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
+                "engineCalls=${decisions.engineCalls} dedupeHits=${decisions.dedupeHits} " +
+                "inferencePeak=${decisions.inferencePeak} inFlightPeak=${decisions.inFlightPeak} " +
+                "queuePeak=${decisions.queuePeak} queueRejects=${decisions.queueRejects} " +
+                "timeouts=${decisions.timeouts} inferenceP50Ms=${decisions.inferenceP50Ms} " +
+                "inferenceP95Ms=${decisions.inferenceP95Ms} inferenceP99Ms=${decisions.inferenceP99Ms} " +
+                "decisionP50Ms=${decisions.decisionP50Ms} decisionP95Ms=${decisions.decisionP95Ms} " +
+                "decisionP99Ms=${decisions.decisionP99Ms} cacheHitP50Ms=${decisions.cacheHitP50Ms} " +
+                "cacheHitP95Ms=${decisions.cacheHitP95Ms} " +
                 "quicAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyQuicAttempts, 0L)} " +
                 "directTcpAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts, 0L)}",
         )

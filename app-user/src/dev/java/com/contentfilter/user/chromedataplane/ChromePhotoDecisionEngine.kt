@@ -51,6 +51,8 @@ internal interface ChromePhotoDecisionEngine : AutoCloseable {
         mimeType: String,
     ): ChromePhotoDecisionResult
 
+    fun isHealthy(): Boolean = true
+
     override fun close() = Unit
 }
 

@@ -29,6 +29,7 @@ internal data class ChromePhotosProxyMetrics(
     val failures: Long,
     val originalBytes: Long,
     val deliveredBytes: Long,
+    val decisionSession: ChromePhotoDecisionSessionMetrics = ChromePhotoDecisionSessionMetrics(),
 )
 
 internal class ChromePhotosHttpsProxy(
@@ -120,6 +121,7 @@ internal class ChromePhotosHttpsProxy(
             failures = failures.get(),
             originalBytes = originalBytes.get(),
             deliveredBytes = deliveredBytes.get(),
+            decisionSession = transformer.decisionMetrics(),
         )
 
     fun isHealthy(): Boolean = running.get() && serverSocket?.isClosed == false
@@ -141,7 +143,7 @@ internal class ChromePhotosHttpsProxy(
         executor.shutdownNow()
         val cleanupFailure =
             listOf(
-                runCatching { transformer.clear() },
+                runCatching { transformer.close() },
                 runCatching { upstream.close() },
                 runCatching { tls.close() },
             ).firstNotNullOfOrNull { result -> result.exceptionOrNull() }
@@ -270,6 +272,7 @@ internal class ChromePhotosHttpsProxy(
                     "bytesIn=${response.originalBytes.size} bytesOut=${transformed.bytes.size} " +
                     "cache=${if (transformed.cacheHit) "hit" else "miss"} " +
                     "decision=${transformed.decision.name.lowercase(Locale.US)} " +
+                    transformed.decisionResult.logFields() +
                     "requestToDecisionMs=${requestStarted.elapsedMillis(decisionAt)} " +
                     "requestToFirstByteMs=${requestStarted.elapsedMillis(firstByteAt)} " +
                     "requestToDeliveryMs=${requestStarted.elapsedMillis(deliveredAt)}",
@@ -302,6 +305,7 @@ internal class ChromePhotosHttpsProxy(
                     "bytesIn=${upstreamResponse.body.size} bytesOut=${sanitized.bytes.size} " +
                     "cache=${if (sanitized.cacheHit) "hit" else "miss"} " +
                     "decision=${sanitized.decision.name.lowercase(Locale.US)} " +
+                    sanitized.decisionResult.logFields() +
                     "requestToDecisionMs=${requestStarted.elapsedMillis(decisionAt)} " +
                     "requestToDeliveryMs=${requestStarted.elapsedMillis(deliveredAt)}",
             )
@@ -453,14 +457,6 @@ internal data class ChromePhotosProxyRequest(
         }
     }
 }
-
-private fun String?.safeLogContentType(): String =
-    this
-        ?.substringBefore(';')
-        ?.lowercase(Locale.US)
-        ?.filter { character -> character.isLetterOrDigit() || character in "/+.-" }
-        ?.take(64)
-        .orEmpty()
 
 private fun logProxyLifecycle(
     message: String,

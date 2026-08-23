@@ -11,6 +11,7 @@ internal data class ChromePhotosSanitizedResponse(
     val decision: ChromePhotosResourceDecision,
     val cacheHit: Boolean,
     val contentHash: String?,
+    val decisionResult: ChromePhotoDecisionResult? = null,
 )
 
 internal class ChromePhotosRealResponseSanitizer(
@@ -66,6 +67,7 @@ internal class ChromePhotosRealResponseSanitizer(
             decision = transformed.decision,
             cacheHit = transformed.cacheHit,
             contentHash = transformed.contentHash,
+            decisionResult = transformed.decisionResult,
         )
     }
 

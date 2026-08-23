@@ -38,6 +38,7 @@ internal class ChromePhotosGloshiaDecisionEngine(
     override val identity = GloshiaIdentity
     private val lifecycleAnalyzer = LifecycleGloshiaVisualAnalyzer(analyzer)
     private val closed = AtomicBoolean(false)
+    private val healthy = AtomicBoolean(true)
 
     override fun decide(
         imageBytes: ByteArray,
@@ -101,14 +102,16 @@ internal class ChromePhotosGloshiaDecisionEngine(
                         visualDecision.reason == GloshiaVisualPolicyContract.ModelFilterReason -> ChromePhotoDecision.Block
                     else -> ChromePhotoDecision.Unknown
                 }
+            val systemicUnavailable = visualDecision.reason in SystemicUnavailableReasons
+            if (systemicUnavailable) healthy.set(false)
             ChromePhotoDecisionResult(
                 decision = mapped,
                 reason = visualDecision.reason,
                 source =
-                    if (mapped == ChromePhotoDecision.Unknown) {
-                        ChromePhotoDecisionSource.Unavailable
-                    } else {
-                        ChromePhotoDecisionSource.Engine
+                    when {
+                        systemicUnavailable -> ChromePhotoDecisionSource.Unavailable
+                        mapped == ChromePhotoDecision.Unknown -> ChromePhotoDecisionSource.Error
+                        else -> ChromePhotoDecisionSource.Engine
                     },
                 filterProbability = visualDecision.filterProbability,
                 basis = visualDecision.basis.name,
@@ -134,12 +137,15 @@ internal class ChromePhotosGloshiaDecisionEngine(
     }
 
     override fun close() {
+        healthy.set(false)
         if (closed.compareAndSet(false, true)) lifecycleAnalyzer.close()
     }
 
+    override fun isHealthy(): Boolean = healthy.get() && !closed.get()
+
     private fun unknown(
         reason: String,
-        source: ChromePhotoDecisionSource = ChromePhotoDecisionSource.Unavailable,
+        source: ChromePhotoDecisionSource = ChromePhotoDecisionSource.Engine,
         totalStarted: Long,
         preprocessNanos: Long = 0L,
         inferenceNanos: Long = 0L,
@@ -172,6 +178,11 @@ internal class ChromePhotosGloshiaDecisionEngine(
         const val EngineExceptionReason = "engine_exception"
         const val AnalyzerClosedReason = "analyzer_closed"
         private const val CandidateIdLength = 32
+        private val SystemicUnavailableReasons =
+            setOf(
+                GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
+                GloshiaVisualPolicyContract.AnalyzerClosedReason,
+            )
     }
 }
 
