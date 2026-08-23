@@ -4,7 +4,7 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- `GLOSH-DEVICE-OWNER-INSTALLER-00` esta **blocked**, owner unico
+- `GLOSH-DEVICE-OWNER-INSTALLER-00` esta **PASS**, owner unico
   Proteccion Android / Codex, en `work/glosh-device-owner-installer-00` sobre
   `1d45a74c`. Su alcance es crear y ejecutar un asistente macOS seguro para
   convertir el A23 actual en Device Owner de Glosh mediante la excepcion ADB de
@@ -54,12 +54,18 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   el permiso de Contactos necesario para preservar el perfil local. Antes de
   completar, Samsung advirtio que el futuro acceso requerira un codigo enviado
   al numero enmascarado terminado en `4168`; la pantalla de confirmacion queda
-  detenida hasta que el usuario confirme acceso a ese numero. Solo tras cuentas
-  cero puede continuar DEV 319 y el unico intento de `set-device-owner`.
+  detenida hasta que el usuario confirme acceso a ese numero. El usuario lo
+  confirmo y completo la verificacion externa: `dumpsys account` muestra cero
+  cuentas y hay un unico usuario 0. DEV 319 verifico el SHA-256 esperado, se
+  instalo in-place con `Success` y conservo `ceDataInode=1239519`. El unico
+  `set-device-owner` respondio `Success`; `dpm list-owners` confirma Glosh como
+  `DeviceOwner,Affiliated` en user 0. Accessibility sigue habilitado, permanecen
+  549 paquetes y no hubo factory reset. Las cuentas pueden restaurarse
+  manualmente despues del gate del data-plane sin quitar el Device Owner.
 - `CHROME-PHOTOS-PROTECTED-SURFACE-00` quedo **PASS final** en A23/API 34/
   Chrome 151 con DEV 318 y commit local `2b01280f`: host unico persistente,
   rotacion continua, cero exposicion, cero marcador faltante y cero stale.
-- `CHROME-PHOTOS-DATA-PLANE-00` esta **blocked**, owner unico Proteccion
+- `CHROME-PHOTOS-DATA-PLANE-00` esta **in_progress**, owner unico Proteccion
   Android / Codex, en `work/chrome-photos-data-plane-00` sobre `2b01280f`. La
   arquitectura inicial usa proxy HTTPS loopback aplicado solo a Chrome, CA/hoja
   efimeras en memoria, regla por SHA-256, cache efimero y ruta VPN exclusiva
@@ -75,8 +81,9 @@ Actualizado: 2026-08-21. Responsable: Direccion General Tecnica.
   El gate fisico se detuvo antes de instalar: el A23 conectado es SM-A235M,
   Android 14/API 34 y Chrome 151.0.7922.137, pero `dpm list-owners` responde
   `no owners`. Glosh figura solo como Device Admin. El contrato exige Device
-  Owner y este ticket no autoriza reprovisionar/factory reset; no activar proxy,
-  CA ni transparencia hasta restaurar esa precondicion por un flujo autorizado.
+  Owner y este ticket no autoriza reprovisionar/factory reset. La precondicion ya
+  fue restaurada: DEV 319 esta instalada y Glosh es Device Owner; corresponde
+  reanudar el gate fisico CA/VPN/proxy/SAFE/sentinel sin recompilar.
 - `CHROME-GLOSHIA-A23` termino **FAILED** sobre Chrome real en A23/API 34. El
   motor fue GloshIA Visual R3.1 ONNX real: permitio contenido seguro y bloqueo
   regiones contrastantes, sin crash/ANR. El gate fallo porque scroll/lazy produjo
