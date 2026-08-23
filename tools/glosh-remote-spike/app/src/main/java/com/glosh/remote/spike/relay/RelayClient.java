@@ -11,6 +11,7 @@ import org.json.JSONObject;
 import java.io.Closeable;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +41,7 @@ public final class RelayClient implements Closeable {
     private volatile String challengeNonce;
     private long inboundSeq;
     private long outboundSeq;
+    private long generation;
 
     public RelayClient(AdbShell shell) {
         this.shell = shell;
@@ -51,8 +53,9 @@ public final class RelayClient implements Closeable {
     }
 
     public synchronized void connect(String rawDescriptor, Listener listener) {
-        disconnect();
+        disconnectLocked();
         JoinDescriptor parsed = JoinDescriptor.parse(rawDescriptor);
+        long newGeneration = ++generation;
         this.descriptor = parsed;
         this.listener = listener;
         this.authenticated = false;
@@ -67,18 +70,28 @@ public final class RelayClient implements Closeable {
 
         listener.onState("Conectando al relay temporal…");
         Request request = new Request.Builder().url(url).build();
-        socket = client.newWebSocket(request, new SocketListener());
+        socket = client.newWebSocket(request, new SocketListener(newGeneration));
     }
 
     public synchronized void disconnect() {
+        generation++;
+        disconnectLocked();
+        listener = null;
+    }
+
+    private void disconnectLocked() {
         authenticated = false;
         challengeNonce = null;
-        WebSocket current = socket;
+        WebSocket currentSocket = socket;
         socket = null;
-        if (current != null) {
-            current.close(1000, "session closed");
+        if (currentSocket != null) {
+            currentSocket.close(1000, "session closed");
         }
+        JoinDescriptor currentDescriptor = descriptor;
         descriptor = null;
+        if (currentDescriptor != null) {
+            currentDescriptor.destroy();
+        }
     }
 
     public boolean isAuthenticated() {
@@ -94,43 +107,63 @@ public final class RelayClient implements Closeable {
     }
 
     private final class SocketListener extends WebSocketListener {
+        private final long socketGeneration;
+
+        private SocketListener(long socketGeneration) {
+            this.socketGeneration = socketGeneration;
+        }
+
         @Override
         public void onOpen(WebSocket webSocket, Response response) {
+            if (!isCurrent(socketGeneration, webSocket)) {
+                webSocket.close(1000, "stale connection");
+                return;
+            }
             notifyState("Relay conectado. Autenticando sesión…");
         }
 
         @Override
         public void onMessage(WebSocket webSocket, String text) {
+            if (!isCurrent(socketGeneration, webSocket)) {
+                return;
+            }
             try {
                 JSONObject message = new JSONObject(text);
                 String type = message.optString("type", "");
                 switch (type) {
                     case "challenge":
-                        handleChallenge(webSocket, message);
+                        handleChallenge(socketGeneration, webSocket, message);
                         break;
                     case "ready":
-                        handleReady(message);
+                        handleReady(socketGeneration, message);
                         break;
                     case "box":
-                        handleBox(message);
+                        handleBox(socketGeneration, message);
                         break;
                     default:
                         throw new SecurityException("Tipo de mensaje remoto no permitido: " + type);
                 }
             } catch (Throwable error) {
-                fail("Mensaje remoto inválido.", error);
+                fail(socketGeneration, webSocket, "Mensaje remoto inválido.", error);
             }
         }
 
         @Override
         public void onFailure(WebSocket webSocket, Throwable t, Response response) {
+            if (!isCurrent(socketGeneration, webSocket)) {
+                return;
+            }
             authenticated = false;
-            fail("Se perdió la conexión con el relay.", t);
+            fail(socketGeneration, webSocket, "Se perdió la conexión con el relay.", t);
         }
 
         @Override
         public void onClosed(WebSocket webSocket, int code, String reason) {
+            if (!isCurrent(socketGeneration, webSocket)) {
+                return;
+            }
             authenticated = false;
+            destroyActiveDescriptor(socketGeneration);
             Listener current = listener;
             if (current != null) {
                 current.onClosed();
@@ -138,7 +171,8 @@ public final class RelayClient implements Closeable {
         }
     }
 
-    private void handleChallenge(WebSocket webSocket, JSONObject message) throws Exception {
+    private void handleChallenge(long expectedGeneration, WebSocket webSocket, JSONObject message) throws Exception {
+        ensureCurrent(expectedGeneration, webSocket);
         JoinDescriptor current = requireDescriptor();
         String nonce = message.getString("nonce");
         if (nonce.length() < 20 || nonce.length() > 128) {
@@ -146,38 +180,54 @@ public final class RelayClient implements Closeable {
         }
         challengeNonce = nonce;
 
-        String proof = SessionCrypto.hmac(
-                current.sessionKey(),
-                "agent-auth:" + current.sessionId() + ":" + nonce);
+        byte[] key = current.sessionKey();
+        try {
+            String proof = SessionCrypto.hmac(
+                    key,
+                    "agent-auth:" + current.sessionId() + ":" + nonce);
 
-        JSONObject device = new JSONObject()
-                .put("manufacturer", Build.MANUFACTURER)
-                .put("model", Build.MODEL)
-                .put("device", Build.DEVICE)
-                .put("android", Build.VERSION.RELEASE)
-                .put("sdk", Build.VERSION.SDK_INT);
+            JSONObject device = new JSONObject()
+                    .put("manufacturer", Build.MANUFACTURER)
+                    .put("model", Build.MODEL)
+                    .put("device", Build.DEVICE)
+                    .put("android", Build.VERSION.RELEASE)
+                    .put("sdk", Build.VERSION.SDK_INT);
 
-        JSONObject auth = new JSONObject()
-                .put("v", 1)
-                .put("type", "auth")
-                .put("proof", proof)
-                .put("device", device);
-        webSocket.send(auth.toString());
+            JSONObject auth = new JSONObject()
+                    .put("v", 1)
+                    .put("type", "auth")
+                    .put("proof", proof)
+                    .put("device", device);
+            if (!webSocket.send(auth.toString())) {
+                throw new IllegalStateException("WebSocket rechazó la autenticación.");
+            }
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
     }
 
-    private void handleReady(JSONObject message) throws Exception {
+    private void handleReady(long expectedGeneration, JSONObject message) throws Exception {
+        ensureCurrent(expectedGeneration, socket);
         JoinDescriptor current = requireDescriptor();
         String nonce = challengeNonce;
         if (nonce == null) {
             throw new SecurityException("Ready recibido sin challenge.");
         }
-        String expected = SessionCrypto.hmac(
-                current.sessionKey(),
-                "server-ready:" + current.sessionId() + ":" + nonce);
-        if (!SessionCrypto.constantTimeEquals(expected, message.getString("serverProof"))) {
-            throw new SecurityException("El relay no pudo demostrar la clave de sesión.");
+
+        byte[] key = current.sessionKey();
+        try {
+            String expected = SessionCrypto.hmac(
+                    key,
+                    "server-ready:" + current.sessionId() + ":" + nonce);
+            if (!SessionCrypto.constantTimeEquals(expected, message.getString("serverProof"))) {
+                throw new SecurityException("El relay no pudo demostrar la clave de sesión.");
+            }
+        } finally {
+            Arrays.fill(key, (byte) 0);
         }
+
         authenticated = true;
+        challengeNonce = null;
         notifyState("Sesión remota autenticada extremo a extremo.");
         Listener currentListener = listener;
         if (currentListener != null) {
@@ -185,13 +235,17 @@ public final class RelayClient implements Closeable {
         }
     }
 
-    private void handleBox(JSONObject message) throws Exception {
+    private void handleBox(long expectedGeneration, JSONObject message) throws Exception {
+        ensureCurrent(expectedGeneration, socket);
         if (!authenticated) {
             throw new SecurityException("Comando cifrado recibido antes de autenticar.");
         }
         JoinDescriptor current = requireDescriptor();
         long seq = message.getLong("seq");
         synchronized (this) {
+            if (expectedGeneration != generation) {
+                throw new IllegalStateException("Conexión remota stale.");
+            }
             if (seq <= inboundSeq) {
                 throw new SecurityException("Replay o secuencia remota inválida.");
             }
@@ -199,26 +253,41 @@ public final class RelayClient implements Closeable {
         }
 
         String aad = current.sessionId() + ":server:" + seq;
-        byte[] plaintext = SessionCrypto.decrypt(
-                current.sessionKey(),
-                message.getString("nonce"),
-                message.getString("ciphertext"),
-                aad);
-        JSONObject payload = new JSONObject(new String(plaintext, StandardCharsets.UTF_8));
+        byte[] key = current.sessionKey();
+        byte[] plaintext;
+        try {
+            plaintext = SessionCrypto.decrypt(
+                    key,
+                    message.getString("nonce"),
+                    message.getString("ciphertext"),
+                    aad);
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
+
+        JSONObject payload;
+        try {
+            payload = new JSONObject(new String(plaintext, StandardCharsets.UTF_8));
+        } finally {
+            Arrays.fill(plaintext, (byte) 0);
+        }
         if (!"command".equals(payload.optString("kind"))) {
             throw new SecurityException("Payload remoto no es un comando.");
         }
 
         String requestId = payload.getString("requestId");
         String action = payload.getString("action");
-        if (requestId.length() > 80 || action.length() > 40) {
+        if (requestId.length() == 0 || requestId.length() > 80 || action.length() == 0 || action.length() > 40) {
             throw new SecurityException("Comando fuera de límites.");
         }
 
-        commandExecutor.execute(() -> executeAndReply(requestId, action));
+        commandExecutor.execute(() -> executeAndReply(expectedGeneration, requestId, action));
     }
 
-    private void executeAndReply(String requestId, String action) {
+    private void executeAndReply(long expectedGeneration, String requestId, String action) {
+        if (!isCurrentGeneration(expectedGeneration)) {
+            return;
+        }
         boolean ok = true;
         String output;
         try {
@@ -234,16 +303,21 @@ public final class RelayClient implements Closeable {
         }
 
         try {
-            sendResult(requestId, action, ok, output);
+            sendResult(expectedGeneration, requestId, action, ok, output);
         } catch (Throwable error) {
-            fail("No se pudo devolver el resultado remoto.", error);
+            WebSocket current = socket;
+            if (current != null) {
+                fail(expectedGeneration, current, "No se pudo devolver el resultado remoto.", error);
+            }
         }
     }
 
-    private void sendResult(String requestId, String action, boolean ok, String output) throws Exception {
-        JoinDescriptor current = requireDescriptor();
+    private void sendResult(long expectedGeneration, String requestId, String action, boolean ok, String output)
+            throws Exception {
         WebSocket currentSocket = socket;
-        if (currentSocket == null || !authenticated) {
+        ensureCurrent(expectedGeneration, currentSocket);
+        JoinDescriptor current = requireDescriptor();
+        if (!authenticated) {
             throw new IllegalStateException("Sesión remota cerrada.");
         }
 
@@ -256,13 +330,22 @@ public final class RelayClient implements Closeable {
 
         long seq;
         synchronized (this) {
+            if (expectedGeneration != generation) {
+                throw new IllegalStateException("Conexión remota stale.");
+            }
             seq = ++outboundSeq;
         }
         String aad = current.sessionId() + ":agent:" + seq;
-        SessionCrypto.Box box = SessionCrypto.encrypt(
-                current.sessionKey(),
-                payload.toString().getBytes(StandardCharsets.UTF_8),
-                aad);
+        byte[] key = current.sessionKey();
+        SessionCrypto.Box box;
+        try {
+            box = SessionCrypto.encrypt(
+                    key,
+                    payload.toString().getBytes(StandardCharsets.UTF_8),
+                    aad);
+        } finally {
+            Arrays.fill(key, (byte) 0);
+        }
 
         JSONObject envelope = new JSONObject()
                 .put("v", 1)
@@ -275,12 +358,38 @@ public final class RelayClient implements Closeable {
         }
     }
 
+    private synchronized boolean isCurrent(long expectedGeneration, WebSocket webSocket) {
+        return expectedGeneration == generation && webSocket != null && webSocket == socket;
+    }
+
+    private synchronized boolean isCurrentGeneration(long expectedGeneration) {
+        return expectedGeneration == generation && socket != null;
+    }
+
+    private void ensureCurrent(long expectedGeneration, WebSocket webSocket) {
+        if (!isCurrent(expectedGeneration, webSocket)) {
+            throw new IllegalStateException("Conexión remota stale.");
+        }
+    }
+
     private JoinDescriptor requireDescriptor() {
         JoinDescriptor current = descriptor;
         if (current == null) {
             throw new IllegalStateException("No hay descriptor de sesión activo.");
         }
         return current;
+    }
+
+    private synchronized void destroyActiveDescriptor(long expectedGeneration) {
+        if (expectedGeneration != generation) {
+            return;
+        }
+        JoinDescriptor current = descriptor;
+        descriptor = null;
+        if (current != null) {
+            current.destroy();
+        }
+        socket = null;
     }
 
     private void notifyState(String state) {
@@ -290,15 +399,16 @@ public final class RelayClient implements Closeable {
         }
     }
 
-    private void fail(String message, Throwable error) {
+    private void fail(long expectedGeneration, WebSocket failingSocket, String message, Throwable error) {
+        if (!isCurrent(expectedGeneration, failingSocket)) {
+            return;
+        }
+        authenticated = false;
         Listener current = listener;
         if (current != null) {
             current.onError(message, error);
         }
-        WebSocket currentSocket = socket;
-        if (currentSocket != null) {
-            currentSocket.close(1008, "protocol error");
-        }
+        failingSocket.close(1008, "protocol error");
     }
 
     private static String urlEncode(String value) {
