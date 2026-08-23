@@ -19,7 +19,9 @@ class ChromePhotosRealWebHostPolicyTest {
             ),
         )
         assertTrue(allowlist.isAllowed(ChromePhotosRealWebLabConfig.GoogleStaticHost))
+        assertTrue(allowlist.isAllowed(ChromePhotosRealWebLabConfig.FlickrStaticHost))
         assertFalse(allowlist.isAllowed("sub.${ChromePhotosRealWebLabConfig.GoogleStaticHost}"))
+        assertFalse(allowlist.isAllowed("staticflickr.com"))
     }
 
     @Test

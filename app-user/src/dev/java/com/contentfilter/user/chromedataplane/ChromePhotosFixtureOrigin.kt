@@ -104,8 +104,8 @@ internal class ChromePhotosFixtureOrigin : ChromePhotosFixtureSource {
         </head>
         <body>
           <section class="status" id="fixture-marker">
-            <h1>CHROME-PHOTOS-REAL-WEB-BATCH-01</h1>
-            <p>HTTPS real · hosts exactos · decisión por identidad</p>
+            <h1>CHROME-PHOTOS-GLOSHIA-REAL-WEB-BATCH-02</h1>
+            <p>HTTPS real · GloshIA Visual R3.1 local · fail closed</p>
           </section>
           <main class="grid">
             <article class="card"><h2>SAFE PNG real</h2><img src="${ChromePhotosRealWebLabConfig.SafePngUrl}" alt="SAFE PNG"></article>
@@ -115,6 +115,7 @@ internal class ChromePhotosFixtureOrigin : ChromePhotosFixtureSource {
             <article class="card"><h2>BLOCK repetida</h2><img src="${ChromePhotosRealWebLabConfig.BlockWebpUrl}" alt="BLOCK repeat"></article>
             <article class="card"><h2>AVIF redirect permitido</h2><img src="${ChromePhotosRealWebLabConfig.AllowedRedirectUrl}" alt="AVIF redirect"></article>
             <article class="card"><h2>UNKNOWN AVIF directa</h2><img src="${ChromePhotosRealWebLabConfig.UnknownAvifUrl}" alt="UNKNOWN AVIF"></article>
+            ${chromePhotosGloshiaPublicMatrixCards()}
             <div class="spacer">Deslizá para activar lazy-load</div>
             <article class="card" id="lazy-card"><h2>LAZY BLOCK real</h2><img loading="lazy" src="${ChromePhotosRealWebLabConfig.BlockWebpUrl}" alt="Lazy block"></article>
             <article class="card"><a href="${ChromePhotosRealWebLabConfig.PublicHtmlUrl}">HTTPS remoto real</a></article>
@@ -181,6 +182,20 @@ internal class ChromePhotosFixtureOrigin : ChromePhotosFixtureSource {
         const val PngQuality = 100
     }
 }
+
+internal fun chromePhotosGloshiaPublicMatrixCards(): String =
+    buildString {
+        ChromePhotosRealWebLabConfig.gloshiaPublicJpegUrls.forEachIndexed { index, url ->
+            val lazy = if (index >= EagerGloshiaImages) " loading=\"lazy\"" else ""
+            append("<article class=\"card\"><h2>GloshIA JPEG ${index + 1}</h2>")
+            append("<img$lazy src=\"$url\" alt=\"Public GloshIA vector ${index + 1}\"></article>\n")
+        }
+        val repeated = ChromePhotosRealWebLabConfig.gloshiaPublicJpegUrls.first()
+        append("<article class=\"card\"><h2>GloshIA JPEG repetida</h2>")
+        append("<img loading=\"lazy\" src=\"$repeated\" alt=\"Repeated public vector\"></article>")
+    }
+
+private const val EagerGloshiaImages = 4
 
 internal object ChromePhotosFixtureLeaseContract {
     const val HeartbeatPath = "/__glosh_lease"
