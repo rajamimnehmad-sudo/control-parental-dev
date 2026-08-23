@@ -53,9 +53,10 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
                     .filter { address -> !address.isAnyLocalAddress && !address.isLoopbackAddress }
                     .distinctBy(InetAddress::getHostAddress)
                     .take(MaximumResolvedRoutes)
-                    .map { address ->
+                    .mapNotNull { address ->
+                        val hostAddress = address.hostAddress ?: return@mapNotNull null
                         ChromePhotosLabVpnRoute(
-                            address = address.hostAddress.substringBefore('%'),
+                            address = hostAddress.substringBefore('%'),
                             prefixLength = if (address.address.size == Ipv4ByteCount) Ipv4HostPrefixLength else Ipv6HostPrefixLength,
                         )
                     }
