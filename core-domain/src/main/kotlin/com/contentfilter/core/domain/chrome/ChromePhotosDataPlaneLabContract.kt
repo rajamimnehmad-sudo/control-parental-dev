@@ -18,6 +18,11 @@ object ChromePhotosDataPlaneLabContract {
     const val KeyResolvedRouteAddresses = "resolved_route_addresses"
     const val KeyInstalledCaDer = "installed_ca_der"
     const val KeyCaFingerprint = "ca_fingerprint"
+    const val KeyTrustedBootstrapResetGeneration = "trusted_bootstrap_reset_generation"
+    const val KeyTrustedBootstrapCompleteGeneration = "trusted_bootstrap_complete_generation"
+    const val KeyTrustedBootstrapResetCount = "trusted_bootstrap_reset_count"
+
+    const val TrustedBootstrapGeneration = 1
 
     const val FixtureHost = "glosh-photos.test"
     const val FixtureUrl = "https://glosh-photos.test/"

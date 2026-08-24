@@ -11,6 +11,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.Toast
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
@@ -104,6 +105,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        ChromePhotosDataPlaneRuntimeAttestation.markAccessibilityBound(true)
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         serviceScope = scope
         chromeVisualProbeController = ChromeVisualProbeController(this, scope)
@@ -129,7 +131,14 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        if (AccessibilityEventFilter.isChromeVisualOnly(event.eventType)) {
+        val eventPackageName = event.packageName?.toString()?.takeIf { it.isNotBlank() }
+        val protectedChromeVisualOnly =
+            AccessibilityEventFilter.isProtectedChromeVisualOnly(
+                eventType = event.eventType,
+                packageName = eventPackageName,
+                protectedSessionActive = ChromePhotosDataPlaneRuntimeAttestation.snapshot().sessionId.isNotBlank(),
+            )
+        if (AccessibilityEventFilter.isChromeVisualOnly(event.eventType) || protectedChromeVisualOnly) {
             chromeVisualProbeController?.onAccessibilityEvent(event)
             chromeVisualController?.onAccessibilityEvent(event)
             return
@@ -137,7 +146,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (!AccessibilityEventFilter.isHandled(event.eventType)) return
         chromeVisualProbeController?.onAccessibilityEvent(event)
         chromeVisualController?.onAccessibilityEvent(event)
-        val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
+        val packageName = eventPackageName ?: return
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             val resolvedOwnUninstaller = packageName in ownUninstallerPackages
             if (!settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)) return
@@ -234,6 +243,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        ChromePhotosDataPlaneRuntimeAttestation.markAccessibilityBound(false)
         chromeVisualProbeController?.close()
         chromeVisualProbeController = null
         chromeVisualController?.close()

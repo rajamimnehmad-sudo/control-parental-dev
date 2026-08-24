@@ -31,13 +31,16 @@ class ChromePhotosDataPlaneLabService : Service() {
     private var healthJob: Job? = null
     private var proxy: ChromePhotosHttpsProxy? = null
     private var modelLoadMs = 0.0
+    private var gloshiaReady = false
     private var currentSessionId = ""
     private var vpnRollbackCompleted = false
     private lateinit var policyController: ChromePhotosLabPolicyController
+    private lateinit var bootstrapController: ChromePhotosTrustedBootstrapController
 
     override fun onCreate() {
         super.onCreate()
         policyController = ChromePhotosLabPolicyController(this)
+        bootstrapController = ChromePhotosTrustedBootstrapController(this)
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     }
 
@@ -84,12 +87,13 @@ class ChromePhotosDataPlaneLabService : Service() {
                     lifecycle.begin()
                     val vpnWasRunningBeforeLab = VpnController.isRunning(this@ChromePhotosDataPlaneLabService)
                     vpnRollbackCompleted = false
+                    bootstrapController.requireDevOwnerAndBlockChrome("session_start")
                     policyController.verifyOwnerAndCleanOrphanedState()
+                    bootstrapController.ensureInitialReset()
                     val sessionId = UUID.randomUUID().toString()
                     currentSessionId = sessionId
                     ChromePhotosDataPlaneRuntimeAttestation.beginSession(sessionId)
-                    preferences.edit()
-                        .clear()
+                    bootstrapController.preserveAcrossSessionReset(preferences.edit().clear())
                         .putString(ChromePhotosDataPlaneLabContract.KeySessionId, sessionId)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyActive, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
@@ -117,6 +121,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                                 error("gloshia_${creation.reason}")
                         }
                     modelLoadMs = gloshia.modelLoadMs
+                    gloshiaReady = true
                     val modelIdentity = gloshia.engine.identity
                     lateinit var startedProxy: ChromePhotosHttpsProxy
                     val decisionSession =
@@ -213,6 +218,11 @@ class ChromePhotosDataPlaneLabService : Service() {
     }
 
     private fun markFailClosed(reason: String) {
+        gloshiaReady = false
+        runCatching { bootstrapController.requireDevOwnerAndBlockChrome(reason) }
+            .onFailure { error ->
+                Log.e(LogTag, "bootstrap=chrome_block_failed error=${error.javaClass.simpleName}")
+            }
         ChromePhotosDataPlaneRuntimeAttestation.failClosed(currentSessionId)
         labPreferences().edit()
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
@@ -270,7 +280,18 @@ class ChromePhotosDataPlaneLabService : Service() {
                             ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed,
                             false,
                         )
-                    if (realWebScopeConfirmed && !wasRealWebReady) {
+                    val chromeReleased =
+                        realWebScopeConfirmed &&
+                            bootstrapController.releaseChromeIfHealthy(
+                                ChromePhotosTrustedBootstrapHealth(
+                                    proxyHealthy = proxyHealthy,
+                                    policyConfirmed = policyConfirmed,
+                                    vpnConfirmed = runtime.vpnConfirmed,
+                                    gloshiaReady = gloshiaReady,
+                                    accessibilityBound = runtime.accessibilityBound,
+                                ),
+                            )
+                    if (chromeReleased && !wasRealWebReady) {
                         lifecycle.presentationReady()
                         labPreferences().edit()
                             .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, true)
@@ -282,6 +303,8 @@ class ChromePhotosDataPlaneLabService : Service() {
                             .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
                             .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
                             .commit()
+                        markFailClosed("real_web_scope_lost")
+                        return@launch
                     }
                     if (realWebScopeConfirmed || fixtureFresh) {
                         ChromePhotosDataPlaneRuntimeAttestation.publishHeartbeat(
@@ -305,6 +328,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         val preferences = labPreferences()
         val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
         val decisions = metrics.decisionSession
+        val bootstrap = bootstrapController.state()
         Log.i(
             LogTag,
             "phase=status lifecycle=${lifecycle.current()} active=${preferences.getBoolean(
@@ -326,7 +350,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "decisionP99Ms=${decisions.decisionP99Ms} cacheHitP50Ms=${decisions.cacheHitP50Ms} " +
                 "cacheHitP95Ms=${decisions.cacheHitP95Ms} " +
                 "quicAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyQuicAttempts, 0L)} " +
-                "directTcpAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts, 0L)}",
+                "directTcpAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts, 0L)} " +
+                "bootstrapResetGeneration=${bootstrap.resetGeneration} " +
+                "bootstrapCompleteGeneration=${bootstrap.completeGeneration} " +
+                "bootstrapResetCount=${bootstrap.resetCount} " +
+                "chromeSuspended=${bootstrapController.isChromeSuspended()}",
         )
     }
 

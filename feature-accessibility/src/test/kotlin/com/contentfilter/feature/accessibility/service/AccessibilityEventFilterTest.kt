@@ -27,6 +27,38 @@ class AccessibilityEventFilterTest {
     }
 
     @Test
+    fun `chrome content changes bypass general traversal only during protected session`() {
+        assertTrue(
+            AccessibilityEventFilter.isProtectedChromeVisualOnly(
+                eventType = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                packageName = "com.android.chrome",
+                protectedSessionActive = true,
+            ),
+        )
+        assertFalse(
+            AccessibilityEventFilter.isProtectedChromeVisualOnly(
+                eventType = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                packageName = "com.android.chrome",
+                protectedSessionActive = false,
+            ),
+        )
+        assertFalse(
+            AccessibilityEventFilter.isProtectedChromeVisualOnly(
+                eventType = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                packageName = "com.example.other",
+                protectedSessionActive = true,
+            ),
+        )
+        assertFalse(
+            AccessibilityEventFilter.isProtectedChromeVisualOnly(
+                eventType = AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+                packageName = "com.android.chrome",
+                protectedSessionActive = true,
+            ),
+        )
+    }
+
+    @Test
     fun `ignores unrelated events`() {
         assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))
         assertFalse(AccessibilityEventFilter.isChromeVisualOnly(AccessibilityEvent.TYPE_VIEW_HOVER_ENTER))

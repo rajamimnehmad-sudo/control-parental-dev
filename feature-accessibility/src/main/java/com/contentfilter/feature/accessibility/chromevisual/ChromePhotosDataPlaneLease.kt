@@ -17,6 +17,7 @@ internal data class ChromePhotosDataPlaneAttestation(
     val realWebScopeConfirmed: Boolean,
     val heartbeatElapsed: Long,
     val validUntilElapsed: Long,
+    val accessibilityBound: Boolean = false,
 )
 
 internal data class ChromePhotosDataPlaneLeaseContext(
@@ -130,6 +131,7 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
             policyConfirmed &&
             vpnConfirmed &&
             vpnSessionId == sessionId &&
+            accessibilityBound &&
             (fixtureConfirmed || realWebScopeConfirmed) &&
             heartbeatElapsed in 1..now &&
             now - heartbeatElapsed <= MaximumHeartbeatAgeMillis &&
@@ -172,6 +174,7 @@ internal class ChromePhotosDataPlaneAttestationReader(
             realWebScopeConfirmed = runtime.realWebScopeConfirmed,
             heartbeatElapsed = runtime.heartbeatElapsed,
             validUntilElapsed = runtime.validUntilElapsed,
+            accessibilityBound = runtime.accessibilityBound,
         )
     }
 }

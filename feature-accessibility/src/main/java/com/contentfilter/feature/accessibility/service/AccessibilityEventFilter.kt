@@ -22,6 +22,15 @@ internal object AccessibilityEventFilter {
 
     fun isChromeVisualOnly(eventType: Int): Boolean = eventType in chromeVisualOnlyEventTypes
 
+    fun isProtectedChromeVisualOnly(
+        eventType: Int,
+        packageName: String?,
+        protectedSessionActive: Boolean,
+    ): Boolean =
+        protectedSessionActive &&
+            packageName == ChromePackageName &&
+            eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+
     fun label(eventType: Int): String =
         when (eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> "TYPE_WINDOW_STATE_CHANGED"
@@ -33,4 +42,6 @@ internal object AccessibilityEventFilter {
             AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> "TYPE_VIEW_TEXT_CHANGED"
             else -> "TYPE_$eventType"
         }
+
+    private const val ChromePackageName = "com.android.chrome"
 }

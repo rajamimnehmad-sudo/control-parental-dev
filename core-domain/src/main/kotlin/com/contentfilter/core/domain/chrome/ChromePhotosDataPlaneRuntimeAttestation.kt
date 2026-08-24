@@ -16,14 +16,26 @@ data class ChromePhotosDataPlaneRuntimeSnapshot(
     val realWebScopeHeartbeatElapsed: Long = 0L,
     val heartbeatElapsed: Long = 0L,
     val validUntilElapsed: Long = 0L,
+    val accessibilityBound: Boolean = false,
 )
 
 object ChromePhotosDataPlaneRuntimeAttestation {
+    private var accessibilityBound = false
     private var state = ChromePhotosDataPlaneRuntimeSnapshot()
 
     @Synchronized
     fun beginSession(sessionId: String) {
-        state = ChromePhotosDataPlaneRuntimeSnapshot(sessionId = sessionId)
+        state =
+            ChromePhotosDataPlaneRuntimeSnapshot(
+                sessionId = sessionId,
+                accessibilityBound = accessibilityBound,
+            )
+    }
+
+    @Synchronized
+    fun markAccessibilityBound(bound: Boolean) {
+        accessibilityBound = bound
+        state = state.copy(accessibilityBound = bound)
     }
 
     @Synchronized
@@ -107,7 +119,7 @@ object ChromePhotosDataPlaneRuntimeAttestation {
 
     @Synchronized
     fun clear() {
-        state = ChromePhotosDataPlaneRuntimeSnapshot()
+        state = ChromePhotosDataPlaneRuntimeSnapshot(accessibilityBound = accessibilityBound)
     }
 
     private inline fun update(

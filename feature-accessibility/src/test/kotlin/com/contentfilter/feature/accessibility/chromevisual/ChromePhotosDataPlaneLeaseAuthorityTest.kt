@@ -99,6 +99,7 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         assertFalse(authority.isValid(lease, attestation(proxyHealthy = false), context()))
         assertFalse(authority.isValid(lease, attestation(vpnConfirmed = false), context()))
         assertFalse(authority.isValid(lease, attestation(vpnSessionId = "old-session"), context()))
+        assertFalse(authority.isValid(lease, attestation(accessibilityBound = false), context()))
     }
 
     @Test
@@ -158,6 +159,7 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         realWebScopeConfirmed: Boolean = false,
         heartbeatElapsed: Long = now,
         validUntilElapsed: Long = now + 1_000L,
+        accessibilityBound: Boolean = true,
     ) = ChromePhotosDataPlaneAttestation(
         devBuild = devBuild,
         sessionId = SessionId,
@@ -170,6 +172,7 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         realWebScopeConfirmed = realWebScopeConfirmed,
         heartbeatElapsed = heartbeatElapsed,
         validUntilElapsed = validUntilElapsed,
+        accessibilityBound = accessibilityBound,
     )
 
     private companion object {

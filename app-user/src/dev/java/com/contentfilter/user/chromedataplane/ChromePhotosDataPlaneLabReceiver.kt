@@ -11,9 +11,16 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (!context.packageName.endsWith(".dev")) return
+        if (intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED) {
+            ChromePhotosTrustedBootstrapBootGuard.blockChrome(context)
+            return
+        }
         val serviceAction =
             when (intent.action) {
                 ActionStart -> ChromePhotosDataPlaneLabService.ActionStart
+                Intent.ACTION_BOOT_COMPLETED,
+                Intent.ACTION_MY_PACKAGE_REPLACED,
+                -> ChromePhotosDataPlaneLabService.ActionStart
                 ActionStop -> ChromePhotosDataPlaneLabService.ActionStop
                 ActionStatus -> ChromePhotosDataPlaneLabService.ActionStatus
                 else -> return
