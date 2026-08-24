@@ -18,6 +18,7 @@ Mientras Codex mantiene ownership de escritura sobre el cierre UDP, ChatGPT prep
 - `CHROME_PROXY_WEB_SEMANTICS_11A_CONTRACT.md`: contrato del proxy web general, commit `1e40a6a2e447318237e9f2921d808b16c4f30035`.
 - `CHROME_IMAGE_CONTENT_AUTHORITY_11B_DESIGN.md`: diseño completo de autoridad visual por MIME+magic+decode bounded, compresión, Range/206, formatos still/animados, SVG y cache generation-bound; commit `a6ea2446ef6e3b272abf09837115bb991813f8c6`.
 - `CHROME_IMAGE_CONTENT_AUTHORITY_11B_CODEX_DRAFT.md`: prompt Codex preparado para usar sólo después de PASS de 10A+11A, commit `75e8ee855429505ad4917724db2dd7df1aa319b2`.
+- `CHROME_GLOSHIA_REALTIME_SCHEDULER_14A_DESIGN.md`: scheduler viewport-aware/dedupe/backpressure para acercar GloshIA a respuesta perceptual en tiempo real sin relajar seguridad; commit `ad2ae472cdcf2a5f71706dbb6533d1bf77dbb40a`.
 - `CHROME_PROVENANCE_GAP_13A_FIXTURE_MATRIX.md`: matriz de fixtures para `data:`, `blob:`, canvas, WebGL, SVG y Service Worker, commit `cc5902f3dcf87958b73851cd83b2bf0d08dfeb3b`.
 - `CHROME_PROCESS_DEATH_GUARD_10B_DESIGN.md`: diseño de guard independiente ante crash/kill/reboot/update, commit `f1274fd9b48ff894e19ef7bbb5a02ef0a83aa5f6`.
 - `CHROME_GENERAL_WEB_PERF_14_PLAN.md`: plan de benchmark p50/p95/p99, memoria, batería, térmica y long-run, commit `b2a07e0b69c0849bb70d97b5526a4e98270b30ae`.
