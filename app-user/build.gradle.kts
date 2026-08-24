@@ -59,9 +59,14 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 328
+            versionCode = 331
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "true")
+            ndk {
+                // 09A packages the pinned feasibility engine for every ABI it
+                // builds; product ABI policy remains a later release decision.
+                abiFilters += listOf("x86", "x86_64")
+            }
         }
         create("beta") {
             dimension = "distribution"

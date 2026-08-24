@@ -38,6 +38,8 @@ import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
 import com.contentfilter.feature.vpn.policy.VpnPolicyState
 import com.contentfilter.feature.vpn.search.SearchProtectionSignals
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
+import com.contentfilter.feature.vpn.transport.VpnPacketDispatcher
+import com.contentfilter.feature.vpn.transport.VpnTransportGate09A
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -51,11 +53,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.net.InetAddress
 import java.net.Socket
 import javax.inject.Inject
@@ -99,6 +97,8 @@ class FilterVpnService : VpnService() {
     private var appliedDomainListVersion: Long? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
     private var connectionOwnerDiagnostics: VpnConnectionOwnerDiagnostics? = null
+    private var packetDispatcher: VpnPacketDispatcher? = null
+    private var transportGate09A: VpnTransportGate09A? = null
 
     @Volatile
     private var lastBlockedDestinationInvalidationAtMillis: Long? = null
@@ -118,6 +118,8 @@ class FilterVpnService : VpnService() {
             ActionStop -> stopVpn(StopReasonApp)
             ActionReconnect -> reconnectVpn(intent?.getStringExtra(ExtraReconnectKey))
             ActionDevLabRoutesChanged -> refreshDevLabRoutes()
+            ActionDevTransportStatus -> logDevTransportStatus()
+            ActionDevTransportStress -> runDevTransportStress(intent?.getIntExtra(ExtraStressCycles, 0) ?: 0)
             else -> startVpn()
         }
         return START_STICKY
@@ -170,8 +172,27 @@ class FilterVpnService : VpnService() {
                     )
                     val establishedInterface = requireNotNull(establishVpn()) { "VPN establish returned null." }
                     vpnInterface = establishedInterface
-                    connectionOwnerDiagnostics =
+                    val dispatcher = VpnPacketDispatcher(establishedInterface)
+                    packetDispatcher = dispatcher
+                    transportGate09A =
                         if (ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService)) {
+                            val controlledAddresses =
+                                ChromePhotosDataPlaneLabVpnPolicy.routes(this@FilterVpnService)
+                                    .mapTo(linkedSetOf()) { route -> route.address }
+                            VpnTransportGate09A.start(
+                                vpnService = this@FilterVpnService,
+                                scope = scope,
+                                allowedAddresses = controlledAddresses,
+                                writeToTun = dispatcher::writePacket,
+                            )
+                        } else {
+                            null
+                        }
+                    connectionOwnerDiagnostics =
+                        if (
+                            ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService) &&
+                            transportGate09A == null
+                        ) {
                             VpnConnectionOwnerDiagnostics.create(this@FilterVpnService)
                         } else {
                             null
@@ -190,7 +211,7 @@ class FilterVpnService : VpnService() {
                     VpnController.markStarted(this@FilterVpnService)
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
-                    readPackets(establishedInterface)
+                    readPackets(dispatcher)
                 } catch (exception: CancellationException) {
                     connectionBarrier?.close()
                     throw exception
@@ -234,6 +255,39 @@ class FilterVpnService : VpnService() {
         if (!DevProtectionMode.isAvailable(this)) return
         cleanup()
         startVpn()
+    }
+
+    private fun logDevTransportStatus() {
+        if (!DevProtectionMode.isAvailable(this)) return
+        val metrics = transportGate09A?.metrics()
+        if (metrics == null) {
+            Log.i(TransportLogTag, "status=inactive")
+            return
+        }
+        Log.i(
+            TransportLogTag,
+            "status=active generation=${metrics.generation} bridge=${metrics.packetSocketType.name.lowercase()} " +
+                "queuePeak=${metrics.queuePeak} queueDrops=${metrics.queueDrops} " +
+                "forwarded=${metrics.forwardedPackets} returned=${metrics.returnedPackets} " +
+                "chromeTcpDrops=${metrics.chromeTcpDrops} chromeUdpDrops=${metrics.chromeUdpDrops} " +
+                "unknownDrops=${metrics.unknownOwnerDrops} recursion=${metrics.recursionPackets} " +
+                "hevTxPackets=${metrics.hev.txPackets} hevRxPackets=${metrics.hev.rxPackets} " +
+                "socksTcp=${metrics.socks.tcpConnects} socksUdp=${metrics.socks.udpDatagrams} " +
+                "protectFailures=${metrics.protectedSockets.protectFailures}",
+        )
+    }
+
+    private fun runDevTransportStress(cycles: Int) {
+        if (!DevProtectionMode.isAvailable(this) || cycles !in 1..MaximumDevStressCycles) return
+        serviceScope?.launch {
+            val result = runCatching { transportGate09A?.runNativeStress(cycles) ?: 0 }
+            Log.i(
+                TransportLogTag,
+                "stress=${if (result.isSuccess) "complete" else "failed"} " +
+                    "cycles=${result.getOrDefault(0)} error=${result.exceptionOrNull()?.javaClass?.simpleName ?: "none"}",
+            )
+            logDevTransportStatus()
+        }
     }
 
     @Synchronized
@@ -454,11 +508,8 @@ class FilterVpnService : VpnService() {
         return linkProperties?.dnsServers.orEmpty()
     }
 
-    private suspend fun readPackets(interfaceDescriptor: ParcelFileDescriptor) =
+    private suspend fun readPackets(dispatcher: VpnPacketDispatcher) =
         withContext(Dispatchers.IO) {
-            val input = FileInputStream(interfaceDescriptor.fileDescriptor)
-            val output = FileOutputStream(interfaceDescriptor.fileDescriptor)
-            val outputMutex = Mutex()
             val telemetryDispatcher =
                 BoundedDnsRequestDispatcher<suspend () -> Unit>(
                     scope = this,
@@ -474,24 +525,19 @@ class FilterVpnService : VpnService() {
                     scope = this,
                     workerCount = DnsWorkerCount,
                     queueCapacity = DnsQueueCapacity,
-                    handler = { question -> handleDnsQuestion(question, output, outputMutex, telemetryDispatcher) },
+                    handler = { question -> handleDnsQuestion(question, dispatcher, telemetryDispatcher) },
                     onFailure = { exception ->
                         Log.w(LogTag, "DNS request failed: ${exception.javaClass.simpleName}")
                     },
                 )
-            val buffer = ByteArray(PacketBufferSize)
             try {
-                while (isActive) {
-                    val length = runCatching { input.read(buffer) }.getOrDefault(NoBytesRead)
-                    if (length > 0) {
-                        enqueuePacket(buffer, length, requestDispatcher, telemetryDispatcher)
-                    }
+                dispatcher.readLoop { buffer, length ->
+                    enqueuePacket(buffer, length, requestDispatcher, telemetryDispatcher)
                 }
             } finally {
                 requestDispatcher.cancel()
                 telemetryDispatcher.cancel()
-                input.close()
-                output.close()
+                dispatcher.close()
             }
         }
 
@@ -502,6 +548,7 @@ class FilterVpnService : VpnService() {
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
+        if (transportGate09A?.submitIfTransport(packet, length) == true) return
         connectionOwnerDiagnostics?.observe(packet, length)
         when (val parsed = parser.parse(packet, length)) {
             is DnsParseResult.Parsed -> {
@@ -514,8 +561,7 @@ class FilterVpnService : VpnService() {
 
     private suspend fun handleDnsQuestion(
         question: DnsQuestion,
-        output: FileOutputStream,
-        outputMutex: Mutex,
+        packetWriter: VpnPacketDispatcher,
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
@@ -532,7 +578,7 @@ class FilterVpnService : VpnService() {
                 } else {
                     responseFactory.safeSearchAddressPacket(question, addresses)
                 }
-            writeResponse(output, outputMutex, packet)
+            writeResponse(packetWriter, packet)
             Log.i(LogTag, "Chrome Photos DEV fixture DNS mapped type=${question.type} localOnly=true")
             return
         }
@@ -558,12 +604,11 @@ class FilterVpnService : VpnService() {
                         target = safeSearchTarget,
                         engineId = searchEngine?.id ?: "unknown",
                         policyRevision = state.snapshot.version,
-                        output = output,
-                        outputMutex = outputMutex,
+                        packetWriter = packetWriter,
                         telemetryDispatcher = telemetryDispatcher,
                     )
                 } else {
-                    forwardDns(question, output, outputMutex)
+                    forwardDns(question, packetWriter)
                 }
             }
             is PolicyDecision.GrantExtraTime -> {
@@ -573,7 +618,7 @@ class FilterVpnService : VpnService() {
                     "DNS decision=grant snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
-                forwardDns(question, output, outputMutex)
+                forwardDns(question, packetWriter)
             }
             is PolicyDecision.Block,
             is PolicyDecision.RequestAuthorization,
@@ -587,7 +632,7 @@ class FilterVpnService : VpnService() {
                 if (decision is PolicyDecision.Block && blockedDestinationRoutes.beginPreparation(domain)) {
                     scheduleBlockedDestinationPreparation(domain, question, state)
                 }
-                writeResponse(output, outputMutex, responseFactory.nxdomainPacket(question))
+                writeResponse(packetWriter, responseFactory.nxdomainPacket(question))
             }
             is PolicyDecision.HealthWarning,
             is PolicyDecision.RequireActivation,
@@ -595,12 +640,12 @@ class FilterVpnService : VpnService() {
             -> {
                 logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
-                forwardDns(question, output, outputMutex)
+                forwardDns(question, packetWriter)
             }
             is PolicyDecision.Warn -> {
                 logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
-                forwardDns(question, output, outputMutex)
+                forwardDns(question, packetWriter)
             }
         }
     }
@@ -610,12 +655,11 @@ class FilterVpnService : VpnService() {
         target: String,
         engineId: String,
         policyRevision: Long,
-        output: FileOutputStream,
-        outputMutex: Mutex,
+        packetWriter: VpnPacketDispatcher,
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (!safeSearchAddressResolver.supports(question.type)) {
-            writeResponse(output, outputMutex, responseFactory.noDataPacket(question))
+            writeResponse(packetWriter, responseFactory.noDataPacket(question))
             reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
             return
         }
@@ -629,7 +673,7 @@ class FilterVpnService : VpnService() {
         if (addresses.isEmpty()) {
             Log.w(LogTag, "SafeSearch DNS target address unavailable engine=$engineId type=${question.type}")
         }
-        writeResponse(output, outputMutex, responseFactory.safeSearchAddressPacket(question, addresses))
+        writeResponse(packetWriter, responseFactory.safeSearchAddressPacket(question, addresses))
         reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
     }
 
@@ -677,19 +721,18 @@ class FilterVpnService : VpnService() {
 
     private suspend fun forwardDns(
         question: DnsQuestion,
-        output: FileOutputStream,
-        outputMutex: Mutex,
+        packetWriter: VpnPacketDispatcher,
     ) {
         runCatching {
             val responsePayload = dnsForwarder.forward(question.queryPayload, upstreamDnsServers)
             if (responsePayload != null) {
-                writeResponse(output, outputMutex, responseFactory.responsePacket(question, responsePayload))
+                writeResponse(packetWriter, responseFactory.responsePacket(question, responsePayload))
             } else {
                 Log.w(
                     LogTag,
                     "DNS forward failed upstream=${upstreamDnsServers.safeAddresses()}",
                 )
-                writeResponse(output, outputMutex, responseFactory.servfailPacket(question))
+                writeResponse(packetWriter, responseFactory.servfailPacket(question))
             }
         }.onFailure { telemetryReporter.recordError("DNS forward failed: ${it.javaClass.simpleName}") }
     }
@@ -789,12 +832,11 @@ class FilterVpnService : VpnService() {
         }
     }
 
-    private suspend fun writeResponse(
-        output: FileOutputStream,
-        outputMutex: Mutex,
+    private fun writeResponse(
+        packetWriter: VpnPacketDispatcher,
         packet: ByteArray,
     ) {
-        outputMutex.withLock { output.write(packet) }
+        packetWriter.writePacket(packet)
     }
 
     private fun reportSafeSearchApplied(
@@ -856,6 +898,10 @@ class FilterVpnService : VpnService() {
         readerJob?.cancel()
         readerJob = null
         snapshotProvider.stop()
+        transportGate09A?.close()
+        transportGate09A = null
+        packetDispatcher?.close()
+        packetDispatcher = null
         vpnInterface?.close()
         vpnInterface = null
         upstreamDnsServers = emptyList()
@@ -876,14 +922,16 @@ class FilterVpnService : VpnService() {
         const val ActionStop = "com.contentfilter.feature.vpn.STOP"
         const val ActionReconnect = "com.contentfilter.feature.vpn.RECONNECT"
         const val ActionDevLabRoutesChanged = "com.contentfilter.feature.vpn.DEV_LAB_ROUTES_CHANGED"
+        const val ActionDevTransportStatus = "com.contentfilter.feature.vpn.DEV_TRANSPORT_STATUS"
+        const val ActionDevTransportStress = "com.contentfilter.feature.vpn.DEV_TRANSPORT_STRESS"
         private const val ExtraReconnectKey = "vpn_reconnect_key"
+        const val ExtraStressCycles = "stress_cycles"
 
         private const val DefaultMtu = 1500
         private const val LocalVpnAddress = "10.8.0.2"
         private const val LocalVpnPrefixLength = 32
         private const val LocalVpnIpv6Address = "fd00:1:fd00:1::2"
         private const val LocalVpnIpv6PrefixLength = 128
-        private const val NoBytesRead = -1
         private const val ConnectionInvalidationMillis = 400L
         private const val ConnectionInvalidationRetryMillis = 100L
         private const val BlockedDestinationBatchWindowMillis = 50L
@@ -893,17 +941,18 @@ class FilterVpnService : VpnService() {
         private const val DnsQueueCapacity = 64
         private const val DnsTelemetryWorkerCount = 1
         private const val DnsTelemetryQueueCapacity = 128
-        private const val PacketBufferSize = 32 * 1024
         private const val AllIpv4Route = "0.0.0.0"
         private const val AllIpv6Route = "::"
         private const val AllTrafficPrefixLength = 0
         private const val PacketDiagnosticCooldownMillis = 5_000L
+        private const val MaximumDevStressCycles = 200
         private const val StopReasonAndroid = "android_stopped_vpn"
         private const val StopReasonApp = "app_stopped_vpn"
         private const val StopReasonDevRescue = "dev_protection_disabled"
         private const val StopReasonFailed = "vpn_failed"
         private const val StopReasonRevoked = "system_revoked_vpn"
         private const val LogTag = "FilterVpnService"
+        private const val TransportLogTag = "VpnTransport09A"
 
         private val BrowserPackageNames =
             listOf(

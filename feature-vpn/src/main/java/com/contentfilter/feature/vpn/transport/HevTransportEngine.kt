@@ -1,0 +1,147 @@
+package com.contentfilter.feature.vpn.transport
+
+import java.io.Closeable
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+
+internal data class HevTransportStopResult(
+    val joined: Boolean,
+    val nativeResult: Int?,
+)
+
+internal class HevTransportEngine(
+    private val nativeApi: HevNativeApi = HevNativeBridge,
+    private val bridgeFactory: VpnPacketBridgeFactory = AndroidVpnPacketBridge,
+) : Closeable {
+    private val lifecycleLock = Any()
+    private val running = AtomicBoolean(false)
+    private val packetWrites = AtomicLong(0)
+    private val packetWriteFailures = AtomicLong(0)
+    private val packetsReturned = AtomicLong(0)
+    private var bridge: VpnPacketBridge? = null
+    private var nativeThread: Thread? = null
+    private var responseThread: Thread? = null
+    private var nativeResult: Int? = null
+    private var configBytes: ByteArray? = null
+
+    fun start(
+        socksPort: Int,
+        username: String,
+        password: String,
+        onPacketFromHev: (ByteArray) -> Unit,
+    ): PacketSocketType =
+        synchronized(lifecycleLock) {
+            check(running.compareAndSet(false, true)) { "HEV transport already running" }
+            nativeResult = null
+            val openedBridge = bridgeFactory.open()
+            bridge = openedBridge
+            val config = config(socksPort, username, password).toByteArray(Charsets.UTF_8)
+            configBytes = config
+            val started = CountDownLatch(1)
+            nativeThread =
+                Thread(
+                    {
+                        started.countDown()
+                        nativeResult = nativeApi.run(config, openedBridge.engineFd)
+                        running.set(false)
+                    },
+                    "GloshHevNative09A",
+                ).also { it.start() }
+            responseThread =
+                Thread(
+                    {
+                        val buffer = ByteArray(MaximumPacketSize)
+                        while (running.get()) {
+                            val length = openedBridge.readPacket(buffer)
+                            if (length <= 0) break
+                            packetsReturned.incrementAndGet()
+                            onPacketFromHev(buffer.copyOf(length))
+                        }
+                    },
+                    "GloshHevResponse09A",
+                ).also { it.start() }
+            check(started.await(StartWaitMillis, TimeUnit.MILLISECONDS)) { "HEV thread did not start" }
+            Thread.sleep(InitializationObservationMillis)
+            check(nativeThread?.isAlive == true) { "HEV exited during initialization result=$nativeResult" }
+            openedBridge.type
+        }
+
+    fun writePacket(packet: ByteArray): Boolean {
+        if (!running.get()) return false
+        val written = bridge?.writePacket(packet) == true
+        if (written) packetWrites.incrementAndGet() else packetWriteFailures.incrementAndGet()
+        return written
+    }
+
+    fun stats(): HevNativeStats = nativeApi.stats()
+
+    fun isRunning(): Boolean = running.get() && nativeThread?.isAlive == true
+
+    fun stop(): HevTransportStopResult =
+        synchronized(lifecycleLock) {
+            val thread = nativeThread
+            if (thread == null) return@synchronized HevTransportStopResult(joined = true, nativeResult = nativeResult)
+            running.set(false)
+            runCatching { nativeApi.quit() }
+            thread.join(NativeJoinTimeoutMillis)
+            val joined = !thread.isAlive
+            // HEV does not own/close the external FD. Glosh closes it only after
+            // quit + the bounded join attempt, which also wakes the response reader.
+            bridge?.close()
+            responseThread?.join(ResponseJoinTimeoutMillis)
+            configBytes?.fill(0)
+            configBytes = null
+            bridge = null
+            nativeThread = null
+            responseThread = null
+            HevTransportStopResult(joined = joined, nativeResult = nativeResult)
+        }
+
+    fun packetWriteCount(): Long = packetWrites.get()
+
+    fun packetWriteFailureCount(): Long = packetWriteFailures.get()
+
+    fun packetReturnCount(): Long = packetsReturned.get()
+
+    override fun close() {
+        stop()
+    }
+
+    private fun config(
+        socksPort: Int,
+        username: String,
+        password: String,
+    ): String =
+        """
+        tunnel:
+          name: tun0
+          mtu: 1500
+          multi-queue: false
+          ipv4: 10.8.0.2
+          ipv6: 'fd00:1:fd00:1::2'
+          icmp: 'off'
+        socks5:
+          port: $socksPort
+          address: 127.0.0.1
+          udp: 'udp'
+          username: '$username'
+          password: '$password'
+        misc:
+          max-session-count: 64
+          connect-timeout: 5000
+          tcp-read-write-timeout: 30000
+          udp-read-write-timeout: 10000
+          log-file: null
+          log-level: warn
+        """.trimIndent()
+
+    private companion object {
+        const val MaximumPacketSize = 32 * 1024
+        const val StartWaitMillis = 1_000L
+        const val InitializationObservationMillis = 20L
+        const val NativeJoinTimeoutMillis = 5_000L
+        const val ResponseJoinTimeoutMillis = 1_000L
+    }
+}

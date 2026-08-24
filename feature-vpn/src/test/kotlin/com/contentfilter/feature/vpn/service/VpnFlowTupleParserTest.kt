@@ -24,7 +24,7 @@ class VpnFlowTupleParserTest {
             requireNotNull(
                 VpnFlowTupleParser.parse(
                     ipv4Packet(protocol = 17, sourcePort = 52_002, destinationPort = 53),
-                    24,
+                    ipv4Packet(protocol = 17, sourcePort = 52_002, destinationPort = 53).size,
                 ),
             )
 
@@ -47,8 +47,9 @@ class VpnFlowTupleParserTest {
         sourcePort: Int,
         destinationPort: Int,
     ): ByteArray =
-        ByteArray(24).apply {
+        ByteArray(if (protocol == 6) 40 else 28).apply {
             this[0] = 0x45
+            writeUInt16(offset = 2, value = size)
             this[9] = protocol.toByte()
             this[12] = 10
             this[13] = 8

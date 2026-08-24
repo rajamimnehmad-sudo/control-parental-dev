@@ -18,6 +18,8 @@
                 <action android:name="com.contentfilter.user.chromedataplane.command.START" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.STOP" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.STATUS" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.TRANSPORT_STATUS" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.TRANSPORT_STRESS" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

@@ -27,6 +27,22 @@ object VpnController {
         context.startService(serviceIntent(context, FilterVpnService.ActionDevLabRoutesChanged))
     }
 
+    fun logDevTransportStatus(context: Context) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(serviceIntent(context, FilterVpnService.ActionDevTransportStatus))
+    }
+
+    fun runDevTransportStress(
+        context: Context,
+        cycles: Int,
+    ) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(
+            serviceIntent(context, FilterVpnService.ActionDevTransportStress)
+                .putExtra(FilterVpnService.ExtraStressCycles, cycles),
+        )
+    }
+
     fun disableDevProtection(context: Context) {
         DevProtectionMode.setProtectionDisabled(context, true)
         stop(context)
