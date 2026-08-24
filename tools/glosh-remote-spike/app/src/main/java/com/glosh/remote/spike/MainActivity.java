@@ -57,15 +57,32 @@ public final class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        consumeJoinIntent(intent);
+        if (!renderActiveSessionState()) {
+            consumeJoinIntent(intent);
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if (sessionStarted) {
+        renderActiveSessionState();
+    }
+
+    private boolean renderActiveSessionState() {
+        RemotePairingService.SessionState state = RemotePairingService.getSessionState();
+        if (state == RemotePairingService.SessionState.CONNECTED) {
+            sessionStarted = true;
+            showConnectedState();
+            return true;
+        } else if (state == RemotePairingService.SessionState.PREPARING) {
+            sessionStarted = true;
             showSessionStartedState();
+            return true;
+        } else if (sessionStarted) {
+            sessionStarted = false;
+            showIdleState();
         }
+        return false;
     }
 
     @Override
@@ -202,6 +219,9 @@ public final class MainActivity extends Activity {
     }
 
     private void requestConnection() {
+        if (renderActiveSessionState()) {
+            return;
+        }
         String raw = pendingJoinUri;
         if (raw == null) {
             raw = readValidJoinFromClipboard();
@@ -346,6 +366,21 @@ public final class MainActivity extends Activity {
         setStatus(
                 "Preparando la conexión…\n\n"
                         + "Ahora activá Depuración inalámbrica y elegí “Emparejar dispositivo con código”.");
+    }
+
+    private void showConnectedState() {
+        manualSection.setVisibility(View.GONE);
+        connectButton.setVisibility(View.GONE);
+        cancelButton.setVisibility(View.VISIBLE);
+        setStatus("¡Listo, Glosher! Soporte ya está conectado de forma segura.");
+    }
+
+    private void showIdleState() {
+        manualSection.setVisibility(View.GONE);
+        connectButton.setText("Empezar");
+        connectButton.setVisibility(View.VISIBLE);
+        cancelButton.setVisibility(View.GONE);
+        statusView.setVisibility(View.GONE);
     }
 
     private void openWirelessDebuggingSettings() {

@@ -34,6 +34,12 @@ import io.github.muntashirakon.adb.android.AdbMdns;
  * After pairing, the service connects to the technician relay automatically.
  */
 public final class RemotePairingService extends Service {
+    public enum SessionState {
+        IDLE,
+        PREPARING,
+        CONNECTED
+    }
+
     public static final String ACTION_START = "com.glosh.remote.spike.START";
     public static final String ACTION_REPLY = "com.glosh.remote.spike.REPLY";
     public static final String ACTION_STOP = "com.glosh.remote.spike.STOP";
@@ -49,6 +55,7 @@ public final class RemotePairingService extends Service {
     private static final int REQUEST_REPLY = 7411;
     private static final int REQUEST_STOP = 7412;
     private static final long CONNECT_TIMEOUT_MS = 15_000;
+    private static volatile SessionState sessionState = SessionState.IDLE;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final AtomicBoolean pairingInProgress = new AtomicBoolean(false);
@@ -59,6 +66,10 @@ public final class RemotePairingService extends Service {
     private WifiManager.MulticastLock multicastLock;
     private RelayClient relayClient;
     private String joinUri;
+
+    public static SessionState getSessionState() {
+        return sessionState;
+    }
 
     @Override
     public void onCreate() {
@@ -81,13 +92,18 @@ public final class RemotePairingService extends Service {
             return START_NOT_STICKY;
         }
 
+        String action = intent.getAction();
+        if (ACTION_START.equals(action) && sessionState != SessionState.IDLE) {
+            intent.removeExtra(EXTRA_JOIN_URI);
+            return START_NOT_STICKY;
+        }
+
         startForeground(
                 NOTIFICATION_ID,
                 statusNotification(
                         "Glosh · Preparando tu conexión",
                         "Abrí Depuración inalámbrica y elegí “Emparejar con código”."));
 
-        String action = intent.getAction();
         if (ACTION_STOP.equals(action)) {
             finishSession("Conexión cerrada", "El acceso temporal terminó correctamente.");
             return START_NOT_STICKY;
@@ -116,6 +132,7 @@ public final class RemotePairingService extends Service {
 
     @Override
     public void onDestroy() {
+        sessionState = SessionState.IDLE;
         cleanupRuntime();
         executor.shutdownNow();
         super.onDestroy();
@@ -134,6 +151,7 @@ public final class RemotePairingService extends Service {
         try {
             JoinDescriptor check = JoinDescriptor.parse(rawJoin);
             check.destroy();
+            sessionState = SessionState.PREPARING;
             joinUri = rawJoin;
             AdbConnectionManager.getInstance(getApplicationContext());
         } catch (Throwable error) {
@@ -257,6 +275,7 @@ public final class RemotePairingService extends Service {
                 @Override
                 public void onAuthenticated() {
                     if (!ending.get()) {
+                        sessionState = SessionState.CONNECTED;
                         updateForeground(
                                 "¡Listo, Glosher!",
                                 "Soporte ya está conectado de forma segura.");
@@ -296,6 +315,7 @@ public final class RemotePairingService extends Service {
         if (!ending.compareAndSet(false, true)) {
             return;
         }
+        sessionState = SessionState.IDLE;
         cleanupRuntime();
         stopForeground(STOP_FOREGROUND_REMOVE);
 
