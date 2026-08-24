@@ -1,6 +1,6 @@
 # Glosh Remote — Supabase broker status
 
-Updated: 2026-08-24 06:34 ART
+Updated: 2026-08-24 06:43 ART
 
 ## REMOTE-INSTALL-NOLINK-GUIDED-03A
 
@@ -10,7 +10,7 @@ Updated: 2026-08-24 06:34 ART
 
 ## REMOTE-SESSION-BROKER-SUPABASE-01
 
-Status: IN PROGRESS / backend deployed, pending live HTTP + Android/Mac integration gate.
+Status: IN PROGRESS / backend v2 deployed, pending live HTTP + Android/Mac integration gate.
 
 Supabase project: `syeycayasyufedwoprea`.
 
@@ -26,14 +26,19 @@ Security:
 - Operator credential is stored only as SHA-256; raw operator key is intended to live only on the operator Mac.
 - Phone requests use per-request nonce hashing, short TTL, explicit operator acceptance, single-use claim and revocation.
 - Broker stores only ciphertext for the sealed session material, never the join/session key in clear.
+- v2 adds `seal_context_sha256 = SHA-256(request_id + ':' + nonce)` so the operator can bind RSA-OAEP sealing to request+nonce without receiving the raw phone nonce.
 
 Edge Function deployed:
 - slug: `glosh-remote-broker`
+- current version: 2 / ACTIVE.
 - verify_jwt: false by design because phone entry is public; operator actions require custom `x-glosh-operator-key` authentication.
 - endpoint: `https://syeycayasyufedwoprea.supabase.co/functions/v1/glosh-remote-broker`
+- public actions: `discover`, `request`, `poll`, `claim`, `revoke`.
+- operator actions: `operator_open`, `operator_list`, `operator_accept`, `operator_revoke`, `operator_close`.
 
 Backend checks completed:
 - migration `glosh_remote_broker_v1` applied successfully.
+- migration `glosh_remote_broker_seal_context_v2` applied successfully.
 - RLS/privilege check PASS: anon=false, authenticated=false, service_role=true.
 - transactional schema lifecycle test PASS and ROLLBACK confirmed with zero test rows.
 - security advisor only reports the intentional INFO `RLS enabled, no policy` for these broker tables; no new broker-specific WARN finding.
@@ -45,4 +50,4 @@ Pending before final PASS:
 4. Physical no-link flow: operator opens support window → Android taps Connect → request appears → explicit accept → sealed descriptor claim → Wireless Debugging wizard → 6-digit pairing → authenticated agent → revoke/cancel.
 5. Cross-network physical validation remains required before closing `REMOTE-INSTALL-CONNECTION-00`.
 
-No Chrome, GloshIA, DAG, App Usuario/Admin or existing Edge Function was modified.
+No Chrome, GloshIA, DAG, App Usuario/Admin or pre-existing Edge Function was modified.
