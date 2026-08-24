@@ -1,0 +1,92 @@
+{
+  "task_id": "REMOTE-INSTALL-LIVE-GUIDE-V2-04",
+  "status": "PRE_CODEX_REFERENCE_COMPLETE",
+  "prototype_tests": "30/30 PASS",
+  "authoritative_local_head_to_verify": "93735b1c2a9f493dcd491556b23920c50c3d66f2",
+  "files": {
+    "ACCEPTANCE_GATES.md": {
+      "sha256": "eacd65660a01d48ad951935ffb38c49d25b2df5847dda56cf73e8831d5aea4d8",
+      "size": 2561
+    },
+    "ANDROID_PORTING_CONTRACT.md": {
+      "sha256": "59675fe9ff7186169fe43119c6935a3dfcecf20b1fa6511a4cf38cfe6d732c1f",
+      "size": 4788
+    },
+    "CODEX_REMOTE_INSTALL_LIVE_GUIDE_V2_04.md": {
+      "sha256": "fc833757a831981cf33602e15c9334be814849dd64ede1d70bd3cfec07aee717",
+      "size": 9622
+    },
+    "GLOSH_REMOTE_LIVE_GUIDE_PRO_AUDIT.md": {
+      "sha256": "61157a793f6736ed763ebec96abd6a890d45d661f7b8265a4d84f848fac72acd",
+      "size": 6309
+    },
+    "README.md": {
+      "sha256": "fb46b9a722720ca3faf1d5068669b3391da4cbd7c3d7a4e494e2fba3e62b4482",
+      "size": 1561
+    },
+    "fixtures/samsung_s22_es.json": {
+      "sha256": "c0bc2ab22c3dff7028c9b8ab0a59809193bdf5e7db191ce6aa44abb368e38eac",
+      "size": 1788
+    },
+    "glosh_live_guide/__init__.py": {
+      "sha256": "5e5fc39d5d558a2b2581c4bc637b914c8219ffcdf542be480e102ff7df401743",
+      "size": 912
+    },
+    "glosh_live_guide/generation.py": {
+      "sha256": "a988f075399d988a949f0612343abd199423f07ee0defb8fdbca8fd56532f337",
+      "size": 739
+    },
+    "glosh_live_guide/matcher.py": {
+      "sha256": "7945d805cb416b1c674bf79218b7127c1112df3c0598be9b6d40a4e9aa3af42a",
+      "size": 4882
+    },
+    "glosh_live_guide/models.py": {
+      "sha256": "7fe34b225c989ea8b5e4647db6dc5ec20109c75fb6309feaf9225aae83036202",
+      "size": 3267
+    },
+    "glosh_live_guide/recipes.py": {
+      "sha256": "21341ec3790a197a5ceb0e602370889dcdf80270906c9179dee29f0822aea660",
+      "size": 5205
+    },
+    "glosh_live_guide/scroll_policy.py": {
+      "sha256": "0e9050052f1364bb863f6b203676f24863f0cdcbb34867e61b27fc24eacee32a",
+      "size": 3230
+    },
+    "glosh_live_guide/stability.py": {
+      "sha256": "a74d53e91e600255a5923f518d497056125c5ae57964c37dce082fe37eafefdf",
+      "size": 1248
+    },
+    "glosh_live_guide/state_machine.py": {
+      "sha256": "0af7a9f8a6dfaf8b5de8a0e706cdc27e5dc83e72fb9e8628ee9343d7fa122c1d",
+      "size": 3076
+    },
+    "glosh_live_guide/telemetry.py": {
+      "sha256": "6032ee769fbd4da4d1d5071d2a0826d01b7f0ddc162cda01eb38db20d7b8e870",
+      "size": 594
+    },
+    "glosh_live_guide/text.py": {
+      "sha256": "952c3b1ad414c352ab83973a46a5839b9854536df6cba85ad22ad7c983cd415f",
+      "size": 672
+    },
+    "glosh_live_guide/window_selector.py": {
+      "sha256": "b1c35ec4d16f9e0b89bd7242235c13998aebc53274839fee04ecb17e005fb63f",
+      "size": 1404
+    },
+    "prototype.html": {
+      "sha256": "3afd6bda5c15f1767b15903e0909cae92e93220d6e931ba32fbe18583dd60154",
+      "size": 9530
+    },
+    "tests/test_engine.py": {
+      "sha256": "731474b5e34fe30c03bd15b1d3e1b73668d1d9f13058e918d6e407be9c6bd8ef",
+      "size": 8620
+    },
+    "tests/test_samsung_fixture.py": {
+      "sha256": "b7c91f2863bb55b89de9a4a7f110484782a0f2931a9a81b6a484f3d1b5b7714f",
+      "size": 3028
+    },
+    "tests/test_state.py": {
+      "sha256": "90c1089c17a02ac5b27cb5a71ff1f9128e0d104f6f55350a63535d711972e885",
+      "size": 3978
+    }
+  }
+}
