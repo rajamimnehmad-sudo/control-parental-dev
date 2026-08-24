@@ -2,7 +2,7 @@ package reference.autopilot
 
 enum class Confidence { LOW, MEDIUM, HIGH }
 enum class Screen { UNKNOWN, APP, SETTINGS_HOME, ABOUT_PHONE, SOFTWARE_INFO, DEVELOPER_OPTIONS, WIRELESS_DEBUGGING, NETWORK_CONFIRMATION, PAIRING_DIALOG, CREDENTIAL_PROMPT }
-enum class Action { WAIT_STABLE, ASK_ENABLE_ACCESSIBILITY, UNSUPPORTED_ANDROID, OPEN_DEVELOPER_SETTINGS, OPEN_DEVICE_INFO_SETTINGS, CLICK_SOFTWARE_INFO, CLICK_BUILD_NUMBER, WAIT_USER_CREDENTIAL, CLICK_WIRELESS_DEBUGGING, ENABLE_WIRELESS_DEBUGGING, ACCEPT_NETWORK_CONFIRMATION, CLICK_PAIR_WITH_CODE, AUTO_PAIR_WITH_CODE, SHOW_MANUAL_PAIR_CODE, CONNECT_SUPPORT, FALLBACK_GUIDE, DONE }
+enum class Action { WAIT_STABLE, ASK_ALLOW_RESTRICTED_SETTINGS, ASK_ENABLE_ACCESSIBILITY, ASK_CONNECT_WIFI, TRY_ADB_RECONNECT, POLICY_BLOCKED, UNSUPPORTED_ANDROID, OPEN_DEVELOPER_SETTINGS, OPEN_DEVICE_INFO_SETTINGS, CLICK_SOFTWARE_INFO, CLICK_BUILD_NUMBER, WAIT_USER_CREDENTIAL, CLICK_WIRELESS_DEBUGGING, ENABLE_WIRELESS_DEBUGGING, ACCEPT_NETWORK_CONFIRMATION, CLICK_PAIR_WITH_CODE, AUTO_PAIR_WITH_CODE, SHOW_MANUAL_PAIR_CODE, CONNECT_SUPPORT, FALLBACK_GUIDE, DONE }
 
 data class SnapshotAuthority(
     val trustedSettingsWindow: Boolean,
@@ -32,6 +32,11 @@ data class Observation(
     val accessibilityEnabled: Boolean,
     val adbConnected: Boolean = false,
     val supportConnected: Boolean = false,
+    val restrictedSettingsRequired: Boolean = false,
+    val wifiReady: Boolean = true,
+    val wirelessPolicyBlocked: Boolean = false,
+    val previousPairingKnown: Boolean = false,
+    val reconnectAttempted: Boolean = false,
     val screen: Screen = Screen.UNKNOWN,
     val authority: SnapshotAuthority? = null,
     val candidate: Candidate? = null,
@@ -53,7 +58,11 @@ class AdaptiveAutopilotPlanner {
         if (o.supportConnected) return Decision(Action.DONE, reason = "support already connected")
         if (o.adbConnected) return Decision(Action.CONNECT_SUPPORT, reason = "ADB already valid; skip Settings/pairing")
         if (o.androidApi < MIN_WIRELESS_ADB_API) return Decision(Action.UNSUPPORTED_ANDROID, reason = "Android <11 standard wireless path unsupported")
+        if (!o.accessibilityEnabled && o.restrictedSettingsRequired) return Decision(Action.ASK_ALLOW_RESTRICTED_SETTINGS, reason = "sideloaded Accessibility is restricted by OS")
         if (!o.accessibilityEnabled) return Decision(Action.ASK_ENABLE_ACCESSIBILITY, reason = "manual bootstrap prerequisite")
+        if (!o.wifiReady) return Decision(Action.ASK_CONNECT_WIFI, reason = "Wireless Debugging needs a usable Wi-Fi network")
+        if (o.wirelessPolicyBlocked) return Decision(Action.POLICY_BLOCKED, reason = "Wireless Debugging disabled by device/admin policy")
+        if (o.previousPairingKnown && !o.reconnectAttempted) return Decision(Action.TRY_ADB_RECONNECT, reason = "reuse previous pairing before opening Settings")
         if (o.screen == Screen.CREDENTIAL_PROMPT) return Decision(Action.WAIT_USER_CREDENTIAL, reason = "never automate device credential")
 
         if (o.screen == Screen.PAIRING_DIALOG) {
