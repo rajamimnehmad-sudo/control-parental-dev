@@ -1,16 +1,15 @@
 # Glosh Remote — Supabase broker status
 
-Updated: 2026-08-24 07:40 ART
+Updated: 2026-08-24 09:23 ART
 
 ## REMOTE-INSTALL-NOLINK-GUIDED-03A
 
-- UX/wizard local candidate remains PASS FINAL ChatGPT at local HEAD `5af84ca4aa3701f91606ef61957f6494d90b3b94`.
-- APK candidate historical: `GloshRemote-NoLink-Guided-03A.apk`, SHA-256 `a9e52ab9747e5858601e67c27f0622b680940919f4ff9f26ae7dc13c1b53f0e6`.
-- Superseded for live no-link testing by the Supabase-integrated APK below.
+- UX/wizard local candidate PASS FINAL ChatGPT at local HEAD `5af84ca4aa3701f91606ef61957f6494d90b3b94`.
+- Superseded for live no-link testing by the Supabase-integrated candidate below.
 
 ## REMOTE-SESSION-BROKER-SUPABASE-01
 
-Status: PASS TÉCNICO REVISADO POR CHATGPT / PENDIENTE ROTACIÓN DE CREDENCIAL + GATE FÍSICO NO-LINK.
+Status: PASS TÉCNICO + PASS FÍSICO NO-LINK.
 
 Supabase project: `syeycayasyufedwoprea`.
 
@@ -19,43 +18,49 @@ Backend deployed:
 - Endpoint: `https://syeycayasyufedwoprea.supabase.co/functions/v1/glosh-remote-broker`.
 - Database objects: `public.glosh_remote_broker_config`, `public.glosh_remote_support_windows`, `public.glosh_remote_support_requests`.
 - RLS enabled; anon/authenticated have no direct table access; service_role only for broker CRUD.
-- Operator credential stored only as SHA-256; raw operator key is intended to remain only on operator Mac.
 - Requests use nonce hashing, short TTL, explicit acceptance, single-use claim, revocation and anti-replay.
 - Broker stores ciphertext only, never join/session key plaintext.
 - `seal_context_sha256 = SHA-256(request_id + ':' + nonce)` preserves request+nonce binding without exposing raw nonce to operator.
 
 Local integration PASS and ChatGPT diff review PASS:
-- HEAD inicial `5af84ca4aa3701f91606ef61957f6494d90b3b94`.
-- HEAD final / local commit `a2ff10744d9c867087f3747ceb9f587b42a96861` (`feat(remote): connect no-link flow to Supabase broker`).
-- Worktree clean; 10 changed files all under `tools/glosh-remote-spike/**`.
-- Android client migrated to POST `discover/request/poll/claim/revoke`.
-- Mac client migrated to `operator_open/list/accept/revoke/close`.
-- RSA-3072 / OAEP-SHA256 V2 bound to `SHA-256(request_id + ':' + nonce)`; Android recomputes binding locally before accepting descriptor.
-- Diff review found no code blocker for DEV physical gate. Legacy V1 sealed-session compatibility remains only as compatibility path.
-- HTTP live gate from Mac PASS: unauth operator_open=401; authenticated operator_open=201; discover available=true; synthetic request=201; operator_list returns metadata/public key/seal_context and no raw nonce; seal context local match exact; operator_accept=200; poll accepted; claim=200; local decrypt/JoinDescriptor PASS; second claim=409 already_claimed; operator_revoke=200; poll revoked; operator_close=200; discover available=false.
-- Integrated Mac broker client gate PASS.
-- Android tests 17/17 PASS; Python/protocol/broker 6/6 PASS; lintDebug PASS 0 errors / 18 pre-existing warnings; assembleDebug PASS.
-- Operator key scan PASS: not present in Git or APK.
-- Public endpoint confirmed embedded in APK.
+- Base local `5af84ca4aa3701f91606ef61957f6494d90b3b94`.
+- Supabase integration commit `a2ff10744d9c867087f3747ceb9f587b42a96861` (`feat(remote): connect no-link flow to Supabase broker`).
+- Android client POST `discover/request/poll/claim/revoke` and Mac client `operator_open/list/accept/revoke/close`.
+- RSA-3072 / OAEP-SHA256 V2 bound to `SHA-256(request_id + ':' + nonce)`.
+- HTTP live gate from Mac PASS end-to-end, including 401 without operator key, explicit accept, ciphertext-only broker, local decrypt, second claim 409, revoke and close.
 
-Security action before physical gate:
-- The raw operator credential used during setup was exposed in the private chat transcript while coordinating the gate. Treat it as compromised and rotate it before any further live physical session.
-- Current Supabase check at 07:40 ART: `open_windows=0`, `active_requests=0`; nothing remains waiting or connected at the broker.
-- Rotation procedure: Codex generates a fresh random operator key locally on the Mac, keeps raw value only in a mode-600 local temp file/environment, and returns only its SHA-256 to ChatGPT; ChatGPT updates only `glosh_remote_broker_config.value_sha256`. Do not paste the raw replacement key into chat or Git.
+Physical no-link gate PASS:
+- Final local HEAD `475bd35b2934f9dca1a54f0b29dc4c320eacd223`.
+- Local commit `fix(remote): renew expired support requests`.
+- Worktree clean.
+- APK `GloshRemote-NoLink-Retry-DEV.apk`.
+- Size `19,061,222` bytes.
+- SHA-256 `5448e97dc458e3770a0ca82fe18e3124a7fcbad0034a1a72dbd5b74c537fbc3b`.
+- Device Samsung SM-S908E / Android 16 / SDK 36.
+- User clarified after the handoff that the physical run was performed with Mac and S22 on different Wi-Fi networks. Treat as cross-network PASS provided they were independent networks/LANs and not merely two SSIDs of the same router.
+- No-link flow PASS: no link/descriptor exposed, automatic broker request PASS, explicit operator acceptance PASS, descriptor hidden from user/broker PASS.
+- Guided wizard PASS; Wireless Debugging and 6-digit pairing PASS.
+- WSS/HMAC/AES authentication PASS.
+- `ping=pong`; `whoami` contains `uid=2000(shell)`; `device` reports Samsung SM-S908E / Android 16 / SDK 36; `status` authenticated.
+- Non-allowlisted `uname` rejected.
+- UX CONNECTED PASS; Connect hidden, Cancel visible; rotation/recreation preserves CONNECTED.
+- Cancel/revoke PASS; post-cancel status has no agent; broker closed with `available=false`; relay and Quick Tunnel closed; no crash/ANR observed.
+- Glosh/Device Owner/Chrome/GloshIA were not modified.
+- Android tests 19/19 PASS; Python 6/6 PASS; lintDebug PASS; assembleDebug PASS.
 
-Current physical candidate after credential rotation:
-- APK `GloshRemote-NoLink-Supabase-DEV.apk`.
-- Path `/private/tmp/glosh-remote-install-connection-00-gate/tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-NoLink-Supabase-DEV.apk`.
-- Size `19,060,018` bytes.
-- SHA-256 `29218638299e5d21312a878ce9c578758f298e63473530798616bea2ea04ca12`.
+Timeout retry fix:
+- Expired broker requests renew with fresh identity, nonce and request ID.
+- Maximum five requests / roughly ten minutes.
+- Renewal only for `expired`; cancellation, revocation and errors remain fail-closed.
+- Unit tests PASS.
+- Full physical TTL-expiry renewal was not exercised because the accepted physical request completed immediately; this remains a narrow residual validation, not a blocker for connection PASS.
 
-Residual product risk (not a DEV gate blocker):
-- The current anonymous no-link rendezvous has no cryptographic identity for the customer before pairing. During an open support window, another Internet client could submit a spoofed request with matching manufacturer/model; explicit operator acceptance mitigates accidental connection but does not prove customer identity. This is acceptable for the controlled DEV gate, but product hardening must add an install-scoped or user-verifiable binding before general release.
+Security debt before product:
+- The operator credential used during DEV coordination was exposed in the private chat transcript. Rotation was explicitly deferred by the user for the DEV gate; rotate before product/general release.
+- Anonymous rendezvous still lacks cryptographic customer identity before pairing; explicit operator acceptance mitigates accidental connection but install-scoped/user-verifiable binding remains product hardening.
 
-Pending before final closure:
-1. Rotate operator credential without exposing the new raw key outside the Mac.
-2. Install the exact Supabase APK on S22 and run the physical no-link flow: open app → CONECTAR CON SOPORTE → operator sees request → explicit accept → sealed claim → guided Wireless Debugging → 6-digit pairing → authenticated agent → cancel/revoke.
-3. Validate UX pulse/wizard physically and no link/descriptor exposure.
-4. Then repeat the same flow cross-network (Mac and S22 on different Wi-Fi/LAN) before closing `REMOTE-INSTALL-CONNECTION-00`.
+Next route:
+- `REMOTE-INSTALL-CONNECTION-00` may close PASS if the two Wi-Fi networks were independent LANs.
+- Advance to `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: use the now-proven no-link remote ADB path to perform real Glosh installations manually/adaptively by OEM/model, with Codex scanning accounts/profiles/restrictions and documenting recipes before further automation.
 
-No Chrome, GloshIA, DAG, App Usuario/Admin or pre-existing Edge Function was modified by this integration. No push/PR/merge/deploy adicional from Codex.
+No Chrome, GloshIA, DAG, App Usuario/Admin or pre-existing Edge Function was modified by the physical gate.
