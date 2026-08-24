@@ -10,6 +10,8 @@ public class SupportFlowOrderTest {
         OnboardingState state = new OnboardingState();
         assertEquals(OnboardingState.BrokerAction.DISCOVER, state.requestSupport());
         state.supportAvailable();
+        assertEquals(OnboardingState.Step.GUIDE_PERMISSION, state.step());
+        state.guideReady();
         assertEquals(OnboardingState.Step.DEVELOPER_OPTIONS, state.step());
         assertEquals(OnboardingState.BrokerAction.REQUEST, state.developerOptionsReady());
         assertEquals(OnboardingState.Step.REQUESTING_SUPPORT, state.step());
@@ -20,6 +22,7 @@ public class SupportFlowOrderTest {
         OnboardingState state = new OnboardingState();
         state.requestSupport();
         state.supportAvailable();
+        state.guideReady();
         state.developerOptionsReady();
         state.unavailable();
         assertEquals(OnboardingState.Step.UNAVAILABLE, state.step());

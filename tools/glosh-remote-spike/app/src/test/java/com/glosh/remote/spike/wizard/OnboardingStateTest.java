@@ -13,6 +13,8 @@ public class OnboardingStateTest {
         assertEquals(OnboardingState.BrokerAction.DISCOVER, state.requestSupport());
         assertEquals(OnboardingState.Step.CHECKING_SUPPORT, state.step());
         state.supportAvailable();
+        assertEquals(OnboardingState.Step.GUIDE_PERMISSION, state.step());
+        state.guideReady();
         assertEquals(OnboardingState.Step.DEVELOPER_OPTIONS, state.step());
         assertEquals(OnboardingState.BrokerAction.REQUEST, state.developerOptionsReady());
         assertEquals(OnboardingState.Step.REQUESTING_SUPPORT, state.step());

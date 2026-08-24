@@ -15,6 +15,10 @@ public final class SettingsNavigator {
         open(activity, SettingsRoute.wirelessDebuggingActions());
     }
 
+    public void openAccessibility(Activity activity) {
+        open(activity, List.of(Settings.ACTION_ACCESSIBILITY_SETTINGS, Settings.ACTION_SETTINGS));
+    }
+
     private void open(Activity activity, List<String> actions) {
         for (String action : actions) {
             Intent intent = new Intent(action);

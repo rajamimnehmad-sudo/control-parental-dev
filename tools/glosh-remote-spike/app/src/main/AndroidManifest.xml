@@ -22,6 +22,9 @@
         <intent>
             <action android:name="android.settings.SETTINGS" />
         </intent>
+        <intent>
+            <action android:name="android.settings.ACCESSIBILITY_SETTINGS" />
+        </intent>
     </queries>
 
     <application
@@ -54,6 +57,19 @@
             android:name=".RemotePairingService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <service
+            android:name=".guide.accessibility.LiveGuideAccessibilityService"
+            android:exported="true"
+            android:label="Guía temporal de Glosh Remote"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/glosh_remote_guide_accessibility_service" />
+        </service>
     </application>
 
 </manifest>

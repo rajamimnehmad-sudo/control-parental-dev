@@ -12,6 +12,10 @@ import android.os.Looper;
 import android.view.WindowManager;
 
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
+import com.glosh.remote.spike.guide.accessibility.GuideServiceStatus;
+import com.glosh.remote.spike.guide.accessibility.SettingsPackageResolver;
+import com.glosh.remote.spike.guide.state.GuideStage;
+import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
@@ -31,6 +35,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SettingsNavigator settingsNavigator = new SettingsNavigator();
+    private final SettingsPackageResolver settingsPackageResolver = new SettingsPackageResolver();
     private final Runnable refreshState = new Runnable() {
         @Override
         public void run() {
@@ -78,6 +83,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         super.onResume();
         coordinator.attach(this);
         ui.onHostResume();
+        synchronizeGuidePermission();
         handler.removeCallbacks(refreshState);
         handler.post(refreshState);
     }
@@ -130,7 +136,8 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         }
         String key = session + ":" + pairing + ":" + step + ":"
                 + coordinator.developerPhase() + ":" + coordinator.wirelessHelp() + ":"
-                + pairingHelp;
+                + pairingHelp + ":" + GuideServiceStatus.isEnabled(this) + ":"
+                + LiveGuideRuntime.stage();
         if (key.equals(lastRenderKey)) {
             return;
         }
@@ -142,6 +149,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         } else {
             switch (step) {
                 case CHECKING_SUPPORT -> renderCheckingSupport();
+                case GUIDE_PERMISSION -> renderGuidePermission();
                 case DEVELOPER_OPTIONS -> renderDeveloperOptions();
                 case REQUESTING_SUPPORT -> renderRequestingSupport();
                 case WIRELESS_DEBUGGING -> renderWirelessDebugging();
@@ -164,6 +172,18 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 "Todavía no comenzó ninguna sesión temporal.");
         ui.clearVisual();
         ui.showSecondary("CANCELAR", view -> coordinator.reset());
+    }
+
+    private void renderGuidePermission() {
+        ui.showScreen(
+                "1 de 3 · Preparar el teléfono",
+                "PERMITÍ QUE GLOSH TE GUÍE",
+                "Durante esta configuración Glosh te va a indicar exactamente dónde tocar dentro de Ajustes.",
+                "La guía mira sólo Ajustes y se desactiva automáticamente cuando terminamos.");
+        ui.clearVisual();
+        ui.showPrimary("ACTIVAR GUÍA", view -> activateGuide(), true);
+        ui.showSecondary("CONTINUAR SIN GUÍA", view -> continueWithoutGuide());
+        ui.showTertiary("CANCELAR", view -> coordinator.reset());
     }
 
     private void renderDeveloperOptions() {
@@ -196,7 +216,8 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 "1 de 3 · Preparar el teléfono",
                 recipe.developerOptions().title(),
                 recipe.developerOptions().body(),
-                "Detectamos: " + recipe.familyLabel() + " · " + coordinator.profile().model());
+                "Detectamos: " + recipe.familyLabel() + " · " + coordinator.profile().model()
+                        + guideFallbackCopy());
         ui.showGuide(recipe.developerOptions());
         ui.showPrimary("ABRIR AJUSTES", view -> openDeveloperSettings(), true);
         ui.showSecondary("YA LO TENGO ACTIVADO", view -> coordinator.openedDeveloperSettings());
@@ -288,7 +309,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 "3 de 3 · Completado",
                 "¡Listo, Glosher!",
                 "Soporte ya está conectado de forma segura.",
-                "La conexión es temporal y podés terminarla cuando quieras.");
+                "Guía terminada ✓\n\nLa conexión es temporal y podés terminarla cuando quieras.");
         ui.clearVisual();
         ui.showSecondary("CANCELAR CONEXIÓN", view -> cancelConnection());
     }
@@ -317,6 +338,9 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         if (notificationsAllowed) {
             guideNotification.show("Paso 1 de 3", coordinator.recipe().developerOptions().help().notificationCopy());
         }
+        if (GuideServiceStatus.isEnabled(this)) {
+            LiveGuideRuntime.setStage(GuideStage.DEV_SOFTWARE_INFO);
+        }
         settingsNavigator.openAboutPhone(this);
     }
 
@@ -344,6 +368,9 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
         guideNotification.clear();
+        if (GuideServiceStatus.isEnabled(this)) {
+            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
+        }
         startForegroundService(new Intent(this, RemotePairingService.class)
                 .setAction(RemotePairingService.ACTION_START)
                 .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
@@ -356,6 +383,9 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void openWirelessDuringSession() {
+        if (GuideServiceStatus.isEnabled(this)) {
+            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
+        }
         guideNotification.show("Paso 2 de 3", coordinator.recipe().wirelessDebugging().help().notificationCopy());
         settingsNavigator.openWirelessDebugging(this);
     }
@@ -376,6 +406,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private void cancelConnection() {
         guideNotification.clear();
+        LiveGuideRuntime.reset();
         pairingHelp = false;
         coordinator.reset();
         if (RemotePairingService.getSessionState() != SessionState.IDLE) {
@@ -393,6 +424,38 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private boolean needsNotificationPermission() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void activateGuide() {
+        LiveGuideRuntime.beginPermission(
+                coordinator.profile().family(),
+                settingsPackageResolver.resolve(this));
+        settingsNavigator.openAccessibility(this);
+    }
+
+    private void continueWithoutGuide() {
+        LiveGuideRuntime.reset();
+        coordinator.guideReady();
+    }
+
+    private void synchronizeGuidePermission() {
+        if (coordinator.step() != OnboardingState.Step.GUIDE_PERMISSION) {
+            return;
+        }
+        if (GuideServiceStatus.isEnabled(this)) {
+            LiveGuideRuntime.beginPermission(
+                    coordinator.profile().family(),
+                    settingsPackageResolver.resolve(this));
+            LiveGuideRuntime.guideEnabled();
+            coordinator.guideReady();
+        }
+    }
+
+    private String guideFallbackCopy() {
+        if (LiveGuideRuntime.isActive() && !GuideServiceStatus.isEnabled(this)) {
+            return "\n\nLa guía en pantalla se desactivó. Podés continuar igual.";
+        }
+        return "";
     }
 
     private void consumeDebugIntent(Intent intent) {
