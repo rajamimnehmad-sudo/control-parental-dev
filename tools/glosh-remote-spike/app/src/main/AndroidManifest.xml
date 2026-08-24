@@ -9,6 +9,21 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <queries>
+        <intent>
+            <action android:name="android.settings.DEVICE_INFO_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.WIRELESS_DEBUGGING_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.APPLICATION_DEVELOPMENT_SETTINGS" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.SETTINGS" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="false"
         android:label="Glosh Remote"

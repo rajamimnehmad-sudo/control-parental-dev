@@ -4,10 +4,7 @@
 This is intentionally a lab tool. It binds only to localhost and asks cloudflared
 for an outbound Quick Tunnel. Commands are allowlisted action names and their
 payloads/results are encrypted end-to-end with a one-time 256-bit session key.
-
-Python 3.9+.
 """
-
 from __future__ import annotations
 
 import argparse
@@ -25,10 +22,10 @@ import urllib.parse
 import uuid
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple, Union
-
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from websockets.legacy.server import WebSocketServerProtocol, serve
-
+from broker_client import BrokerOperatorClient
+from broker_console import accept_request, announce_pending_requests, print_pending_requests
 PROTOCOL_VERSION = 1
 MAX_MESSAGE_BYTES = 256 * 1024
 DEFAULT_PORT = 8765
@@ -317,45 +314,62 @@ async def async_input(prompt: str) -> str:
             pass
 
 
-async def interactive_cli(session: RemoteSession) -> None:
+async def interactive_cli(
+    session: RemoteSession,
+    descriptor: str,
+    broker: Optional[BrokerOperatorClient],
+) -> None:
     print("\nEsperando al Android…")
+    print("Comandos: " + ", ".join(ACTIONS) + ", status, requests, accept <request-id>, help, quit")
     while not session.stop_event.is_set():
-        await session.agent_ready.wait()
-        if session.stop_event.is_set():
+        try:
+            raw = (await async_input("glosh-remote> ")).strip()
+        except (EOFError, KeyboardInterrupt):
+            raw = "quit"
+
+        command = raw.lower()
+        if not command:
+            continue
+        if command == "quit":
+            session.stop_event.set()
             return
-        print("Comandos: " + ", ".join(ACTIONS) + ", status, help, quit")
-        while session.agent is not None and not session.stop_event.is_set():
+        if command == "help":
+            for name, description in ACTIONS.items():
+                print(f"  {name:8} {description}")
+            print("  status                 Muestra el agente actual")
+            print("  requests               Muestra solicitudes pendientes del broker")
+            print("  accept <request-id>     Acepta explícitamente un teléfono")
+            print("  quit                    Revoca la sesión")
+            continue
+        if command == "status":
+            print(session.agent_info or "sin agente")
+            continue
+        if command == "requests":
+            if broker is None:
+                print("Broker no configurado; esta sesión usa el fallback DEV por descriptor.")
+            else:
+                await print_pending_requests(broker)
+            continue
+        if command.startswith("accept "):
+            if broker is None:
+                print("Broker no configurado.")
+                continue
+            request_id = raw.split(maxsplit=1)[1].strip()
             try:
-                raw = (await async_input("glosh-remote> ")).strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                raw = "quit"
-
-            if not raw:
-                continue
-            if raw == "quit":
-                session.stop_event.set()
-                return
-            if raw == "help":
-                for name, description in ACTIONS.items():
-                    print(f"  {name:8} {description}")
-                print("  status   Muestra el agente actual")
-                print("  quit     Revoca la sesión")
-                continue
-            if raw == "status":
-                print(session.agent_info or "sin agente")
-                continue
-            if raw not in ACTIONS:
-                print("Comando no permitido. Usá help.")
-                continue
-
-            try:
-                result = await session.command(raw)
-                marker = "PASS" if result.get("ok") else "ERROR"
-                print(f"[{marker}] {raw}\n{result.get('output', '')}".rstrip())
+                print(await accept_request(broker, request_id, descriptor))
             except Exception as exc:
-                print(f"[ERROR] {exc}")
-                if session.agent is None:
-                    break
+                print(f"[broker] no se pudo aceptar la solicitud: {exc}")
+            continue
+        if command not in ACTIONS:
+            print("Comando no permitido. Usá help.")
+            continue
+
+        try:
+            result = await session.command(command)
+            marker = "PASS" if result.get("ok") else "ERROR"
+            print(f"[{marker}] {command}\n{result.get('output', '')}".rstrip())
+        except Exception as exc:
+            print(f"[ERROR] {exc}")
 
 
 async def expire_session(session: RemoteSession) -> None:
@@ -369,6 +383,7 @@ async def expire_session(session: RemoteSession) -> None:
 async def async_main(args: argparse.Namespace) -> int:
     session = RemoteSession(args.session_minutes)
     tunnel_process: Optional[asyncio.subprocess.Process] = None
+    broker: Optional[BrokerOperatorClient] = None
 
     async with serve(
         session.handler,
@@ -384,23 +399,48 @@ async def async_main(args: argparse.Namespace) -> int:
             else:
                 tunnel_process, public_url = await start_cloudflared(args.port)
 
+            descriptor = session.join_uri(public_url)
+            if args.broker_url:
+                broker = BrokerOperatorClient(args.broker_url, args.broker_token, session.sid)
+                await asyncio.get_running_loop().run_in_executor(
+                    None,
+                    broker.register,
+                    args.session_minutes * 60,
+                )
+
             print("\n=== GLOSH REMOTE SPIKE ===")
             print(f"Relay local: ws://127.0.0.1:{args.port}")
             print(f"Relay público temporal: {public_url}")
             print(f"Expira en: {args.session_minutes} min")
-            print("\nPegá este enlace en el APK (contiene una clave temporal; no lo publiques):\n")
-            print(session.join_uri(public_url))
-            print()
+            if broker is None:
+                print("\nFallback DEV directo (contiene una clave temporal; no lo publiques):\n")
+                print(descriptor)
+                print()
+            else:
+                print(f"Broker de soporte activo: {args.broker_url}")
+                print("El descriptor no se muestra ni se entrega al broker en claro.")
 
             expiry_task = asyncio.create_task(expire_session(session))
-            cli_task = asyncio.create_task(interactive_cli(session))
+            cli_task = asyncio.create_task(interactive_cli(session, descriptor, broker))
+            broker_task = (
+                asyncio.create_task(announce_pending_requests(session, broker))
+                if broker is not None
+                else None
+            )
             await session.stop_event.wait()
             cli_task.cancel()
             expiry_task.cancel()
-            await asyncio.gather(cli_task, expiry_task, return_exceptions=True)
+            if broker_task is not None:
+                broker_task.cancel()
+            await asyncio.gather(
+                *[task for task in (cli_task, expiry_task, broker_task) if task is not None],
+                return_exceptions=True,
+            )
             await session.close()
             return 0
         finally:
+            if broker is not None:
+                await asyncio.get_running_loop().run_in_executor(None, broker.close)
             if tunnel_process is not None and tunnel_process.returncode is None:
                 tunnel_process.terminate()
                 try:
@@ -418,6 +458,16 @@ def parse_args() -> argparse.Namespace:
         "--public-url",
         help="URL HTTPS de un túnel ya creado; si se omite se lanza cloudflared Quick Tunnel.",
     )
+    parser.add_argument(
+        "--broker-url",
+        default=os.environ.get("BROKER_BASE_URL", ""),
+        help="Endpoint estable HTTPS del Support Session Broker.",
+    )
+    parser.add_argument(
+        "--broker-token",
+        default=os.environ.get("BROKER_OPERATOR_TOKEN", ""),
+        help="Token efímero del operador para el broker DEV.",
+    )
     args = parser.parse_args()
     if not (1 <= args.port <= 65535):
         parser.error("--port fuera de rango")
@@ -425,6 +475,13 @@ def parse_args() -> argparse.Namespace:
         parser.error("--session-minutes debe estar entre 1 y 120")
     if args.public_url and not args.public_url.startswith("https://"):
         parser.error("--public-url debe ser HTTPS")
+    if bool(args.broker_url) != bool(args.broker_token):
+        parser.error("--broker-url y --broker-token deben configurarse juntos")
+    if args.broker_url:
+        parsed_broker = urllib.parse.urlparse(args.broker_url)
+        loopback_dev = parsed_broker.scheme == "http" and parsed_broker.hostname in {"127.0.0.1", "localhost"}
+        if parsed_broker.scheme != "https" and not loopback_dev:
+            parser.error("--broker-url debe ser HTTPS (HTTP sólo se admite en loopback DEV)")
     return args
 
 

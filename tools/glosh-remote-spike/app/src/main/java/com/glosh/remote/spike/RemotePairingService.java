@@ -17,7 +17,9 @@ import android.util.Log;
 import com.glosh.remote.spike.adb.AdbConnectionManager;
 import com.glosh.remote.spike.adb.AdbShell;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
+import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.relay.RelayClient;
+import com.glosh.remote.spike.session.SessionState;
 
 import java.net.InetAddress;
 import java.util.concurrent.ExecutorService;
@@ -34,12 +36,6 @@ import io.github.muntashirakon.adb.android.AdbMdns;
  * After pairing, the service connects to the technician relay automatically.
  */
 public final class RemotePairingService extends Service {
-    public enum SessionState {
-        IDLE,
-        PREPARING,
-        CONNECTED
-    }
-
     public static final String ACTION_START = "com.glosh.remote.spike.START";
     public static final String ACTION_REPLY = "com.glosh.remote.spike.REPLY";
     public static final String ACTION_STOP = "com.glosh.remote.spike.STOP";
@@ -93,7 +89,7 @@ public final class RemotePairingService extends Service {
         }
 
         String action = intent.getAction();
-        if (ACTION_START.equals(action) && sessionState != SessionState.IDLE) {
+        if (SessionState.shouldIgnoreStart(action, ACTION_START, sessionState)) {
             intent.removeExtra(EXTRA_JOIN_URI);
             return START_NOT_STICKY;
         }
@@ -101,8 +97,8 @@ public final class RemotePairingService extends Service {
         startForeground(
                 NOTIFICATION_ID,
                 statusNotification(
-                        "Glosh · Preparando tu conexión",
-                        "Abrí Depuración inalámbrica y elegí “Emparejar con código”."));
+                        "Glosh · Paso 2 de 3",
+                        "Activá “Depuración inalámbrica” y tocá “Emparejar dispositivo con código”."));
 
         if (ACTION_STOP.equals(action)) {
             finishSession("Conexión cerrada", "El acceso temporal terminó correctamente.");
@@ -155,13 +151,13 @@ public final class RemotePairingService extends Service {
             joinUri = rawJoin;
             AdbConnectionManager.getInstance(getApplicationContext());
         } catch (Throwable error) {
-            finishWithError("El enlace de soporte no es válido.");
+            finishWithError("La sesión de soporte no es válida. Intentá nuevamente.");
             return;
         }
 
         updateForeground(
-                "Glosh · Preparando tu conexión",
-                "Abrí Depuración inalámbrica y elegí “Emparejar con código”.");
+                "Glosh · Paso 2 de 3",
+                "Activá “Depuración inalámbrica” y tocá “Emparejar dispositivo con código”.");
         startPairingDiscovery();
     }
 
@@ -209,8 +205,8 @@ public final class RemotePairingService extends Service {
                 .build();
 
         Notification notification = baseNotification()
-                .setContentTitle("Último paso")
-                .setContentText("Escribí acá los 6 números que ves en pantalla.")
+                .setContentTitle("Glosh · Último paso")
+                .setContentText("Escribí acá los 6 números que muestra Android.")
                 .setOngoing(true)
                 .addAction(replyAction)
                 .addAction(stopAction())
@@ -226,7 +222,7 @@ public final class RemotePairingService extends Service {
         String host = intent.getStringExtra(EXTRA_HOST);
         int port = intent.getIntExtra(EXTRA_PORT, -1);
 
-        if (!code.matches("\\d{6}") || host == null || port <= 0 || joinUri == null) {
+        if (!PairingPin.isValid(code) || host == null || port <= 0 || joinUri == null) {
             finishWithError("El código o la sesión expiraron. Volvé a iniciar la conexión.");
             return;
         }

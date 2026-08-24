@@ -2,6 +2,13 @@ plugins {
     id("com.android.application")
 }
 
+val brokerBaseUrl = providers.gradleProperty("brokerBaseUrl").orElse("").get()
+val escapedBrokerBaseUrl = brokerBaseUrl
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+    .replace("\r", "")
+    .replace("\n", "")
+
 android {
     namespace = "com.glosh.remote.spike"
     compileSdk = 35
@@ -12,6 +19,8 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0-spike"
+
+        buildConfigField("String", "BROKER_BASE_URL", "\"$escapedBrokerBaseUrl\"")
 
         testInstrumentationRunner = "android.test.InstrumentationTestRunner"
     }
@@ -29,6 +38,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 }
 

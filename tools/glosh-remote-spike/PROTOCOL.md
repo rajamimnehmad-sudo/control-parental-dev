@@ -13,7 +13,24 @@ Purpose: prove temporary remote technical access to an Android 11+ device withou
 - No inbound port is opened on the Mac or Android device.
 - ADB itself is never exposed to the Internet.
 
-## Join descriptor
+## Support rendezvous
+
+The normal client flow discovers a waiting operator through a stable, explicitly configured
+`BROKER_BASE_URL`. Android sends only a random request ID, random nonce, ephemeral RSA-3072 public key,
+manufacturer/model and Android version. It sends no account, IMEI, Android ID or persistent identity.
+
+The operator registers one waiting relay session and must explicitly run `accept <request-id>`. The Mac
+then seals the internal descriptor with RSA-OAEP SHA-256 for that request's public key. The plaintext
+descriptor remains on the Mac and Android only. The broker receives and transfers ciphertext.
+
+Requests have a short TTL, are rate-limited and can be revoked. A ciphertext can be accepted once and
+claimed once; consumed, expired and revoked request IDs become temporary tombstones to reject replay.
+The sealed plaintext binds protocol version, request ID, nonce and descriptor.
+
+The included broker is an in-memory DEV reference implementation. A stable public broker is required
+before the no-link flow can pass a physical Internet gate; this ticket does not deploy one.
+
+## Internal join descriptor
 
 The Mac generates a one-time URI:
 
@@ -21,7 +38,8 @@ The Mac generates a one-time URI:
 gloshremote://join?v=1&url=<WSS_URL>&sid=<SESSION_ID>&k=<BASE64URL_32_BYTE_KEY>
 ```
 
-The 256-bit session key is delivered out-of-band in that URI and is never sent as plaintext command-protocol data.
+The 256-bit session key is delivered inside the RSA-OAEP sealed rendezvous payload and is never visible
+to the normal UI or broker. Debug builds retain direct intent parsing solely for laboratory recovery.
 
 ## Authentication
 
