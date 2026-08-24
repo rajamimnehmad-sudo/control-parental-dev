@@ -1,6 +1,6 @@
 # Glosh Remote — Supabase broker status
 
-Updated: 2026-08-24 09:49 ART
+Updated: 2026-08-24 09:55 ART
 
 ## REMOTE-INSTALL-NOLINK-GUIDED-03A
 
@@ -38,48 +38,85 @@ Physical no-link + cross-network gate PASS:
 - SHA-256 `5448e97dc458e3770a0ca82fe18e3124a7fcbad0034a1a72dbd5b74c537fbc3b`.
 - Device Samsung SM-S908E / Android 16 / SDK 36.
 - Physical run was performed with Mac and S22 on different Wi-Fi networks; cross-network requirement is satisfied.
-- No-link flow PASS: no link/descriptor exposed, automatic broker request PASS, explicit operator acceptance PASS, descriptor hidden from user/broker PASS.
-- Guided wizard PASS; Wireless Debugging and 6-digit pairing PASS.
-- WSS/HMAC/AES authentication PASS.
-- `ping=pong`; `whoami` contains `uid=2000(shell)`; `device` reports Samsung SM-S908E / Android 16 / SDK 36; `status` authenticated.
-- Non-allowlisted `uname` rejected.
-- UX CONNECTED PASS; Connect hidden, Cancel visible; rotation/recreation preserves CONNECTED.
-- Cancel/revoke PASS; post-cancel status has no agent; broker closed with `available=false`; relay and Quick Tunnel closed; no crash/ANR observed.
-- Glosh/Device Owner/Chrome/GloshIA were not modified.
-- Android tests 19/19 PASS; Python 6/6 PASS; lintDebug PASS; assembleDebug PASS.
+- No-link flow PASS; guided wizard PASS; Wireless Debugging + 6-digit pairing PASS; WSS/HMAC/AES PASS.
+- `ping=pong`; `whoami` contains `uid=2000(shell)`; `device` correct; `status` authenticated; non-allowlisted `uname` rejected.
+- UX CONNECTED PASS; rotation/recreation preserves CONNECTED; cancel/revoke PASS; broker, relay and Quick Tunnel closed; no crash/ANR.
 
 Timeout retry fix:
 - Expired broker requests renew with fresh identity, nonce and request ID.
 - Maximum five requests / roughly ten minutes.
 - Renewal only for `expired`; cancellation, revocation and errors remain fail-closed.
 - Unit tests PASS.
-- Full physical TTL-expiry renewal was not exercised because the accepted physical request completed immediately; this remains a narrow residual validation, not a blocker for connection PASS.
 
 ## REMOTE-INSTALL-OEM-GUIDANCE-02
 
-Status: NEXT / IN PROGRESS DESIGN — completar antes de iniciar pilotos adaptativos reales.
+Status: DESIGN FINAL / IMPLEMENTATION LOCAL PENDING — prioridad inmediata antes de pilotos adaptativos.
 
-Objetivo aprobado por usuario:
-- Glosh Remote detecta automáticamente fabricante/modelo/Android/SDK.
-- Animación nativa en loop dentro de Glosh, no GIF pesado ni copia exacta de Ajustes.
-- Tres recetas iniciales: Samsung, Motorola y Xiaomi/Redmi/POCO; fallback Android genérico para otros OEM.
-- Samsung: `Ajustes → Acerca del teléfono → Información de software → Número de compilación ×7`.
-- Motorola: `Ajustes → Acerca del teléfono` o `Ajustes → Sistema → Acerca del teléfono → Número de compilación ×7`.
-- Xiaomi/Redmi/POCO: `Ajustes → Acerca del teléfono → Información detallada y especificaciones → versión OS/MIUI varias veces`; luego `Ajustes adicionales → Opciones de desarrollador`.
-- Después de Developer Options, intentar apertura directa de Wireless Debugging cuando el intent/resolución del OEM lo permita; fallback a Developer Settings.
-- Segunda animación específica: `Opciones de desarrollador → Depuración inalámbrica → Activar → Emparejar dispositivo con código`.
-- El código de 6 dígitos debe poder ingresarse tanto dentro de Glosh Remote como desde la notificación; ambos caminos comparten el mismo estado y al completar 6 dígitos se intenta pairing automáticamente.
-- La animación resalta secuencialmente sólo el elemento que el usuario debe tocar, con flecha/pulso, y se detiene/respeta `ValueAnimator.areAnimatorsEnabled()`.
-- No overlays sobre Ajustes, no Accessibility adicional para controlar Settings, no taps automatizados dentro de Settings.
-- UX actual, broker, crypto, relay, allowlist y estados IDLE/PREPARING/CONNECTED deben permanecer intactos.
+Objetivo: una persona sin conocimientos técnicos debe poder completar el emparejamiento siguiendo una sola acción por pantalla.
+
+### Detección y recetas
+- Detectar `Build.MANUFACTURER`, `Build.BRAND`, modelo, Android y SDK; normalizar case/espacios.
+- Samsung → receta Samsung.
+- Motorola → receta Motorola.
+- Xiaomi, Redmi y POCO → receta Xiaomi family.
+- Cualquier otro OEM → receta Android genérica.
+- No intentar detectar `Settings.Global.DEVELOPMENT_SETTINGS_ENABLED`: Android documenta que para apps de terceros siempre devuelve 0; usar confirmación humana simple en vez de una detección falsa.
+
+### Animación nativa
+- No GIF ni video. Componente Android nativo liviano, vectorial/programático, en loop.
+- Mostrar un teléfono estilizado con filas de Ajustes; una sola fila por vez recibe pulso lima + flecha/mano; transición suave a la siguiente pantalla.
+- Samsung: `Acerca del teléfono → Información de software → Número de compilación ×7`.
+- Motorola: `Acerca del teléfono` o `Sistema → Acerca del teléfono → Número de compilación ×7`.
+- Xiaomi/Redmi/POCO: `Acerca del teléfono → Información detallada y especificaciones → versión OS/MIUI varias veces`; luego `Ajustes adicionales → Opciones de desarrollador`.
+- Segunda animación para todos: `Opciones de desarrollador → Depuración inalámbrica → Activar → Emparejar dispositivo con código`.
+- Respetar `ValueAnimator.areAnimatorsEnabled()`; con animaciones desactivadas mostrar frame estático resaltado.
+- Detener animaciones en `onPause` y reiniciarlas en `onResume`; sin leaks ni animadores duplicados.
+
+### UX para usuario básico total
+- Una sola acción principal por pantalla; evitar tres botones simultáneos.
+- Progress visible y humano: `1 de 3 · Preparar el teléfono`, `2 de 3 · Abrir conexión`, `3 de 3 · Ingresar código`.
+- No usar en copy normal: ADB, descriptor, nonce, broker, endpoint, RSA, WSS, Developer API.
+- Sí usar el nombre exacto que verá en Android cuando sea imprescindible: `Número de compilación`, `Opciones de desarrollador`, `Depuración inalámbrica`, `Emparejar dispositivo con código`.
+- Mensaje tranquilizador breve: `No cambies nada más. Glosh te indica exactamente qué tocar.`
+- En paso 1, CTA principal `MOSTRARME DÓNDE`/`ABRIR AJUSTES`; secundario discreto `YA LO TENGO ACTIVADO`.
+- Al volver de Ajustes, no fingir detección automática: pantalla `¿Viste el mensaje “Ya sos desarrollador”?` con CTA único `SÍ, SEGUIR` y ayuda `NO ME APARECIÓ` que repite la animación de ese OEM.
+- Agregar `ME PERDÍ`/`MOSTRAR DE NUEVO` como escape en cada etapa, sin salir del flujo.
+- Notificación durante Ajustes con una sola instrucción contextual y acción `VOLVER A GLOSH`.
+
+### Apertura de Settings
+- Usar intents oficiales donde existan y resolverlos con PackageManager.
+- `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS` es el fallback obligatorio y soportado por Android.
+- Para Wireless Debugging conservar cualquier ruta OEM/directa ya probada sólo si resuelve en ese dispositivo; si no, abrir Developer Settings y dejar la animación/notificación mostrando qué tocar.
+- No overlays sobre Ajustes, no Accessibility extra para manipular Settings, no auto-scroll/taps falsos.
+
+### Código de 6 dígitos
+- Camino principal dentro de Glosh: seis casilleros grandes, `inputType=number`, longitud exacta 6, foco y teclado numérico automáticos.
+- Al completar el sexto dígito, enviar automáticamente; sin botón `Aceptar` extra.
+- La notificación con RemoteInput sigue disponible mientras el usuario permanece viendo el código en Ajustes.
+- App y notificación deben llamar al mismo entrypoint/estado del `RemotePairingService`; nunca dos implementaciones de pairing.
+- Guard anti-doble-submit: un solo intento activo; entradas duplicadas o concurrentes se ignoran de forma segura.
+- Mientras empareja: `Conectando… no cierres Glosh`.
+- Si el código vence/falla: `Ese código ya no sirve. Generá uno nuevo y escribilo acá.` + CTA `ABRIR DEPURACIÓN INALÁMBRICA`.
+- `NO VEO EL CÓDIGO` vuelve a mostrar animación `Activar → Emparejar con código` y reabre Settings.
+
+### Preservar arquitectura validada
+- No cambiar broker Supabase, crypto, RSA/OAEP, HMAC/AES, relay, allowlist ni retry de requests expiradas.
+- Mantener `FLAG_SECURE` y estados autoritativos IDLE/PREPARING/CONNECTED.
+- No tocar Chrome, GloshIA, DAG, App Usuario/Admin ni Device Owner.
+
+### Gates esperados
+- Tests unitarios de clasificación OEM, secuencia de recetas, reduced-motion, submit 6 dígitos, doble-submit y timeout/fallo.
+- Tests existentes Android/Python sin regresiones.
+- lintDebug 0 errores; assembleDebug PASS.
+- APK nueva para gate visual Samsung S22 primero.
+- Validar físicamente Samsung; Motorola y Xiaomi quedan como recetas implementadas + tests hasta disponer de cada hardware, sin declarar gate físico de esos OEM.
 
 Fuentes oficiales verificadas 2026-08-24: Samsung Developer/Samsung Support, Motorola Support, Xiaomi Global Support y Android Developers.
 
 ## Next route
-
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
-- `REMOTE-INSTALL-OEM-GUIDANCE-02`: prioridad inmediata antes de pilotos.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: queda en espera hasta terminar y validar físicamente el nuevo guiado OEM.
+- `REMOTE-INSTALL-OEM-GUIDANCE-02`: prioridad inmediata.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: espera el gate Samsung del guiado OEM.
 
 Security debt before product:
 - Rotate the operator credential before product/general release.
