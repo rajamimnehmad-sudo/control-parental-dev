@@ -12,6 +12,7 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.util.Log;
 
 import com.glosh.remote.spike.adb.AdbConnectionManager;
 import com.glosh.remote.spike.adb.AdbShell;
@@ -42,6 +43,7 @@ public final class RemotePairingService extends Service {
     private static final String EXTRA_PORT = "pair_port";
     private static final String REMOTE_INPUT_CODE = "pair_code";
     private static final String CHANNEL_ID = "glosh_remote_pairing";
+    private static final String TAG = "GloshRemote";
     private static final int NOTIFICATION_ID = 7401;
     private static final int FINAL_NOTIFICATION_ID = 7402;
     private static final int REQUEST_REPLY = 7411;
@@ -81,11 +83,13 @@ public final class RemotePairingService extends Service {
 
         startForeground(
                 NOTIFICATION_ID,
-                statusNotification("Preparando conexión segura…", "No cierres esta notificación."));
+                statusNotification(
+                        "Glosh · Preparando tu conexión",
+                        "Abrí Depuración inalámbrica y elegí “Emparejar con código”."));
 
         String action = intent.getAction();
         if (ACTION_STOP.equals(action)) {
-            finishSession("Sesión cancelada", "El acceso temporal fue revocado.");
+            finishSession("Conexión cerrada", "El acceso temporal terminó correctamente.");
             return START_NOT_STICKY;
         }
 
@@ -138,8 +142,8 @@ public final class RemotePairingService extends Service {
         }
 
         updateForeground(
-                "Abrí Depuración inalámbrica",
-                "Tocá “Emparejar dispositivo con código”. Glosh detectará el puerto solo.");
+                "Glosh · Preparando tu conexión",
+                "Abrí Depuración inalámbrica y elegí “Emparejar con código”.");
         startPairingDiscovery();
     }
 
@@ -187,8 +191,8 @@ public final class RemotePairingService extends Service {
                 .build();
 
         Notification notification = baseNotification()
-                .setContentTitle("Código detectado")
-                .setContentText("Escribí acá los 6 números que muestra Android.")
+                .setContentTitle("Último paso")
+                .setContentText("Escribí acá los 6 números que ves en pantalla.")
                 .setOngoing(true)
                 .addAction(replyAction)
                 .addAction(stopAction())
@@ -212,7 +216,7 @@ public final class RemotePairingService extends Service {
             return;
         }
 
-        updateForeground("Emparejando…", "Esto suele tardar sólo unos segundos.");
+        updateForeground("Perfecto, conectando…", "Esto tarda sólo unos segundos.");
         executor.execute(() -> pairAndConnect(host, port, code));
     }
 
@@ -225,7 +229,7 @@ public final class RemotePairingService extends Service {
             }
 
             stopPairingDiscovery();
-            updateForeground("Pairing correcto", "Conectando al ADB local seguro…");
+            updateForeground("Perfecto, conectando…", "Estamos terminando la conexión segura.");
 
             boolean connected = manager.connectTls(this, CONNECT_TIMEOUT_MS);
             if (!connected && !manager.isConnected()) {
@@ -238,14 +242,15 @@ public final class RemotePairingService extends Service {
                 throw new IllegalStateException("ADB respondió sin identidad shell.");
             }
 
-            updateForeground("ADB local listo", "Conectando automáticamente con tu Mac…");
+            updateForeground("Ya casi estamos", "Conectando de forma segura con soporte…");
             RelayClient client = new RelayClient(shell);
             relayClient = client;
             client.connect(joinUri, new RelayClient.Listener() {
                 @Override
                 public void onState(String state) {
+                    Log.d(TAG, "Relay state: " + state);
                     if (!ending.get()) {
-                        updateForeground("Conectando con soporte…", state);
+                        updateForeground("Ya casi estamos", "Conectando de forma segura con soporte…");
                     }
                 }
 
@@ -253,29 +258,30 @@ public final class RemotePairingService extends Service {
                 public void onAuthenticated() {
                     if (!ending.get()) {
                         updateForeground(
-                                "Conectado con soporte",
-                                "Listo. Tu Mac ya puede ejecutar sólo las acciones autorizadas.");
+                                "¡Listo, Glosher!",
+                                "Soporte ya está conectado de forma segura.");
                     }
                 }
 
                 @Override
                 public void onError(String message, Throwable error) {
+                    Log.w(TAG, "Relay connection failed: " + message, error);
                     if (!ending.get()) {
-                        finishWithError(message);
+                        finishWithError("La conexión con soporte se interrumpió. Intentá nuevamente.");
                     }
                 }
 
                 @Override
                 public void onClosed() {
                     if (!ending.get()) {
-                        finishSession("Sesión finalizada", "Soporte cerró el acceso temporal.");
+                        finishSession("Conexión cerrada", "El acceso temporal terminó correctamente.");
                     }
                 }
             });
         } catch (Throwable error) {
+            Log.w(TAG, "Pairing or support connection failed", error);
             if (!ending.get()) {
-                String detail = error.getMessage();
-                finishWithError(detail == null ? "No se pudo completar el pairing." : detail);
+                finishWithError("Revisá el código y la conexión, y volvé a intentarlo.");
             }
         } finally {
             pairingInProgress.set(false);
@@ -283,7 +289,7 @@ public final class RemotePairingService extends Service {
     }
 
     private void finishWithError(String message) {
-        finishSession("No se pudo conectar", message);
+        finishSession("No pudimos conectar", message);
     }
 
     private void finishSession(String title, String message) {
