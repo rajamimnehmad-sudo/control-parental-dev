@@ -25,6 +25,7 @@ import android.widget.TextView;
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.session.SessionState;
+import com.glosh.remote.spike.wizard.ActiveCtaPulse;
 import com.glosh.remote.spike.wizard.OemGuide;
 import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.SettingsNavigator;
@@ -51,6 +52,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     };
 
     private SupportSessionCoordinator coordinator;
+    private ActiveCtaPulse ctaPulse;
     private TextView progressView;
     private TextView titleView;
     private TextView bodyView;
@@ -66,6 +68,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         coordinator = SupportSessionCoordinator.get(this);
         setContentView(buildUi());
+        ctaPulse = new ActiveCtaPulse(COLOR_LIME);
         consumeDebugIntent(getIntent());
         render();
     }
@@ -84,6 +87,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     protected void onResume() {
         super.onResume();
         coordinator.attach(this);
+        ctaPulse.onHostResume();
         handler.removeCallbacks(refreshState);
         handler.post(refreshState);
     }
@@ -91,6 +95,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     @Override
     protected void onPause() {
         handler.removeCallbacks(refreshState);
+        ctaPulse.onHostPause();
         coordinator.detach(this);
         super.onPause();
     }
@@ -217,6 +222,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         informationView.setVisibility(View.GONE);
         homeDetails.setVisibility(View.VISIBLE);
         showButton(primaryButton, "CONECTAR CON SOPORTE", v -> coordinator.requestSupport());
+        ctaPulse.setTarget(primaryButton);
         hideButton(secondaryButton);
         hideButton(tertiaryButton);
     }
@@ -228,6 +234,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 "Esto puede tardar unos segundos. No cierres Glosh Remote.");
         informationView.setText("Un operador debe aceptar tu solicitud antes de continuar.");
         hideButton(primaryButton);
+        ctaPulse.clear();
         showButton(secondaryButton, "CANCELAR", v -> coordinator.reset());
         hideButton(tertiaryButton);
     }
@@ -248,6 +255,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         showButton(primaryButton, "ABRIR ACERCA DEL TELÉFONO", v -> settingsNavigator.openAboutPhone(this));
         showButton(secondaryButton, "SÍ, CONTINUAR", v -> coordinator.continueToWirelessDebugging());
         showButton(tertiaryButton, "NO LA ENCUENTRO", v -> settingsNavigator.openAboutPhone(this));
+        ctaPulse.setTarget(enabled ? secondaryButton : primaryButton);
     }
 
     private void renderWirelessDebugging() {
@@ -261,6 +269,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                         + "2. Tocá Emparejar dispositivo con código.\n"
                         + "3. Android va a mostrarte 6 números.");
         showButton(primaryButton, "ABRIR DEPURACIÓN INALÁMBRICA", v -> prepareAndOpenWirelessDebugging());
+        ctaPulse.setTarget(primaryButton);
         showButton(secondaryButton, "CANCELAR CONEXIÓN", v -> cancelConnection());
         hideButton(tertiaryButton);
     }
@@ -272,6 +281,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 "Ingresá en la notificación de Glosh los 6 números que muestra Android.");
         informationView.setText("Después seguimos automáticamente. Esto tarda sólo unos segundos.");
         hideButton(primaryButton);
+        ctaPulse.clear();
         showButton(secondaryButton, "CANCELAR CONEXIÓN", v -> cancelConnection());
         hideButton(tertiaryButton);
     }
@@ -283,6 +293,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 "Soporte ya está conectado de forma segura.");
         informationView.setText("La conexión es temporal y podés terminarla cuando quieras.");
         hideButton(primaryButton);
+        ctaPulse.clear();
         showButton(secondaryButton, "CANCELAR CONEXIÓN", v -> cancelConnection());
         hideButton(tertiaryButton);
     }
@@ -294,6 +305,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 "Intentá nuevamente más tarde.");
         informationView.setText("No necesitás ingresar ningún dato técnico.");
         showButton(primaryButton, "VOLVER", v -> coordinator.reset());
+        ctaPulse.clear();
         hideButton(secondaryButton);
         hideButton(tertiaryButton);
     }
