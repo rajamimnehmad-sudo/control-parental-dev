@@ -3,17 +3,28 @@ package com.contentfilter.feature.vpn.transport
 import com.contentfilter.feature.vpn.service.VpnConnectionOwnerResult
 import com.contentfilter.feature.vpn.service.VpnFlowTuple
 import java.util.LinkedHashMap
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.CancellationException
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.Executor
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicInteger
 
 internal class VpnFlowOwnerCache(
     private val lookup: (VpnFlowTuple) -> VpnConnectionOwnerResult,
     private val nowMillis: () -> Long,
     private val capacity: Int = DefaultCapacity,
     private val ttlMillis: Long = DefaultTtlMillis,
+    private val lookupWaitTimeoutMillis: Long = DefaultLookupWaitTimeoutMillis,
+    private val lookupExecutor: Executor = DefaultLookupExecutor,
 ) {
     init {
         require(capacity > 0)
         require(ttlMillis > 0)
+        require(lookupWaitTimeoutMillis > 0)
     }
 
     private data class Entry(
@@ -54,19 +65,41 @@ internal class VpnFlowOwnerCache(
                 leader = true
             }
         }
-        if (!leader) return future.get()
-        return try {
-            val result = lookup(flow)
-            synchronized(cache) {
-                cache[flow] = Entry(generation, nowMillis() + ttlMillis, result)
+        if (leader) {
+            try {
+                lookupExecutor.execute { performLookup(key, flow, generation, future) }
+            } catch (_: RejectedExecutionException) {
+                synchronized(inFlight) { inFlight.remove(key, future) }
+                future.complete(VpnConnectionOwnerResult.Unknown)
             }
-            future.complete(result)
-            result
+        }
+        return try {
+            future.get(lookupWaitTimeoutMillis, TimeUnit.MILLISECONDS)
+        } catch (_: TimeoutException) {
+            VpnConnectionOwnerResult.Unknown
+        } catch (_: CancellationException) {
+            VpnConnectionOwnerResult.Unknown
+        }
+    }
+
+    private fun performLookup(
+        key: Pair<Long, VpnFlowTuple>,
+        flow: VpnFlowTuple,
+        generation: Long,
+        future: CompletableFuture<VpnConnectionOwnerResult>,
+    ) {
+        try {
+            val result = lookup(flow)
+            if (!future.isCancelled) {
+                synchronized(cache) {
+                    cache[flow] = Entry(generation, nowMillis() + ttlMillis, result)
+                }
+                future.complete(result)
+            }
         } catch (error: Throwable) {
             future.completeExceptionally(error)
-            throw error
         } finally {
-            synchronized(inFlight) { inFlight.remove(key) }
+            synchronized(inFlight) { inFlight.remove(key, future) }
         }
     }
 
@@ -87,6 +120,24 @@ internal class VpnFlowOwnerCache(
     private companion object {
         const val DefaultCapacity = 512
         const val DefaultTtlMillis = 30_000L
+        const val DefaultLookupWaitTimeoutMillis = 750L
+        const val LookupThreadCount = 2
+        const val LookupQueueCapacity = 64
         const val LoadFactor = 0.75f
+        val lookupThreadCounter = AtomicInteger(0)
+        val DefaultLookupExecutor: Executor =
+            ThreadPoolExecutor(
+                LookupThreadCount,
+                LookupThreadCount,
+                30L,
+                TimeUnit.SECONDS,
+                ArrayBlockingQueue(LookupQueueCapacity),
+                { task ->
+                    Thread(task, "GloshVpnOwnerLookup-${lookupThreadCounter.incrementAndGet()}").apply {
+                        isDaemon = true
+                    }
+                },
+                ThreadPoolExecutor.AbortPolicy(),
+            ).apply { allowCoreThreadTimeOut(true) }
     }
 }

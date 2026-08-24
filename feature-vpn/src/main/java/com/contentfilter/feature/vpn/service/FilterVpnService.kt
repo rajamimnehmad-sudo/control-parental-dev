@@ -288,6 +288,9 @@ class FilterVpnService : VpnService() {
                 "chromeTcpDrops=${metrics.chromeTcpDrops} chromeUdpDrops=${metrics.chromeUdpDrops} " +
                 "unknownDrops=${metrics.unknownOwnerDrops} recursion=${metrics.recursionPackets} " +
                 "hevTxPackets=${metrics.hev.txPackets} hevRxPackets=${metrics.hev.rxPackets} " +
+                "hevLifecycle=${metrics.hevLifecycle.state.name.lowercase()} " +
+                "hevJoinTimeouts=${metrics.hevLifecycle.joinTimeouts} " +
+                "hevCleanupCount=${metrics.hevLifecycle.cleanupCount} " +
                 "socksTcp=${metrics.socks.tcpConnects} socksUdpAssociations=${metrics.socks.udpAssociations} " +
                 "socksUdpOut=${metrics.socks.udpDatagramsOut} socksUdpIn=${metrics.socks.udpDatagramsIn} " +
                 "socksUdpInvalid=${metrics.socks.malformedUdpDatagrams} " +
@@ -305,7 +308,8 @@ class FilterVpnService : VpnService() {
                 "malformedEmpty=${metrics.socks.malformedProbeEmptySent} " +
                 "malformedTruncated=${metrics.socks.malformedProbeTruncatedSent} " +
                 "malformedInvalidHeader=${metrics.socks.malformedProbeInvalidHeaderSent} " +
-                "socksSessionIoFailures=${metrics.socks.sessionIoFailures}",
+                "socksSessionIoFailures=${metrics.socks.sessionIoFailures} " +
+                "socksShutdownTimeouts=${metrics.socks.executorShutdownTimeouts}",
         )
     }
 

@@ -42,6 +42,7 @@ internal data class VpnTransportGateMetrics(
     val recursionPackets: Long,
     val packetSocketType: PacketSocketType,
     val hev: HevNativeStats,
+    val hevLifecycle: HevTransportLifecycleSnapshot,
     val socks: VpnLocalSocksMetrics,
     val protectedSockets: VpnProtectedSocketMetrics,
     val resources: VpnOwnedResourceSnapshot,
@@ -213,6 +214,7 @@ internal class VpnTransportGate09A private constructor(
             recursionPackets = recursionPackets.get(),
             packetSocketType = packetSocketType,
             hev = engine.stats(),
+            hevLifecycle = engine.lifecycleSnapshot(),
             socks = socks.metrics(),
             protectedSockets = protectedSockets.metrics(),
             resources = resources.snapshot(),
@@ -339,16 +341,27 @@ internal class VpnTransportGate09A private constructor(
     }
 
     override fun close() {
-        if (!closed.compareAndSet(false, true)) return
-        runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
-        queue.close()
-        jobs.forEach { it.cancel() }
-        engine.close()
-        socks.close()
-        ownerCache.clear()
-        ownerResolver.clear()
-        loggedFlows.clear()
+        val firstClose = closed.compareAndSet(false, true)
+        if (firstClose) {
+            runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
+            queue.close()
+            jobs.forEach { it.cancel() }
+        }
+        val engineStop = engine.stop()
+        val socksStop = socks.shutdown()
+        if (firstClose) {
+            ownerCache.clear()
+            ownerResolver.clear()
+            loggedFlows.clear()
+        }
         VpnTransportResourceDiagnostics.publish(resources.snapshot())
+        check(engineStop.joined && engineStop.cleanupComplete) {
+            "HEV lifecycle quarantined state=${engineStop.state}"
+        }
+        check(socksStop.clean) {
+            "SOCKS executors did not terminate accept=${socksStop.acceptExecutorTerminated} " +
+                "sessions=${socksStop.sessionExecutorTerminated}"
+        }
     }
 
     companion object {

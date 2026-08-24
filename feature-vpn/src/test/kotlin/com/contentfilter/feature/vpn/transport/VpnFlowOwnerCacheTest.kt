@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class VpnFlowOwnerCacheTest {
     @Test
@@ -60,6 +61,36 @@ class VpnFlowOwnerCacheTest {
         assertEquals(3, calls.get())
     }
 
+    @Test
+    fun `lookup timeout fails closed for leader and followers`() {
+        val lookupStarted = CountDownLatch(1)
+        val releaseLookup = CountDownLatch(1)
+        val lookupCompleted = CountDownLatch(1)
+        val cache =
+            VpnFlowOwnerCache(
+                lookup = {
+                    lookupStarted.countDown()
+                    releaseLookup.await(1, TimeUnit.SECONDS)
+                    lookupCompleted.countDown()
+                    resolved()
+                },
+                nowMillis = { 10L },
+                lookupWaitTimeoutMillis = 25,
+            )
+        val executor = Executors.newSingleThreadExecutor()
+        val leader = executor.submit<VpnConnectionOwnerResult> { cache.resolve(flow(), 1) }
+        assertTrue(lookupStarted.await(1, TimeUnit.SECONDS))
+
+        assertEquals(VpnConnectionOwnerResult.Unknown, cache.resolve(flow(), 1))
+        assertEquals(VpnConnectionOwnerResult.Unknown, leader.get(1, TimeUnit.SECONDS))
+
+        releaseLookup.countDown()
+        assertTrue(lookupCompleted.await(1, TimeUnit.SECONDS))
+        assertTrue(waitUntil { cache.size() == 1 })
+        assertEquals(resolved(), cache.resolve(flow(), 1))
+        executor.shutdownNow()
+    }
+
     private fun flow() =
         VpnFlowTuple(
             VpnTransportProtocol.Tcp,
@@ -68,4 +99,13 @@ class VpnFlowOwnerCacheTest {
         )
 
     private fun resolved() = VpnConnectionOwnerResult.Resolved(10_262, listOf("com.sec.android.app.sbrowser"))
+
+    private fun waitUntil(condition: () -> Boolean): Boolean {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(1)
+        while (System.nanoTime() < deadline) {
+            if (condition()) return true
+            Thread.sleep(10)
+        }
+        return condition()
+    }
 }

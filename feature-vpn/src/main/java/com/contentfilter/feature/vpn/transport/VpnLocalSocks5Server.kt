@@ -65,7 +65,15 @@ internal data class VpnLocalSocksMetrics(
     val malformedProbeTruncatedSent: Long,
     val malformedProbeInvalidHeaderSent: Long,
     val sessionIoFailures: Long,
+    val executorShutdownTimeouts: Long,
 )
+
+internal data class VpnLocalSocksCloseResult(
+    val acceptExecutorTerminated: Boolean,
+    val sessionExecutorTerminated: Boolean,
+) {
+    val clean: Boolean = acceptExecutorTerminated && sessionExecutorTerminated
+}
 
 /** Loopback-only authenticated SOCKS5 server for the bounded 09A route set. */
 internal class VpnLocalSocks5Server(
@@ -94,11 +102,15 @@ internal class VpnLocalSocks5Server(
     private val malformedProbeTruncatedSent = AtomicLong(0)
     private val malformedProbeInvalidHeaderSent = AtomicLong(0)
     private val sessionIoFailures = AtomicLong(0)
+    private val executorShutdownTimeouts = AtomicLong(0)
+    private val closeLock = Any()
+    private val closed = AtomicBoolean(false)
     private val sessions = Collections.synchronizedSet(mutableSetOf<Closeable>())
     private var serverSocket: ServerSocket? = null
     private var acceptExecutor: ExecutorService? = null
     private var sessionExecutor: ExecutorService? = null
     private var listenerResource: Closeable? = null
+    private var lastCloseResult = VpnLocalSocksCloseResult(true, true)
 
     val port: Int
         get() = requireNotNull(serverSocket).localPort
@@ -108,6 +120,7 @@ internal class VpnLocalSocks5Server(
     fun password(): String = credentials.passwordText()
 
     fun start() {
+        check(!closed.get()) { "SOCKS5 server already closed" }
         check(running.compareAndSet(false, true)) { "SOCKS5 server already started" }
         val socket = ServerSocket()
         socket.reuseAddress = false
@@ -365,23 +378,48 @@ internal class VpnLocalSocks5Server(
             malformedProbeTruncatedSent = malformedProbeTruncatedSent.get(),
             malformedProbeInvalidHeaderSent = malformedProbeInvalidHeaderSent.get(),
             sessionIoFailures = sessionIoFailures.get(),
+            executorShutdownTimeouts = executorShutdownTimeouts.get(),
         )
 
+    fun shutdown(): VpnLocalSocksCloseResult =
+        synchronized(closeLock) {
+            if (!closed.compareAndSet(false, true)) return@synchronized lastCloseResult
+            running.set(false)
+            runCatching { serverSocket?.close() }
+            listenerResource?.close()
+            listenerResource = null
+            synchronized(sessions) { sessions.toList() }.forEach { runCatching { it.close() } }
+            sessions.clear()
+            val accept = acceptExecutor
+            val workers = sessionExecutor
+            accept?.shutdownNow()
+            workers?.shutdownNow()
+            val result =
+                VpnLocalSocksCloseResult(
+                    acceptExecutorTerminated = accept.awaitTerminationBounded(),
+                    sessionExecutorTerminated = workers.awaitTerminationBounded(),
+                )
+            if (!result.clean) executorShutdownTimeouts.incrementAndGet()
+            lastCloseResult = result
+            credentials.close()
+            serverSocket = null
+            acceptExecutor = null
+            sessionExecutor = null
+            result
+        }
+
     override fun close() {
-        if (!running.compareAndSet(true, false)) return
-        runCatching { serverSocket?.close() }
-        listenerResource?.close()
-        listenerResource = null
-        synchronized(sessions) { sessions.toList() }.forEach { runCatching { it.close() } }
-        sessions.clear()
-        acceptExecutor?.shutdownNow()
-        sessionExecutor?.shutdownNow()
-        acceptExecutor?.awaitTermination(ExecutorShutdownMillis, TimeUnit.MILLISECONDS)
-        sessionExecutor?.awaitTermination(ExecutorShutdownMillis, TimeUnit.MILLISECONDS)
-        credentials.close()
-        serverSocket = null
-        acceptExecutor = null
-        sessionExecutor = null
+        shutdown()
+    }
+
+    private fun ExecutorService?.awaitTerminationBounded(): Boolean {
+        if (this == null) return true
+        return try {
+            awaitTermination(ExecutorShutdownMillis, TimeUnit.MILLISECONDS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            false
+        }
     }
 
     private companion object {

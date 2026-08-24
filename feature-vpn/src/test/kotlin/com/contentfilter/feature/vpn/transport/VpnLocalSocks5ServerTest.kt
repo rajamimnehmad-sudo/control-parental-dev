@@ -19,6 +19,24 @@ import kotlin.test.assertTrue
 
 class VpnLocalSocks5ServerTest {
     @Test
+    fun `shutdown result is bounded observable and idempotent`() {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        val socks =
+            VpnLocalSocks5Server(
+                protectedSockets = VpnProtectedSocketFactory(protectTcp = { true }, protectUdp = { true }),
+                allowedAddresses = setOf(loopback.hostAddress.orEmpty()),
+            )
+
+        socks.start()
+        val first = socks.shutdown()
+        val second = socks.shutdown()
+
+        assertTrue(first.clean)
+        assertEquals(first, second)
+        assertEquals(0, socks.metrics().executorShutdownTimeouts)
+    }
+
+    @Test
     fun `authenticated CONNECT relays through a protected TCP socket`() {
         val loopback = InetAddress.getByName("127.0.0.1")
         val fixture = ServerSocket(0, 1, loopback)
