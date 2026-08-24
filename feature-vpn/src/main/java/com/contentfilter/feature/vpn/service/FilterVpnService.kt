@@ -98,6 +98,7 @@ class FilterVpnService : VpnService() {
     private var requestedVpnReconnectKey: String? = null
     private var appliedDomainListVersion: Long? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
+    private var connectionOwnerDiagnostics: VpnConnectionOwnerDiagnostics? = null
 
     @Volatile
     private var lastBlockedDestinationInvalidationAtMillis: Long? = null
@@ -169,6 +170,12 @@ class FilterVpnService : VpnService() {
                     )
                     val establishedInterface = requireNotNull(establishVpn()) { "VPN establish returned null." }
                     vpnInterface = establishedInterface
+                    connectionOwnerDiagnostics =
+                        if (ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService)) {
+                            VpnConnectionOwnerDiagnostics.create(this@FilterVpnService)
+                        } else {
+                            null
+                        }
                     ChromePhotosDataPlaneLabVpnPolicy.markTunnelState(
                         this@FilterVpnService,
                         established = true,
@@ -495,6 +502,7 @@ class FilterVpnService : VpnService() {
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
+        connectionOwnerDiagnostics?.observe(packet, length)
         when (val parsed = parser.parse(packet, length)) {
             is DnsParseResult.Parsed -> {
                 maybeRecordParsedPacket(parser.inspect(packet, length), telemetryDispatcher)
@@ -857,6 +865,8 @@ class FilterVpnService : VpnService() {
         requestedVpnReconnectKey = null
         appliedDomainListVersion = null
         lastReportedPolicy = null
+        connectionOwnerDiagnostics?.clear()
+        connectionOwnerDiagnostics = null
         serviceScope?.cancel()
         serviceScope = null
     }
