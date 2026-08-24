@@ -2,7 +2,10 @@
 
 ## Veredicto
 
-`BLOCKED_PHYSICAL_DEVICE_UNAVAILABLE`
+`PASS DEV`
+
+> Estado autoritativo: la sección **Cierre final DEV 337** al final de este
+> documento reemplaza el blocker histórico conservado debajo como trazabilidad.
 
 El roundtrip UDP controlado quedó demostrado físicamente en DEV 333 con 220/220
 respuestas byte-identical, UID/package exactos, HEV, SOCKS5 UDP ASSOCIATE y
@@ -284,3 +287,167 @@ Cuando macOS vuelva a enumerar el A23:
 
 No avanzar a full-tunnel hasta que ese bloque pase y ChatGPT revise el hardening
 de join nativo.
+
+---
+
+## Cierre final DEV 337
+
+Esta sección es el estado final autoritativo y deja resuelto el blocker histórico
+anterior. El A23 volvió a enumerar por ADB y se completó toda la secuencia.
+
+### Coordinación y recuperación de la Mac
+
+- Owner: Protección Android / Codex.
+- Base: `87ba18540a4146af0203ead6813df49abb8b72ef`.
+- Rama: `work/chrome-vpn-09a-udp-fixture-roundtrip-01`.
+- Worktree: `/Users/yejielnehmad/Developer/glosh-chrome-vpn-09a-udp-fixture-roundtrip-01`.
+- Funcional UDP inicial: `8028fbfebdf05f706ea323c3db2225ccd0848d0d`.
+- Hardening HEV/owner/SOCKS: `bf60c6a0300aebcd3d51dd5cf46cea0ee6b7be24`.
+- Hardening cierre SOCKS: `93ea2d6960a4badf550d19e47d8cdcdcad0a9a9d`.
+- Funcional final: `ce26034aae9d49cbbd1ad08d9c1ce4e27e7170ef`.
+- Sin push, PR, merge, main, Production ni modificación de Glosh Central.
+
+macOS reinició el 24 de agosto a las 12:05. El reporte local
+`ResetCounter-2026-08-24-120535.diag` registra `Reset count: 1`,
+`Boot failure count: 0`, `Boot faults: wdog,reset_in_1` y `Boot stage: 0x0`.
+No hubo panic report convencional. La causa observable fue un reset forzado por
+watchdog; se perdió estado efímero bajo `/private/tmp`, no código o commits.
+
+### Causa raíz y hardening final
+
+DEV 335 completó los gates pero su STOP lanzó `IllegalStateException` al vencer
+el await del executor SOCKS. DEV 336 dejó de derribar el proceso y puso el cierre
+incompleto en cuarentena, pero mostró `ownedFdResources=10` persistentes.
+
+La causa exacta no era HEV ni UDP: cinco workers estaban dentro de
+`Socket.connect()` hacia `198.18.0.1` sin timeout. El protected socket todavía no
+había retornado al servidor SOCKS, no estaba en `sessions` y el STOP no podía
+cerrarlo. DEV 337 usa connect TCP bounded de 3 s y shutdown SOCKS de 5 s. Timeout
+libera el resource lease. El mismo escenario físico, con conexiones pendientes y
+STOP un segundo después, terminó sin cuarentena ni crash y con recursos `0`.
+
+El lifecycle HEV mantiene la propiedad previa: join timeout conserva bridge/FD,
+pasa a `QUARANTINED`, prohíbe restart y sólo limpia tras terminación real. El
+owner lookup sigue single-flight/cola bounded con timeout de 750 ms y UNKNOWN
+fail-closed.
+
+### Identidad final
+
+| Campo | Valor |
+| --- | --- |
+| Dispositivo | Samsung A23 SM-A235M, serial `R58T34V31AE` |
+| Android | 14 / API 34 |
+| Chrome | 151.0.7922.169 |
+| App Usuario | DEV 337 / 1.0.1-dev |
+| APK SHA-256 | `ec0b13b45be8aad4ed8288718008aa35eccb0277fee263661be80ded2539b7eb` |
+| APK bytes | 158794709 |
+| Instalación | `adb install -r`, PASS |
+| ceDataInode | 1239519 antes/después |
+| resetCount | 1; `chrome_reset_skipped generation=1` |
+| Device Owner | Glosh, Affiliated |
+| Accessibility | enabled=1, enabled/bound |
+| VPN final | productiva activa; rutas DNS originales |
+| Chrome final | suspendido por STOP fail-closed |
+
+Fixture final:
+
+- package `com.glosh.vpnudpfixture`, versionCode/name `1/1.0`, UID `10280`;
+- APK SHA-256 `5519512532ce86034599a790d56570c9e486b17ef324c9499dbdf92f9c707001`;
+- 16853 bytes, instalada e inerte al final;
+- echo UDP Mac `192.168.0.21:32123` y ruta temporal exacta
+  `192.168.0.21/32`.
+
+### Gate UDP DEV 337
+
+20 datagramas:
+
+- sent/received/validated `20/20/20`;
+- tamaños `1, 32, 128, 512, 1200` bytes;
+- timeouts/duplicates/out-of-order `0/0/0`;
+- p50/p95/p99 `20.211/62.522/778.252 ms`; el primer sample incluye setup y
+  no es un gate de performance.
+
+200 datagramas:
+
+- sent/received/validated `200/200/200`;
+- timeouts/duplicates/out-of-order `0/0/0`;
+- p50/p95/p99 `7.013/19.129/37.197 ms`;
+- owner UID `10280`, package exacto, policy `FORWARD_TO_HEV`;
+- HEV tx/rx acumulado `220/221`;
+- SOCKS associations/out/in `2/220/220`;
+- protect UDP created/success/failure `2/2/0`;
+- recursion `0`; bridge `seqpacket`; queue peak/drops `2/0`.
+
+HEV issue #323:
+
+- empty/truncated/invalid header `1/1/1`;
+- datagrama válido posterior PASS;
+- SIGSEGV/SIGABRT `0/0`.
+
+Stress UDP:
+
+- `100` ciclos, `stress=complete error=none`;
+- SOCKS associations `102`, datagrams out/in `520/520`;
+- protected UDP created/success/failure `102/102/0`;
+- HEV cleanups `101`, join timeouts `0`;
+- SocketException atribuible `0`;
+- Java/native crash, ANR, OOM `0/0/0`;
+- después del stress, engine baseline resources `4`, asociaciones/protected UDP
+  activas `0/0`.
+
+### Canarios de regresión
+
+- TCP Samsung Internet: UID `10262`, `FORWARD_TO_HEV`, SOCKS CONNECT, protect y
+  HTTP roundtrip a `192.168.0.21:32123`: PASS.
+- DNS `glosh-photos.test`: A/AAAA/HTTPS quedaron en `FilterVpnService`; SOCKS UDP
+  permaneció `520/520`, HEV DNS normal `0`.
+- SAFE `httpbingo.org/image/png`: `8090 -> 8090`, `model_allow`.
+- BLOCK Flickr: `77187 -> 6303`, placeholder PNG, `model_filter`.
+- `rawPresented=false`, stale `0`, grid visible `0`,
+  `captureRequestsSincePresentationReady=0`, errorCode3 `0`.
+- host lógico simultáneo máximo `1`; attachmentCount de la sesión final `1`.
+- Chrome direct TCP/UDP no se disparó naturalmente detrás de ProxySettings en
+  esta corrida (`0/0`). Los tests mantienen ambos DROP; 09A anterior observó 42
+  drops físicos TCP/443. UDP físico: `CHROME_UDP443_NOT_TRIGGERED_UNDER_PROXY`.
+
+### Gates automáticos DEV 337
+
+- `:feature-vpn:testDebugUnitTest`: PASS.
+- `:feature-vpn:compileDebugKotlin`: PASS.
+- `:feature-vpn:ktlintCheck`: PASS.
+- `:feature-vpn:lintDebug`: PASS.
+- `:app-user:testDevDebugUnitTest`: PASS.
+- `:app-user:compileDevDebugKotlin`: PASS.
+- `:app-user:lintDevDebug`: PASS.
+- `:app-user:assembleDevDebug`: PASS.
+- Agregado: `BUILD SUCCESSFUL in 2m24s`, 850 tasks.
+- Dirigidos factory/SOCKS/HEV: `BUILD SUCCESSFUL in 25s`, 98 tasks.
+- `git diff --check`: PASS.
+
+Warnings preexistentes no bloqueantes: SDK XML/tool mismatch, futuros targets de
+anotaciones Kotlin y API Firebase deprecada. No hubo nueva falla touched-scope.
+
+### Rollback final
+
+- fail-closed y Chrome suspendido antes de desarmar: PASS;
+- HEV quit/join real: PASS, `hevJoinTimeouts=0`;
+- SOCKS: sin `socks_shutdown=quarantined`;
+- owned resources peak/final `10/0`;
+- active UDP associations peak/final `2/0`;
+- protected UDP sockets peak/final `2/0`;
+- ruta `/32`, fixture admission, rutas `198.18.0.1`, proxy y CA retirados;
+- VPN/DNS productivo restaurado;
+- PSS/native representativo bajo carga `223929/46476 KB`; después de STOP final
+  `96929/22236 KB`, sin crecimiento lineal observado;
+- último ApplicationExitInfo DEV 337: `PACKAGE_UPDATED`, sin crash nuevo;
+- resetCount `1`, ceDataInode `1239519`, DO/Affiliated y Accessibility preservados.
+
+### Riesgos residuales y decisión
+
+- No existe default route todavía; full-tunnel general no está implementado.
+- UDP IPv6 no tuvo roundtrip físico en este cierre.
+- Chrome UDP/443 debe repetirse físicamente en el futuro gate full-tunnel.
+- Handover, throughput/batería y process-death independiente quedan fuera de 09A.
+
+HEV 2.17.1 queda técnicamente aceptado para revisión de ChatGPT y, sólo después,
+para un eventual `CHROME-VPN-FULL-TUNNEL-CONTROLLED-10A`. Este ticket no lo inicia.
