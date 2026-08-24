@@ -143,8 +143,8 @@ Se preparó fuera del repo un paquete de referencia aislado con:
 - **30/30 tests Python/fixture PASS**.
 
 Artifact local: `glosh_remote_live_guide_v2_prototype.zip`.
-SHA-256: `b84c2ddb88bdc0a4d36fc01f5fdbdecc0c32789ec9fc6e005391aa39fb5ce3cd`.
-Size: `35,807` bytes.
+SHA-256: `cdff82c2bcd3c15d8ead1286d545f38cb473dfa2473bb1d505e07894d58a8418`.
+Size: `36,217` bytes.
 
 El paquete incluye `HANDOFF_MANIFEST.json` con SHA-256 individual de cada artefacto de referencia.
 
