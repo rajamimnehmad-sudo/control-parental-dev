@@ -164,8 +164,12 @@ La fixture temporal externa se actualizó fuera del monorepo, misma UID y sólo
 permiso INTERNET:
 
 - package: `com.glosh.vpnudpfixture`;
-- versionCode/name: `2 / 1.1-10a`;
-- APK SHA-256: `dcbbf1799fed4af329c3f7a1afe1edd234288ccebd49ef0a619bc2e0b06aefa6`;
+- candidata usada para el roundtrip UDP: versionCode/name `2 / 1.1-10a`,
+  APK SHA-256
+  `dcbbf1799fed4af329c3f7a1afe1edd234288ccebd49ef0a619bc2e0b06aefa6`;
+- versión final instalada e inerte después del canario TCP/53:
+  versionCode/name `3 / 1.2-10a`, APK SHA-256
+  `7f1bc45efc2daefdc6b5111acdc81f7aa953a298562bc457435cfac56b202607`;
 - endpoint público Digi: `52.43.121.77:10001/UDP`;
 - tamaños: `1, 32, 128, 512, 1200` bytes;
 - sent/received/byte-identical: `20/20/20`;
@@ -187,9 +191,12 @@ apagado al rollback.
   se registraron consultas de `google.com`, `accounts.google.com`, `gstatic.com`,
   `play.google.com`, `httpbingo.org` e `ipv6.google.com` en el pipeline Glosh.
 - UDP/53 retorna al parser DNS existente antes del transport gate.
-- TCP/53 entra en acción `ExistingDnsPath` y se descarta explícitamente; la
-  cobertura TCP/UDP 53 pasó. No se produjo espontáneamente un flow TCP/53 durante
-  la sesión física (`dnsTcpDrops=0`), por lo que no se inventa evidencia física.
+- TCP/53 entra en acción `ExistingDnsPath` y se descarta explícitamente. Una
+  segunda sesión física estrecha, sin cambios a Glosh ni a DEV 339, disparó desde
+  la fixture UID `10280` un connect a `8.8.8.8:53`: el dispatcher registró
+  `action=existingdnspath`, la app terminó en `SocketTimeoutException` esperado y
+  `dnsTcpDrops` subió de `0` a `2` (SYN/retransmisión). HEV permaneció exactamente
+  en `tx/rx=67/55` antes y después del flow: PASS físico TCP/53 fuera de HEV.
 - DoT/853 no se admite al transport general.
 - SOCKS ATYP DOMAIN y HEV mapped DNS permanecen deshabilitados.
 - HEV DNS normal observado: `0`.
@@ -243,6 +250,10 @@ Secuencia: fail-close/STOP -> Chrome suspendido -> proxy cerrado -> CA/policy
 retiradas -> HEV quit/join -> SOCKS cerrado -> caches limpias -> VPN productiva
 reestablecida -> flag full-tunnel explícitamente OFF -> STOP final.
 
+La sesión estrecha TCP/53 repitió el mismo rollback: runtime `inactive/ready`,
+owned resources `0`, sin default routes, fixture retirada de los UIDs del VPN y
+Chrome bloqueado físicamente mediante `ActionDisabledByAdminDialog`.
+
 Verificación final:
 
 - transport `inactive`, runtime `ready`;
@@ -261,8 +272,6 @@ La fixture APK queda instalada pero inerte; el echo local fue detenido.
 
 ## Riesgos residuales / fuera de alcance
 
-- No hay cobertura física de TCP/53 espontáneo; el contrato fail-close está
-  cubierto automáticamente y debe tener un gate físico dedicado si se requiere.
 - No hubo handover celular por ausencia de servicio; sí hubo invalidación y
   recuperación física Wi-Fi.
 - La allowlist HTTP/TLS del proxy de Chrome sigue siendo la del laboratorio; los
