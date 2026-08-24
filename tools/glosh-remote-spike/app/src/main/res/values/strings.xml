@@ -3,6 +3,9 @@
     <string name="live_guide_accessibility_description">Guía temporal que señala opciones únicamente dentro de Ajustes durante la conexión con soporte.</string>
     <string name="live_guide_bubble_help">ME PERDÍ</string>
     <string name="live_guide_bubble_open_settings">ABRIR AJUSTES CORRECTOS</string>
+    <string name="live_guide_bubble_close">CERRAR GUÍA</string>
+    <string name="live_guide_bubble_close_confirm">¿Cerrar la guía en pantalla? Podés continuar igual desde Glosh.</string>
+    <string name="live_guide_bubble_continue">SEGUIR CON LA GUÍA</string>
     <string name="live_guide_bubble_copy">Glosh · guía en pantalla\n%1$s</string>
     <string name="live_guide_bubble_minimized">glosh</string>
 </resources>
