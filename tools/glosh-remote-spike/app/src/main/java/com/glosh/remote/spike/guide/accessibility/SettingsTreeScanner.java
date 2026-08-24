@@ -66,27 +66,25 @@ public final class SettingsTreeScanner {
     }
 
     private String findTitle(AccessibilityNodeInfo root) {
-        String identified = findTitleById(root);
+        String identified = findTitleById(root, false);
         if (!identified.isEmpty()) {
             return identified;
         }
         return firstVisibleText(root);
     }
 
-    private String findTitleById(AccessibilityNodeInfo node) {
+    private String findTitleById(AccessibilityNodeInfo node, boolean insideTitleContainer) {
         if (node == null) {
             return "";
         }
         String own = textOf(node);
         String viewId = node.getViewIdResourceName();
-        if (!own.isEmpty() && viewId != null
-                && (viewId.contains("collapsing_toolbar")
-                || viewId.contains("toolbar_title")
-                || viewId.contains("action_bar_title"))) {
+        boolean titleContext = insideTitleContainer || SettingsTitleDetector.isTitleContainer(viewId);
+        if (!own.isEmpty() && titleContext) {
             return own;
         }
         for (int index = 0; index < node.getChildCount(); index++) {
-            String found = findTitleById(node.getChild(index));
+            String found = findTitleById(node.getChild(index), titleContext);
             if (!found.isEmpty()) {
                 return found;
             }
