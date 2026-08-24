@@ -10,6 +10,16 @@ Actualizado: 2026-08-24
 - `CHROME-VPN-09A-UDP-FIXTURE-ROUNDTRIP-01`: IN PROGRESS en Codex; resultado y diff todavía no entregados a ChatGPT, no asumir PASS/FAIL.
 - Auditoría completa Chrome + GloshIA: DONE read-only en commit docs `33a67f43bf8af6cf8833912a49a293f188c92826`, rama `audit/chrome-gloshia-complete-2026-08-24-final`.
 
+## Prework adelantado por ChatGPT sin colisión con Codex
+
+Mientras Codex mantiene ownership de escritura sobre el cierre UDP, ChatGPT preparó únicamente documentación/arquitectura en la rama de auditoría; no tocó `feature-vpn`, HEV, APK ni runtime.
+
+- `CHROME_VPN_FULL_TUNNEL_CONTROLLED_10A_DESIGN.md`: diseño ejecutable del próximo full-tunnel controlado, commit `279eb6af343ec32b93e3636bdc14fcc6494ba3db`.
+- `CHROME_PROXY_WEB_SEMANTICS_11A_CONTRACT.md`: contrato del proxy web general, commit `1e40a6a2e447318237e9f2921d808b16c4f30035`.
+- `CHROME_PROVENANCE_GAP_13A_FIXTURE_MATRIX.md`: matriz de fixtures para `data:`, `blob:`, canvas, WebGL, SVG y Service Worker, commit `cc5902f3dcf87958b73851cd83b2bf0d08dfeb3b`.
+
+Estos documentos quedan PREPARED, no autorizan ejecución anticipada. El resultado del UDP actual sigue siendo la bifurcación inmediata.
+
 ## Veredicto
 
 El filtrado de imágenes interceptadas y el bootstrap/fail-close de Chrome están avanzados y demostrados en DEV. Chrome general todavía no está listo como producto.
@@ -26,7 +36,7 @@ Bloqueos de producto vigentes:
 ## Ruta inmediata
 
 - Esperar y revisar el resultado/diff de `UDP-FIXTURE-ROUNDTRIP-01`.
-- Si PASS: `CHROME-VPN-FULL-TUNNEL-CONTROLLED-10A`.
+- Si PASS: `CHROME-VPN-FULL-TUNNEL-CONTROLLED-10A` usando el diseño preparado como base, pero verificando primero SHA/owner/rutas vigentes.
 - Si BLOCKED: ticket mínimo por causa exacta, sin relajar seguridad.
 
 No avanzar a REGION-DETECTOR, video, DRM, full-tunnel default routes, Production, merge ni publicación antes de esa revisión.
