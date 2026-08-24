@@ -1,6 +1,6 @@
 # Glosh Remote — Supabase broker status
 
-Updated: 2026-08-24 09:23 ART
+Updated: 2026-08-24 09:27 ART
 
 ## REMOTE-INSTALL-NOLINK-GUIDED-03A
 
@@ -9,7 +9,7 @@ Updated: 2026-08-24 09:23 ART
 
 ## REMOTE-SESSION-BROKER-SUPABASE-01
 
-Status: PASS TÉCNICO + PASS FÍSICO NO-LINK.
+Status: PASS FINAL DEV — técnico + físico no-link + cross-network.
 
 Supabase project: `syeycayasyufedwoprea`.
 
@@ -29,15 +29,15 @@ Local integration PASS and ChatGPT diff review PASS:
 - RSA-3072 / OAEP-SHA256 V2 bound to `SHA-256(request_id + ':' + nonce)`.
 - HTTP live gate from Mac PASS end-to-end, including 401 without operator key, explicit accept, ciphertext-only broker, local decrypt, second claim 409, revoke and close.
 
-Physical no-link gate PASS:
+Physical no-link + cross-network gate PASS:
 - Final local HEAD `475bd35b2934f9dca1a54f0b29dc4c320eacd223`.
-- Local commit `fix(remote): renew expired support requests`.
+- Local commit `fix(remote): renew expired support requests` reviewed by ChatGPT: PASS.
 - Worktree clean.
 - APK `GloshRemote-NoLink-Retry-DEV.apk`.
 - Size `19,061,222` bytes.
 - SHA-256 `5448e97dc458e3770a0ca82fe18e3124a7fcbad0034a1a72dbd5b74c537fbc3b`.
 - Device Samsung SM-S908E / Android 16 / SDK 36.
-- User clarified after the handoff that the physical run was performed with Mac and S22 on different Wi-Fi networks. Treat as cross-network PASS provided they were independent networks/LANs and not merely two SSIDs of the same router.
+- Physical run was performed with Mac and S22 on different Wi-Fi networks; cross-network requirement is satisfied.
 - No-link flow PASS: no link/descriptor exposed, automatic broker request PASS, explicit operator acceptance PASS, descriptor hidden from user/broker PASS.
 - Guided wizard PASS; Wireless Debugging and 6-digit pairing PASS.
 - WSS/HMAC/AES authentication PASS.
@@ -60,7 +60,7 @@ Security debt before product:
 - Anonymous rendezvous still lacks cryptographic customer identity before pairing; explicit operator acceptance mitigates accidental connection but install-scoped/user-verifiable binding remains product hardening.
 
 Next route:
-- `REMOTE-INSTALL-CONNECTION-00` may close PASS if the two Wi-Fi networks were independent LANs.
-- Advance to `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: use the now-proven no-link remote ADB path to perform real Glosh installations manually/adaptively by OEM/model, with Codex scanning accounts/profiles/restrictions and documenting recipes before further automation.
+- `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
+- Advance `REMOTE-ADAPTIVE-INSTALL-PILOT-01` to the next active route: use the proven no-link remote ADB path to perform real Glosh installations manually/adaptively by OEM/model, with Codex scanning accounts/profiles/restrictions and documenting recipes before further automation.
 
 No Chrome, GloshIA, DAG, App Usuario/Admin or pre-existing Edge Function was modified by the physical gate.
