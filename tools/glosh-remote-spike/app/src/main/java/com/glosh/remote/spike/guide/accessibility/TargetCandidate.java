@@ -12,4 +12,12 @@ public record TargetCandidate(
         String className,
         boolean clickable,
         Rect bounds) {
+    public TargetCandidate {
+        bounds = bounds == null ? new Rect() : new Rect(bounds);
+    }
+
+    @Override
+    public Rect bounds() {
+        return new Rect(bounds);
+    }
 }

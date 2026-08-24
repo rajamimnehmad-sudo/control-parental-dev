@@ -15,6 +15,12 @@ public final class SettingsNavigator {
         open(activity, SettingsRoute.wirelessDebuggingActions());
     }
 
+    public void openDeveloperOptions(Activity activity) {
+        open(activity, List.of(
+                Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS,
+                Settings.ACTION_SETTINGS));
+    }
+
     public void openAccessibility(Activity activity) {
         open(activity, List.of(Settings.ACTION_ACCESSIBILITY_SETTINGS, Settings.ACTION_SETTINGS));
     }

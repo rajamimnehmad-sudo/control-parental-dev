@@ -61,7 +61,7 @@ public final class TargetMatcher {
         if (viewId && (exact || alias)) {
             return Confidence.HIGH;
         }
-        if (exact && (!spec.screenTitles().isEmpty()) && (parent || child || candidate.clickable())) {
+        if (exact && !spec.screenTitles().isEmpty()) {
             return Confidence.HIGH;
         }
         if (alias && (!spec.screenTitles().isEmpty()) && (parent || child)) {

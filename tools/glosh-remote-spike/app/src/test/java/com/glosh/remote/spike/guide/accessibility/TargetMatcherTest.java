@@ -62,6 +62,29 @@ public class TargetMatcherTest {
         assertFalse(result.actionable());
     }
 
+    @Test
+    public void samsungVisibleBuildNumberIsHighWithoutClickableTextNode() {
+        TargetSpec samsungBuild = GuideTargetCatalog.forStage(
+                com.glosh.remote.spike.wizard.OemFamily.SAMSUNG,
+                com.glosh.remote.spike.guide.state.GuideStage.DEV_BUILD_NUMBER);
+        TargetCandidate buildNumber = candidate(
+                "Número de compilación", "Información de software", "", false, "TextView", null);
+        TargetMatcher.Match result = matcher.best(samsungBuild, List.of(buildNumber));
+        assertTrue(result.actionable());
+        assertEquals(TargetMatcher.Confidence.HIGH, result.confidence());
+    }
+
+    @Test
+    public void samsungBuildNumberOnWrongScreenCannotTriggerFalseHighlight() {
+        TargetSpec samsungBuild = GuideTargetCatalog.forStage(
+                com.glosh.remote.spike.wizard.OemFamily.SAMSUNG,
+                com.glosh.remote.spike.guide.state.GuideStage.DEV_BUILD_NUMBER);
+        TargetMatcher.Match result = matcher.best(samsungBuild, List.of(candidate(
+                "Número de compilación", "Privacidad", "", true, "TextView", null)));
+        assertFalse(result.actionable());
+        assertEquals(TargetMatcher.Confidence.NONE, result.confidence());
+    }
+
     private TargetCandidate candidate(
             String text, String screen, String parent, boolean clickable, String role, String id) {
         return new TargetCandidate(text, "", id, screen, parent, "", role, clickable, new Rect(0, 0, 10, 10));

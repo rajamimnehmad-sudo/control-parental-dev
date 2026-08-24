@@ -22,6 +22,7 @@ import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.relay.RelayClient;
 import com.glosh.remote.spike.session.PairingSubmissionGuard;
+import com.glosh.remote.spike.session.PairingAuthorityPolicy;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
 
@@ -266,12 +267,17 @@ public final class RemotePairingService extends Service {
     }
 
     private void handlePairingCode(String rawCode) {
-        if (sessionState != SessionState.PREPARING || pairingGuard.isActive()) {
-            return;
-        }
         String code = rawCode == null ? "" : rawCode.trim();
         String host = pairingHost;
         int port = pairingPort;
+        if (!PairingAuthorityPolicy.canSubmit(
+                sessionState,
+                pairingUiState,
+                pairingGuard.isActive(),
+                host != null && port > 0,
+                joinUri != null)) {
+            return;
+        }
         if (!PairingPin.isValid(code)) {
             showCodeFailure("Ingresá exactamente los 6 números que muestra Android.");
             return;
@@ -330,6 +336,14 @@ public final class RemotePairingService extends Service {
                 @Override
                 public void onAuthenticated() {
                     if (!ending.get()) {
+                        if (!PairingAuthorityPolicy.canBecomeConnected(
+                                sessionState,
+                                pairingUiState,
+                                pairingGuard.isActive(),
+                                joinUri != null)) {
+                            finishWithError("La conexión no pudo validarse. Intentá nuevamente.");
+                            return;
+                        }
                         sessionState = SessionState.CONNECTED;
                         pairingUiState = PairingUiState.INACTIVE;
                         pairingGuard.finish();

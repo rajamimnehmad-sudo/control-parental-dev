@@ -3,43 +3,50 @@ package com.glosh.remote.spike.guide.accessibility;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.content.Intent;
+import android.graphics.Insets;
 import android.graphics.Rect;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
+import android.view.WindowInsets;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import com.glosh.remote.spike.RemotePairingService;
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
-import com.glosh.remote.spike.guide.overlay.GuideBubbleController;
-import com.glosh.remote.spike.guide.overlay.HighlightOverlayController;
+import com.glosh.remote.spike.guide.overlay.CoachBarController;
+import com.glosh.remote.spike.guide.overlay.HighlightController;
+import com.glosh.remote.spike.guide.overlay.OverlayGeometry;
 import com.glosh.remote.spike.guide.pairing.PairingCodeDetector;
-import com.glosh.remote.spike.guide.scroll.AutoScrollController;
+import com.glosh.remote.spike.guide.scroll.RevealActionExecutor;
+import com.glosh.remote.spike.guide.scroll.RevealScrollController;
 import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.wizard.OemDetector;
-import android.os.Build;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 public final class LiveGuideAccessibilityService extends AccessibilityService
-        implements LiveGuideRuntime.Listener {
-    private static final long RESCAN_DEBOUNCE_MS = 220;
-
-    private final Handler handler = new Handler(Looper.getMainLooper());
-    private final SettingsTreeScanner scanner = new SettingsTreeScanner();
+        implements LiveGuideRuntime.Listener, GuideEventActor.Listener {
+    private final Handler actorHandler = new Handler(Looper.getMainLooper());
     private final TargetMatcher matcher = new TargetMatcher();
+    private final GuideTargetLocator locator = new GuideTargetLocator(matcher);
     private final PairingCodeDetector codeDetector = new PairingCodeDetector();
-    private final AutoScrollController scroll = new AutoScrollController();
-    private final Runnable rescan = this::scanCurrentWindow;
+    private final ScanGenerationGuard generationGuard = new ScanGenerationGuard();
+    private final RevealScrollController reveal = new RevealScrollController();
 
-    private HighlightOverlayController highlight;
-    private GuideBubbleController bubble;
-    private String currentPackage;
-    private String currentScreen;
+    private GuideEventActor actor;
+    private SettingsWindowAuthority windowAuthority;
+    private RevealActionExecutor revealExecutor;
+    private HighlightController highlight;
+    private CoachBarController coach;
+    private ScanGenerationGuard.Token currentToken;
+    private SettingsSnapshot currentSnapshot;
+    private boolean rescueRequested;
     private int buildTapCount;
 
     @Override
@@ -54,48 +61,61 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
                         Build.VERSION.RELEASE,
                         Build.VERSION.SDK_INT).family());
         LiveGuideRuntime.updateSettingsPackages(new SettingsPackageResolver().resolve(this));
-        highlight = new HighlightOverlayController(this);
-        bubble = new GuideBubbleController(
+        windowAuthority = new SettingsWindowAuthority(this);
+        revealExecutor = new RevealActionExecutor(windowAuthority, reveal, generationGuard);
+        highlight = new HighlightController(this, generationGuard);
+        coach = new CoachBarController(
                 this,
-                this::rescue,
-                this::openCorrectSettings,
+                this::requestReveal,
+                this::requestRescue,
                 this::closeGuide);
+        actor = new GuideEventActor(actorHandler, this::captureSnapshot, this, generationGuard);
         LiveGuideRuntime.register(this);
         applyPackageScope();
-        scheduleScan();
+        actor.relevantEvent();
     }
 
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (event == null || !LiveGuideRuntime.isActive()) {
+        if (event == null || actor == null) {
+            return;
+        }
+        if (!LiveGuideRuntime.isActive() || !LiveGuideRuntime.stage().observesSettings()) {
             clearVisuals();
             return;
         }
-        GuideStage stage = LiveGuideRuntime.stage();
-        String packageName = event.getPackageName() == null ? "" : event.getPackageName().toString();
-        Set<String> allowed = LiveGuideRuntime.settingsPackages();
-        if (!stage.observesSettings() || !SettingsPackageResolver.isAllowed(packageName, allowed)) {
-            clearVisuals();
+        String packageName = string(event.getPackageName());
+        if (getPackageName().equals(packageName) || isAccessibilityOverlay(event.getWindowId())) {
             return;
         }
-        currentPackage = packageName;
-        if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+        if (!SettingsPackageResolver.isAllowed(packageName, LiveGuideRuntime.settingsPackages())) {
+            if (event.getEventType() == AccessibilityEvent.TYPE_WINDOWS_CHANGED
+                    || event.getEventType() == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+                actor.relevantEvent();
+            }
+            return;
+        }
+        if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+            reveal.onScrolled(SystemClock.elapsedRealtime());
+        } else if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED) {
             trackExpectedClick(event);
         } else if (event.getEventType() == AccessibilityEvent.TYPE_ANNOUNCEMENT
                 || event.getEventType() == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) {
             detectDeveloperConfirmation(event);
         }
-        scheduleScan();
+        actor.relevantEvent();
     }
 
     @Override
     public void onInterrupt() {
-        clearVisuals();
+        invalidateVisualAuthority();
     }
 
     @Override
     public void onDestroy() {
-        handler.removeCallbacks(rescan);
+        if (actor != null) {
+            actor.close();
+        }
         LiveGuideRuntime.unregister(this);
         clearVisuals();
         super.onDestroy();
@@ -103,17 +123,83 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
 
     @Override
     public void onGuideStateChanged(GuideStage stage, boolean active) {
-        handler.post(() -> {
+        if (actor == null) {
+            return;
+        }
+        actor.runSerialized(() -> {
             applyPackageScope();
             if (!active || stage == GuideStage.CONNECTED || stage == GuideStage.OFF) {
                 clearVisuals();
+                reveal.reset();
                 LiveGuideRuntime.unregister(this);
                 disableSelf();
                 return;
             }
-            scroll.reset();
-            scheduleScan();
+            reveal.cancel();
+            rescueRequested = false;
+            actor.relevantEvent();
         });
+    }
+
+    @Override
+    public void onGenerationInvalidated(long generation) {
+        currentToken = null;
+        currentSnapshot = null;
+        if (highlight != null) {
+            highlight.clear();
+        }
+    }
+
+    @Override
+    public void onStableSnapshot(
+            ScanGenerationGuard.Token token,
+            SettingsSnapshot snapshot) {
+        if (!generationGuard.isCurrent(token, snapshot)
+                || !LiveGuideRuntime.isActive()
+                || !LiveGuideRuntime.stage().observesSettings()) {
+            return;
+        }
+        currentToken = token;
+        currentSnapshot = snapshot;
+
+        if (LiveGuideRuntime.stage() == GuideStage.PAIR_CODE_TARGET) {
+            String code = codeDetector.detect(snapshot.visibleText(), true);
+            if (code != null) {
+                submitDetectedCode(code);
+                return;
+            }
+        }
+
+        LocatedTarget located = locate(snapshot, rescueRequested);
+        if (rescueRequested) {
+            rescueRequested = false;
+            if (located == null) {
+                showRecovery("Volvamos al punto correcto");
+                return;
+            }
+        }
+        if (located == null) {
+            showMissingTarget(snapshot);
+            return;
+        }
+        if (located.stage() != LiveGuideRuntime.stage()) {
+            LiveGuideRuntime.setStage(located.stage());
+            return;
+        }
+        showLocatedTarget(token, snapshot, located);
+    }
+
+    @Override
+    public void onNoTrustedWindow(long generation) {
+        currentToken = null;
+        currentSnapshot = null;
+        if (highlight != null) {
+            highlight.clear();
+        }
+        if (rescueRequested) {
+            rescueRequested = false;
+            showRecovery("Abramos nuevamente los Ajustes correctos");
+        }
     }
 
     private void applyPackageScope() {
@@ -130,188 +216,119 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         setServiceInfo(info);
     }
 
-    private void scheduleScan() {
-        handler.removeCallbacks(rescan);
-        handler.postDelayed(rescan, RESCAN_DEBOUNCE_MS);
-    }
-
-    private void scanCurrentWindow() {
-        if (!LiveGuideRuntime.isActive() || !LiveGuideRuntime.stage().observesSettings()) {
-            clearVisuals();
-            return;
-        }
-        AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) {
-            showRecovery();
-            return;
-        }
-        String packageName = root.getPackageName() == null ? "" : root.getPackageName().toString();
-        if (!SettingsPackageResolver.isAllowed(packageName, LiveGuideRuntime.settingsPackages())) {
-            clearVisuals();
-            return;
-        }
-        SettingsTreeScanner.ScanResult result = scanner.scan(root);
-        boolean screenChanged = currentScreen != null && !currentScreen.equals(result.screenTitle());
-        currentScreen = result.screenTitle();
-
-        if (LiveGuideRuntime.stage() == GuideStage.PAIR_CODE_TARGET) {
-            String code = codeDetector.detect(result.visibleText(), true);
-            if (code != null) {
-                submitDetectedCode(code);
-                return;
-            }
-        }
-
-        LocatedTarget located = locate(result);
-        if (located == null) {
-            clearVisuals();
-            attemptScroll(root, null, result, screenChanged);
-            return;
-        }
-        if (located.stage != LiveGuideRuntime.stage()) {
-            LiveGuideRuntime.setStage(located.stage);
-            scroll.reset();
-        }
-        android.view.WindowManager windowManager = getSystemService(android.view.WindowManager.class);
-        android.view.WindowMetrics metrics = windowManager.getCurrentWindowMetrics();
-        Rect display = metrics.getBounds();
-        android.graphics.Insets insets = metrics.getWindowInsets().getInsetsIgnoringVisibility(
-                android.view.WindowInsets.Type.systemBars()
-                        | android.view.WindowInsets.Type.displayCutout());
-        Rect bounds = com.glosh.remote.spike.guide.overlay.OverlayGeometry.clampHighlight(
-                located.record.candidate().bounds(), display, insets);
-        boolean visible = Rect.intersects(display, bounds) && !bounds.isEmpty();
-        if (visible) {
-            scroll.reset();
-            highlight.show(bounds);
-            bubble.show(instruction(located.stage), bounds);
-        } else {
-            clearVisuals();
-            attemptScroll(root, located.record.node(), result, screenChanged);
-        }
-    }
-
-    private LocatedTarget locate(SettingsTreeScanner.ScanResult result) {
-        List<GuideStage> stages = new ArrayList<>();
-        stages.add(LiveGuideRuntime.stage());
-        for (GuideStage candidate : new GuideStage[] {
-                GuideStage.DEV_ABOUT_PHONE,
-                GuideStage.DEV_SOFTWARE_INFO,
-                GuideStage.DEV_BUILD_NUMBER,
-                GuideStage.WIRELESS_DEBUGGING,
-                GuideStage.PAIR_CODE_TARGET}) {
-            if (!stages.contains(candidate)) {
-                stages.add(candidate);
-            }
-        }
-        List<TargetCandidate> candidates = result.nodes().stream()
-                .map(SettingsTreeScanner.NodeRecord::candidate)
-                .toList();
-        for (GuideStage stage : stages) {
-            TargetSpec spec = GuideTargetCatalog.forStage(LiveGuideRuntime.family(), stage);
-            if (spec == null) {
-                continue;
-            }
-            TargetMatcher.Match match = matcher.best(spec, candidates);
-            if (!match.actionable()) {
-                continue;
-            }
-            for (SettingsTreeScanner.NodeRecord record : result.nodes()) {
-                if (record.candidate() == match.candidate()) {
-                    return new LocatedTarget(stage, record);
-                }
-            }
-        }
-        return null;
-    }
-
-    private void attemptScroll(
-            AccessibilityNodeInfo root,
-            AccessibilityNodeInfo target,
-            SettingsTreeScanner.ScanResult result,
-            boolean screenChanged) {
-        AccessibilityNodeInfo scrollable = target == null
-                ? findScrollableDescendant(root)
-                : findScrollable(target);
-        int showAction = AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId();
-        int downAction = AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_DOWN.getId();
-        int forwardAction = AccessibilityNodeInfo.ACTION_SCROLL_FORWARD;
-        boolean show = target != null && supports(target, showAction);
-        boolean down = scrollable != null && supports(scrollable, downAction);
-        boolean forward = scrollable != null && supports(scrollable, forwardAction);
-        AutoScrollController.Action action = scroll.next(
-                target != null,
-                false,
-                show,
-                down,
-                forward,
-                fingerprint(result),
-                screenChanged,
-                true);
-        AccessibilityNodeInfo receiver = action == AutoScrollController.Action.SHOW_ON_SCREEN
-                ? target
-                : scrollable;
-        if (receiver == null) {
-            showRecovery();
-            return;
-        }
-        GuideActionPolicy.Operation operation = switch (action) {
-            case SHOW_ON_SCREEN -> GuideActionPolicy.Operation.SHOW_ON_SCREEN;
-            case SCROLL_DOWN -> GuideActionPolicy.Operation.SCROLL_DOWN;
-            case SCROLL_FORWARD -> GuideActionPolicy.Operation.SCROLL_FORWARD;
-            case STOP -> null;
-        };
-        int nodeAction = switch (action) {
-            case SHOW_ON_SCREEN -> showAction;
-            case SCROLL_DOWN -> downAction;
-            case SCROLL_FORWARD -> forwardAction;
-            case STOP -> 0;
-        };
-        if (nodeAction == 0 || !GuideActionPolicy.isAllowed(operation)
-                || !receiver.performAction(nodeAction)) {
-            showRecovery();
-        }
-    }
-
-    private AccessibilityNodeInfo findScrollable(AccessibilityNodeInfo start) {
-        AccessibilityNodeInfo current = start;
-        while (current != null) {
-            if (current.isScrollable()) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        return null;
-    }
-
-    private AccessibilityNodeInfo findScrollableDescendant(AccessibilityNodeInfo node) {
-        if (node == null) {
-            return null;
-        }
-        if (node.isScrollable()) {
-            return node;
-        }
-        for (int index = 0; index < node.getChildCount(); index++) {
-            AccessibilityNodeInfo found = findScrollableDescendant(node.getChild(index));
-            if (found != null) {
-                return found;
-            }
-        }
-        return null;
-    }
-
-    private boolean supports(AccessibilityNodeInfo node, int action) {
-        for (AccessibilityNodeInfo.AccessibilityAction supported : node.getActionList()) {
-            if (supported.getId() == action) {
+    private boolean isAccessibilityOverlay(int windowId) {
+        for (android.view.accessibility.AccessibilityWindowInfo window : getWindows()) {
+            if (window.getId() == windowId
+                    && window.getType()
+                    == android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY) {
                 return true;
             }
         }
         return false;
     }
 
+    private SettingsSnapshot captureSnapshot() {
+        return windowAuthority.capture(LiveGuideRuntime.settingsPackages());
+    }
+
+    private LocatedTarget locate(SettingsSnapshot snapshot, boolean rescue) {
+        GuideTargetLocator.LocatedTarget located = locator.locate(
+                snapshot, LiveGuideRuntime.family(), LiveGuideRuntime.stage(), rescue);
+        return located == null ? null : new LocatedTarget(located.stage(), located.node());
+    }
+
+    private void showLocatedTarget(
+            ScanGenerationGuard.Token token,
+            SettingsSnapshot snapshot,
+            LocatedTarget located) {
+        Rect target = located.node().candidate().bounds();
+        Rect content = contentBounds();
+        boolean visible = !target.isEmpty() && Rect.intersects(content, target);
+        if (visible) {
+            reveal.cancel();
+            Rect clamped = OverlayGeometry.clampHighlight(
+                    target,
+                    getSystemService(WindowManager.class).getCurrentWindowMetrics().getBounds(),
+                    systemInsets());
+            if (highlight.show(token, snapshot, clamped)) {
+                coach.show(instruction(located.stage()), false);
+            }
+            return;
+        }
+        highlight.clear();
+        coach.show(instruction(located.stage()), true);
+        if (reveal.movementAllowed(SystemClock.elapsedRealtime())) {
+            performReveal(token, snapshot, located.node());
+        }
+    }
+
+    private void showMissingTarget(SettingsSnapshot snapshot) {
+        highlight.clear();
+        boolean expectedScreen = locator.isExpectedScreen(
+                LiveGuideRuntime.family(), LiveGuideRuntime.stage(), snapshot.screenTitle());
+        if (expectedScreen) {
+            coach.show(instruction(LiveGuideRuntime.stage()), hasScrollable(snapshot));
+            if (reveal.movementAllowed(SystemClock.elapsedRealtime())) {
+                performReveal(currentToken, snapshot, null);
+            }
+        } else {
+            reveal.cancel();
+            coach.showRecovery("No encuentro este paso en esta pantalla");
+        }
+    }
+
+    private void requestReveal() {
+        if (actor == null) {
+            return;
+        }
+        actor.runSerialized(() -> {
+            long now = SystemClock.elapsedRealtime();
+            if (!reveal.arm(now)) {
+                coach.showRecovery("Esperá un momento y volvé a tocar MOSTRARME");
+                return;
+            }
+            ScanGenerationGuard.Token token = currentToken;
+            SettingsSnapshot snapshot = currentSnapshot;
+            if (token == null || snapshot == null || !generationGuard.isCurrent(token, snapshot)) {
+                actor.relevantEvent();
+                return;
+            }
+            LocatedTarget located = locate(snapshot, false);
+            performReveal(token, snapshot, located == null ? null : located.node());
+        });
+    }
+
+    private void performReveal(
+            ScanGenerationGuard.Token token,
+            SettingsSnapshot snapshot,
+            NodeSnapshot targetSnapshot) {
+        RevealActionExecutor.Result result = revealExecutor.perform(
+                token,
+                snapshot,
+                targetSnapshot,
+                contentBounds(),
+                LiveGuideRuntime.settingsPackages());
+        // PERFORMED waits for the next real Accessibility event before continuing.
+        if (result == RevealActionExecutor.Result.UNSUPPORTED) {
+            coach.showRecovery("Deslizá suavemente y te sigo guiando.");
+        }
+    }
+
+    private void requestRescue() {
+        if (actor == null) {
+            return;
+        }
+        actor.runSerialized(() -> {
+            reveal.cancel();
+            rescueRequested = true;
+            actor.relevantEvent();
+        });
+    }
+
     private void trackExpectedClick(AccessibilityEvent event) {
         AccessibilityNodeInfo source = event.getSource();
-        if (source == null) {
+        SettingsSnapshot snapshot = currentSnapshot;
+        if (source == null || snapshot == null) {
             return;
         }
         GuideStage stage = LiveGuideRuntime.stage();
@@ -321,12 +338,13 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         }
         Rect bounds = new Rect();
         source.getBoundsInScreen(bounds);
+        AccessibilityNodeInfo parent = source.getParent();
         TargetCandidate candidate = new TargetCandidate(
                 string(source.getText()),
                 string(source.getContentDescription()),
                 source.getViewIdResourceName(),
-                currentScreen,
-                source.getParent() == null ? "" : string(source.getParent().getText()),
+                snapshot.screenTitle(),
+                parent == null ? "" : string(parent.getText()),
                 "",
                 string(source.getClassName()),
                 source.isClickable(),
@@ -346,8 +364,8 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
     }
 
     private void detectDeveloperConfirmation(AccessibilityEvent event) {
-        String joined = event.getText() == null ? "" : event.getText().toString();
-        String normalized = TargetMatcher.normalize(joined);
+        String normalized = TargetMatcher.normalize(
+                event.getText() == null ? "" : event.getText().toString());
         if (normalized.contains("ya sos desarrollador")
                 || normalized.contains("you are now a developer")
                 || normalized.contains("modo desarrollador activado")) {
@@ -357,48 +375,29 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         }
     }
 
-    private void submitDetectedCode(String detected) {
+    private void submitDetectedCode(String code) {
+        if (LiveGuideRuntime.stage() != GuideStage.PAIR_CODE_TARGET) {
+            return;
+        }
         clearVisuals();
-        LiveGuideRuntime.setStage(GuideStage.PAIRING);
         Intent intent = new Intent(this, RemotePairingService.class)
                 .setAction(RemotePairingService.ACTION_SUBMIT_CODE)
-                .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, detected);
+                .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, code);
         startService(intent);
     }
 
-    private void rescue() {
-        scroll.reset();
-        scheduleScan();
-    }
-
-    private void showRecovery() {
+    private void showRecovery(String message) {
         if (highlight != null) {
             highlight.clear();
         }
-        if (bubble != null) {
-            Rect display = getSystemService(android.view.WindowManager.class)
-                    .getCurrentWindowMetrics().getBounds();
-            Rect anchor = new Rect(display.centerX() - 1, display.centerY() - 1,
-                    display.centerX() + 1, display.centerY() + 1);
-            bubble.showRecovery("Volvamos al punto correcto", anchor);
+        if (coach != null) {
+            coach.showRecovery(message);
         }
-    }
-
-    private void openCorrectSettings() {
-        GuideStage stage = LiveGuideRuntime.stage();
-        String action = stage == GuideStage.WIRELESS_DEBUGGING || stage == GuideStage.PAIR_CODE_TARGET
-                ? Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS
-                : Settings.ACTION_DEVICE_INFO_SETTINGS;
-        Intent intent = new Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        if (intent.resolveActivity(getPackageManager()) == null) {
-            intent = new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        }
-        clearVisuals();
-        startActivity(intent);
     }
 
     private void closeGuide() {
         clearVisuals();
+        reveal.reset();
         LiveGuideRuntime.reset();
     }
 
@@ -406,9 +405,38 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         if (highlight != null) {
             highlight.clear();
         }
-        if (bubble != null) {
-            bubble.clear();
+        if (coach != null) {
+            coach.clear();
         }
+    }
+
+    private void invalidateVisualAuthority() {
+        generationGuard.invalidate();
+        currentToken = null;
+        currentSnapshot = null;
+        clearVisuals();
+    }
+
+    private boolean hasScrollable(SettingsSnapshot snapshot) {
+        return snapshot.nodes().stream().anyMatch(NodeSnapshot::scrollable);
+    }
+
+    private Rect contentBounds() {
+        Rect display = getSystemService(WindowManager.class).getCurrentWindowMetrics().getBounds();
+        Insets insets = systemInsets();
+        return new Rect(
+                display.left + insets.left,
+                display.top + insets.top,
+                display.right - insets.right,
+                display.bottom - insets.bottom);
+    }
+
+    private Insets systemInsets() {
+        return getSystemService(WindowManager.class)
+                .getCurrentWindowMetrics()
+                .getWindowInsets()
+                .getInsetsIgnoringVisibility(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
     }
 
     private String instruction(GuideStage stage) {
@@ -418,18 +446,10 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         return GuideTargetCatalog.instruction(stage);
     }
 
-    private String fingerprint(SettingsTreeScanner.ScanResult result) {
-        String first = result.nodes().isEmpty() ? "" : result.nodes().get(0).candidate().text();
-        String last = result.nodes().isEmpty()
-                ? ""
-                : result.nodes().get(result.nodes().size() - 1).candidate().text();
-        return TargetMatcher.normalize(result.screenTitle() + "|" + first + "|" + last);
-    }
-
     private String string(CharSequence value) {
         return value == null ? "" : value.toString();
     }
 
-    private record LocatedTarget(GuideStage stage, SettingsTreeScanner.NodeRecord record) {
+    private record LocatedTarget(GuideStage stage, NodeSnapshot node) {
     }
 }
