@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-24 20:55 ART
+Updated: 2026-08-24 21:05 ART
 
 ## Connection base
 
@@ -29,10 +29,14 @@ Normal UX after one-time Accessibility bootstrap:
 
 `INICIAR → detect real state → shortest safe Settings path → enable Wireless Debugging if needed → open pairing dialog → auto-read exactly one contextual 6-digit code when possible → existing local pairing/ADB → existing secure support connection`.
 
-Shortcuts are mandatory:
+Shortest-path prerequisites/shortcuts are mandatory:
 - support already connected → DONE;
 - valid local ADB → skip Settings/pairing;
-- previous pairing reconnect succeeds → skip new pairing;
+- previous pairing exists → try reconnect before opening Settings;
+- Accessibility blocked by Restricted Settings → user clears that prerequisite first;
+- Accessibility disabled → user enables it once;
+- no usable Wi-Fi → stop and ask for Wi-Fi;
+- Wireless Debugging blocked by device/admin policy → BLOCKED, no guessed workaround;
 - Developer Options already available → skip Build Number;
 - Wireless Debugging already ON → skip toggle/confirmation;
 - pairing dialog already open → pair immediately;
@@ -55,9 +59,13 @@ Executable/text reference:
 - `docs/artifacts/remote-install-autopilot/reference/SCENARIO_MATRIX.md`
 - `docs/artifacts/remote-install-autopilot/reference/adaptive_engine.py`
 - `docs/artifacts/remote-install-autopilot/reference/test_adaptive_engine.py`
+- `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlanner.kt`
+- `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlannerTest.kt`
 - `docs/artifacts/remote-install-autopilot/reference/CODEX_MINIMAL_PORT.md`
 
-Reference engine executed by ChatGPT: **33/33 tests PASS**.
+Reference validation by ChatGPT:
+- Python: **38/38 tests PASS**;
+- Kotlin: **40 reference checks PASS** after successful `kotlinc` compilation.
 
 The old binary `glosh_remote_live_guide_v2_prototype.zip` is deprecated and must not be used.
 
@@ -103,11 +111,11 @@ The core state engine is universal. Samsung is the only OEM-specific automatic e
 
 Only environment-bound work remains:
 1. verify actual current local Remote Installer HEAD/worktree and owner;
-2. port the frozen reference into `tools/glosh-remote-spike/**`, preserving useful current guide/pairing code;
-3. port the 33 reference cases to Android/JVM tests;
+2. port the frozen Kotlin planner and Android bindings into `tools/glosh-remote-spike/**`, preserving useful current guide/pairing code;
+3. port the full reference coverage to Android/JVM tests;
 4. compile/lint/regression tests;
 5. use Samsung A23 SM-A235M / Android 14 / API 34 as instrumented lab device;
-6. physically validate multiple start states with **zero wrong automatic clicks**;
+6. physically validate all important start states with **zero wrong automatic clicks**;
 7. verify automatic code pairing when unambiguous and manual six-box fallback otherwise;
 8. reuse the frozen PASS connection base once local ADB is ready;
 9. generate exact APK and send the same candidate to S22 for cable-free real-user UX validation;
