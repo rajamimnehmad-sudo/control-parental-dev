@@ -358,9 +358,14 @@ internal class VpnTransportGate09A private constructor(
         check(engineStop.joined && engineStop.cleanupComplete) {
             "HEV lifecycle quarantined state=${engineStop.state}"
         }
-        check(socksStop.clean) {
-            "SOCKS executors did not terminate accept=${socksStop.acceptExecutorTerminated} " +
-                "sessions=${socksStop.sessionExecutorTerminated}"
+        if (!socksStop.clean) {
+            // All listeners/sessions/upstream sockets are already closed and Chrome is fail-closed.
+            // Keep the bounded timeout observable without crashing the VPN service's main thread.
+            Log.e(
+                LogTag,
+                "socks_shutdown=quarantined accept=${socksStop.acceptExecutorTerminated} " +
+                    "sessions=${socksStop.sessionExecutorTerminated}",
+            )
         }
     }
 

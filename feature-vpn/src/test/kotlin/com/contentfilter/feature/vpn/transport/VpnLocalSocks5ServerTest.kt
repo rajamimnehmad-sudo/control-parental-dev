@@ -87,6 +87,66 @@ class VpnLocalSocks5ServerTest {
     }
 
     @Test
+    fun `shutdown with active TCP relays terminates workers and releases resources`() {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        val resources = VpnOwnedResourceTracker()
+        val fixture = ServerSocket(0, 8, loopback)
+        val accepted = CountDownLatch(4)
+        val releaseFixture = CountDownLatch(1)
+        val fixtureThread =
+            thread(name = "SocksTcpShutdownFixture") {
+                val peers = mutableListOf<Socket>()
+                try {
+                    repeat(4) {
+                        peers += fixture.accept()
+                        accepted.countDown()
+                    }
+                    releaseFixture.await(10, TimeUnit.SECONDS)
+                } finally {
+                    peers.forEach { runCatching { it.close() } }
+                }
+            }
+        val socks =
+            VpnLocalSocks5Server(
+                protectedSockets =
+                    VpnProtectedSocketFactory(
+                        protectTcp = { true },
+                        protectUdp = { true },
+                        resources = resources,
+                    ),
+                allowedAddresses = setOf(loopback.hostAddress.orEmpty()),
+                allowedPorts = setOf(fixture.localPort),
+                resources = resources,
+            )
+        val clients = mutableListOf<Socket>()
+
+        try {
+            socks.start()
+            repeat(4) {
+                clients +=
+                    Socket(loopback, socks.port).also { client ->
+                        authenticate(client, socks)
+                        client.getOutputStream().write(connectRequest(loopback, fixture.localPort))
+                        assertEquals(Socks5Protocol.Success, readReply(client.getInputStream()))
+                    }
+            }
+            assertTrue(accepted.await(1, TimeUnit.SECONDS))
+
+            val result = socks.shutdown()
+
+            assertTrue(result.clean)
+            assertEquals(0, socks.metrics().executorShutdownTimeouts)
+            assertEquals(0, resources.snapshot().ownedFdResources)
+        } finally {
+            clients.forEach { runCatching { it.close() } }
+            releaseFixture.countDown()
+            fixture.close()
+            fixtureThread.join(1_000)
+            socks.close()
+        }
+    }
+
+    @Test
     fun `UDP associate roundtrips and malformed datagram does not poison association`() {
         val loopback = InetAddress.getByName("127.0.0.1")
         val fixture = DatagramSocket(InetSocketAddress(loopback, 0))

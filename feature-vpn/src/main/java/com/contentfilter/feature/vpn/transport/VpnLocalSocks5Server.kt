@@ -429,7 +429,10 @@ internal class VpnLocalSocks5Server(
         const val RelayReadTimeoutMillis = 30_000
         const val RelayJoinTimeoutMillis = 2_000L
         const val ControlWatcherJoinMillis = 1_000L
-        const val ExecutorShutdownMillis = 2_000L
+
+        // Active CONNECT workers may still be completing their bounded reverse-relay join after
+        // both sockets are closed. Give that join a real margin before reporting quarantine.
+        const val ExecutorShutdownMillis = RelayJoinTimeoutMillis + 3_000L
         const val UdpPollMillis = 250
         const val UdpResponseTimeoutMillis = 2_000
         const val TcpBufferSize = 16 * 1024
