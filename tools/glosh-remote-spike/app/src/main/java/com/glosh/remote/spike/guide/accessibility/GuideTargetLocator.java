@@ -24,6 +24,10 @@ public final class GuideTargetLocator {
         List<GuideStage> stages = new ArrayList<>();
         stages.add(currentStage);
         if (isDeveloperLearningStage(currentStage)) {
+            GuideStage next = nextDeveloperStage(currentStage);
+            if (next != null) {
+                stages.add(next);
+            }
             stages.add(GuideStage.WIRELESS_DEBUGGING);
         }
         if (rescue) {
@@ -70,6 +74,14 @@ public final class GuideTargetLocator {
         return stage == GuideStage.DEV_ABOUT_PHONE
                 || stage == GuideStage.DEV_SOFTWARE_INFO
                 || stage == GuideStage.DEV_BUILD_NUMBER;
+    }
+
+    private GuideStage nextDeveloperStage(GuideStage stage) {
+        return switch (stage) {
+            case DEV_ABOUT_PHONE -> GuideStage.DEV_SOFTWARE_INFO;
+            case DEV_SOFTWARE_INFO -> GuideStage.DEV_BUILD_NUMBER;
+            default -> null;
+        };
     }
 
     private List<GuideStage> observableStages() {

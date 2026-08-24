@@ -89,7 +89,8 @@ public final class SettingsTreeScanner {
         if (node == null) {
             return "";
         }
-        String own = textOf(node);
+        String own = SettingsTitleDetector.explicitTitle(
+                node.getText(), node.getContentDescription());
         boolean titleContext = insideTitleContainer
                 || SettingsTitleDetector.isTitleContainer(node.getViewIdResourceName());
         if (!own.isEmpty() && titleContext) {

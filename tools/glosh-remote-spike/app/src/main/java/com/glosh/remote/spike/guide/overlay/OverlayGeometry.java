@@ -55,6 +55,31 @@ public final class OverlayGeometry {
         return result;
     }
 
+    public static Rect toLocal(Rect screenBounds, int windowLeft, int windowTop) {
+        Box local = toLocal(
+                new Box(screenBounds.left, screenBounds.top, screenBounds.right, screenBounds.bottom),
+                windowLeft,
+                windowTop);
+        return new Rect(local.left(), local.top(), local.right(), local.bottom());
+    }
+
+    public static boolean coachAtTop(
+            Box target, Box display, EdgeInsets insets, int barHeight, int margin) {
+        if (target == null || target.right() <= target.left() || target.bottom() <= target.top()) {
+            return false;
+        }
+        int bottomBarTop = display.bottom() - insets.bottom() - margin - barHeight;
+        return target.bottom() > bottomBarTop;
+    }
+
+    public static Box toLocal(Box screenBounds, int windowLeft, int windowTop) {
+        return new Box(
+                screenBounds.left() - windowLeft,
+                screenBounds.top() - windowTop,
+                screenBounds.right() - windowLeft,
+                screenBounds.bottom() - windowTop);
+    }
+
     public static Point bubblePosition(Rect display, Rect target, int width, int height, Insets insets) {
         int left = Math.max(display.left + insets.left + MARGIN,
                 Math.min(target.centerX() - width / 2, display.right - insets.right - width - MARGIN));

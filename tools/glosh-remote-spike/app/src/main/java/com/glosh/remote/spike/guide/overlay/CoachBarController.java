@@ -2,6 +2,8 @@ package com.glosh.remote.spike.guide.overlay;
 
 import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Insets;
+import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
@@ -27,6 +29,7 @@ public final class CoachBarController {
     private final Runnable onClose;
     private boolean attached;
     private boolean confirmingClose;
+    private Rect targetBounds;
 
     public CoachBarController(
             Context context,
@@ -68,7 +71,12 @@ public final class CoachBarController {
     }
 
     public void show(String instruction, boolean revealAvailable) {
+        show(instruction, revealAvailable, null);
+    }
+
+    public void show(String instruction, boolean revealAvailable, Rect targetBounds) {
         confirmingClose = false;
+        this.targetBounds = targetBounds == null ? null : new Rect(targetBounds);
         copy.setText(instruction);
         showMe.setVisibility(revealAvailable ? View.VISIBLE : View.GONE);
         rescue.setVisibility(View.VISIBLE);
@@ -81,6 +89,7 @@ public final class CoachBarController {
 
     public void showRecovery(String message) {
         confirmingClose = false;
+        targetBounds = null;
         copy.setText(message);
         showMe.setVisibility(View.GONE);
         rescue.setVisibility(View.VISIBLE);
@@ -97,6 +106,7 @@ public final class CoachBarController {
             attached = false;
         }
         confirmingClose = false;
+        targetBounds = null;
     }
 
     private void confirmClose() {
@@ -125,7 +135,20 @@ public final class CoachBarController {
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 android.graphics.PixelFormat.TRANSLUCENT);
-        params.gravity = Gravity.BOTTOM;
+        Rect display = windowManager.getCurrentWindowMetrics().getBounds();
+        Insets insets = windowManager.getCurrentWindowMetrics()
+                .getWindowInsets()
+                .getInsetsIgnoringVisibility(
+                        android.view.WindowInsets.Type.systemBars()
+                                | android.view.WindowInsets.Type.displayCutout());
+        boolean atTop = OverlayGeometry.coachAtTop(
+                targetBounds == null ? null : new OverlayGeometry.Box(
+                        targetBounds.left, targetBounds.top, targetBounds.right, targetBounds.bottom),
+                new OverlayGeometry.Box(display.left, display.top, display.right, display.bottom),
+                new OverlayGeometry.EdgeInsets(
+                        insets.left, insets.top, insets.right, insets.bottom),
+                dp(68), dp(12));
+        params.gravity = atTop ? Gravity.TOP : Gravity.BOTTOM;
         params.horizontalMargin = 0.025f;
         params.y = dp(12);
         if (attached) {
