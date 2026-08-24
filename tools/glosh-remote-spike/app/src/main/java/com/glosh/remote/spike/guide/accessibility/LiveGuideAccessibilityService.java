@@ -55,7 +55,11 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
                         Build.VERSION.SDK_INT).family());
         LiveGuideRuntime.updateSettingsPackages(new SettingsPackageResolver().resolve(this));
         highlight = new HighlightOverlayController(this);
-        bubble = new GuideBubbleController(this, this::rescue, this::openCorrectSettings);
+        bubble = new GuideBubbleController(
+                this,
+                this::rescue,
+                this::openCorrectSettings,
+                this::closeGuide);
         LiveGuideRuntime.register(this);
         applyPackageScope();
         scheduleScan();
@@ -391,6 +395,11 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         }
         clearVisuals();
         startActivity(intent);
+    }
+
+    private void closeGuide() {
+        clearVisuals();
+        LiveGuideRuntime.reset();
     }
 
     private void clearVisuals() {
