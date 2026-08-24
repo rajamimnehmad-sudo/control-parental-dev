@@ -17,7 +17,7 @@ class VpnProtectedSocketFactoryTest {
             VpnProtectedSocketFactory(
                 protectTcp = { false },
                 protectUdp = { false },
-                tcpConnector = { _, _ -> connects.incrementAndGet() },
+                tcpConnector = { _, _, _ -> connects.incrementAndGet() },
             )
 
         assertNull(factory.connectTcp(InetSocketAddress("127.0.0.1", 443)))
@@ -45,8 +45,9 @@ class VpnProtectedSocketFactoryTest {
                     assertTrue(it.isBound)
                     true
                 },
-                tcpConnector = { socket: Socket, _: InetSocketAddress ->
+                tcpConnector = { socket: Socket, _: InetSocketAddress, timeoutMillis: Int ->
                     check(protected)
+                    assertEquals(3_000, timeoutMillis)
                     socket.close()
                 },
             )
@@ -57,5 +58,21 @@ class VpnProtectedSocketFactoryTest {
         assertEquals(1, factory.metrics().protectedUdpSocketsCreated)
         assertEquals(1, factory.metrics().protectUdpSuccess)
         assertEquals(0, factory.metrics().protectUdpFailure)
+    }
+
+    @Test
+    fun `TCP connect failure releases the protected resource`() {
+        val resources = VpnOwnedResourceTracker()
+        val factory =
+            VpnProtectedSocketFactory(
+                protectTcp = { true },
+                protectUdp = { true },
+                tcpConnector = { _, _, _ -> throw java.net.SocketTimeoutException("fixture timeout") },
+                resources = resources,
+            )
+
+        assertNull(factory.connectTcp(InetSocketAddress("192.0.2.1", 443)))
+        assertEquals(0, resources.snapshot().ownedFdResources)
+        assertEquals(1, factory.metrics().tcpConnectAttempts)
     }
 }

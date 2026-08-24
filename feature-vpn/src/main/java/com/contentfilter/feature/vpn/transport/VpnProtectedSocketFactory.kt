@@ -52,9 +52,16 @@ internal class VpnProtectedSocketFactory(
     private val udpSocketFactory: () -> DatagramSocket = {
         DatagramSocket(null).apply { bind(InetSocketAddress(0)) }
     },
-    private val tcpConnector: (Socket, InetSocketAddress) -> Unit = { socket, target -> socket.connect(target) },
+    private val tcpConnectTimeoutMillis: Int = DefaultTcpConnectTimeoutMillis,
+    private val tcpConnector: (Socket, InetSocketAddress, Int) -> Unit = { socket, target, timeout ->
+        socket.connect(target, timeout)
+    },
     private val resources: VpnOwnedResourceTracker = VpnOwnedResourceTracker(),
 ) {
+    init {
+        require(tcpConnectTimeoutMillis > 0) { "TCP connect timeout must be positive" }
+    }
+
     private val protectFailures = AtomicLong(0)
     private val tcpConnectAttempts = AtomicLong(0)
     private val udpSendAttempts = AtomicLong(0)
@@ -74,7 +81,7 @@ internal class VpnProtectedSocketFactory(
         val protectedSocket = VpnProtectedTcpSocket(socket, resource)
         return runCatching {
             tcpConnectAttempts.incrementAndGet()
-            tcpConnector(socket, target)
+            tcpConnector(socket, target, tcpConnectTimeoutMillis)
             protectedSocket
         }.getOrElse {
             protectedSocket.close()
@@ -110,4 +117,8 @@ internal class VpnProtectedSocketFactory(
             protectUdpSuccess = protectUdpSuccess.get(),
             protectUdpFailure = protectUdpFailure.get(),
         )
+
+    private companion object {
+        const val DefaultTcpConnectTimeoutMillis = 3_000
+    }
 }
