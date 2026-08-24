@@ -1,0 +1,42 @@
+{
+  "oem": "Samsung",
+  "version": 1,
+  "minimum_android_api": 30,
+  "settings_packages": ["com.android.settings"],
+  "entry_intents": {
+    "developer_options": "android.settings.APPLICATION_DEVELOPMENT_SETTINGS",
+    "about_phone": "android.settings.DEVICE_INFO_SETTINGS"
+  },
+  "steps": {
+    "about_phone": {
+      "target": "software_info",
+      "aliases_es": ["Información de software"],
+      "expected_next": ["software_info"]
+    },
+    "software_info": {
+      "target": "build_number",
+      "aliases_es": ["Número de compilación"],
+      "repeat_max": 7,
+      "reacquire_before_each_click": true,
+      "allowed_interruptions": ["credential_prompt", "developer_enabled_feedback"]
+    },
+    "developer_options": {
+      "target": "wireless_debugging",
+      "aliases_es": ["Depuración inalámbrica"],
+      "expected_next": ["wireless_debugging"]
+    },
+    "wireless_debugging": {
+      "toggle_target": "wireless_debugging_toggle",
+      "pair_target": "pair_with_code",
+      "pair_aliases_es": ["Vincular dispositivo con código de vinculación", "Vincular dispositivo con código"],
+      "network_confirmation": "exact_positive_button_only"
+    },
+    "pairing_dialog": {
+      "code_regex": "^[0-9]{6}$",
+      "require_exactly_one": true,
+      "require_pairing_context": true,
+      "manual_fallback": true
+    }
+  },
+  "never_automate": ["device_pin", "device_password", "device_pattern", "unknown_screen", "ambiguous_target"]
+}
