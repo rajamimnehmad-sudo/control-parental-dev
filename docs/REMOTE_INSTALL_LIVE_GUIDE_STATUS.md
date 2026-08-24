@@ -58,8 +58,8 @@ ChatGPT isolated reference package:
 - interactive HTML mock;
 - **30/30 tests PASS**;
 - artifact `glosh_remote_live_guide_v2_prototype.zip`;
-- size `35,807` bytes;
-- SHA-256 `b84c2ddb88bdc0a4d36fc01f5fdbdecc0c32789ec9fc6e005391aa39fb5ce3cd`;
+- size `36,217` bytes;
+- SHA-256 `cdff82c2bcd3c15d8ead1286d545f38cb473dfa2473bb1d505e07894d58a8418`;
 - `HANDOFF_MANIFEST.json` contains per-file SHA-256s.
 
 Next work requiring Codex/Mac:
