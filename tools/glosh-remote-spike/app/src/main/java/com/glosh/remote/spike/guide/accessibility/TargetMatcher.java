@@ -37,6 +37,16 @@ public final class TargetMatcher {
             return new Match(highs.get(0), Confidence.HIGH, false);
         }
         if (highs.size() > 1) {
+            List<TargetCandidate> explicitLabels = new ArrayList<>();
+            for (TargetCandidate candidate : highs) {
+                if (contains(spec.exactLabels(), normalize(candidate.text()))
+                        || contains(spec.aliases(), normalize(candidate.text()))) {
+                    explicitLabels.add(candidate);
+                }
+            }
+            if (explicitLabels.size() == 1) {
+                return new Match(explicitLabels.get(0), Confidence.HIGH, false);
+            }
             return new Match(null, Confidence.HIGH, true);
         }
         return new Match(best, bestConfidence, false);
@@ -82,9 +92,10 @@ public final class TargetMatcher {
         }
         String decomposed = Normalizer.normalize(raw.toString(), Normalizer.Form.NFD);
         return decomposed.replaceAll("\\p{M}+", "")
+                .replaceAll("\\p{Cf}", "")
                 .toLowerCase(Locale.ROOT)
                 .trim()
-                .replaceAll("\\s+", " ");
+                .replaceAll("[\\s\\p{Z}]+", " ");
     }
 
     private static boolean contains(List<String> values, String normalized) {

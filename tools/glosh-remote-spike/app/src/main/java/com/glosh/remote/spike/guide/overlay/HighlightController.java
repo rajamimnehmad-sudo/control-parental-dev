@@ -117,8 +117,18 @@ public final class HighlightController {
             super.onDraw(canvas);
             framePaint.setAlpha(Math.round(alpha * 255));
             float padding = dp(5);
-            frame.set(target.left - padding, target.top - padding,
-                    target.right + padding, target.bottom + padding);
+            int[] windowOrigin = new int[2];
+            getLocationOnScreen(windowOrigin);
+            Rect localTarget = OverlayGeometry.toLocal(
+                    new Rect(
+                            Math.round(target.left),
+                            Math.round(target.top),
+                            Math.round(target.right),
+                            Math.round(target.bottom)),
+                    windowOrigin[0],
+                    windowOrigin[1]);
+            frame.set(localTarget.left - padding, localTarget.top - padding,
+                    localTarget.right + padding, localTarget.bottom + padding);
             canvas.drawRoundRect(frame, dp(13), dp(13), framePaint);
             markerPaint.setAlpha(framePaint.getAlpha());
             canvas.drawCircle(frame.left + dp(12), frame.centerY(), dp(6), markerPaint);

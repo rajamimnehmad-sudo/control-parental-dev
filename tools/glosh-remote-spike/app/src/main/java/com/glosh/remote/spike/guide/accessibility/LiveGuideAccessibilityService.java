@@ -10,12 +10,14 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import com.glosh.remote.spike.RemotePairingService;
+import com.glosh.remote.spike.BuildConfig;
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.guide.overlay.CoachBarController;
 import com.glosh.remote.spike.guide.overlay.HighlightController;
@@ -34,6 +36,8 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         implements LiveGuideRuntime.Listener, GuideEventActor.Listener {
     private final Handler actorHandler = new Handler(Looper.getMainLooper());
     private final TargetMatcher matcher = new TargetMatcher();
+    private final AccessibilityEventTargetInspector eventTargetInspector =
+            new AccessibilityEventTargetInspector(matcher);
     private final GuideTargetLocator locator = new GuideTargetLocator(matcher);
     private final PairingCodeDetector codeDetector = new PairingCodeDetector();
     private final ScanGenerationGuard generationGuard = new ScanGenerationGuard();
@@ -171,6 +175,12 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         }
 
         LocatedTarget located = locate(snapshot, rescueRequested);
+        debug("stable stage=" + LiveGuideRuntime.stage()
+                + " result=" + (located == null ? "none" : located.stage())
+                + " expectedScreen=" + locator.isExpectedScreen(
+                        LiveGuideRuntime.family(), LiveGuideRuntime.stage(), snapshot.screenTitle())
+                + " nodes=" + snapshot.nodes().size()
+                + " confidence=" + confidenceSummary(snapshot));
         if (rescueRequested) {
             rescueRequested = false;
             if (located == null) {
@@ -212,7 +222,8 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
                 : Set.of();
         info.packageNames = packages.toArray(new String[0]);
         info.flags |= AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
-                | AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS;
+                | AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+                | AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS;
         setServiceInfo(info);
     }
 
@@ -244,6 +255,7 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         Rect target = located.node().candidate().bounds();
         Rect content = contentBounds();
         boolean visible = !target.isEmpty() && Rect.intersects(content, target);
+        debug("target stage=" + located.stage() + " visible=" + visible);
         if (visible) {
             reveal.cancel();
             Rect clamped = OverlayGeometry.clampHighlight(
@@ -251,7 +263,7 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
                     getSystemService(WindowManager.class).getCurrentWindowMetrics().getBounds(),
                     systemInsets());
             if (highlight.show(token, snapshot, clamped)) {
-                coach.show(instruction(located.stage()), false);
+                coach.show(instruction(located.stage()), false, clamped);
             }
             return;
         }
@@ -336,20 +348,7 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         if (spec == null) {
             return;
         }
-        Rect bounds = new Rect();
-        source.getBoundsInScreen(bounds);
-        AccessibilityNodeInfo parent = source.getParent();
-        TargetCandidate candidate = new TargetCandidate(
-                string(source.getText()),
-                string(source.getContentDescription()),
-                source.getViewIdResourceName(),
-                snapshot.screenTitle(),
-                parent == null ? "" : string(parent.getText()),
-                "",
-                string(source.getClassName()),
-                source.isClickable(),
-                bounds);
-        if (matcher.score(spec, candidate) != TargetMatcher.Confidence.HIGH) {
+        if (!eventTargetInspector.matches(source, spec, snapshot.screenTitle())) {
             return;
         }
         if (stage == GuideStage.DEV_ABOUT_PHONE) {
@@ -448,6 +447,95 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
 
     private String string(CharSequence value) {
         return value == null ? "" : value.toString();
+    }
+
+    private void debug(String message) {
+        if (BuildConfig.DEBUG) {
+            Log.d("GloshGuideV2", message);
+        }
+    }
+
+    private String confidenceSummary(SettingsSnapshot snapshot) {
+        TargetSpec spec = GuideTargetCatalog.forStage(
+                LiveGuideRuntime.family(), LiveGuideRuntime.stage());
+        if (spec == null) {
+            return "none";
+        }
+        int high = 0;
+        int textLabel = 0;
+        int descriptionLabel = 0;
+        int textPrefix = 0;
+        int descriptionPrefix = 0;
+        int textContains = 0;
+        int descriptionContains = 0;
+        for (NodeSnapshot node : snapshot.nodes()) {
+            TargetCandidate candidate = node.candidate();
+            if (matchesLabel(spec, candidate.text())) {
+                textLabel++;
+            }
+            if (matchesLabel(spec, candidate.contentDescription())) {
+                descriptionLabel++;
+            }
+            if (startsWithLabel(spec, candidate.text())) {
+                textPrefix++;
+            }
+            if (startsWithLabel(spec, candidate.contentDescription())) {
+                descriptionPrefix++;
+            }
+            if (containsLabel(spec, candidate.text())) {
+                textContains++;
+            }
+            if (containsLabel(spec, candidate.contentDescription())) {
+                descriptionContains++;
+            }
+            if (matcher.score(spec, candidate) == TargetMatcher.Confidence.HIGH) {
+                high++;
+            }
+        }
+        return "high:" + high + ",text:" + textLabel + ",desc:" + descriptionLabel
+                + ",textPrefix:" + textPrefix + ",descPrefix:" + descriptionPrefix
+                + ",textContains:" + textContains + ",descContains:" + descriptionContains;
+    }
+
+    private boolean matchesLabel(TargetSpec spec, String value) {
+        String normalized = TargetMatcher.normalize(value);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        return spec.exactLabels().stream()
+                .map(TargetMatcher::normalize)
+                .anyMatch(normalized::equals)
+                || spec.aliases().stream()
+                .map(TargetMatcher::normalize)
+                .anyMatch(normalized::equals);
+    }
+
+    private boolean startsWithLabel(TargetSpec spec, String value) {
+        String normalized = TargetMatcher.normalize(value);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        return spec.exactLabels().stream()
+                .map(TargetMatcher::normalize)
+                .anyMatch(label -> normalized.startsWith(label + " ")
+                        || normalized.startsWith(label + ","))
+                || spec.aliases().stream()
+                .map(TargetMatcher::normalize)
+                .anyMatch(label -> normalized.startsWith(label + " ")
+                        || normalized.startsWith(label + ","));
+    }
+
+    private boolean containsLabel(TargetSpec spec, String value) {
+        String normalized = TargetMatcher.normalize(value);
+        if (normalized.isEmpty()) {
+            return false;
+        }
+        return spec.exactLabels().stream()
+                .map(TargetMatcher::normalize)
+                .anyMatch(normalized::contains)
+                || spec.aliases().stream()
+                .map(TargetMatcher::normalize)
+                .anyMatch(normalized::contains);
     }
 
     private record LocatedTarget(GuideStage stage, NodeSnapshot node) {

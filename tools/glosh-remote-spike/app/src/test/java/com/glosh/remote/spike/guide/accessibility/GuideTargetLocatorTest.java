@@ -36,6 +36,17 @@ public class GuideTargetLocatorTest {
     }
 
     @Test
+    public void samsungStableNextScreenAdvancesAfterClickSnapshotWasInvalidated() {
+        SettingsSnapshot snapshot = snapshot(
+                "Información de software",
+                node("Número de compilación", "Información de software"));
+        GuideTargetLocator.LocatedTarget result = locator.locate(
+                snapshot, OemFamily.SAMSUNG, GuideStage.DEV_SOFTWARE_INFO, false);
+        assertNotNull(result);
+        assertEquals(GuideStage.DEV_BUILD_NUMBER, result.stage());
+    }
+
+    @Test
     public void explicitRescueCanRealignKnownScreen() {
         SettingsSnapshot snapshot = snapshot(
                 "Opciones de desarrollador",

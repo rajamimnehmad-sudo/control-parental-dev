@@ -12,6 +12,23 @@ import java.util.List;
 
 public class TargetMatcherTest {
     private final TargetMatcher matcher = new TargetMatcher();
+
+    @Test
+    public void samsungClickEventCanMatchLabelInsideClickableParent() {
+        TargetSpec spec = GuideTargetCatalog.forStage(
+                com.glosh.remote.spike.wizard.OemFamily.SAMSUNG,
+                com.glosh.remote.spike.guide.state.GuideStage.DEV_SOFTWARE_INFO);
+        TargetCandidate parent = candidate(
+                "", "Acerca del teléfono", "", true, "LinearLayout", null);
+        TargetCandidate label = candidate(
+                "Información de software", "Acerca del teléfono", "", false, "TextView", null);
+
+        TargetMatcher.Match match = matcher.best(spec, List.of(parent, label));
+
+        assertTrue(match.actionable());
+        assertEquals(label, match.candidate());
+    }
+
     private final TargetSpec spec = new TargetSpec(
             List.of("Depuración inalámbrica"),
             List.of("Wireless debugging"),
@@ -25,6 +42,9 @@ public class TargetMatcherTest {
     @Test
     public void normalizationHandlesCaseWhitespaceUnicodeAndAccents() {
         assertEquals("depuracion inalambrica", TargetMatcher.normalize("  DEPURACIÓN   inalámbrica "));
+        assertEquals(
+                "depuracion inalambrica",
+                TargetMatcher.normalize("\u200eDEPURACIÓN\u00a0inalámbrica\u200f"));
     }
 
     @Test
@@ -60,6 +80,26 @@ public class TargetMatcherTest {
         TargetMatcher.Match result = matcher.best(spec, List.of(value, value));
         assertTrue(result.ambiguous());
         assertFalse(result.actionable());
+    }
+
+    @Test
+    public void uniqueVisibleLabelWinsOverSamsungSwitchDescriptionDuplicate() {
+        TargetSpec wirelessSpec = GuideTargetCatalog.forStage(
+                com.glosh.remote.spike.wizard.OemFamily.SAMSUNG,
+                com.glosh.remote.spike.guide.state.GuideStage.WIRELESS_DEBUGGING);
+        TargetCandidate label = candidate(
+                "Depuración inalámbrica", "Opciones de desarrollador", "", false,
+                "TextView", null);
+        TargetCandidate switchDescription = new TargetCandidate(
+                "", "Depuración inalámbrica", "android:id/switch_widget",
+                "Opciones de desarrollador", "", "", "Switch", true,
+                new Rect(800, 0, 1000, 100));
+
+        TargetMatcher.Match result = matcher.best(
+                wirelessSpec, List.of(label, switchDescription));
+
+        assertTrue(result.actionable());
+        assertEquals(label, result.candidate());
     }
 
     @Test

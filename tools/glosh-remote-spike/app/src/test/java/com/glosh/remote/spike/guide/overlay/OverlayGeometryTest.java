@@ -31,6 +31,26 @@ public class OverlayGeometryTest {
         assertTrue(OverlayMotionPolicy.shouldPulse(true));
     }
 
+    @Test
+    public void screenBoundsAreTranslatedToAccessibilityOverlayCoordinates() {
+        OverlayGeometry.Box local = OverlayGeometry.toLocal(
+                new OverlayGeometry.Box(68, 1816, 681, 1889), 0, 66);
+        assertTrue(local.left() == 68);
+        assertTrue(local.top() == 1750);
+        assertTrue(local.right() == 681);
+        assertTrue(local.bottom() == 1823);
+    }
+
+    @Test
+    public void coachMovesToTopOnlyWhenBottomPlacementWouldCoverTarget() {
+        OverlayGeometry.Box display = new OverlayGeometry.Box(0, 0, 2408, 1080);
+        OverlayGeometry.EdgeInsets insets = new OverlayGeometry.EdgeInsets(0, 66, 0, 42);
+        assertTrue(OverlayGeometry.coachAtTop(
+                new OverlayGeometry.Box(100, 730, 700, 840), display, insets, 190, 24));
+        assertFalse(OverlayGeometry.coachAtTop(
+                new OverlayGeometry.Box(100, 300, 700, 390), display, insets, 190, 24));
+    }
+
     private boolean intersects(OverlayGeometry.Box first, OverlayGeometry.Box second) {
         return first.left() < second.right() && first.right() > second.left()
                 && first.top() < second.bottom() && first.bottom() > second.top();
