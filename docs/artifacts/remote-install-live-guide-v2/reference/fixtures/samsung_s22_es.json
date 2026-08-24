@@ -1,0 +1,48 @@
+{
+  "device": {
+    "family": "samsung",
+    "model": "SM-S908E",
+    "android": 16,
+    "sdk": 36,
+    "language": "es"
+  },
+  "settings_packages": ["com.android.settings", "com.samsung.android.settings"],
+  "scenarios": [
+    {
+      "name": "about_phone_software_information",
+      "title": "Acerca del teléfono",
+      "target": "software_information",
+      "rows": ["Nombre del teléfono", "Número de modelo", "Información de estado", "Información legal", "Información de software"],
+      "expected_confidence": "high"
+    },
+    {
+      "name": "software_information_build_number_with_overlay_duplicate",
+      "title": "Información de software",
+      "target": "build_number",
+      "rows": ["Versión de One UI", "Versión de Android", "Versión de banda base", "Versión de kernel", "Número de compilación"],
+      "overlay_text": "Ahora tocá Número de compilación",
+      "expected_confidence": "high"
+    },
+    {
+      "name": "wrong_screen_must_not_guess",
+      "title": "Privacidad",
+      "target": "build_number",
+      "rows": ["Administrador de permisos", "Panel de privacidad", "Otros ajustes de privacidad"],
+      "expected_confidence": "none"
+    },
+    {
+      "name": "developer_options_wireless_debugging",
+      "title": "Opciones de desarrollador",
+      "target": "wireless_debugging",
+      "rows": ["Memoria", "Depuración USB", "Revocar autorizaciones USB", "Depuración inalámbrica"],
+      "expected_confidence": "high"
+    },
+    {
+      "name": "wireless_pair_with_code",
+      "title": "Depuración inalámbrica",
+      "target": "pair_with_code",
+      "rows": ["Usar depuración inalámbrica", "Nombre del dispositivo", "Emparejar dispositivo con código", "Dispositivos vinculados"],
+      "expected_confidence": "high"
+    }
+  ]
+}
