@@ -41,6 +41,9 @@ import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import com.contentfilter.feature.vpn.transport.VpnPacketDispatcher
 import com.contentfilter.feature.vpn.transport.VpnTransportGate09A
 import com.contentfilter.feature.vpn.transport.VpnTransportResourceDiagnostics
+import com.contentfilter.feature.vpn.transport.VpnTransportRuntimeAuthority
+import com.contentfilter.feature.vpn.transport.toDevInactiveStatusLog
+import com.contentfilter.feature.vpn.transport.toDevStatusLog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -121,6 +124,8 @@ class FilterVpnService : VpnService() {
             ActionDevLabRoutesChanged -> refreshDevLabRoutes()
             ActionDevTransportStatus -> logDevTransportStatus()
             ActionDevTransportStress -> runDevTransportStress(intent?.getIntExtra(ExtraStressCycles, 0) ?: 0)
+            ActionDevFullTunnelGateChanged ->
+                updateDevFullTunnelGate(intent?.getBooleanExtra(ExtraFullTunnelEnabled, false) == true)
             else -> startVpn()
         }
         return START_STICKY
@@ -177,6 +182,10 @@ class FilterVpnService : VpnService() {
                     packetDispatcher = dispatcher
                     transportGate09A =
                         if (ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService)) {
+                            val fullTunnelEnabled =
+                                ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(
+                                    this@FilterVpnService,
+                                )
                             val controlledAddresses =
                                 ChromePhotosDataPlaneLabVpnPolicy.routes(this@FilterVpnService)
                                     .mapTo(linkedSetOf()) { route -> route.address }
@@ -192,6 +201,7 @@ class FilterVpnService : VpnService() {
                                     ChromePhotosDataPlaneLabVpnPolicy.udpFixtureGate(
                                         this@FilterVpnService,
                                     ),
+                                fullTunnelEnabled = fullTunnelEnabled,
                                 writeToTun = dispatcher::writePacket,
                             )
                         } else {
@@ -266,51 +276,22 @@ class FilterVpnService : VpnService() {
         startVpn()
     }
 
+    private fun updateDevFullTunnelGate(enabled: Boolean) {
+        if (!DevProtectionMode.isAvailable(this)) return
+        val updated = ChromePhotosDataPlaneLabVpnPolicy.setFullTunnelDevGate(this, enabled)
+        Log.i(LogTag, "transport_scope_request=full_tunnel_dev enabled=$enabled accepted=$updated")
+        if (updated) refreshDevLabRoutes()
+    }
+
     private fun logDevTransportStatus() {
         if (!DevProtectionMode.isAvailable(this)) return
         val metrics = transportGate09A?.metrics()
         if (metrics == null) {
             val resources = VpnTransportResourceDiagnostics.snapshot()
-            Log.i(
-                TransportLogTag,
-                "status=inactive ownedFdResources=${resources.ownedFdResources} " +
-                    "ownedFdPeak=${resources.ownedFdResourcesPeak} " +
-                    "activeProtectedUdpSockets=${resources.activeProtectedUdpSockets} " +
-                    "protectedUdpPeak=${resources.activeProtectedUdpSocketsPeak}",
-            )
+            Log.i(TransportLogTag, resources.toDevInactiveStatusLog(VpnTransportRuntimeAuthority.snapshot()))
             return
         }
-        Log.i(
-            TransportLogTag,
-            "status=active generation=${metrics.generation} bridge=${metrics.packetSocketType.name.lowercase()} " +
-                "queuePeak=${metrics.queuePeak} queueDrops=${metrics.queueDrops} " +
-                "forwarded=${metrics.forwardedPackets} returned=${metrics.returnedPackets} " +
-                "chromeTcpDrops=${metrics.chromeTcpDrops} chromeUdpDrops=${metrics.chromeUdpDrops} " +
-                "unknownDrops=${metrics.unknownOwnerDrops} recursion=${metrics.recursionPackets} " +
-                "hevTxPackets=${metrics.hev.txPackets} hevRxPackets=${metrics.hev.rxPackets} " +
-                "hevLifecycle=${metrics.hevLifecycle.state.name.lowercase()} " +
-                "hevJoinTimeouts=${metrics.hevLifecycle.joinTimeouts} " +
-                "hevCleanupCount=${metrics.hevLifecycle.cleanupCount} " +
-                "socksTcp=${metrics.socks.tcpConnects} socksUdpAssociations=${metrics.socks.udpAssociations} " +
-                "socksUdpOut=${metrics.socks.udpDatagramsOut} socksUdpIn=${metrics.socks.udpDatagramsIn} " +
-                "socksUdpInvalid=${metrics.socks.malformedUdpDatagrams} " +
-                "socksUdpFragmentsDropped=${metrics.socks.udpFragmentsDropped} " +
-                "activeUdpAssociations=${metrics.socks.activeUdpAssociations} " +
-                "activeUdpAssociationsPeak=${metrics.socks.activeUdpAssociationsPeak} " +
-                "protectFailures=${metrics.protectedSockets.protectFailures} " +
-                "protectedUdpSocketsCreated=${metrics.protectedSockets.protectedUdpSocketsCreated} " +
-                "protectUdpSuccess=${metrics.protectedSockets.protectUdpSuccess} " +
-                "protectUdpFailure=${metrics.protectedSockets.protectUdpFailure} " +
-                "ownedFdResources=${metrics.resources.ownedFdResources} " +
-                "ownedFdPeak=${metrics.resources.ownedFdResourcesPeak} " +
-                "activeProtectedUdpSockets=${metrics.resources.activeProtectedUdpSockets} " +
-                "protectedUdpPeak=${metrics.resources.activeProtectedUdpSocketsPeak} " +
-                "malformedEmpty=${metrics.socks.malformedProbeEmptySent} " +
-                "malformedTruncated=${metrics.socks.malformedProbeTruncatedSent} " +
-                "malformedInvalidHeader=${metrics.socks.malformedProbeInvalidHeaderSent} " +
-                "socksSessionIoFailures=${metrics.socks.sessionIoFailures} " +
-                "socksShutdownTimeouts=${metrics.socks.executorShutdownTimeouts}",
-        )
+        Log.i(TransportLogTag, metrics.toDevStatusLog())
     }
 
     private fun runDevTransportStress(cycles: Int) {
@@ -425,6 +406,7 @@ class FilterVpnService : VpnService() {
                 blockedDestinations = blockedDestinationRoutes.activeRoutes(),
             )
             .applyChromePhotosDataPlaneLabRoute()
+            .applyDevFullTunnelRoutes()
             .allowBrowserApps()
             .setMtu(DefaultMtu)
             .setBlocking(true)
@@ -456,6 +438,17 @@ class FilterVpnService : VpnService() {
             ChromePhotosDataPlaneLabVpnPolicy
                 .routes(this@FilterVpnService)
                 .forEach { route -> addRoute(route.address, route.prefixLength) }
+        }
+
+    private fun Builder.applyDevFullTunnelRoutes(): Builder =
+        apply {
+            val enabled =
+                ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(this@FilterVpnService) &&
+                    !strictWebBlockMode
+            ChromePhotosDataPlaneLabVpnPolicy.fullTunnelRoutes(enabled).forEach { route ->
+                addRoute(route.address, route.prefixLength)
+            }
+            if (enabled) Log.i(LogTag, "transport_scope=full_tunnel_dev routes=ipv4_default,ipv6_default")
         }
 
     private fun observeVpnReconnectPolicy(scope: CoroutineScope) {
@@ -942,7 +935,11 @@ class FilterVpnService : VpnService() {
         readerJob?.cancel()
         readerJob = null
         snapshotProvider.stop()
-        transportGate09A?.close()
+        transportGate09A?.shutdown()?.let { result ->
+            if (!result.clean) {
+                Log.e(LogTag, "transport_cleanup=quarantined chrome=fail_closed")
+            }
+        }
         transportGate09A = null
         packetDispatcher?.close()
         packetDispatcher = null
@@ -968,8 +965,10 @@ class FilterVpnService : VpnService() {
         const val ActionDevLabRoutesChanged = "com.contentfilter.feature.vpn.DEV_LAB_ROUTES_CHANGED"
         const val ActionDevTransportStatus = "com.contentfilter.feature.vpn.DEV_TRANSPORT_STATUS"
         const val ActionDevTransportStress = "com.contentfilter.feature.vpn.DEV_TRANSPORT_STRESS"
+        const val ActionDevFullTunnelGateChanged = "com.contentfilter.feature.vpn.DEV_FULL_TUNNEL_GATE_CHANGED"
         private const val ExtraReconnectKey = "vpn_reconnect_key"
         const val ExtraStressCycles = "stress_cycles"
+        const val ExtraFullTunnelEnabled = "full_tunnel_enabled"
 
         private const val DefaultMtu = 1500
         private const val LocalVpnAddress = "10.8.0.2"

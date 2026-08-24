@@ -6,6 +6,7 @@ import com.contentfilter.feature.vpn.service.VpnTransportProtocol
 
 internal enum class VpnTransportAction {
     ExistingDnsPath,
+    AuthorizedChromeProxyPath,
     ForwardToHev,
     DropChromeDirectHttps,
     DropUnknownOwner,
@@ -14,31 +15,32 @@ internal enum class VpnTransportAction {
 
 internal class VpnTransportPolicy(
     private val chromePackage: String,
-    private val allowedDestinationAddresses: Set<String>,
+    private val destinationAuthority: VpnDestinationAuthority,
+    private val proxyAddress: String = "127.0.0.1",
+    private val proxyPort: Int = 8877,
 ) {
-    internal fun allowedAddressesForStress(): Set<String> = allowedDestinationAddresses
-
     fun decide(
         flow: VpnFlowTuple,
         owner: VpnConnectionOwnerResult,
     ): VpnTransportAction {
         if (flow.remoteAddress.port == DnsPort) return VpnTransportAction.ExistingDnsPath
-        if (flow.remoteAddress.address.hostAddress.orEmpty().substringBefore('%') !in allowedDestinationAddresses) {
-            return VpnTransportAction.DropUnapprovedDestination
-        }
         if (owner !is VpnConnectionOwnerResult.Resolved) return VpnTransportAction.DropUnknownOwner
-        if (
-            chromePackage in owner.packages &&
-            flow.remoteAddress.port == HttpsPort &&
-            flow.protocol in setOf(VpnTransportProtocol.Tcp, VpnTransportProtocol.Udp)
-        ) {
+        if (chromePackage in owner.packages) {
+            val normalized = flow.remoteAddress.address.hostAddress.orEmpty().substringBefore('%')
+            if (
+                flow.protocol == VpnTransportProtocol.Tcp &&
+                normalized == proxyAddress &&
+                flow.remoteAddress.port == proxyPort
+            ) {
+                return VpnTransportAction.AuthorizedChromeProxyPath
+            }
             return VpnTransportAction.DropChromeDirectHttps
         }
+        if (!destinationAuthority.isAllowed(flow.remoteAddress)) return VpnTransportAction.DropUnapprovedDestination
         return VpnTransportAction.ForwardToHev
     }
 
     private companion object {
         const val DnsPort = 53
-        const val HttpsPort = 443
     }
 }

@@ -12,6 +12,14 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
+
+internal data class VpnFlowOwnerCacheMetrics(
+    val cacheHits: Long,
+    val cacheMisses: Long,
+    val lookupTimeouts: Long,
+    val queueRejections: Long,
+)
 
 internal class VpnFlowOwnerCache(
     private val lookup: (VpnFlowTuple) -> VpnConnectionOwnerResult,
@@ -39,6 +47,10 @@ internal class VpnFlowOwnerCache(
                 size > capacity
         }
     private val inFlight = mutableMapOf<Pair<Long, VpnFlowTuple>, CompletableFuture<VpnConnectionOwnerResult>>()
+    private val cacheHits = AtomicLong(0)
+    private val cacheMisses = AtomicLong(0)
+    private val lookupTimeouts = AtomicLong(0)
+    private val queueRejections = AtomicLong(0)
 
     fun resolve(
         flow: VpnFlowTuple,
@@ -48,9 +60,13 @@ internal class VpnFlowOwnerCache(
         synchronized(cache) {
             cache[flow]
                 ?.takeIf { it.generation == generation && now < it.expiresAtMillis }
-                ?.let { return it.result }
+                ?.let {
+                    cacheHits.incrementAndGet()
+                    return it.result
+                }
             cache.remove(flow)
         }
+        cacheMisses.incrementAndGet()
         val key = generation to flow
         val future: CompletableFuture<VpnConnectionOwnerResult>
         val leader: Boolean
@@ -69,6 +85,7 @@ internal class VpnFlowOwnerCache(
             try {
                 lookupExecutor.execute { performLookup(key, flow, generation, future) }
             } catch (_: RejectedExecutionException) {
+                queueRejections.incrementAndGet()
                 synchronized(inFlight) { inFlight.remove(key, future) }
                 future.complete(VpnConnectionOwnerResult.Unknown)
             }
@@ -76,6 +93,7 @@ internal class VpnFlowOwnerCache(
         return try {
             future.get(lookupWaitTimeoutMillis, TimeUnit.MILLISECONDS)
         } catch (_: TimeoutException) {
+            lookupTimeouts.incrementAndGet()
             VpnConnectionOwnerResult.Unknown
         } catch (_: CancellationException) {
             VpnConnectionOwnerResult.Unknown
@@ -116,6 +134,14 @@ internal class VpnFlowOwnerCache(
     }
 
     internal fun size(): Int = synchronized(cache) { cache.size }
+
+    fun metrics(): VpnFlowOwnerCacheMetrics =
+        VpnFlowOwnerCacheMetrics(
+            cacheHits = cacheHits.get(),
+            cacheMisses = cacheMisses.get(),
+            lookupTimeouts = lookupTimeouts.get(),
+            queueRejections = queueRejections.get(),
+        )
 
     private companion object {
         const val DefaultCapacity = 512

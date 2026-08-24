@@ -30,6 +30,10 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
             )
             return
         }
+        if (intent.action == ActionFullTunnelStart || intent.action == ActionFullTunnelStop) {
+            VpnController.setDevFullTunnelGate(context, intent.action == ActionFullTunnelStart)
+            return
+        }
         when (intent.action) {
             ActionStart ->
                 ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(
@@ -63,6 +67,10 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                     ExtraUdpFixtureMalformedProbeEnabled,
                     intent.getBooleanExtra(ExtraUdpFixtureMalformedProbeEnabled, false),
                 )
+                .putExtra(
+                    ExtraFullTunnelDevGateEnabled,
+                    intent.getBooleanExtra(ExtraFullTunnelDevGateEnabled, false),
+                )
         }
         ContextCompat.startForegroundService(context, serviceIntent)
     }
@@ -73,6 +81,8 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ActionStatus = "com.contentfilter.user.chromedataplane.command.STATUS"
         const val ActionTransportStatus = "com.contentfilter.user.chromedataplane.command.TRANSPORT_STATUS"
         const val ActionTransportStress = "com.contentfilter.user.chromedataplane.command.TRANSPORT_STRESS"
+        const val ActionFullTunnelStart = "com.contentfilter.user.chromedataplane.command.FULL_TUNNEL_START"
+        const val ActionFullTunnelStop = "com.contentfilter.user.chromedataplane.command.FULL_TUNNEL_STOP"
         const val ExtraSurfaceMarkerEnabled = "chrome_photos_surface_marker_enabled"
         const val ExtraTransportStressCycles = "transport_stress_cycles"
         const val ExtraUdpFixtureGateEnabled = ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled
@@ -80,6 +90,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ExtraUdpFixturePort = ChromePhotosDataPlaneLabContract.KeyUdpFixturePort
         const val ExtraUdpFixtureMalformedProbeEnabled =
             ChromePhotosDataPlaneLabContract.KeyUdpFixtureMalformedProbeEnabled
+        const val ExtraFullTunnelDevGateEnabled = "full_tunnel_dev_gate_enabled"
         private const val DefaultTransportStressCycles = 100
     }
 }

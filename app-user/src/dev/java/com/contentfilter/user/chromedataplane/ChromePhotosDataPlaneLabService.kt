@@ -85,6 +85,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                 val preferences = labPreferences()
                 try {
                     val udpFixtureGate = ChromePhotosUdpFixtureGateConfig.fromIntent(intent)
+                    val fullTunnelDevGateEnabled =
+                        intent?.getBooleanExtra(
+                            ChromePhotosDataPlaneLabReceiver.ExtraFullTunnelDevGateEnabled,
+                            false,
+                        ) == true
                     if (udpFixtureGate.enabled) {
                         require(
                             packageManager.getApplicationInfo(ChromePhotosDataPlaneLabContract.UdpFixturePackage, 0).enabled,
@@ -168,6 +173,12 @@ class ChromePhotosDataPlaneLabService : Service() {
                         .putLong(ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts, 0L)
                         .remove(ChromePhotosDataPlaneLabContract.KeyLastFailure)
                         .commit()
+                    check(
+                        VpnController.configureDevFullTunnelGate(
+                            this@ChromePhotosDataPlaneLabService,
+                            fullTunnelDevGateEnabled,
+                        ),
+                    ) { "full_tunnel_gate_configuration_failed" }
                     VpnController.refreshDevLabRoutes(this@ChromePhotosDataPlaneLabService)
                     startHealthAttestation(sessionId, tls.caCertificateDer)
                     Log.i(
@@ -180,6 +191,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             "fixture=controlled realHosts=${ChromePhotosRealWebLabConfig.realHosts.size} " +
                             "routes=${routeAddresses.size} udpFixture=${udpFixtureGate.enabled} " +
                             "udpTarget=${udpFixtureGate.address}:${udpFixtureGate.port} " +
+                            "transport=${if (fullTunnelDevGateEnabled) "full_tunnel_dev" else "controlled"} " +
                             "privacy=public_only_memory_only",
                     )
                 } catch (error: Throwable) {

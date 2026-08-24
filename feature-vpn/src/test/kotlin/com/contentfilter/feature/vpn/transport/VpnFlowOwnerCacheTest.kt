@@ -7,6 +7,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -83,12 +84,47 @@ class VpnFlowOwnerCacheTest {
 
         assertEquals(VpnConnectionOwnerResult.Unknown, cache.resolve(flow(), 1))
         assertEquals(VpnConnectionOwnerResult.Unknown, leader.get(1, TimeUnit.SECONDS))
+        assertTrue(cache.metrics().lookupTimeouts >= 2)
 
         releaseLookup.countDown()
         assertTrue(lookupCompleted.await(1, TimeUnit.SECONDS))
         assertTrue(waitUntil { cache.size() == 1 })
         assertEquals(resolved(), cache.resolve(flow(), 1))
         executor.shutdownNow()
+    }
+
+    @Test
+    fun `generation change never reuses old owner authority`() {
+        val calls = AtomicInteger(0)
+        val cache =
+            VpnFlowOwnerCache(
+                lookup = {
+                    calls.incrementAndGet()
+                    resolved()
+                },
+                nowMillis = { 10L },
+            )
+
+        cache.resolve(flow(), 7)
+        cache.resolve(flow(), 7)
+        cache.resolve(flow(), 8)
+
+        assertEquals(2, calls.get())
+        assertEquals(1, cache.metrics().cacheHits)
+        assertEquals(2, cache.metrics().cacheMisses)
+    }
+
+    @Test
+    fun `owner lookup queue rejection fails closed and is observable`() {
+        val cache =
+            VpnFlowOwnerCache(
+                lookup = { resolved() },
+                nowMillis = { 10L },
+                lookupExecutor = { throw RejectedExecutionException("full") },
+            )
+
+        assertEquals(VpnConnectionOwnerResult.Unknown, cache.resolve(flow(), 1))
+        assertEquals(1, cache.metrics().queueRejections)
     }
 
     private fun flow() =

@@ -43,6 +43,24 @@ object VpnController {
         )
     }
 
+    fun setDevFullTunnelGate(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(
+            serviceIntent(context, FilterVpnService.ActionDevFullTunnelGateChanged)
+                .putExtra(FilterVpnService.ExtraFullTunnelEnabled, enabled),
+        )
+    }
+
+    fun configureDevFullTunnelGate(
+        context: Context,
+        enabled: Boolean,
+    ): Boolean =
+        DevProtectionMode.isAvailable(context) &&
+            ChromePhotosDataPlaneLabVpnPolicy.setFullTunnelDevGate(context, enabled)
+
     fun disableDevProtection(context: Context) {
         DevProtectionMode.setProtectionDisabled(context, true)
         stop(context)

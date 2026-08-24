@@ -84,8 +84,9 @@ internal class VpnLocalSocks5Server(
     private val allowedPorts: Set<Int> = DefaultAllowedPorts,
     private val resources: VpnOwnedResourceTracker = VpnOwnedResourceTracker(),
     private val malformedResponseProbeEnabled: Boolean = false,
+    transportScope: VpnTransportScope = VpnTransportScope.Controlled,
 ) : Closeable {
-    private val allowedAddresses = allowedAddresses.mapTo(hashSetOf()) { it.substringBefore('%') }
+    private val destinationAuthority = VpnDestinationAuthority(allowedAddresses, allowedPorts, transportScope)
     private val running = AtomicBoolean(false)
     private val acceptedConnections = AtomicLong(0)
     private val rejectedDestinations = AtomicLong(0)
@@ -357,8 +358,7 @@ internal class VpnLocalSocks5Server(
         malformedProbeInvalidHeaderSent.incrementAndGet()
     }
 
-    private fun isAllowed(target: InetSocketAddress): Boolean =
-        target.address.hostAddress.orEmpty().substringBefore('%') in allowedAddresses && target.port in allowedPorts
+    private fun isAllowed(target: InetSocketAddress): Boolean = destinationAuthority.isAllowed(target)
 
     fun metrics(): VpnLocalSocksMetrics =
         VpnLocalSocksMetrics(

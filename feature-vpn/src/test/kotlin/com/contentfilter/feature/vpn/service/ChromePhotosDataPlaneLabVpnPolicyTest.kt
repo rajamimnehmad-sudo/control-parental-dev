@@ -80,6 +80,42 @@ class ChromePhotosDataPlaneLabVpnPolicyTest {
     }
 
     @Test
+    fun `full tunnel DEV routes are off by default and dual stack when explicit transport gate is active`() {
+        assertFalse(
+            ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(
+                active = true,
+                currentSessionId = "session-a",
+                enabled = false,
+                gateSessionId = "session-a",
+            ),
+        )
+        assertEquals(emptyList(), ChromePhotosDataPlaneLabVpnPolicy.fullTunnelRoutes(enabled = false))
+        assertTrue(
+            ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(
+                active = true,
+                currentSessionId = "session-a",
+                enabled = true,
+                gateSessionId = "session-a",
+            ),
+        )
+        assertEquals(
+            listOf(
+                ChromePhotosLabVpnRoute("0.0.0.0", 0),
+                ChromePhotosLabVpnRoute("::", 0),
+            ),
+            ChromePhotosDataPlaneLabVpnPolicy.fullTunnelRoutes(enabled = true),
+        )
+        assertFalse(
+            ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(
+                active = true,
+                currentSessionId = "session-b",
+                enabled = true,
+                gateSessionId = "session-a",
+            ),
+        )
+    }
+
+    @Test
     fun `fixture DNS match is exact and gated`() {
         assertTrue(
             ChromePhotosDataPlaneLabVpnPolicy.isFixtureDomain(

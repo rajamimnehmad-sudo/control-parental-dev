@@ -125,6 +125,56 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
     fun additionalAllowedPackages(gate: ChromePhotosUdpFixtureGate?): Set<String> =
         if (gate != null) setOf(ChromePhotosDataPlaneLabContract.UdpFixturePackage) else emptySet()
 
+    fun isFullTunnelDevGateEnabled(context: Context): Boolean {
+        val labPreferences =
+            context.getSharedPreferences(
+                ChromePhotosDataPlaneLabContract.PreferencesName,
+                Context.MODE_PRIVATE,
+            )
+        val gatePreferences = context.getSharedPreferences(FullTunnelPreferencesName, Context.MODE_PRIVATE)
+        return isFullTunnelDevGateEnabled(
+            active = isActive(context),
+            currentSessionId = labPreferences.getString(ChromePhotosDataPlaneLabContract.KeySessionId, "").orEmpty(),
+            enabled = gatePreferences.getBoolean(FullTunnelEnabledKey, false),
+            gateSessionId = gatePreferences.getString(FullTunnelSessionKey, "").orEmpty(),
+        )
+    }
+
+    fun isFullTunnelDevGateEnabled(
+        active: Boolean,
+        currentSessionId: String,
+        enabled: Boolean,
+        gateSessionId: String,
+    ): Boolean = active && enabled && currentSessionId.isNotBlank() && gateSessionId == currentSessionId
+
+    fun setFullTunnelDevGate(
+        context: Context,
+        enabled: Boolean,
+    ): Boolean {
+        if (!context.packageName.endsWith(".dev")) return false
+        val sessionId =
+            context.getSharedPreferences(
+                ChromePhotosDataPlaneLabContract.PreferencesName,
+                Context.MODE_PRIVATE,
+            ).getString(ChromePhotosDataPlaneLabContract.KeySessionId, "").orEmpty()
+        if (enabled && (!isActive(context) || sessionId.isBlank())) return false
+        return context.getSharedPreferences(FullTunnelPreferencesName, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(FullTunnelEnabledKey, enabled)
+            .putString(FullTunnelSessionKey, if (enabled) sessionId else "")
+            .commit()
+    }
+
+    fun fullTunnelRoutes(enabled: Boolean): List<ChromePhotosLabVpnRoute> =
+        if (enabled) {
+            listOf(
+                ChromePhotosLabVpnRoute(AllIpv4Route, AllTrafficPrefixLength),
+                ChromePhotosLabVpnRoute(AllIpv6Route, AllTrafficPrefixLength),
+            )
+        } else {
+            emptyList()
+        }
+
     fun allowedTransportPorts(context: Context): Set<Int> =
         DefaultTransportPorts + listOfNotNull(udpFixtureGate(context)?.port)
 
@@ -210,6 +260,12 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
     private const val MaximumFixturePort = 50_000
     private const val Ipv4OctetCount = 4
     private const val SessionLogLength = 8
+    private const val AllIpv4Route = "0.0.0.0"
+    private const val AllIpv6Route = "::"
+    private const val AllTrafficPrefixLength = 0
+    private const val FullTunnelPreferencesName = "vpn_full_tunnel_dev_gate"
+    private const val FullTunnelEnabledKey = "enabled"
+    private const val FullTunnelSessionKey = "session_id"
     private const val LogTag = "ChromePhotosDataPlane"
     private val DefaultTransportPorts = setOf(80, 443)
 

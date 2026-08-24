@@ -32,6 +32,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 internal data class VpnTransportGateMetrics(
     val generation: Long,
+    val scope: VpnTransportScope,
     val queuePeak: Int,
     val queueDrops: Long,
     val forwardedPackets: Long,
@@ -39,12 +40,24 @@ internal data class VpnTransportGateMetrics(
     val chromeTcpDrops: Long,
     val chromeUdpDrops: Long,
     val unknownOwnerDrops: Long,
+    val dnsTcpDrops: Long,
+    val authorizedProxyPackets: Long,
     val recursionPackets: Long,
+    val networkInvalidations: Long,
     val packetSocketType: PacketSocketType,
     val hev: HevNativeStats,
     val hevLifecycle: HevTransportLifecycleSnapshot,
     val socks: VpnLocalSocksMetrics,
     val protectedSockets: VpnProtectedSocketMetrics,
+    val ownerCache: VpnFlowOwnerCacheMetrics,
+    val runtime: VpnTransportRuntimeSnapshot,
+    val resources: VpnOwnedResourceSnapshot,
+)
+
+internal data class VpnTransportGateCloseResult(
+    val clean: Boolean,
+    val hev: HevTransportStopResult,
+    val socks: VpnLocalSocksCloseResult,
     val resources: VpnOwnedResourceSnapshot,
 )
 
@@ -62,6 +75,8 @@ internal class VpnTransportGate09A private constructor(
     private val resources: VpnOwnedResourceTracker,
     private val udpStressTarget: InetSocketAddress?,
     private val packetSocketType: PacketSocketType,
+    private val transportScope: VpnTransportScope,
+    private val runtimeToken: Long,
     private val writeToTun: (ByteArray) -> Boolean,
 ) : Closeable {
     private data class Packet(
@@ -80,7 +95,10 @@ internal class VpnTransportGate09A private constructor(
     private val chromeTcpDrops = AtomicLong(0)
     private val chromeUdpDrops = AtomicLong(0)
     private val unknownOwnerDrops = AtomicLong(0)
+    private val dnsTcpDrops = AtomicLong(0)
+    private val authorizedProxyPackets = AtomicLong(0)
     private val recursionPackets = AtomicLong(0)
+    private val networkInvalidations = AtomicLong(0)
     private val loggedFlows =
         Collections.synchronizedMap(
             object : LinkedHashMap<com.contentfilter.feature.vpn.service.VpnFlowTuple, Unit>(64, 0.75f, true) {
@@ -172,7 +190,10 @@ internal class VpnTransportGate09A private constructor(
                 }
             }
             VpnTransportAction.DropUnknownOwner -> unknownOwnerDrops.incrementAndGet()
-            VpnTransportAction.ExistingDnsPath,
+            VpnTransportAction.ExistingDnsPath -> {
+                if (packet.parsed.flow.protocol == VpnTransportProtocol.Tcp) dnsTcpDrops.incrementAndGet()
+            }
+            VpnTransportAction.AuthorizedChromeProxyPath -> authorizedProxyPackets.incrementAndGet()
             VpnTransportAction.DropUnapprovedDestination,
             -> Unit
         }
@@ -204,6 +225,7 @@ internal class VpnTransportGate09A private constructor(
     fun metrics(): VpnTransportGateMetrics =
         VpnTransportGateMetrics(
             generation = authorityGeneration.get(),
+            scope = transportScope,
             queuePeak = queuePeak.get(),
             queueDrops = queueDrops.get(),
             forwardedPackets = forwardedPackets.get(),
@@ -211,12 +233,17 @@ internal class VpnTransportGate09A private constructor(
             chromeTcpDrops = chromeTcpDrops.get(),
             chromeUdpDrops = chromeUdpDrops.get(),
             unknownOwnerDrops = unknownOwnerDrops.get(),
+            dnsTcpDrops = dnsTcpDrops.get(),
+            authorizedProxyPackets = authorizedProxyPackets.get(),
             recursionPackets = recursionPackets.get(),
+            networkInvalidations = networkInvalidations.get(),
             packetSocketType = packetSocketType,
             hev = engine.stats(),
             hevLifecycle = engine.lifecycleSnapshot(),
             socks = socks.metrics(),
             protectedSockets = protectedSockets.metrics(),
+            ownerCache = ownerCache.metrics(),
+            runtime = VpnTransportRuntimeAuthority.snapshot(),
             resources = resources.snapshot(),
         ).also { metrics -> VpnTransportResourceDiagnostics.publish(metrics.resources) }
 
@@ -337,10 +364,11 @@ internal class VpnTransportGate09A private constructor(
         ownerCache.clear()
         ownerResolver.clear()
         loggedFlows.clear()
+        networkInvalidations.incrementAndGet()
         Log.i(LogTag, "generation=$next owner_authority=invalidated reason=$reason")
     }
 
-    override fun close() {
+    fun shutdown(): VpnTransportGateCloseResult {
         val firstClose = closed.compareAndSet(false, true)
         if (firstClose) {
             runCatching { connectivityManager?.unregisterNetworkCallback(networkCallback) }
@@ -354,24 +382,41 @@ internal class VpnTransportGate09A private constructor(
             ownerResolver.clear()
             loggedFlows.clear()
         }
-        VpnTransportResourceDiagnostics.publish(resources.snapshot())
-        check(engineStop.joined && engineStop.cleanupComplete) {
-            "HEV lifecycle quarantined state=${engineStop.state}"
-        }
-        if (!socksStop.clean) {
-            // All listeners/sessions/upstream sockets are already closed and Chrome is fail-closed.
-            // Keep the bounded timeout observable without crashing the VPN service's main thread.
+        val resourceSnapshot = resources.snapshot()
+        VpnTransportResourceDiagnostics.publish(resourceSnapshot)
+        val clean =
+            engineStop.joined &&
+                engineStop.cleanupComplete &&
+                socksStop.clean &&
+                resourceSnapshot.ownedFdResources == 0
+        val dirtyReason =
+            when {
+                !engineStop.joined || !engineStop.cleanupComplete -> "hev_quarantined"
+                !socksStop.clean -> "socks_dirty_shutdown"
+                resourceSnapshot.ownedFdResources != 0 -> "resources_not_released"
+                else -> null
+            }
+        VpnTransportRuntimeAuthority.finish(runtimeToken, clean, dirtyReason)
+        if (!clean) {
             Log.e(
                 LogTag,
-                "socks_shutdown=quarantined accept=${socksStop.acceptExecutorTerminated} " +
-                    "sessions=${socksStop.sessionExecutorTerminated}",
+                "transport_shutdown=quarantined reason=$dirtyReason " +
+                    "hev=${engineStop.state} socks=${socksStop.clean} resources=${resourceSnapshot.ownedFdResources}",
             )
         }
+        return VpnTransportGateCloseResult(clean, engineStop, socksStop, resourceSnapshot)
+    }
+
+    override fun close() {
+        shutdown()
     }
 
     companion object {
-        private const val QueueCapacity = 128
-        private const val WorkerCount = 2
+        private const val QueueCapacity = 512
+
+        // HEV/lwIP must observe packets in TUN order. Owner lookups remain off the TUN reader and
+        // become cache hits after the first packet, but multiple consumers could reorder a TCP flow.
+        private const val WorkerCount = 1
         private const val DnsPort = 53
         private const val MaximumStressCycles = 200
         private const val StressPayloadSize = 8
@@ -388,6 +433,7 @@ internal class VpnTransportGate09A private constructor(
             allowedAddresses: Set<String>,
             allowedPorts: Set<Int>,
             udpFixtureGate: ChromePhotosUdpFixtureGate?,
+            fullTunnelEnabled: Boolean,
             writeToTun: (ByteArray) -> Boolean,
         ): VpnTransportGate09A {
             require(vpnService.packageName.endsWith(".dev"))
@@ -409,11 +455,13 @@ internal class VpnTransportGate09A private constructor(
                     allowedPorts = allowedPorts,
                     resources = resources,
                     malformedResponseProbeEnabled = udpFixtureGate?.malformedProbeEnabled == true,
+                    transportScope =
+                        if (fullTunnelEnabled) VpnTransportScope.FullTunnelDev else VpnTransportScope.Controlled,
                 )
-            socks.start()
             val engine = HevTransportEngine(resources = resources)
             val socketType =
                 try {
+                    socks.start()
                     engine.start(
                         socksPort = socks.port,
                         username = socks.username(),
@@ -426,14 +474,28 @@ internal class VpnTransportGate09A private constructor(
                         },
                     )
                 } catch (error: Throwable) {
-                    engine.close()
-                    socks.close()
+                    engine.stop()
+                    socks.shutdown()
                     throw error
                 }
+            val runtimeToken =
+                try {
+                    VpnTransportRuntimeAuthority.begin()
+                } catch (error: Throwable) {
+                    engine.stop()
+                    socks.shutdown()
+                    throw error
+                }
+            val destinationAuthority =
+                VpnDestinationAuthority(
+                    controlledAddresses = allowedAddresses,
+                    controlledPorts = allowedPorts,
+                    scope = if (fullTunnelEnabled) VpnTransportScope.FullTunnelDev else VpnTransportScope.Controlled,
+                )
             val policy =
                 VpnTransportPolicy(
                     chromePackage = ChromePhotosDataPlaneLabContract.ChromePackage,
-                    allowedDestinationAddresses = allowedAddresses.mapTo(hashSetOf()) { it.substringBefore('%') },
+                    destinationAuthority = destinationAuthority,
                 )
             return VpnTransportGate09A(
                 context = vpnService,
@@ -451,10 +513,17 @@ internal class VpnTransportGate09A private constructor(
                         InetSocketAddress(InetAddress.getByName(gate.address) as Inet4Address, gate.port)
                     },
                 packetSocketType = socketType,
+                transportScope =
+                    if (fullTunnelEnabled) VpnTransportScope.FullTunnelDev else VpnTransportScope.Controlled,
+                runtimeToken = runtimeToken,
                 writeToTun = writeToTun,
             ).also {
                 // Rebind the response counter through the HEV authoritative counters at status time.
-                Log.i(LogTag, "generation=$generation engine=started bridge=${socketType.name.lowercase()}")
+                Log.i(
+                    LogTag,
+                    "generation=$generation engine=started bridge=${socketType.name.lowercase()} " +
+                        "scope=${if (fullTunnelEnabled) "full_tunnel_dev" else "controlled"}",
+                )
             }
         }
     }
