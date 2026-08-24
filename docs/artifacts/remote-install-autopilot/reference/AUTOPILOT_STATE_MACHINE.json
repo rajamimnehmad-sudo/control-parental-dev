@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "strategy": "samsung_first_universal_core",
+  "start": "BOOT",
+  "states": {
+    "BOOT": {"priority": ["SUPPORT_CONNECTED", "ADB_CONNECTED", "ANDROID_CAPABILITY", "ACCESSIBILITY", "DIRECT_DEV_PROBE"]},
+    "NEED_ACCESSIBILITY": {"actor": "user", "resume": "BOOT"},
+    "PROBE_DEVELOPER_SETTINGS": {"entry": "ACTION_APPLICATION_DEVELOPMENT_SETTINGS", "recognized": "DEVELOPER_OPTIONS", "samsung_unavailable": "OEM_ENABLE_DEVELOPMENT"},
+    "OEM_ENABLE_DEVELOPMENT": {"samsung_entry": "ACTION_DEVICE_INFO_SETTINGS", "route": ["ABOUT_PHONE", "SOFTWARE_INFO", "BUILD_NUMBER_X7_VERIFIED"], "credential": "WAIT_USER_CREDENTIAL", "success": "PROBE_DEVELOPER_SETTINGS"},
+    "WAIT_USER_CREDENTIAL": {"actor": "user", "secret_capture": false, "resume": "PROBE_DEVELOPER_SETTINGS"},
+    "DEVELOPER_OPTIONS": {"target": "wireless_debugging", "next": "WIRELESS_DEBUGGING"},
+    "WIRELESS_DEBUGGING": {"if_off": "ENABLE_EXACT_TOGGLE", "if_on": "OPEN_PAIR_WITH_CODE", "network_confirmation": "WAIT_NETWORK_CONFIRMATION", "next": "PAIRING_DIALOG"},
+    "WAIT_NETWORK_CONFIRMATION": {"auto_positive_only_when_exact": true, "next": "WIRELESS_DEBUGGING"},
+    "PAIRING_DIALOG": {"unique_contextual_6_digit": "LOCAL_PAIRING", "else": "MANUAL_SIX_BOX"},
+    "LOCAL_PAIRING": {"component": "existing_remote_pairing_service", "next": "LOCAL_ADB_READY"},
+    "LOCAL_ADB_READY": {"component": "existing_adb_transport", "next": "CONNECT_SUPPORT"},
+    "CONNECT_SUPPORT": {"component": "existing_no_link_secure_stack", "next": "DONE"},
+    "GUIDED_FALLBACK": {"automatic_clicks": false},
+    "BLOCKED": {"automatic_clicks": false},
+    "DONE": {"terminal": true}
+  },
+  "automatic_click_preconditions": [
+    "single_trusted_settings_application_window",
+    "overlay_and_ime_excluded",
+    "two_stable_snapshots",
+    "current_generation_window_fingerprint",
+    "oem_recipe_allows_target",
+    "high_confidence",
+    "unique_candidate",
+    "margin_over_second_candidate",
+    "click_semantics_available",
+    "fresh_live_node_reacquired"
+  ],
+  "automatic_click_postcondition": "expected_next_state_observed_before_any_next_click"
+}
