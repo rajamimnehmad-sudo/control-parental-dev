@@ -2,9 +2,6 @@ package com.glosh.remote.spike;
 
 import android.Manifest;
 import android.app.Activity;
-import android.content.ClipData;
-import android.content.ClipboardManager;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
@@ -13,23 +10,28 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
-import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
+import com.glosh.remote.spike.session.SessionState;
+import com.glosh.remote.spike.wizard.OemGuide;
+import com.glosh.remote.spike.wizard.OnboardingState;
+import com.glosh.remote.spike.wizard.SettingsNavigator;
 
-public final class MainActivity extends Activity {
+public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
     private static final int REQUEST_NOTIFICATIONS = 9001;
-    private static final String ACTION_WIRELESS_DEBUGGING_SETTINGS = "android.settings.WIRELESS_DEBUGGING_SETTINGS";
+    private static final long STATE_REFRESH_MS = 500;
 
     private static final int COLOR_BACKGROUND = Color.rgb(248, 248, 243);
     private static final int COLOR_GRAPHITE = Color.rgb(25, 27, 24);
@@ -37,52 +39,65 @@ public final class MainActivity extends Activity {
     private static final int COLOR_LIME = Color.rgb(190, 242, 84);
     private static final int COLOR_LIME_SOFT = Color.rgb(234, 250, 202);
     private static final int COLOR_LINE = Color.rgb(218, 221, 211);
-    private TextView statusView;
-    private EditText joinUriView;
-    private LinearLayout manualSection;
-    private Button connectButton;
-    private Button cancelButton;
-    private String pendingJoinUri;
-    private boolean sessionStarted;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final SettingsNavigator settingsNavigator = new SettingsNavigator();
+    private final Runnable refreshState = new Runnable() {
+        @Override
+        public void run() {
+            render();
+            handler.postDelayed(this, STATE_REFRESH_MS);
+        }
+    };
+
+    private SupportSessionCoordinator coordinator;
+    private TextView progressView;
+    private TextView titleView;
+    private TextView bodyView;
+    private TextView informationView;
+    private Button primaryButton;
+    private Button secondaryButton;
+    private Button tertiaryButton;
+    private LinearLayout homeDetails;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        coordinator = SupportSessionCoordinator.get(this);
         setContentView(buildUi());
-        consumeJoinIntent(getIntent());
+        consumeDebugIntent(getIntent());
+        render();
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        if (!renderActiveSessionState()) {
-            consumeJoinIntent(intent);
+        if (RemotePairingService.getSessionState() == SessionState.IDLE) {
+            consumeDebugIntent(intent);
         }
+        render();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        renderActiveSessionState();
+        coordinator.attach(this);
+        handler.removeCallbacks(refreshState);
+        handler.post(refreshState);
     }
 
-    private boolean renderActiveSessionState() {
-        RemotePairingService.SessionState state = RemotePairingService.getSessionState();
-        if (state == RemotePairingService.SessionState.CONNECTED) {
-            sessionStarted = true;
-            showConnectedState();
-            return true;
-        } else if (state == RemotePairingService.SessionState.PREPARING) {
-            sessionStarted = true;
-            showSessionStartedState();
-            return true;
-        } else if (sessionStarted) {
-            sessionStarted = false;
-            showIdleState();
-        }
-        return false;
+    @Override
+    protected void onPause() {
+        handler.removeCallbacks(refreshState);
+        coordinator.detach(this);
+        super.onPause();
+    }
+
+    @Override
+    public void onStateChanged() {
+        render();
     }
 
     @Override
@@ -92,12 +107,10 @@ public final class MainActivity extends Activity {
             return;
         }
         if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-            String raw = pendingJoinUri;
-            if (raw != null) {
-                startSupportSession(raw);
-            }
+            startSupportSession();
         } else {
-            setStatus("Necesitamos mostrarte una notificación para que puedas ingresar los 6 números.");
+            informationView.setText(
+                    "Necesitamos mostrarte una notificación para que puedas ingresar los 6 números.");
         }
     }
 
@@ -110,27 +123,42 @@ public final class MainActivity extends Activity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(26), dp(28), dp(26), dp(38));
         scroll.addView(root, new ScrollView.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
 
         TextView wordmark = text("glosh", 20, COLOR_GRAPHITE, Typeface.BOLD);
         wordmark.setLetterSpacing(0.04f);
-        add(root, wordmark, 0, 42);
+        add(root, wordmark, 0, 34);
 
-        TextView title = text("¡Bienvenido, Glosher!", 38, COLOR_GRAPHITE, Typeface.BOLD);
-        title.setLineSpacing(0, 0.94f);
-        add(root, title, 0, 8);
+        progressView = text("", 14, COLOR_MUTED, Typeface.BOLD);
+        progressView.setVisibility(View.GONE);
+        add(root, progressView, 0, 12);
 
-        TextView subheadline = text("Te estábamos esperando.", 22, COLOR_GRAPHITE, Typeface.BOLD);
-        add(root, subheadline, 0, 18);
+        titleView = text("", 38, COLOR_GRAPHITE, Typeface.BOLD);
+        titleView.setLineSpacing(0, 0.94f);
+        add(root, titleView, 0, 12);
 
-        TextView intro = text(
-                "En unos minutos vamos a dejar tu teléfono listo para que soporte pueda ayudarte de forma segura.",
-                17,
-                COLOR_MUTED,
-                Typeface.NORMAL);
-        intro.setLineSpacing(dp(4), 1f);
-        add(root, intro, 0, 22);
+        bodyView = text("", 18, COLOR_MUTED, Typeface.NORMAL);
+        bodyView.setLineSpacing(dp(4), 1f);
+        add(root, bodyView, 0, 20);
 
+        informationView = text("", 16, COLOR_GRAPHITE, Typeface.NORMAL);
+        informationView.setLineSpacing(dp(5), 1f);
+        informationView.setPadding(dp(16), dp(15), dp(16), dp(15));
+        informationView.setBackground(rounded(Color.WHITE, 16));
+        add(root, informationView, 0, 18);
+
+        primaryButton = primaryButton("");
+        add(root, primaryButton, 0, 10);
+
+        secondaryButton = secondaryButton("");
+        add(root, secondaryButton, 0, 6);
+
+        tertiaryButton = textButton("");
+        add(root, tertiaryButton, 0, 28);
+
+        homeDetails = new LinearLayout(this);
+        homeDetails.setOrientation(LinearLayout.VERTICAL);
         TextView reassurance = text(
                 "Conexión temporal · Segura · Vos tenés el control",
                 14,
@@ -139,312 +167,241 @@ public final class MainActivity extends Activity {
         reassurance.setBackground(rounded(COLOR_LIME_SOFT, 14));
         reassurance.setGravity(Gravity.CENTER);
         reassurance.setPadding(dp(14), dp(11), dp(14), dp(11));
-        add(root, reassurance, 0, 18);
-
-        statusView = text("", 16, COLOR_GRAPHITE, Typeface.BOLD);
-        statusView.setBackground(rounded(Color.WHITE, 14));
-        statusView.setPadding(dp(16), dp(13), dp(16), dp(13));
-        statusView.setVisibility(View.GONE);
-        add(root, statusView, 0, 14);
-
-        manualSection = buildManualSection();
-        manualSection.setVisibility(View.GONE);
-        add(root, manualSection, 0, 14);
-
-        connectButton = primaryButton("Empezar");
-        connectButton.setOnClickListener(v -> requestConnection());
-        add(root, connectButton, 0, 10);
-
-        cancelButton = secondaryButton("Cancelar conexión");
-        cancelButton.setOnClickListener(v -> cancelConnection());
-        cancelButton.setVisibility(View.GONE);
-        add(root, cancelButton, 0, 40);
-
-        add(root, sectionTitle("Así de simple"), 0, 20);
-        addStep(root, "1", "Conectamos tu teléfono");
-        addStep(root, "2", "Ingresás 6 números");
-        addStep(root, "3", "Soporte continúa");
-
-        add(root, divider(), 26, 26);
-        add(root, sectionTitle("Tu privacidad primero"), 0, 14);
-        add(root, text(
+        add(homeDetails, reassurance, 0, 28);
+        add(homeDetails, sectionTitle("Así de simple"), 0, 18);
+        addStep(homeDetails, "1", "Conectamos tu teléfono");
+        addStep(homeDetails, "2", "Ingresás 6 números");
+        addStep(homeDetails, "3", "Soporte continúa");
+        add(homeDetails, divider(), 20, 24);
+        add(homeDetails, sectionTitle("Tu privacidad primero"), 0, 14);
+        add(homeDetails, text(
                 "• La conexión es temporal.\n"
                         + "• Podés cancelarla cuando quieras.\n"
                         + "• No dejamos acceso permanente en tu teléfono.",
                 16,
                 COLOR_MUTED,
                 Typeface.NORMAL), 0, 0);
-
+        add(root, homeDetails, 0, 0);
         return scroll;
     }
 
-    private LinearLayout buildManualSection() {
-        LinearLayout section = new LinearLayout(this);
-        section.setOrientation(LinearLayout.VERTICAL);
-        section.setPadding(dp(16), dp(16), dp(16), dp(14));
-        section.setBackground(rounded(Color.WHITE, 16));
+    private void render() {
+        SessionState session = RemotePairingService.getSessionState();
+        if (session == SessionState.CONNECTED) {
+            renderConnected();
+            return;
+        }
+        if (session == SessionState.PREPARING) {
+            renderPreparing();
+            return;
+        }
+        if (coordinator.step() == OnboardingState.Step.SESSION_ACTIVE) {
+            coordinator.reset();
+        }
 
-        add(section, text(
-                "Pegá el enlace que te envió soporte",
-                17,
-                COLOR_GRAPHITE,
-                Typeface.BOLD), 0, 12);
-
-        Button pasteButton = secondaryButton("Pegar enlace");
-        pasteButton.setOnClickListener(v -> pasteSupportLink());
-        add(section, pasteButton, 0, 4);
-
-        Button manualButton = textButton("Ingresarlo manualmente");
-        manualButton.setOnClickListener(v -> {
-            joinUriView.setVisibility(View.VISIBLE);
-            joinUriView.requestFocus();
-        });
-        add(section, manualButton, 0, 8);
-
-        joinUriView = new EditText(this);
-        joinUriView.setHint("Enlace de soporte");
-        joinUriView.setTextColor(COLOR_GRAPHITE);
-        joinUriView.setHintTextColor(COLOR_MUTED);
-        joinUriView.setTextSize(14);
-        joinUriView.setMinLines(2);
-        joinUriView.setSaveEnabled(false);
-        joinUriView.setAutofillHints((String[]) null);
-        joinUriView.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE);
-        joinUriView.setPadding(dp(14), dp(12), dp(14), dp(12));
-        joinUriView.setBackground(outlined(Color.WHITE, COLOR_LINE, 14));
-        joinUriView.setVisibility(View.GONE);
-        add(section, joinUriView, 0, 0);
-
-        return section;
+        switch (coordinator.step()) {
+            case REQUESTING_SUPPORT -> renderRequesting();
+            case DEVELOPER_OPTIONS -> renderDeveloperOptions();
+            case WIRELESS_DEBUGGING -> renderWirelessDebugging();
+            case UNAVAILABLE -> renderUnavailable();
+            default -> renderHome();
+        }
     }
 
-    private void requestConnection() {
-        if (renderActiveSessionState()) {
+    private void renderHome() {
+        progressView.setVisibility(View.GONE);
+        titleView.setText("¡Bienvenido, Glosher!");
+        bodyView.setText(
+                "Te estábamos esperando.\n\n"
+                        + "En unos minutos vamos a dejar tu teléfono listo para que soporte pueda ayudarte de forma segura.");
+        informationView.setVisibility(View.GONE);
+        homeDetails.setVisibility(View.VISIBLE);
+        showButton(primaryButton, "CONECTAR CON SOPORTE", v -> coordinator.requestSupport());
+        hideButton(secondaryButton);
+        hideButton(tertiaryButton);
+    }
+
+    private void renderRequesting() {
+        renderWizardBase(
+                "Conectando con soporte",
+                "Estamos preparando tu sesión",
+                "Esto puede tardar unos segundos. No cierres Glosh Remote.");
+        informationView.setText("Un operador debe aceptar tu solicitud antes de continuar.");
+        hideButton(primaryButton);
+        showButton(secondaryButton, "CANCELAR", v -> coordinator.reset());
+        hideButton(tertiaryButton);
+    }
+
+    private void renderDeveloperOptions() {
+        OemGuide guide = OemGuide.forDevice(Build.MANUFACTURER, Build.MODEL);
+        boolean enabled = Settings.Global.getInt(
+                getContentResolver(),
+                Settings.Global.DEVELOPMENT_SETTINGS_ENABLED,
+                0) == 1;
+        renderWizardBase(
+                "Paso 1 de 3",
+                guide.title(),
+                enabled
+                        ? "Las Opciones de desarrollador ya están activadas. Podemos continuar."
+                        : "Primero habilitemos una opción de Android que permite esta conexión temporal.");
+        informationView.setText(guide.instructions());
+        showButton(primaryButton, "ABRIR ACERCA DEL TELÉFONO", v -> settingsNavigator.openAboutPhone(this));
+        showButton(secondaryButton, "SÍ, CONTINUAR", v -> coordinator.continueToWirelessDebugging());
+        showButton(tertiaryButton, "NO LA ENCUENTRO", v -> settingsNavigator.openAboutPhone(this));
+    }
+
+    private void renderWirelessDebugging() {
+        renderWizardBase(
+                "Paso 2 de 3",
+                "Activemos la conexión segura",
+                "Ahora vamos a abrir la pantalla donde Android permite conectar temporalmente el soporte.");
+        informationView.setText(
+                "En la próxima pantalla:\n\n"
+                        + "1. Activá Depuración inalámbrica.\n"
+                        + "2. Tocá Emparejar dispositivo con código.\n"
+                        + "3. Android va a mostrarte 6 números.");
+        showButton(primaryButton, "ABRIR DEPURACIÓN INALÁMBRICA", v -> prepareAndOpenWirelessDebugging());
+        showButton(secondaryButton, "CANCELAR CONEXIÓN", v -> cancelConnection());
+        hideButton(tertiaryButton);
+    }
+
+    private void renderPreparing() {
+        renderWizardBase(
+                "Paso 3 de 3",
+                "Perfecto, conectando…",
+                "Ingresá en la notificación de Glosh los 6 números que muestra Android.");
+        informationView.setText("Después seguimos automáticamente. Esto tarda sólo unos segundos.");
+        hideButton(primaryButton);
+        showButton(secondaryButton, "CANCELAR CONEXIÓN", v -> cancelConnection());
+        hideButton(tertiaryButton);
+    }
+
+    private void renderConnected() {
+        renderWizardBase(
+                "Paso 3 de 3 · Completado",
+                "¡Listo, Glosher!",
+                "Soporte ya está conectado de forma segura.");
+        informationView.setText("La conexión es temporal y podés terminarla cuando quieras.");
+        hideButton(primaryButton);
+        showButton(secondaryButton, "CANCELAR CONEXIÓN", v -> cancelConnection());
+        hideButton(tertiaryButton);
+    }
+
+    private void renderUnavailable() {
+        renderWizardBase(
+                "Conexión no disponible",
+                "Soporte remoto no está disponible en este momento.",
+                "Intentá nuevamente más tarde.");
+        informationView.setText("No necesitás ingresar ningún dato técnico.");
+        showButton(primaryButton, "VOLVER", v -> coordinator.reset());
+        hideButton(secondaryButton);
+        hideButton(tertiaryButton);
+    }
+
+    private void renderWizardBase(String progress, String title, String body) {
+        progressView.setText(progress);
+        progressView.setVisibility(View.VISIBLE);
+        titleView.setText(title);
+        bodyView.setText(body);
+        informationView.setVisibility(View.VISIBLE);
+        homeDetails.setVisibility(View.GONE);
+    }
+
+    private void prepareAndOpenWirelessDebugging() {
+        if (coordinator.descriptor() == null) {
+            coordinator.reset();
+            renderUnavailable();
             return;
         }
-        String raw = pendingJoinUri;
-        if (raw == null) {
-            raw = readValidJoinFromClipboard();
-        }
-        if (raw == null && joinUriView.getVisibility() == View.VISIBLE) {
-            raw = validJoinOrNull(joinUriView.getText().toString());
-        }
-
-        if (raw == null) {
-            showManualEntry("No encontramos el enlace todavía. Podés pegarlo acá.");
-            return;
-        }
-
-        pendingJoinUri = raw;
-        showReadyState();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
             return;
         }
-        startSupportSession(raw);
+        startSupportSession();
     }
 
-    private void pasteSupportLink() {
-        String raw = readValidJoinFromClipboard();
-        if (raw == null) {
-            showManualEntry("No pudimos reconocer un enlace válido. Copialo de nuevo o ingresalo manualmente.");
+    private void startSupportSession() {
+        if (RemotePairingService.getSessionState() != SessionState.IDLE) {
+            render();
             return;
         }
-        pendingJoinUri = raw;
-        joinUriView.setText("");
-        showReadyState();
-    }
-
-    private String readValidJoinFromClipboard() {
-        try {
-            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboard == null || !clipboard.hasPrimaryClip()) {
-                return null;
-            }
-            ClipData clip = clipboard.getPrimaryClip();
-            if (clip == null || clip.getItemCount() == 0) {
-                return null;
-            }
-            CharSequence value = clip.getItemAt(0).coerceToText(this);
-            return value == null ? null : validJoinOrNull(value.toString());
-        } catch (Throwable ignored) {
-            return null;
+        String descriptor = coordinator.markSessionStarted();
+        if (descriptor == null) {
+            coordinator.reset();
+            render();
+            return;
         }
-    }
-
-    private String validJoinOrNull(String raw) {
-        if (raw == null || raw.trim().isEmpty()) {
-            return null;
-        }
-        String candidate = raw.trim();
-        try {
-            JoinDescriptor check = JoinDescriptor.parse(candidate);
-            check.destroy();
-            return candidate;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private void startSupportSession(String raw) {
         Intent service = new Intent(this, RemotePairingService.class)
                 .setAction(RemotePairingService.ACTION_START)
-                .putExtra(RemotePairingService.EXTRA_JOIN_URI, raw);
+                .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor);
         startForegroundService(service);
-
-        clearClipboardIfMatches(raw);
-        pendingJoinUri = null;
-        joinUriView.setText("");
         if (getIntent() != null) {
             getIntent().setData(null);
         }
-
-        sessionStarted = true;
-        showSessionStartedState();
-        openWirelessDebuggingSettings();
+        render();
+        settingsNavigator.openWirelessDebugging(this);
     }
 
     private void cancelConnection() {
-        Intent service = new Intent(this, RemotePairingService.class)
-                .setAction(RemotePairingService.ACTION_STOP);
-        try {
-            startService(service);
-        } catch (Throwable ignored) {
-            // If the service no longer exists there is nothing left to revoke.
+        coordinator.reset();
+        if (RemotePairingService.getSessionState() != SessionState.IDLE) {
+            try {
+                startService(new Intent(this, RemotePairingService.class)
+                        .setAction(RemotePairingService.ACTION_STOP));
+            } catch (Throwable ignored) {
+                // The session may already have closed itself.
+            }
         }
-        sessionStarted = false;
-        pendingJoinUri = null;
-        joinUriView.setText("");
-        manualSection.setVisibility(View.GONE);
-        connectButton.setText("Empezar");
-        connectButton.setVisibility(View.VISIBLE);
-        cancelButton.setVisibility(View.GONE);
-        setStatus("Conexión cerrada. Podés empezar de nuevo cuando quieras.");
+        handler.postDelayed(this::render, 250);
     }
 
-    private void consumeJoinIntent(Intent intent) {
-        if (intent == null) {
+    private void consumeDebugIntent(Intent intent) {
+        if (!BuildConfig.DEBUG || intent == null) {
             return;
         }
         Uri data = intent.getData();
         if (data == null || !"gloshremote".equalsIgnoreCase(data.getScheme())) {
             return;
         }
-        String raw = validJoinOrNull(data.toString());
-        if (raw != null) {
-            pendingJoinUri = raw;
-            joinUriView.setText("");
-            showReadyState();
-        } else {
-            pendingJoinUri = null;
-            showManualEntry("El enlace no está completo. Pedile a soporte que te lo envíe nuevamente.");
-        }
-    }
-
-    private void showReadyState() {
-        sessionStarted = false;
-        manualSection.setVisibility(View.GONE);
-        connectButton.setText("Empezar");
-        connectButton.setVisibility(View.VISIBLE);
-        cancelButton.setVisibility(View.GONE);
-        setStatus("Todo listo para empezar");
-    }
-
-    private void showManualEntry(String message) {
-        manualSection.setVisibility(View.VISIBLE);
-        connectButton.setText("Continuar");
-        connectButton.setVisibility(View.VISIBLE);
-        cancelButton.setVisibility(View.GONE);
-        setStatus(message);
-    }
-
-    private void showSessionStartedState() {
-        manualSection.setVisibility(View.GONE);
-        connectButton.setVisibility(View.GONE);
-        cancelButton.setVisibility(View.VISIBLE);
-        setStatus(
-                "Preparando la conexión…\n\n"
-                        + "Ahora activá Depuración inalámbrica y elegí “Emparejar dispositivo con código”.");
-    }
-
-    private void showConnectedState() {
-        manualSection.setVisibility(View.GONE);
-        connectButton.setVisibility(View.GONE);
-        cancelButton.setVisibility(View.VISIBLE);
-        setStatus("¡Listo, Glosher! Soporte ya está conectado de forma segura.");
-    }
-
-    private void showIdleState() {
-        manualSection.setVisibility(View.GONE);
-        connectButton.setText("Empezar");
-        connectButton.setVisibility(View.VISIBLE);
-        cancelButton.setVisibility(View.GONE);
-        statusView.setVisibility(View.GONE);
-    }
-
-    private void openWirelessDebuggingSettings() {
-        Intent wirelessDebugging = new Intent(ACTION_WIRELESS_DEBUGGING_SETTINGS);
-        if (wirelessDebugging.resolveActivity(getPackageManager()) != null) {
-            try {
-                startActivity(wirelessDebugging);
-                return;
-            } catch (Throwable ignored) {
-                // Continue with the documented fallback.
-            }
-        }
-
-        Intent developerSettings = new Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
-        if (developerSettings.resolveActivity(getPackageManager()) != null) {
-            try {
-                startActivity(developerSettings);
-                return;
-            } catch (Throwable ignored) {
-                // Continue with the final settings fallback.
-            }
-        }
-        startActivity(new Intent(Settings.ACTION_SETTINGS));
-    }
-
-    private void clearClipboardIfMatches(String secret) {
-        if (secret == null || secret.isEmpty()) {
-            return;
-        }
         try {
-            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-            if (clipboard == null || !clipboard.hasPrimaryClip()) {
-                return;
-            }
-            ClipData clip = clipboard.getPrimaryClip();
-            if (clip == null || clip.getItemCount() == 0) {
-                return;
-            }
-            CharSequence current = clip.getItemAt(0).coerceToText(this);
-            if (current != null && secret.contentEquals(current)) {
-                clipboard.clearPrimaryClip();
-            }
+            String raw = data.toString();
+            JoinDescriptor descriptor = JoinDescriptor.parse(raw);
+            descriptor.destroy();
+            coordinator.seedDebugDescriptor(raw);
         } catch (Throwable ignored) {
-            // Best effort only.
+            // Direct descriptor intents are a hidden DEV fallback and fail closed.
+        } finally {
+            intent.setData(null);
         }
+    }
+
+    private void showButton(Button button, String label, View.OnClickListener listener) {
+        button.setText(label);
+        button.setOnClickListener(listener);
+        button.setVisibility(View.VISIBLE);
+    }
+
+    private void hideButton(Button button) {
+        button.setOnClickListener(null);
+        button.setVisibility(View.GONE);
     }
 
     private void addStep(LinearLayout root, String number, String label) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-
         TextView badge = text(number, 16, COLOR_GRAPHITE, Typeface.BOLD);
         badge.setGravity(Gravity.CENTER);
         badge.setBackground(rounded(COLOR_LIME, 18));
         row.addView(badge, new LinearLayout.LayoutParams(dp(36), dp(36)));
-
         TextView copy = text(label, 17, COLOR_GRAPHITE, Typeface.BOLD);
-        LinearLayout.LayoutParams copyParams = new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 0,
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 1f);
-        copyParams.setMargins(dp(14), 0, 0, 0);
-        row.addView(copy, copyParams);
+        params.setMargins(dp(14), 0, 0, 0);
+        row.addView(copy, params);
         add(root, row, 0, 16);
     }
 
@@ -471,7 +428,9 @@ public final class MainActivity extends Activity {
     private Button secondaryButton(String label) {
         Button button = baseButton(label);
         button.setTextColor(COLOR_GRAPHITE);
-        button.setBackground(outlined(Color.TRANSPARENT, COLOR_LINE, 18));
+        GradientDrawable background = rounded(Color.TRANSPARENT, 18);
+        background.setStroke(dp(1), COLOR_LINE);
+        button.setBackground(background);
         return button;
     }
 
@@ -509,23 +468,12 @@ public final class MainActivity extends Activity {
         return drawable;
     }
 
-    private GradientDrawable outlined(int color, int strokeColor, int radiusDp) {
-        GradientDrawable drawable = rounded(color, radiusDp);
-        drawable.setStroke(dp(1), strokeColor);
-        return drawable;
-    }
-
     private void add(LinearLayout parent, View child, int topDp, int bottomDp) {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
         params.setMargins(0, dp(topDp), 0, dp(bottomDp));
         parent.addView(child, params);
-    }
-
-    private void setStatus(String text) {
-        statusView.setText(text);
-        statusView.setVisibility(View.VISIBLE);
     }
 
     private int dp(int value) {
