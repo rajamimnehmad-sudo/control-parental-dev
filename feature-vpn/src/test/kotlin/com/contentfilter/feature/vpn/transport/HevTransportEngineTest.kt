@@ -13,7 +13,8 @@ class HevTransportEngineTest {
     fun `start quit join close and double stop are safe`() {
         val native = BlockingNative()
         val bridge = FakeBridge()
-        val engine = HevTransportEngine(native, VpnPacketBridgeFactory { bridge })
+        val resources = VpnOwnedResourceTracker()
+        val engine = HevTransportEngine(native, VpnPacketBridgeFactory { bridge }, resources)
 
         assertEquals(PacketSocketType.SeqPacket, engine.start(1234, "user", "pass") {})
         assertTrue(native.started.await(1, TimeUnit.SECONDS))
@@ -24,6 +25,8 @@ class HevTransportEngineTest {
         assertTrue(bridge.closed.get())
         assertTrue(engine.stop().joined)
         assertFalse(engine.isRunning())
+        assertEquals(0, resources.snapshot().ownedFdResources)
+        assertEquals(3, resources.snapshot().ownedFdResourcesPeak)
     }
 
     private class BlockingNative : HevNativeApi {

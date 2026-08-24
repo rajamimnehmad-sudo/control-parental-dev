@@ -113,6 +113,10 @@ internal class ChromePhotosLabPolicyController(
             .remove(ChromePhotosDataPlaneLabContract.KeyInstalledCaDer)
             .remove(ChromePhotosDataPlaneLabContract.KeyCaFingerprint)
             .remove(ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses)
+            .remove(ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled)
+            .remove(ChromePhotosDataPlaneLabContract.KeyUdpFixtureAddress)
+            .remove(ChromePhotosDataPlaneLabContract.KeyUdpFixturePort)
+            .remove(ChromePhotosDataPlaneLabContract.KeyUdpFixtureMalformedProbeEnabled)
             .apply()
         Log.i(LogTag, "rollback=complete proxy=cleared ca=removed")
     }

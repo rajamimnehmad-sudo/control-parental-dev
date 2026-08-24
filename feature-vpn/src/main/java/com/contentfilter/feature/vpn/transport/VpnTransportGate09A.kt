@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.net.VpnService
 import android.util.Log
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
+import com.contentfilter.feature.vpn.service.ChromePhotosUdpFixtureGate
 import com.contentfilter.feature.vpn.service.VpnConnectionOwnerResolver
 import com.contentfilter.feature.vpn.service.VpnConnectionOwnerResult
 import com.contentfilter.feature.vpn.service.VpnPacketParseResult
@@ -20,6 +21,8 @@ import kotlinx.coroutines.launch
 import java.io.Closeable
 import java.net.DatagramSocket
 import java.net.Inet4Address
+import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.Collections
 import java.util.LinkedHashMap
@@ -41,6 +44,7 @@ internal data class VpnTransportGateMetrics(
     val hev: HevNativeStats,
     val socks: VpnLocalSocksMetrics,
     val protectedSockets: VpnProtectedSocketMetrics,
+    val resources: VpnOwnedResourceSnapshot,
 )
 
 /** Bounded DEV feasibility datapath for the existing controlled /32-/128 routes. */
@@ -54,6 +58,8 @@ internal class VpnTransportGate09A private constructor(
     private val protectedSockets: VpnProtectedSocketFactory,
     private val socks: VpnLocalSocks5Server,
     private val engine: HevTransportEngine,
+    private val resources: VpnOwnedResourceTracker,
+    private val udpStressTarget: InetSocketAddress?,
     private val packetSocketType: PacketSocketType,
     private val writeToTun: (ByteArray) -> Boolean,
 ) : Closeable {
@@ -209,14 +215,13 @@ internal class VpnTransportGate09A private constructor(
             hev = engine.stats(),
             socks = socks.metrics(),
             protectedSockets = protectedSockets.metrics(),
-        )
+            resources = resources.snapshot(),
+        ).also { metrics -> VpnTransportResourceDiagnostics.publish(metrics.resources) }
 
     fun runNativeStress(cycles: Int): Int =
         synchronized(stressLock) {
             require(cycles in 1..MaximumStressCycles)
-            val target =
-                policyStressTarget()
-                    ?: throw IllegalStateException("No IPv4 fixture for HEV stress")
+            val target = udpStressTarget ?: throw IllegalStateException("No UDP fixture configured for HEV stress")
             engine.stop().also { check(it.joined) { "HEV did not join before stress" } }
             var completed = 0
             repeat(cycles) {
@@ -226,10 +231,21 @@ internal class VpnTransportGate09A private constructor(
                     password = socks.password(),
                     onPacketFromHev = { packet -> writeToTun(packet) },
                 )
-                engine.writePacket(udpStressPacket(target))
-                Thread.sleep(StressTrafficMillis)
+                val roundTrips = it % MaximumStressRoundTripsPerCycle + 1
+                repeat(roundTrips) { sequence ->
+                    val before = socks.metrics()
+                    check(engine.writePacket(udpStressPacket(target, it, sequence))) {
+                        "HEV stress write failed cycle=${it + 1} sequence=$sequence"
+                    }
+                    check(waitForUdpRoundTrip(before, target)) {
+                        "HEV UDP roundtrip timeout cycle=${it + 1} sequence=$sequence"
+                    }
+                }
                 val stopped = engine.stop()
                 check(stopped.joined) { "HEV stress join failed cycle=${it + 1}" }
+                check(waitForUdpAssociationsClosed()) {
+                    "SOCKS UDP association did not close cycle=${it + 1}"
+                }
                 completed++
             }
             engine.start(
@@ -241,30 +257,58 @@ internal class VpnTransportGate09A private constructor(
             completed
         }
 
-    private fun policyStressTarget(): ByteArray? =
-        policy.allowedAddressesForStress()
-            .asSequence()
-            .mapNotNull { runCatching { java.net.InetAddress.getByName(it) }.getOrNull() }
-            .filterIsInstance<Inet4Address>()
-            .firstOrNull()
-            ?.address
+    private fun waitForUdpRoundTrip(
+        before: VpnLocalSocksMetrics,
+        target: InetSocketAddress,
+    ): Boolean {
+        val deadline = System.nanoTime() + StressRoundTripTimeoutMillis * 1_000_000L
+        while (System.nanoTime() < deadline) {
+            val current = socks.metrics()
+            if (
+                current.udpDatagramsOut > before.udpDatagramsOut &&
+                current.udpDatagramsIn > before.udpDatagramsIn
+            ) {
+                return true
+            }
+            Thread.sleep(StressPollMillis)
+        }
+        Log.w(LogTag, "stress=udp_timeout target=${target.address.hostAddress}:${target.port}")
+        return false
+    }
 
-    private fun udpStressPacket(destination: ByteArray): ByteArray =
-        ByteArray(29).apply {
+    private fun waitForUdpAssociationsClosed(): Boolean {
+        val deadline = System.nanoTime() + StressAssociationCloseTimeoutMillis * 1_000_000L
+        while (System.nanoTime() < deadline) {
+            if (socks.metrics().activeUdpAssociations == 0) return true
+            Thread.sleep(StressPollMillis)
+        }
+        return false
+    }
+
+    private fun udpStressPacket(
+        target: InetSocketAddress,
+        cycle: Int,
+        sequence: Int,
+    ): ByteArray =
+        ByteArray(28 + StressPayloadSize).apply {
             this[0] = 0x45
             this[2] = 0
             this[3] = size.toByte()
             this[8] = 64
             this[9] = 17
             byteArrayOf(10, 8, 0, 2).copyInto(this, 12)
-            destination.copyInto(this, 16)
+            target.address.address.copyInto(this, 16)
             this[20] = 0x9C.toByte()
             this[21] = 0x40
-            this[22] = 0x01
-            this[23] = 0xBB.toByte()
-            this[24] = 0
-            this[25] = 9
-            this[28] = 0x5A
+            this[22] = (target.port ushr 8).toByte()
+            this[23] = target.port.toByte()
+            val udpLength = size - 20
+            this[24] = (udpLength ushr 8).toByte()
+            this[25] = udpLength.toByte()
+            this[28] = 0x47
+            this[29] = 0x4C
+            this[30] = cycle.toByte()
+            this[31] = sequence.toByte()
             val checksum = ipv4Checksum(this, 20)
             this[10] = (checksum ushr 8).toByte()
             this[11] = checksum.toByte()
@@ -304,6 +348,7 @@ internal class VpnTransportGate09A private constructor(
         ownerCache.clear()
         ownerResolver.clear()
         loggedFlows.clear()
+        VpnTransportResourceDiagnostics.publish(resources.snapshot())
     }
 
     companion object {
@@ -311,7 +356,11 @@ internal class VpnTransportGate09A private constructor(
         private const val WorkerCount = 2
         private const val DnsPort = 53
         private const val MaximumStressCycles = 200
-        private const val StressTrafficMillis = 10L
+        private const val StressPayloadSize = 8
+        private const val MaximumStressRoundTripsPerCycle = 5
+        private const val StressPollMillis = 10L
+        private const val StressRoundTripTimeoutMillis = 2_000L
+        private const val StressAssociationCloseTimeoutMillis = 2_000L
         private const val LogTag = "VpnTransport09A"
         private val generationCounter = AtomicLong(0)
 
@@ -319,6 +368,8 @@ internal class VpnTransportGate09A private constructor(
             vpnService: VpnService,
             scope: CoroutineScope,
             allowedAddresses: Set<String>,
+            allowedPorts: Set<Int>,
+            udpFixtureGate: ChromePhotosUdpFixtureGate?,
             writeToTun: (ByteArray) -> Boolean,
         ): VpnTransportGate09A {
             require(vpnService.packageName.endsWith(".dev"))
@@ -326,14 +377,23 @@ internal class VpnTransportGate09A private constructor(
             val generation = generationCounter.incrementAndGet()
             val resolver = VpnConnectionOwnerResolver.create(vpnService)
             val ownerCache = VpnFlowOwnerCache(resolver::resolve, android.os.SystemClock::elapsedRealtime)
+            val resources = VpnOwnedResourceTracker()
             val protectedSockets =
                 VpnProtectedSocketFactory(
                     protectTcp = { socket: Socket -> vpnService.protect(socket) },
                     protectUdp = { socket: DatagramSocket -> vpnService.protect(socket) },
+                    resources = resources,
                 )
-            val socks = VpnLocalSocks5Server(protectedSockets, allowedAddresses)
+            val socks =
+                VpnLocalSocks5Server(
+                    protectedSockets = protectedSockets,
+                    allowedAddresses = allowedAddresses,
+                    allowedPorts = allowedPorts,
+                    resources = resources,
+                    malformedResponseProbeEnabled = udpFixtureGate?.malformedProbeEnabled == true,
+                )
             socks.start()
-            val engine = HevTransportEngine()
+            val engine = HevTransportEngine(resources = resources)
             val socketType =
                 try {
                     engine.start(
@@ -367,6 +427,11 @@ internal class VpnTransportGate09A private constructor(
                 protectedSockets = protectedSockets,
                 socks = socks,
                 engine = engine,
+                resources = resources,
+                udpStressTarget =
+                    udpFixtureGate?.let { gate ->
+                        InetSocketAddress(InetAddress.getByName(gate.address) as Inet4Address, gate.port)
+                    },
                 packetSocketType = socketType,
                 writeToTun = writeToTun,
             ).also {

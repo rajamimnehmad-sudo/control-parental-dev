@@ -33,6 +33,53 @@ class ChromePhotosDataPlaneLabVpnPolicyTest {
     }
 
     @Test
+    fun `UDP fixture route is off by default and exact when gate is enabled`() {
+        assertEquals(
+            listOf(ChromePhotosLabVpnRoute(ChromePhotosDataPlaneLabContract.FixtureIpv4, 32)),
+            ChromePhotosDataPlaneLabVpnPolicy.routes(active = true),
+        )
+        assertEquals(
+            listOf(
+                ChromePhotosLabVpnRoute(ChromePhotosDataPlaneLabContract.FixtureIpv4, 32),
+                ChromePhotosLabVpnRoute("192.168.0.20", 32),
+            ),
+            ChromePhotosDataPlaneLabVpnPolicy.routes(
+                active = true,
+                udpFixtureAddress = "192.168.0.20",
+            ),
+        )
+        assertEquals(
+            listOf(ChromePhotosLabVpnRoute(ChromePhotosDataPlaneLabContract.FixtureIpv4, 32)),
+            ChromePhotosDataPlaneLabVpnPolicy.routes(
+                active = true,
+                udpFixtureAddress = "8.8.8.8",
+            ),
+        )
+        assertEquals(
+            listOf(ChromePhotosLabVpnRoute(ChromePhotosDataPlaneLabContract.FixtureIpv4, 32)),
+            ChromePhotosDataPlaneLabVpnPolicy.routes(
+                active = true,
+                udpFixtureAddress = "localhost",
+            ),
+        )
+    }
+
+    @Test
+    fun `UDP fixture VPN admission is opt in and bounded to the fixture package`() {
+        assertEquals(emptySet(), ChromePhotosDataPlaneLabVpnPolicy.additionalAllowedPackages(null))
+        assertEquals(
+            setOf(ChromePhotosDataPlaneLabContract.UdpFixturePackage),
+            ChromePhotosDataPlaneLabVpnPolicy.additionalAllowedPackages(
+                ChromePhotosUdpFixtureGate(
+                    address = "192.168.0.20",
+                    port = 32_123,
+                    malformedProbeEnabled = false,
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `fixture DNS match is exact and gated`() {
         assertTrue(
             ChromePhotosDataPlaneLabVpnPolicy.isFixtureDomain(

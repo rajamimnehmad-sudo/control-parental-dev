@@ -40,6 +40,7 @@ import com.contentfilter.feature.vpn.search.SearchProtectionSignals
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import com.contentfilter.feature.vpn.transport.VpnPacketDispatcher
 import com.contentfilter.feature.vpn.transport.VpnTransportGate09A
+import com.contentfilter.feature.vpn.transport.VpnTransportResourceDiagnostics
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -183,6 +184,14 @@ class FilterVpnService : VpnService() {
                                 vpnService = this@FilterVpnService,
                                 scope = scope,
                                 allowedAddresses = controlledAddresses,
+                                allowedPorts =
+                                    ChromePhotosDataPlaneLabVpnPolicy.allowedTransportPorts(
+                                        this@FilterVpnService,
+                                    ),
+                                udpFixtureGate =
+                                    ChromePhotosDataPlaneLabVpnPolicy.udpFixtureGate(
+                                        this@FilterVpnService,
+                                    ),
                                 writeToTun = dispatcher::writePacket,
                             )
                         } else {
@@ -261,7 +270,14 @@ class FilterVpnService : VpnService() {
         if (!DevProtectionMode.isAvailable(this)) return
         val metrics = transportGate09A?.metrics()
         if (metrics == null) {
-            Log.i(TransportLogTag, "status=inactive")
+            val resources = VpnTransportResourceDiagnostics.snapshot()
+            Log.i(
+                TransportLogTag,
+                "status=inactive ownedFdResources=${resources.ownedFdResources} " +
+                    "ownedFdPeak=${resources.ownedFdResourcesPeak} " +
+                    "activeProtectedUdpSockets=${resources.activeProtectedUdpSockets} " +
+                    "protectedUdpPeak=${resources.activeProtectedUdpSocketsPeak}",
+            )
             return
         }
         Log.i(
@@ -272,8 +288,24 @@ class FilterVpnService : VpnService() {
                 "chromeTcpDrops=${metrics.chromeTcpDrops} chromeUdpDrops=${metrics.chromeUdpDrops} " +
                 "unknownDrops=${metrics.unknownOwnerDrops} recursion=${metrics.recursionPackets} " +
                 "hevTxPackets=${metrics.hev.txPackets} hevRxPackets=${metrics.hev.rxPackets} " +
-                "socksTcp=${metrics.socks.tcpConnects} socksUdp=${metrics.socks.udpDatagrams} " +
-                "protectFailures=${metrics.protectedSockets.protectFailures}",
+                "socksTcp=${metrics.socks.tcpConnects} socksUdpAssociations=${metrics.socks.udpAssociations} " +
+                "socksUdpOut=${metrics.socks.udpDatagramsOut} socksUdpIn=${metrics.socks.udpDatagramsIn} " +
+                "socksUdpInvalid=${metrics.socks.malformedUdpDatagrams} " +
+                "socksUdpFragmentsDropped=${metrics.socks.udpFragmentsDropped} " +
+                "activeUdpAssociations=${metrics.socks.activeUdpAssociations} " +
+                "activeUdpAssociationsPeak=${metrics.socks.activeUdpAssociationsPeak} " +
+                "protectFailures=${metrics.protectedSockets.protectFailures} " +
+                "protectedUdpSocketsCreated=${metrics.protectedSockets.protectedUdpSocketsCreated} " +
+                "protectUdpSuccess=${metrics.protectedSockets.protectUdpSuccess} " +
+                "protectUdpFailure=${metrics.protectedSockets.protectUdpFailure} " +
+                "ownedFdResources=${metrics.resources.ownedFdResources} " +
+                "ownedFdPeak=${metrics.resources.ownedFdResourcesPeak} " +
+                "activeProtectedUdpSockets=${metrics.resources.activeProtectedUdpSockets} " +
+                "protectedUdpPeak=${metrics.resources.activeProtectedUdpSocketsPeak} " +
+                "malformedEmpty=${metrics.socks.malformedProbeEmptySent} " +
+                "malformedTruncated=${metrics.socks.malformedProbeTruncatedSent} " +
+                "malformedInvalidHeader=${metrics.socks.malformedProbeInvalidHeaderSent} " +
+                "socksSessionIoFailures=${metrics.socks.sessionIoFailures}",
         )
     }
 
@@ -493,6 +525,14 @@ class FilterVpnService : VpnService() {
             BrowserPackageNames.forEach { packageName ->
                 runCatching { addAllowedApplication(packageName) }
                     .onSuccess { allowedCount++ }
+            }
+            ChromePhotosDataPlaneLabVpnPolicy.additionalAllowedPackages(this@FilterVpnService).forEach { packageName ->
+                runCatching { addAllowedApplication(packageName) }
+                    .onSuccess { allowedCount++ }
+                    .onFailure { error ->
+                        Log.e(LogTag, "DEV UDP fixture admission failed error=${error.javaClass.simpleName}")
+                        throw error
+                    }
             }
             if (allowedCount == 0) {
                 AdminPackageNames.forEach { packageName ->

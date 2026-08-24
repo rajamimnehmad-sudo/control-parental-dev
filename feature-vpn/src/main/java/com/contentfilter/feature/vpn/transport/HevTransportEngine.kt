@@ -14,6 +14,7 @@ internal data class HevTransportStopResult(
 internal class HevTransportEngine(
     private val nativeApi: HevNativeApi = HevNativeBridge,
     private val bridgeFactory: VpnPacketBridgeFactory = AndroidVpnPacketBridge,
+    private val resources: VpnOwnedResourceTracker = VpnOwnedResourceTracker(),
 ) : Closeable {
     private val lifecycleLock = Any()
     private val running = AtomicBoolean(false)
@@ -25,6 +26,7 @@ internal class HevTransportEngine(
     private var responseThread: Thread? = null
     private var nativeResult: Int? = null
     private var configBytes: ByteArray? = null
+    private var bridgeResources: Closeable? = null
 
     fun start(
         socksPort: Int,
@@ -35,37 +37,52 @@ internal class HevTransportEngine(
         synchronized(lifecycleLock) {
             check(running.compareAndSet(false, true)) { "HEV transport already running" }
             nativeResult = null
-            val openedBridge = bridgeFactory.open()
-            bridge = openedBridge
-            val config = config(socksPort, username, password).toByteArray(Charsets.UTF_8)
-            configBytes = config
-            val started = CountDownLatch(1)
-            nativeThread =
-                Thread(
-                    {
-                        started.countDown()
-                        nativeResult = nativeApi.run(config, openedBridge.engineFd)
-                        running.set(false)
-                    },
-                    "GloshHevNative09A",
-                ).also { it.start() }
-            responseThread =
-                Thread(
-                    {
-                        val buffer = ByteArray(MaximumPacketSize)
-                        while (running.get()) {
-                            val length = openedBridge.readPacket(buffer)
-                            if (length <= 0) break
-                            packetsReturned.incrementAndGet()
-                            onPacketFromHev(buffer.copyOf(length))
-                        }
-                    },
-                    "GloshHevResponse09A",
-                ).also { it.start() }
-            check(started.await(StartWaitMillis, TimeUnit.MILLISECONDS)) { "HEV thread did not start" }
-            Thread.sleep(InitializationObservationMillis)
-            check(nativeThread?.isAlive == true) { "HEV exited during initialization result=$nativeResult" }
-            openedBridge.type
+            try {
+                val openedBridge = bridgeFactory.open()
+                bridge = openedBridge
+                bridgeResources = resources.acquire(VpnOwnedResourceKind.PacketBridgeFd, PacketBridgeOwnedFdCount)
+                val config = config(socksPort, username, password).toByteArray(Charsets.UTF_8)
+                configBytes = config
+                val started = CountDownLatch(1)
+                nativeThread =
+                    Thread(
+                        {
+                            started.countDown()
+                            nativeResult = nativeApi.run(config, openedBridge.engineFd)
+                            running.set(false)
+                        },
+                        "GloshHevNative09A",
+                    ).also { it.start() }
+                responseThread =
+                    Thread(
+                        {
+                            val buffer = ByteArray(MaximumPacketSize)
+                            while (running.get()) {
+                                val length = openedBridge.readPacket(buffer)
+                                if (length <= 0) break
+                                packetsReturned.incrementAndGet()
+                                onPacketFromHev(buffer.copyOf(length))
+                            }
+                        },
+                        "GloshHevResponse09A",
+                    ).also { it.start() }
+                check(started.await(StartWaitMillis, TimeUnit.MILLISECONDS)) { "HEV thread did not start" }
+                Thread.sleep(InitializationObservationMillis)
+                check(nativeThread?.isAlive == true) { "HEV exited during initialization result=$nativeResult" }
+                openedBridge.type
+            } catch (error: Throwable) {
+                running.set(false)
+                runCatching { nativeApi.quit() }
+                runCatching { bridge?.close() }
+                bridgeResources?.close()
+                configBytes?.fill(0)
+                bridge = null
+                bridgeResources = null
+                configBytes = null
+                nativeThread = null
+                responseThread = null
+                throw error
+            }
         }
 
     fun writePacket(packet: ByteArray): Boolean {
@@ -90,10 +107,12 @@ internal class HevTransportEngine(
             // HEV does not own/close the external FD. Glosh closes it only after
             // quit + the bounded join attempt, which also wakes the response reader.
             bridge?.close()
+            bridgeResources?.close()
             responseThread?.join(ResponseJoinTimeoutMillis)
             configBytes?.fill(0)
             configBytes = null
             bridge = null
+            bridgeResources = null
             nativeThread = null
             responseThread = null
             HevTransportStopResult(joined = joined, nativeResult = nativeResult)
@@ -143,5 +162,6 @@ internal class HevTransportEngine(
         const val InitializationObservationMillis = 20L
         const val NativeJoinTimeoutMillis = 5_000L
         const val ResponseJoinTimeoutMillis = 1_000L
+        const val PacketBridgeOwnedFdCount = 3
     }
 }

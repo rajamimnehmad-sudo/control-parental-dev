@@ -21,6 +21,10 @@ object ChromePhotosDataPlaneLabContract {
     const val KeyTrustedBootstrapResetGeneration = "trusted_bootstrap_reset_generation"
     const val KeyTrustedBootstrapCompleteGeneration = "trusted_bootstrap_complete_generation"
     const val KeyTrustedBootstrapResetCount = "trusted_bootstrap_reset_count"
+    const val KeyUdpFixtureGateEnabled = "udp_fixture_gate_enabled"
+    const val KeyUdpFixtureAddress = "udp_fixture_address"
+    const val KeyUdpFixturePort = "udp_fixture_port"
+    const val KeyUdpFixtureMalformedProbeEnabled = "udp_fixture_malformed_probe_enabled"
 
     const val TrustedBootstrapGeneration = 1
 
@@ -31,4 +35,5 @@ object ChromePhotosDataPlaneLabContract {
     const val ProxyPort = 8877
 
     const val ChromePackage = "com.android.chrome"
+    const val UdpFixturePackage = "com.glosh.vpnudpfixture"
 }

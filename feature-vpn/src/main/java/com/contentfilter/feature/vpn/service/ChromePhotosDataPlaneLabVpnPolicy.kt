@@ -12,6 +12,12 @@ internal data class ChromePhotosLabVpnRoute(
     val prefixLength: Int,
 )
 
+internal data class ChromePhotosUdpFixtureGate(
+    val address: String,
+    val port: Int,
+    val malformedProbeEnabled: Boolean,
+)
+
 internal object ChromePhotosDataPlaneLabVpnPolicy {
     fun isActive(context: Context): Boolean =
         context.packageName.endsWith(".dev") &&
@@ -33,12 +39,14 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
                     ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
                     emptySet(),
                 ).orEmpty(),
+            udpFixtureAddress = udpFixtureGate(context)?.address,
         )
     }
 
     fun routes(
         active: Boolean,
         resolvedAddresses: Collection<String> = emptySet(),
+        udpFixtureAddress: String? = null,
     ): List<ChromePhotosLabVpnRoute> =
         if (active) {
             val fixture =
@@ -61,10 +69,64 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
                         )
                     }
                     .toList()
-            listOf(fixture) + realRoutes
+            val udpFixtureRoute =
+                udpFixtureAddress
+                    ?.let(::parseIpv4Literal)
+                    ?.takeIf { address ->
+                        address.address.size == Ipv4ByteCount &&
+                            address.isSiteLocalAddress &&
+                            !address.isAnyLocalAddress &&
+                            !address.isLoopbackAddress &&
+                            !address.isMulticastAddress
+                    }
+                    ?.let { address ->
+                        ChromePhotosLabVpnRoute(address.hostAddress.orEmpty(), Ipv4HostPrefixLength)
+                    }
+            listOfNotNull(fixture, udpFixtureRoute) + realRoutes
         } else {
             emptyList()
         }
+
+    fun udpFixtureGate(context: Context): ChromePhotosUdpFixtureGate? {
+        if (!isActive(context)) return null
+        val preferences =
+            context.getSharedPreferences(
+                ChromePhotosDataPlaneLabContract.PreferencesName,
+                Context.MODE_PRIVATE,
+            )
+        if (!preferences.getBoolean(ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled, false)) return null
+        val address = preferences.getString(ChromePhotosDataPlaneLabContract.KeyUdpFixtureAddress, "").orEmpty()
+        val parsedAddress = parseIpv4Literal(address)
+        val port = preferences.getInt(ChromePhotosDataPlaneLabContract.KeyUdpFixturePort, 0)
+        if (
+            parsedAddress == null ||
+            parsedAddress.address.size != Ipv4ByteCount ||
+            !parsedAddress.isSiteLocalAddress ||
+            parsedAddress.isAnyLocalAddress ||
+            parsedAddress.isLoopbackAddress ||
+            parsedAddress.isMulticastAddress ||
+            port !in MinimumFixturePort..MaximumFixturePort
+        ) {
+            return null
+        }
+        return ChromePhotosUdpFixtureGate(
+            address = parsedAddress.hostAddress.orEmpty(),
+            port = port,
+            malformedProbeEnabled =
+                preferences.getBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyUdpFixtureMalformedProbeEnabled,
+                    false,
+                ),
+        )
+    }
+
+    fun additionalAllowedPackages(context: Context): Set<String> = additionalAllowedPackages(udpFixtureGate(context))
+
+    fun additionalAllowedPackages(gate: ChromePhotosUdpFixtureGate?): Set<String> =
+        if (gate != null) setOf(ChromePhotosDataPlaneLabContract.UdpFixturePackage) else emptySet()
+
+    fun allowedTransportPorts(context: Context): Set<Int> =
+        DefaultTransportPorts + listOfNotNull(udpFixtureGate(context)?.port)
 
     fun isFixtureDomain(
         active: Boolean,
@@ -144,6 +206,22 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
     private const val Ipv6HostPrefixLength = 128
     private const val Ipv4ByteCount = 4
     private const val MaximumResolvedRoutes = 32
+    private const val MinimumFixturePort = 20_000
+    private const val MaximumFixturePort = 50_000
+    private const val Ipv4OctetCount = 4
     private const val SessionLogLength = 8
     private const val LogTag = "ChromePhotosDataPlane"
+    private val DefaultTransportPorts = setOf(80, 443)
+
+    private fun parseIpv4Literal(value: String): InetAddress? {
+        val octets = value.split('.')
+        if (octets.size != Ipv4OctetCount) return null
+        val bytes =
+            octets.map { octet ->
+                if (octet.isEmpty() || octet.any { character -> !character.isDigit() }) return null
+                val number = octet.toIntOrNull()?.takeIf { it in 0..255 } ?: return null
+                number.toByte()
+            }.toByteArray()
+        return InetAddress.getByAddress(bytes)
+    }
 }

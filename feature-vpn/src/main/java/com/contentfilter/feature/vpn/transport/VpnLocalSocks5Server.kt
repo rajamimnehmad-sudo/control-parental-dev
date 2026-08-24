@@ -1,12 +1,14 @@
 package com.contentfilter.feature.vpn.transport
 
 import java.io.Closeable
+import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.security.SecureRandom
 import java.util.Base64
@@ -15,6 +17,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 internal class Socks5SessionCredentials private constructor(
@@ -51,8 +54,17 @@ internal data class VpnLocalSocksMetrics(
     val tcpConnects: Long,
     val udpAssociations: Long,
     val udpDatagrams: Long,
+    val udpDatagramsOut: Long,
+    val udpDatagramsIn: Long,
     val malformedUdpDatagrams: Long,
+    val udpFragmentsDropped: Long,
     val activeSessions: Int,
+    val activeUdpAssociations: Int,
+    val activeUdpAssociationsPeak: Int,
+    val malformedProbeEmptySent: Long,
+    val malformedProbeTruncatedSent: Long,
+    val malformedProbeInvalidHeaderSent: Long,
+    val sessionIoFailures: Long,
 )
 
 /** Loopback-only authenticated SOCKS5 server for the bounded 09A route set. */
@@ -62,6 +74,8 @@ internal class VpnLocalSocks5Server(
     private val credentials: Socks5SessionCredentials = Socks5SessionCredentials.create(),
     private val maximumSessions: Int = DefaultMaximumSessions,
     private val allowedPorts: Set<Int> = DefaultAllowedPorts,
+    private val resources: VpnOwnedResourceTracker = VpnOwnedResourceTracker(),
+    private val malformedResponseProbeEnabled: Boolean = false,
 ) : Closeable {
     private val allowedAddresses = allowedAddresses.mapTo(hashSetOf()) { it.substringBefore('%') }
     private val running = AtomicBoolean(false)
@@ -69,12 +83,22 @@ internal class VpnLocalSocks5Server(
     private val rejectedDestinations = AtomicLong(0)
     private val tcpConnects = AtomicLong(0)
     private val udpAssociations = AtomicLong(0)
-    private val udpDatagrams = AtomicLong(0)
+    private val udpDatagramsOut = AtomicLong(0)
+    private val udpDatagramsIn = AtomicLong(0)
     private val malformedUdpDatagrams = AtomicLong(0)
+    private val udpFragmentsDropped = AtomicLong(0)
+    private val activeUdpAssociations = AtomicInteger(0)
+    private val activeUdpAssociationsPeak = AtomicInteger(0)
+    private val malformedProbeInjected = AtomicBoolean(false)
+    private val malformedProbeEmptySent = AtomicLong(0)
+    private val malformedProbeTruncatedSent = AtomicLong(0)
+    private val malformedProbeInvalidHeaderSent = AtomicLong(0)
+    private val sessionIoFailures = AtomicLong(0)
     private val sessions = Collections.synchronizedSet(mutableSetOf<Closeable>())
     private var serverSocket: ServerSocket? = null
     private var acceptExecutor: ExecutorService? = null
     private var sessionExecutor: ExecutorService? = null
+    private var listenerResource: Closeable? = null
 
     val port: Int
         get() = requireNotNull(serverSocket).localPort
@@ -89,6 +113,7 @@ internal class VpnLocalSocks5Server(
         socket.reuseAddress = false
         socket.bind(InetSocketAddress(InetAddress.getByName(LoopbackIpv4), 0), maximumSessions)
         serverSocket = socket
+        listenerResource = resources.acquire(VpnOwnedResourceKind.SocksListener)
         val workers = Executors.newFixedThreadPool(maximumSessions) { task -> Thread(task, "GloshSocksSession09A") }
         sessionExecutor = workers
         acceptExecutor =
@@ -102,12 +127,16 @@ internal class VpnLocalSocks5Server(
                         }
                         sessions += client
                         acceptedConnections.incrementAndGet()
+                        val controlResource = resources.acquire(VpnOwnedResourceKind.SocksControl)
                         workers.execute {
                             try {
                                 handleClient(client)
+                            } catch (_: IOException) {
+                                sessionIoFailures.incrementAndGet()
                             } finally {
                                 sessions -= client
                                 runCatching { client.close() }
+                                controlResource.close()
                             }
                         }
                     }
@@ -155,24 +184,24 @@ internal class VpnLocalSocks5Server(
             Socks5Protocol.writeReply(client.getOutputStream(), Socks5Protocol.GeneralFailure)
             return
         }
-        upstream.soTimeout = RelayReadTimeoutMillis
+        upstream.socket.soTimeout = RelayReadTimeoutMillis
         sessions += upstream
         try {
             tcpConnects.incrementAndGet()
             Socks5Protocol.writeReply(
                 client.getOutputStream(),
                 Socks5Protocol.Success,
-                upstream.localSocketAddress as InetSocketAddress,
+                upstream.socket.localSocketAddress as InetSocketAddress,
             )
             client.soTimeout = 0
-            val reverse = Thread({ relay(upstream, client) }, "GloshSocksTcpReverse09A")
+            val reverse = Thread({ relay(upstream.socket, client) }, "GloshSocksTcpReverse09A")
             reverse.start()
-            relay(client, upstream)
-            runCatching { upstream.shutdownOutput() }
+            relay(client, upstream.socket)
+            runCatching { upstream.socket.shutdownOutput() }
             reverse.join(RelayJoinTimeoutMillis)
         } finally {
             sessions -= upstream
-            runCatching { upstream.close() }
+            upstream.close()
         }
     }
 
@@ -193,17 +222,21 @@ internal class VpnLocalSocks5Server(
 
     private fun handleUdpAssociate(control: Socket) {
         val relay = DatagramSocket(InetSocketAddress(InetAddress.getByName(LoopbackIpv4), 0))
+        val relayResource = resources.acquire(VpnOwnedResourceKind.SocksUdpRelay)
         val upstream = protectedSockets.openUdp()
         if (upstream == null) {
             relay.close()
+            relayResource.close()
             Socks5Protocol.writeReply(control.getOutputStream(), Socks5Protocol.GeneralFailure)
             return
         }
         relay.soTimeout = UdpPollMillis
         upstream.socket.soTimeout = UdpResponseTimeoutMillis
         sessions += relay
-        sessions += upstream.socket
+        sessions += upstream
         udpAssociations.incrementAndGet()
+        val activeAssociations = activeUdpAssociations.incrementAndGet()
+        activeUdpAssociationsPeak.accumulateAndGet(activeAssociations, ::maxOf)
         val associationOpen = AtomicBoolean(true)
         val controlWatcher =
             Thread(
@@ -211,7 +244,7 @@ internal class VpnLocalSocks5Server(
                     runCatching { while (control.getInputStream().read() >= 0) Unit }
                     associationOpen.set(false)
                     relay.close()
-                    upstream.socket.close()
+                    upstream.close()
                 },
                 "GloshSocksUdpControl09A",
             )
@@ -226,42 +259,89 @@ internal class VpnLocalSocks5Server(
             var clientEndpoint: InetSocketAddress? = null
             val incomingBuffer = ByteArray(MaximumUdpDatagramSize)
             val responseBuffer = ByteArray(MaximumUdpDatagramSize)
-            while (running.get() && associationOpen.get()) {
+            associationLoop@ while (running.get() && associationOpen.get()) {
                 val incoming = DatagramPacket(incomingBuffer, incomingBuffer.size)
                 try {
                     relay.receive(incoming)
                 } catch (_: SocketTimeoutException) {
                     continue
+                } catch (error: SocketException) {
+                    if (!running.get() || !associationOpen.get() || relay.isClosed) break@associationLoop
+                    throw error
                 }
                 val source = incoming.socketAddress as? InetSocketAddress ?: continue
                 if (!source.address.isLoopbackAddress || (clientEndpoint != null && source != clientEndpoint)) continue
                 clientEndpoint = source
-                val datagram = Socks5Protocol.parseUdpDatagram(incoming.data, incoming.length)
-                if (datagram == null || !isAllowed(datagram.target)) {
+                val datagram =
+                    when (val parsed = Socks5Protocol.classifyUdpDatagram(incoming.data, incoming.length)) {
+                        Socks5UdpParseResult.Fragmented -> {
+                            udpFragmentsDropped.incrementAndGet()
+                            continue
+                        }
+                        Socks5UdpParseResult.Invalid -> {
+                            malformedUdpDatagrams.incrementAndGet()
+                            continue
+                        }
+                        is Socks5UdpParseResult.Parsed -> parsed.datagram
+                    }
+                if (!isAllowed(datagram.target)) {
                     malformedUdpDatagrams.incrementAndGet()
                     continue
                 }
-                upstream.send(DatagramPacket(datagram.payload, datagram.payload.size, datagram.target))
-                udpDatagrams.incrementAndGet()
+                try {
+                    injectMalformedResponsesOnce(relay, clientEndpoint)
+                    upstream.send(DatagramPacket(datagram.payload, datagram.payload.size, datagram.target))
+                } catch (error: SocketException) {
+                    if (!running.get() || !associationOpen.get() || relay.isClosed || upstream.socket.isClosed) {
+                        break@associationLoop
+                    }
+                    throw error
+                }
+                udpDatagramsOut.incrementAndGet()
                 val response = DatagramPacket(responseBuffer, responseBuffer.size)
                 try {
                     upstream.socket.receive(response)
                 } catch (_: SocketTimeoutException) {
                     continue
+                } catch (error: SocketException) {
+                    if (!running.get() || !associationOpen.get() || upstream.socket.isClosed) break@associationLoop
+                    throw error
                 }
                 val responseSource = response.socketAddress as? InetSocketAddress ?: continue
                 if (!isAllowed(responseSource)) continue
+                udpDatagramsIn.incrementAndGet()
                 val wrapped = Socks5Protocol.encodeUdpDatagram(responseSource, response.data, response.length)
-                relay.send(DatagramPacket(wrapped, wrapped.size, clientEndpoint))
+                try {
+                    relay.send(DatagramPacket(wrapped, wrapped.size, clientEndpoint))
+                } catch (error: SocketException) {
+                    if (!running.get() || !associationOpen.get() || relay.isClosed) break@associationLoop
+                    throw error
+                }
             }
         } finally {
             associationOpen.set(false)
             sessions -= relay
-            sessions -= upstream.socket
+            sessions -= upstream
             relay.close()
-            upstream.socket.close()
+            relayResource.close()
+            upstream.close()
             controlWatcher.join(ControlWatcherJoinMillis)
+            activeUdpAssociations.decrementAndGet()
         }
+    }
+
+    private fun injectMalformedResponsesOnce(
+        relay: DatagramSocket,
+        clientEndpoint: InetSocketAddress,
+    ) {
+        if (!malformedResponseProbeEnabled || !malformedProbeInjected.compareAndSet(false, true)) return
+        relay.send(DatagramPacket(ByteArray(0), 0, clientEndpoint))
+        malformedProbeEmptySent.incrementAndGet()
+        relay.send(DatagramPacket(byteArrayOf(0, 0, 0), 3, clientEndpoint))
+        malformedProbeTruncatedSent.incrementAndGet()
+        val invalidHeader = byteArrayOf(1, 0, 0, 1, 127, 0, 0, 1, 0, 1)
+        relay.send(DatagramPacket(invalidHeader, invalidHeader.size, clientEndpoint))
+        malformedProbeInvalidHeaderSent.incrementAndGet()
     }
 
     private fun isAllowed(target: InetSocketAddress): Boolean =
@@ -273,14 +353,25 @@ internal class VpnLocalSocks5Server(
             rejectedDestinations = rejectedDestinations.get(),
             tcpConnects = tcpConnects.get(),
             udpAssociations = udpAssociations.get(),
-            udpDatagrams = udpDatagrams.get(),
+            udpDatagrams = udpDatagramsOut.get(),
+            udpDatagramsOut = udpDatagramsOut.get(),
+            udpDatagramsIn = udpDatagramsIn.get(),
             malformedUdpDatagrams = malformedUdpDatagrams.get(),
+            udpFragmentsDropped = udpFragmentsDropped.get(),
             activeSessions = sessions.size,
+            activeUdpAssociations = activeUdpAssociations.get(),
+            activeUdpAssociationsPeak = activeUdpAssociationsPeak.get(),
+            malformedProbeEmptySent = malformedProbeEmptySent.get(),
+            malformedProbeTruncatedSent = malformedProbeTruncatedSent.get(),
+            malformedProbeInvalidHeaderSent = malformedProbeInvalidHeaderSent.get(),
+            sessionIoFailures = sessionIoFailures.get(),
         )
 
     override fun close() {
         if (!running.compareAndSet(true, false)) return
         runCatching { serverSocket?.close() }
+        listenerResource?.close()
+        listenerResource = null
         synchronized(sessions) { sessions.toList() }.forEach { runCatching { it.close() } }
         sessions.clear()
         acceptExecutor?.shutdownNow()

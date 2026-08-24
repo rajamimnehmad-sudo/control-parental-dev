@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.ContextCompat
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import com.contentfilter.feature.accessibility.chromevisual.ChromePhotosProtectedSurfaceDiagnostics
 import com.contentfilter.feature.vpn.service.VpnController
 
@@ -49,10 +50,21 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                 ActionStatus -> ChromePhotosDataPlaneLabService.ActionStatus
                 else -> return
             }
-        ContextCompat.startForegroundService(
-            context,
-            Intent(context, ChromePhotosDataPlaneLabService::class.java).setAction(serviceAction),
-        )
+        val serviceIntent = Intent(context, ChromePhotosDataPlaneLabService::class.java).setAction(serviceAction)
+        if (intent.action == ActionStart) {
+            serviceIntent
+                .putExtra(
+                    ExtraUdpFixtureGateEnabled,
+                    intent.getBooleanExtra(ExtraUdpFixtureGateEnabled, false),
+                )
+                .putExtra(ExtraUdpFixtureAddress, intent.getStringExtra(ExtraUdpFixtureAddress))
+                .putExtra(ExtraUdpFixturePort, intent.getIntExtra(ExtraUdpFixturePort, 0))
+                .putExtra(
+                    ExtraUdpFixtureMalformedProbeEnabled,
+                    intent.getBooleanExtra(ExtraUdpFixtureMalformedProbeEnabled, false),
+                )
+        }
+        ContextCompat.startForegroundService(context, serviceIntent)
     }
 
     companion object {
@@ -63,6 +75,11 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ActionTransportStress = "com.contentfilter.user.chromedataplane.command.TRANSPORT_STRESS"
         const val ExtraSurfaceMarkerEnabled = "chrome_photos_surface_marker_enabled"
         const val ExtraTransportStressCycles = "transport_stress_cycles"
+        const val ExtraUdpFixtureGateEnabled = ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled
+        const val ExtraUdpFixtureAddress = ChromePhotosDataPlaneLabContract.KeyUdpFixtureAddress
+        const val ExtraUdpFixturePort = ChromePhotosDataPlaneLabContract.KeyUdpFixturePort
+        const val ExtraUdpFixtureMalformedProbeEnabled =
+            ChromePhotosDataPlaneLabContract.KeyUdpFixtureMalformedProbeEnabled
         private const val DefaultTransportStressCycles = 100
     }
 }

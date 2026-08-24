@@ -26,6 +26,9 @@ class VpnProtectedSocketFactoryTest {
         assertEquals(0, factory.metrics().tcpConnectAttempts)
         assertEquals(0, factory.metrics().udpSendAttempts)
         assertEquals(2, factory.metrics().protectFailures)
+        assertEquals(1, factory.metrics().protectedUdpSocketsCreated)
+        assertEquals(0, factory.metrics().protectUdpSuccess)
+        assertEquals(1, factory.metrics().protectUdpFailure)
     }
 
     @Test
@@ -49,7 +52,10 @@ class VpnProtectedSocketFactoryTest {
             )
 
         assertNotNull(factory.connectTcp(InetSocketAddress("127.0.0.1", 443)))
-        assertNotNull(factory.openUdp()).socket.close()
+        assertNotNull(factory.openUdp()).close()
         assertEquals(1, factory.metrics().tcpConnectAttempts)
+        assertEquals(1, factory.metrics().protectedUdpSocketsCreated)
+        assertEquals(1, factory.metrics().protectUdpSuccess)
+        assertEquals(0, factory.metrics().protectUdpFailure)
     }
 }

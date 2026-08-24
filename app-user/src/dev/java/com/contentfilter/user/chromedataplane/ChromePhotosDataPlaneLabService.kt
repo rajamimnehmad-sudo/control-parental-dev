@@ -53,7 +53,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         when (intent?.action) {
             ActionStop -> stopLab()
             ActionStatus -> logStatus()
-            else -> startLab()
+            else -> startLab(intent)
         }
         return START_NOT_STICKY
     }
@@ -75,7 +75,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         super.onDestroy()
     }
 
-    private fun startLab() {
+    private fun startLab(intent: Intent?) {
         if (operation?.isActive == true || lifecycle.current() in ActivePhases) {
             logStatus()
             return
@@ -84,6 +84,12 @@ class ChromePhotosDataPlaneLabService : Service() {
             serviceScope?.launch {
                 val preferences = labPreferences()
                 try {
+                    val udpFixtureGate = ChromePhotosUdpFixtureGateConfig.fromIntent(intent)
+                    if (udpFixtureGate.enabled) {
+                        require(
+                            packageManager.getApplicationInfo(ChromePhotosDataPlaneLabContract.UdpFixturePackage, 0).enabled,
+                        ) { "UDP fixture package is not installed and enabled" }
+                    }
                     lifecycle.begin()
                     val vpnWasRunningBeforeLab = VpnController.isRunning(this@ChromePhotosDataPlaneLabService)
                     vpnRollbackCompleted = false
@@ -103,6 +109,13 @@ class ChromePhotosDataPlaneLabService : Service() {
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyFixtureConfirmed, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
                         .putBoolean(KeyVpnWasRunningBeforeLab, vpnWasRunningBeforeLab)
+                        .putBoolean(ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled, udpFixtureGate.enabled)
+                        .putString(ChromePhotosDataPlaneLabContract.KeyUdpFixtureAddress, udpFixtureGate.address)
+                        .putInt(ChromePhotosDataPlaneLabContract.KeyUdpFixturePort, udpFixtureGate.port)
+                        .putBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyUdpFixtureMalformedProbeEnabled,
+                            udpFixtureGate.malformedProbeEnabled,
+                        )
                         .commit()
                     val routeAddresses =
                         ChromePhotosRealWebRouteResolver().resolve(ChromePhotosRealWebLabConfig.realHosts)
@@ -165,7 +178,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                             "policy=${modelIdentity.policyVersion} " +
                             "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
                             "fixture=controlled realHosts=${ChromePhotosRealWebLabConfig.realHosts.size} " +
-                            "routes=${routeAddresses.size} privacy=public_only_memory_only",
+                            "routes=${routeAddresses.size} udpFixture=${udpFixtureGate.enabled} " +
+                            "udpTarget=${udpFixtureGate.address}:${udpFixtureGate.port} " +
+                            "privacy=public_only_memory_only",
                     )
                 } catch (error: Throwable) {
                     lifecycle.fail()

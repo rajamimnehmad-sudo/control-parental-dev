@@ -65,6 +65,8 @@ class Socks5ProtocolTest {
 
         assertNull(Socks5Protocol.parseUdpDatagram(byteArrayOf(0, 0), 2))
         assertNull(Socks5Protocol.parseUdpDatagram(fragmented, fragmented.size))
+        assertEquals(Socks5UdpParseResult.Invalid, Socks5Protocol.classifyUdpDatagram(byteArrayOf(0, 0), 2))
+        assertEquals(Socks5UdpParseResult.Fragmented, Socks5Protocol.classifyUdpDatagram(fragmented, fragmented.size))
         assertContentEquals(byteArrayOf(1, 2, 3), Socks5Protocol.parseUdpDatagram(valid, valid.size)?.payload)
     }
 }

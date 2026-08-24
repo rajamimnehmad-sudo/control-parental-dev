@@ -21,6 +21,14 @@ internal data class Socks5UdpDatagram(
     val payload: ByteArray,
 )
 
+internal sealed interface Socks5UdpParseResult {
+    data class Parsed(val datagram: Socks5UdpDatagram) : Socks5UdpParseResult
+
+    data object Fragmented : Socks5UdpParseResult
+
+    data object Invalid : Socks5UdpParseResult
+}
+
 internal object Socks5Protocol {
     const val Version = 5
     const val UsernamePasswordMethod = 2
@@ -93,22 +101,30 @@ internal object Socks5Protocol {
     fun parseUdpDatagram(
         bytes: ByteArray,
         length: Int,
-    ): Socks5UdpDatagram? {
-        if (length !in MinimumUdpPacketSize..bytes.size) return null
-        if (bytes[0].toInt() != 0 || bytes[1].toInt() != 0 || bytes[2].toInt() != 0) return null
+    ): Socks5UdpDatagram? = (classifyUdpDatagram(bytes, length) as? Socks5UdpParseResult.Parsed)?.datagram
+
+    fun classifyUdpDatagram(
+        bytes: ByteArray,
+        length: Int,
+    ): Socks5UdpParseResult {
+        if (length !in MinimumUdpPacketSize..bytes.size) return Socks5UdpParseResult.Invalid
+        if (bytes[0].toInt() != 0 || bytes[1].toInt() != 0) return Socks5UdpParseResult.Invalid
+        if (bytes[2].toInt() != 0) return Socks5UdpParseResult.Fragmented
         var offset = 3
         val addressSize =
             when (bytes[offset++].toInt() and 0xFF) {
                 AddressIpv4 -> Ipv4Size
                 AddressIpv6 -> Ipv6Size
-                else -> return null
+                else -> return Socks5UdpParseResult.Invalid
             }
-        if (offset + addressSize + PortSize > length) return null
+        if (offset + addressSize + PortSize > length) return Socks5UdpParseResult.Invalid
         val address = InetAddress.getByAddress(bytes.copyOfRange(offset, offset + addressSize))
         offset += addressSize
         val port = ((bytes[offset].toInt() and 0xFF) shl 8) or (bytes[offset + 1].toInt() and 0xFF)
         offset += PortSize
-        return Socks5UdpDatagram(InetSocketAddress(address, port), bytes.copyOfRange(offset, length))
+        return Socks5UdpParseResult.Parsed(
+            Socks5UdpDatagram(InetSocketAddress(address, port), bytes.copyOfRange(offset, length)),
+        )
     }
 
     fun encodeUdpDatagram(
