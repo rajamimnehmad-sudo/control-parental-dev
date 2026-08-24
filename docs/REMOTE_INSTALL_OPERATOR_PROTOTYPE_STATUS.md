@@ -1,6 +1,6 @@
 # Glosh Remote — Operator prototype status
 
-Updated: 2026-08-24 12:52 ART
+Updated: 2026-08-24
 
 ## Scope
 This is a coordination/status document only. No production/local installer code was modified by ChatGPT because the current Glosh Remote implementation HEAD remains local on the user's Mac and newer than the stale GitHub remote branch.
@@ -23,7 +23,14 @@ Prototype contents:
 - local audit event filtering that drops pairing codes, operator keys, session keys, nonces, descriptors and ciphertext;
 - explicit wire-contract models for `precheck_v1` and staged install actions;
 - PRECHECK wire parser rejects unexpected identity fields such as account email addresses and accepts coarse counts only;
-- chunk wire-size validation accounts for base64 inside encrypted payload plus outer ciphertext/base64 envelope.
+- chunk wire-size validation accounts for base64 inside encrypted payload plus outer ciphertext/base64 envelope;
+- Device Owner commit state machine;
+- Device Owner assessment for foreign owner, Profile Owner, extra users/profiles, any account presence, Glosh installation/signing/admin receiver/self-test and ADB readiness;
+- fresh PRECHECK SHA-256 fingerprint binding;
+- short-lived Android-side user commit grant model;
+- independent Mac operator confirmation;
+- fixed `device_owner_activate_v1` contract with no arbitrary shell field;
+- post-activation VERIFYING/ACTIVE/RECOVERY states and explicit prohibition on automatic Device Owner rollback.
 
 Why 96 KiB chunks:
 - the current relay caps a WebSocket message at 256 KiB;
@@ -32,20 +39,23 @@ Why 96 KiB chunks:
 - 96 KiB leaves conservative room for both expansions plus JSON/AES overhead.
 
 Local prototype test result:
-- 12/12 Python unit tests PASS.
-- Tests cover one-active-session enforcement, READY precheck, account USER_ACTION classification, Device Owner blocker, signing mismatch blocker, installation stage transitions, transfer completeness, chunk-size bound, full-file hashing, secret stripping from audit events, rejection of identity-bearing PRECHECK fields and wire chunk bounds.
+- 18/18 Python unit tests PASS.
+- Coverage includes one-active-session enforcement, READY precheck, account USER_ACTION classification, Device Owner blockers, signing mismatch blocker, installation stage transitions, transfer completeness, chunk-size bound, full-file hashing, secret stripping, rejection of identity-bearing PRECHECK fields, wire chunk bounds, dual-consent Device Owner commit, fresh-precheck invalidation and recovery-without-auto-rollback.
 
-Artifact SHA-256:
-`a41eb13352cacf8d27fc2c885dbf1bc08652be3808c7b9e89cf5208dab2d6a0c`
+Current artifact SHA-256:
+`0eab46a459df25c96fa89b177d7276e650848dcb663c0b623a4e00cdb3820b50`
 
 ## Product decisions locked
 - Mac Operator is a GUI over the existing relay/broker engine, not a replacement security protocol.
 - Initial product model: many requests may wait, but only one accepted/active support session per operator.
 - PRECHECK is strictly read-only and runs before account removal, APK install or Device Owner changes.
-- Installation is staged: PRECHECK -> TRANSFER -> VERIFY -> INSTALL -> VERIFY INSTALL -> optional Device Owner phase.
+- Installation is staged: PRECHECK -> TRANSFER -> VERIFY -> INSTALL -> VERIFY INSTALL -> Device Owner commit -> VERIFY OWNER.
 - No arbitrary shell exposed in normal UI; advanced DEV console remains hidden/separate.
-- APK transfer should use the existing end-to-end encrypted session, chunked and hash-verified, rather than a public APK URL.
-- PRECHECK should return coarse account/provider counts and blocker classes, not account identifiers/emails unless an explicitly separate troubleshooting action is later authorized.
+- APK transfer uses the existing end-to-end encrypted session, chunked and hash-verified, rather than a public APK URL.
+- PRECHECK returns coarse account/provider counts and blocker classes, not account identifiers/emails.
+- For the ADB Device Owner route, total Android account count must reach zero and extra users/profiles must be cleared explicitly before commit.
+- Device Owner is an asymmetric commit point: all reversible validation happens first; after commit, failures enter repair/recovery rather than automatic owner removal.
+- Device Owner activation requires a short-lived Android user grant bound to the PRECHECK fingerprint plus an independent Mac operator confirmation.
 - No local-head integration should be attempted from stale GitHub code.
 
 ## Next integration when Mac/local runner is available
@@ -54,9 +64,13 @@ Artifact SHA-256:
 3. Implement an adapter over the current Supabase broker client + relay session.
 4. Add read-only remote PRECHECK actions to the allowlist/agent contract.
 5. Add chunked APK transfer/install actions with strict manifest and signature verification.
-6. Keep message sizing consistent with the live relay envelope limit; do not raise WebSocket limits merely to move larger chunks.
-7. Package the Operator for macOS and run local/physical gates.
-8. ChatGPT reviews the exact diff and evidence before closure.
+6. Integrate Android Live Guide account/profile cleanup without exposing identities to Mac.
+7. Add Android-minted short-lived user Device Owner grant.
+8. Add fixed Device Owner activation action bound to fresh precheck fingerprint + verified APK/component.
+9. Verify Device Owner through both system state and Glosh's own DevicePolicyManager view.
+10. Keep message sizing consistent with the live relay envelope limit; do not raise WebSocket limits merely to move larger chunks.
+11. Package the Operator for macOS and run local/physical gates.
+12. ChatGPT reviews the exact diff and evidence before closure.
 
 ## Coordination
 - REMOTE-INSTALL-CONNECTION-00: PASS FINAL DEV / CLOSED.
@@ -64,6 +78,7 @@ Artifact SHA-256:
 - REMOTE-INSTALL-MAC-OPERATOR-04: architecture + isolated prototype complete; integration pending current local HEAD.
 - REMOTE-INSTALL-PRECHECK-05: contract/decision model defined; remote command implementation pending current local HEAD.
 - REMOTE-INSTALL-PIPELINE-06: staged transfer/install model defined; remote command implementation pending current local HEAD.
-- REMOTE-ADAPTIVE-INSTALL-PILOT-01 remains after Live Guide + Operator/Precheck integration.
+- REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07: design final + isolated state machine/tests PASS; local integration pending.
+- REMOTE-ADAPTIVE-INSTALL-PILOT-01 remains after Live Guide + Operator/Precheck/Device Owner integration.
 
 No Chrome, GloshIA, DAG, App Usuario/Admin, Supabase backend, production Device Owner logic or current local Glosh Remote worktree was modified by this prototype work.
