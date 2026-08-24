@@ -8,7 +8,7 @@ public record WizardSnapshot(
         boolean wirelessHelp) {
     public WizardSnapshot safeAfterProcessDeath() {
         return switch (step) {
-            case CHECKING_SUPPORT -> new WizardSnapshot(
+            case CHECKING_SUPPORT, GUIDE_PERMISSION -> new WizardSnapshot(
                     family, OnboardingState.Step.HOME, DeveloperGuidePhase.GUIDE, false, false);
             case REQUESTING_SUPPORT, WIRELESS_DEBUGGING, SESSION_ACTIVE -> new WizardSnapshot(
                     family,

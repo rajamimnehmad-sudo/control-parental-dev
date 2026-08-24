@@ -4,6 +4,7 @@ public final class OnboardingState {
     public enum Step {
         HOME,
         CHECKING_SUPPORT,
+        GUIDE_PERMISSION,
         REQUESTING_SUPPORT,
         DEVELOPER_OPTIONS,
         WIRELESS_DEBUGGING,
@@ -25,6 +26,11 @@ public final class OnboardingState {
 
     public synchronized void supportAvailable() {
         require(Step.CHECKING_SUPPORT);
+        step = Step.GUIDE_PERMISSION;
+    }
+
+    public synchronized void guideReady() {
+        require(Step.GUIDE_PERMISSION);
         step = Step.DEVELOPER_OPTIONS;
     }
 

@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Build;
 
 import com.glosh.remote.spike.protocol.JoinDescriptor;
+import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.wizard.DeveloperGuidePhase;
 import com.glosh.remote.spike.wizard.DeviceProfile;
 import com.glosh.remote.spike.wizard.OemDetector;
@@ -49,6 +50,7 @@ public final class SupportSessionCoordinator {
                 detected.oemVersion(),
                 restored.family());
         recipe = OemGuideRecipe.forProfile(profile);
+        LiveGuideRuntime.initialize(context, profile.family());
         onboarding.restore(restored.step());
         developerPhase = restored.developerPhase();
         developerConfirmed = restored.developerConfirmed();
@@ -90,6 +92,14 @@ public final class SupportSessionCoordinator {
         return wirelessHelp;
     }
 
+    public synchronized void guideReady() {
+        if (onboarding.step() == OnboardingState.Step.GUIDE_PERMISSION) {
+            onboarding.guideReady();
+            persist();
+            notifyChanged();
+        }
+    }
+
     public synchronized void attach(Listener value) {
         listener = value;
     }
@@ -110,6 +120,7 @@ public final class SupportSessionCoordinator {
             developerPhase = DeveloperGuidePhase.GUIDE;
             developerConfirmed = false;
             wirelessHelp = false;
+            LiveGuideRuntime.reset();
             persist();
         }
         notifyChanged();
@@ -146,6 +157,7 @@ public final class SupportSessionCoordinator {
             onboarding.developerOptionsReady();
             developerConfirmed = true;
             developerPhase = DeveloperGuidePhase.CONFIRMATION;
+            LiveGuideRuntime.setStage(com.glosh.remote.spike.guide.state.GuideStage.SUPPORT_PREPARING);
             persist();
         }
         notifyChanged();
@@ -169,6 +181,8 @@ public final class SupportSessionCoordinator {
                             descriptor = value;
                             onboarding.sessionReady();
                             wirelessHelp = false;
+                            LiveGuideRuntime.setStage(
+                                    com.glosh.remote.spike.guide.state.GuideStage.WIRELESS_DEBUGGING);
                             persist();
                         }
                         notifyChanged();
@@ -257,6 +271,7 @@ public final class SupportSessionCoordinator {
         developerPhase = DeveloperGuidePhase.GUIDE;
         developerConfirmed = false;
         wirelessHelp = false;
+        LiveGuideRuntime.reset();
         persistence.clear();
         notifyChanged();
     }

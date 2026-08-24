@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="live_guide_accessibility_description">Guía temporal que señala opciones únicamente dentro de Ajustes durante la conexión con soporte.</string>
+    <string name="live_guide_bubble_help">ME PERDÍ</string>
+    <string name="live_guide_bubble_open_settings">ABRIR AJUSTES CORRECTOS</string>
+    <string name="live_guide_bubble_copy">Glosh · guía en pantalla\n%1$s</string>
+    <string name="live_guide_bubble_minimized">glosh</string>
+</resources>
