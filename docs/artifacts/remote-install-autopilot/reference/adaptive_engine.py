@@ -10,7 +10,7 @@ class Screen(str, Enum):
     UNKNOWN='UNKNOWN'; APP='APP'; SETTINGS_HOME='SETTINGS_HOME'; ABOUT_PHONE='ABOUT_PHONE'; SOFTWARE_INFO='SOFTWARE_INFO'; DEVELOPER_OPTIONS='DEVELOPER_OPTIONS'; WIRELESS_DEBUGGING='WIRELESS_DEBUGGING'; NETWORK_CONFIRMATION='NETWORK_CONFIRMATION'; PAIRING_DIALOG='PAIRING_DIALOG'; CREDENTIAL_PROMPT='CREDENTIAL_PROMPT'
 
 class Action(str, Enum):
-    WAIT_STABLE='WAIT_STABLE'; ASK_ENABLE_ACCESSIBILITY='ASK_ENABLE_ACCESSIBILITY'; UNSUPPORTED_ANDROID='UNSUPPORTED_ANDROID'; OPEN_DEVELOPER_SETTINGS='OPEN_DEVELOPER_SETTINGS'; OPEN_DEVICE_INFO_SETTINGS='OPEN_DEVICE_INFO_SETTINGS'; CLICK_SOFTWARE_INFO='CLICK_SOFTWARE_INFO'; CLICK_BUILD_NUMBER='CLICK_BUILD_NUMBER'; WAIT_USER_CREDENTIAL='WAIT_USER_CREDENTIAL'; CLICK_WIRELESS_DEBUGGING='CLICK_WIRELESS_DEBUGGING'; ENABLE_WIRELESS_DEBUGGING='ENABLE_WIRELESS_DEBUGGING'; ACCEPT_NETWORK_CONFIRMATION='ACCEPT_NETWORK_CONFIRMATION'; CLICK_PAIR_WITH_CODE='CLICK_PAIR_WITH_CODE'; AUTO_PAIR_WITH_CODE='AUTO_PAIR_WITH_CODE'; SHOW_MANUAL_PAIR_CODE='SHOW_MANUAL_PAIR_CODE'; CONNECT_SUPPORT='CONNECT_SUPPORT'; FALLBACK_GUIDE='FALLBACK_GUIDE'; DONE='DONE'
+    WAIT_STABLE='WAIT_STABLE'; ASK_ALLOW_RESTRICTED_SETTINGS='ASK_ALLOW_RESTRICTED_SETTINGS'; ASK_ENABLE_ACCESSIBILITY='ASK_ENABLE_ACCESSIBILITY'; ASK_CONNECT_WIFI='ASK_CONNECT_WIFI'; TRY_ADB_RECONNECT='TRY_ADB_RECONNECT'; POLICY_BLOCKED='POLICY_BLOCKED'; UNSUPPORTED_ANDROID='UNSUPPORTED_ANDROID'; OPEN_DEVELOPER_SETTINGS='OPEN_DEVELOPER_SETTINGS'; OPEN_DEVICE_INFO_SETTINGS='OPEN_DEVICE_INFO_SETTINGS'; CLICK_SOFTWARE_INFO='CLICK_SOFTWARE_INFO'; CLICK_BUILD_NUMBER='CLICK_BUILD_NUMBER'; WAIT_USER_CREDENTIAL='WAIT_USER_CREDENTIAL'; CLICK_WIRELESS_DEBUGGING='CLICK_WIRELESS_DEBUGGING'; ENABLE_WIRELESS_DEBUGGING='ENABLE_WIRELESS_DEBUGGING'; ACCEPT_NETWORK_CONFIRMATION='ACCEPT_NETWORK_CONFIRMATION'; CLICK_PAIR_WITH_CODE='CLICK_PAIR_WITH_CODE'; AUTO_PAIR_WITH_CODE='AUTO_PAIR_WITH_CODE'; SHOW_MANUAL_PAIR_CODE='SHOW_MANUAL_PAIR_CODE'; CONNECT_SUPPORT='CONNECT_SUPPORT'; FALLBACK_GUIDE='FALLBACK_GUIDE'; DONE='DONE'
 
 @dataclass(frozen=True)
 class SnapshotAuthority:
@@ -41,6 +41,11 @@ class Observation:
     accessibility_enabled: bool
     adb_connected: bool=False
     support_connected: bool=False
+    restricted_settings_required: bool=False
+    wifi_ready: bool=True
+    wireless_policy_blocked: bool=False
+    previous_pairing_known: bool=False
+    reconnect_attempted: bool=False
     screen: Screen=Screen.UNKNOWN
     authority: Optional[SnapshotAuthority]=None
     candidate: Optional[Candidate]=None
@@ -64,7 +69,11 @@ class AdaptiveAutopilot:
         if o.support_connected: return Decision(Action.DONE, reason='support already connected')
         if o.adb_connected: return Decision(Action.CONNECT_SUPPORT, reason='ADB already valid; skip Settings/pairing')
         if o.android_api<self.MIN_WIRELESS_ADB_API: return Decision(Action.UNSUPPORTED_ANDROID, reason='Android <11 standard wireless path unsupported')
+        if not o.accessibility_enabled and o.restricted_settings_required: return Decision(Action.ASK_ALLOW_RESTRICTED_SETTINGS, reason='sideloaded Accessibility is restricted by OS')
         if not o.accessibility_enabled: return Decision(Action.ASK_ENABLE_ACCESSIBILITY, reason='manual bootstrap prerequisite')
+        if not o.wifi_ready: return Decision(Action.ASK_CONNECT_WIFI, reason='Wireless Debugging needs a usable Wi-Fi network')
+        if o.wireless_policy_blocked: return Decision(Action.POLICY_BLOCKED, reason='Wireless Debugging disabled by device/admin policy')
+        if o.previous_pairing_known and not o.reconnect_attempted: return Decision(Action.TRY_ADB_RECONNECT, reason='reuse previous pairing before opening Settings')
         if o.screen==Screen.CREDENTIAL_PROMPT: return Decision(Action.WAIT_USER_CREDENTIAL, reason='never automate device credential')
         if o.screen==Screen.PAIRING_DIALOG:
             if not self._safe_observation(o): return Decision(Action.WAIT_STABLE, reason='pairing dialog not stable/trusted')
