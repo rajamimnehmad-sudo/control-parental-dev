@@ -1,10 +1,14 @@
 {
-  "version": 1,
-  "strategy": "samsung_first_universal_core",
+  "version": 2,
+  "strategy": "samsung_first_universal_core_shortest_path",
   "start": "BOOT",
   "states": {
-    "BOOT": {"priority": ["SUPPORT_CONNECTED", "ADB_CONNECTED", "ANDROID_CAPABILITY", "ACCESSIBILITY", "DIRECT_DEV_PROBE"]},
+    "BOOT": {"priority": ["SUPPORT_CONNECTED", "ADB_CONNECTED", "ANDROID_CAPABILITY", "RESTRICTED_SETTINGS", "ACCESSIBILITY", "WIFI", "WIRELESS_POLICY", "PREVIOUS_PAIRING_RECONNECT", "PAIRING_DIALOG", "DIRECT_DEV_PROBE"]},
+    "NEED_RESTRICTED_SETTINGS": {"actor": "user", "only_if_accessibility_blocked_by_os": true, "resume": "BOOT"},
     "NEED_ACCESSIBILITY": {"actor": "user", "resume": "BOOT"},
+    "NEED_WIFI": {"actor": "user", "resume": "BOOT"},
+    "WIRELESS_POLICY_BLOCKED": {"automatic_clicks": false, "terminal_until_policy_changes": true},
+    "TRY_ADB_RECONNECT": {"condition": "previous_pairing_known_and_not_yet_attempted", "success": "LOCAL_ADB_READY", "failure": "PROBE_DEVELOPER_SETTINGS"},
     "PROBE_DEVELOPER_SETTINGS": {"entry": "ACTION_APPLICATION_DEVELOPMENT_SETTINGS", "recognized": "DEVELOPER_OPTIONS", "samsung_unavailable": "OEM_ENABLE_DEVELOPMENT"},
     "OEM_ENABLE_DEVELOPMENT": {"samsung_entry": "ACTION_DEVICE_INFO_SETTINGS", "route": ["ABOUT_PHONE", "SOFTWARE_INFO", "BUILD_NUMBER_X7_VERIFIED"], "credential": "WAIT_USER_CREDENTIAL", "success": "PROBE_DEVELOPER_SETTINGS"},
     "WAIT_USER_CREDENTIAL": {"actor": "user", "secret_capture": false, "resume": "PROBE_DEVELOPER_SETTINGS"},
@@ -31,5 +35,6 @@
     "click_semantics_available",
     "fresh_live_node_reacquired"
   ],
-  "automatic_click_postcondition": "expected_next_state_observed_before_any_next_click"
+  "automatic_click_postcondition": "expected_next_state_observed_before_any_next_click",
+  "never_automate": ["device_pin", "device_password", "device_pattern", "ambiguous_screen", "ambiguous_pairing_code"]
 }
