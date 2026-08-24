@@ -19,6 +19,8 @@ import com.glosh.remote.spike.adb.AdbShell;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.relay.RelayClient;
+import com.glosh.remote.spike.session.PairingSubmissionGuard;
+import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
 
 import java.net.InetAddress;
@@ -38,11 +40,11 @@ import io.github.muntashirakon.adb.android.AdbMdns;
 public final class RemotePairingService extends Service {
     public static final String ACTION_START = "com.glosh.remote.spike.START";
     public static final String ACTION_REPLY = "com.glosh.remote.spike.REPLY";
+    public static final String ACTION_SUBMIT_CODE = "com.glosh.remote.spike.SUBMIT_CODE";
     public static final String ACTION_STOP = "com.glosh.remote.spike.STOP";
     public static final String EXTRA_JOIN_URI = "join_uri";
+    public static final String EXTRA_PAIRING_CODE = "pairing_code";
 
-    private static final String EXTRA_HOST = "pair_host";
-    private static final String EXTRA_PORT = "pair_port";
     private static final String REMOTE_INPUT_CODE = "pair_code";
     private static final String CHANNEL_ID = "glosh_remote_pairing";
     private static final String TAG = "GloshRemote";
@@ -52,9 +54,10 @@ public final class RemotePairingService extends Service {
     private static final int REQUEST_STOP = 7412;
     private static final long CONNECT_TIMEOUT_MS = 15_000;
     private static volatile SessionState sessionState = SessionState.IDLE;
+    private static volatile PairingUiState pairingUiState = PairingUiState.INACTIVE;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private final AtomicBoolean pairingInProgress = new AtomicBoolean(false);
+    private final PairingSubmissionGuard pairingGuard = new PairingSubmissionGuard();
     private final AtomicBoolean ending = new AtomicBoolean(false);
 
     private NotificationManager notifications;
@@ -62,9 +65,16 @@ public final class RemotePairingService extends Service {
     private WifiManager.MulticastLock multicastLock;
     private RelayClient relayClient;
     private String joinUri;
+    private volatile String pairingHost;
+    private volatile int pairingPort = -1;
+    private volatile String rejectedEndpoint;
 
     public static SessionState getSessionState() {
         return sessionState;
+    }
+
+    public static PairingUiState getPairingUiState() {
+        return pairingUiState;
     }
 
     @Override
@@ -93,6 +103,11 @@ public final class RemotePairingService extends Service {
             intent.removeExtra(EXTRA_JOIN_URI);
             return START_NOT_STICKY;
         }
+        if ((ACTION_REPLY.equals(action) || ACTION_SUBMIT_CODE.equals(action))
+                && sessionState != SessionState.PREPARING) {
+            intent.removeExtra(EXTRA_PAIRING_CODE);
+            return START_NOT_STICKY;
+        }
 
         startForeground(
                 NOTIFICATION_ID,
@@ -107,6 +122,12 @@ public final class RemotePairingService extends Service {
 
         if (ACTION_REPLY.equals(action)) {
             handlePairingReply(intent);
+            return START_NOT_STICKY;
+        }
+
+        if (ACTION_SUBMIT_CODE.equals(action)) {
+            handlePairingCode(intent.getStringExtra(EXTRA_PAIRING_CODE));
+            intent.removeExtra(EXTRA_PAIRING_CODE);
             return START_NOT_STICKY;
         }
 
@@ -129,6 +150,7 @@ public final class RemotePairingService extends Service {
     @Override
     public void onDestroy() {
         sessionState = SessionState.IDLE;
+        pairingUiState = PairingUiState.INACTIVE;
         cleanupRuntime();
         executor.shutdownNow();
         super.onDestroy();
@@ -137,7 +159,7 @@ public final class RemotePairingService extends Service {
     private void begin(String rawJoin) {
         cleanupRuntime();
         ending.set(false);
-        pairingInProgress.set(false);
+        pairingGuard.finish();
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             finishWithError("Glosh Remote V0 requiere Android 11 o superior.");
@@ -148,6 +170,7 @@ public final class RemotePairingService extends Service {
             JoinDescriptor check = JoinDescriptor.parse(rawJoin);
             check.destroy();
             sessionState = SessionState.PREPARING;
+            pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
             joinUri = rawJoin;
             AdbConnectionManager.getInstance(getApplicationContext());
         } catch (Throwable error) {
@@ -170,6 +193,12 @@ public final class RemotePairingService extends Service {
                 AdbMdns.SERVICE_TYPE_TLS_PAIRING,
                 (InetAddress address, int port) -> {
                     if (address != null && port > 0 && !ending.get()) {
+                        String endpoint = address.getHostAddress() + ":" + port;
+                        if (pairingUiState == PairingUiState.CODE_FAILED
+                                && endpoint.equals(rejectedEndpoint)) {
+                            return;
+                        }
+                        rejectedEndpoint = null;
                         showPairingCodeNotification(address.getHostAddress(), port);
                     }
                 });
@@ -177,10 +206,21 @@ public final class RemotePairingService extends Service {
     }
 
     private void showPairingCodeNotification(String host, int port) {
+        if (pairingGuard.isActive() || ending.get()) {
+            return;
+        }
+        pairingHost = host;
+        pairingPort = port;
+        notifyCodeEntry(
+                "Glosh · Último paso",
+                "Escribí acá los 6 números que muestra Android.",
+                PairingUiState.WAITING_FOR_CODE);
+    }
+
+    private void notifyCodeEntry(String title, String text, PairingUiState state) {
+        pairingUiState = state;
         Intent replyIntent = new Intent(this, RemotePairingService.class)
-                .setAction(ACTION_REPLY)
-                .putExtra(EXTRA_HOST, host)
-                .putExtra(EXTRA_PORT, port);
+                .setAction(ACTION_REPLY);
 
         int mutableFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -205,8 +245,8 @@ public final class RemotePairingService extends Service {
                 .build();
 
         Notification notification = baseNotification()
-                .setContentTitle("Glosh · Último paso")
-                .setContentText("Escribí acá los 6 números que muestra Android.")
+                .setContentTitle(title)
+                .setContentText(text)
                 .setOngoing(true)
                 .addAction(replyAction)
                 .addAction(stopAction())
@@ -218,18 +258,29 @@ public final class RemotePairingService extends Service {
     private void handlePairingReply(Intent intent) {
         Bundle results = RemoteInput.getResultsFromIntent(intent);
         CharSequence value = results == null ? null : results.getCharSequence(REMOTE_INPUT_CODE);
-        String code = value == null ? "" : value.toString().trim();
-        String host = intent.getStringExtra(EXTRA_HOST);
-        int port = intent.getIntExtra(EXTRA_PORT, -1);
+        handlePairingCode(value == null ? "" : value.toString().trim());
+    }
 
-        if (!PairingPin.isValid(code) || host == null || port <= 0 || joinUri == null) {
-            finishWithError("El código o la sesión expiraron. Volvé a iniciar la conexión.");
+    private void handlePairingCode(String rawCode) {
+        if (sessionState != SessionState.PREPARING || pairingGuard.isActive()) {
             return;
         }
-        if (!pairingInProgress.compareAndSet(false, true)) {
+        String code = rawCode == null ? "" : rawCode.trim();
+        String host = pairingHost;
+        int port = pairingPort;
+        if (!PairingPin.isValid(code)) {
+            showCodeFailure("Ingresá exactamente los 6 números que muestra Android.");
+            return;
+        }
+        if (host == null || port <= 0 || joinUri == null) {
+            showCodeFailure("Ese código ya no sirve. Generá uno nuevo y escribilo acá.");
+            return;
+        }
+        if (!pairingGuard.tryStart()) {
             return;
         }
 
+        pairingUiState = PairingUiState.CONNECTING;
         updateForeground("Perfecto, conectando…", "Esto tarda sólo unos segundos.");
         executor.execute(() -> pairAndConnect(host, port, code));
     }
@@ -239,10 +290,13 @@ public final class RemotePairingService extends Service {
             AdbConnectionManager manager = AdbConnectionManager.getInstance(getApplicationContext());
             boolean paired = manager.pair(host, port, code);
             if (!paired) {
-                throw new IllegalStateException("Android rechazó el pairing.");
+                showCodeFailure("Ese código ya no sirve. Generá uno nuevo y escribilo acá.");
+                return;
             }
 
             stopPairingDiscovery();
+            pairingHost = null;
+            pairingPort = -1;
             updateForeground("Perfecto, conectando…", "Estamos terminando la conexión segura.");
 
             boolean connected = manager.connectTls(this, CONNECT_TIMEOUT_MS);
@@ -272,6 +326,8 @@ public final class RemotePairingService extends Service {
                 public void onAuthenticated() {
                     if (!ending.get()) {
                         sessionState = SessionState.CONNECTED;
+                        pairingUiState = PairingUiState.INACTIVE;
+                        pairingGuard.finish();
                         updateForeground(
                                 "¡Listo, Glosher!",
                                 "Soporte ya está conectado de forma segura.");
@@ -295,11 +351,27 @@ public final class RemotePairingService extends Service {
             });
         } catch (Throwable error) {
             Log.w(TAG, "Pairing or support connection failed", error);
-            if (!ending.get()) {
-                finishWithError("Revisá el código y la conexión, y volvé a intentarlo.");
+            if (!ending.get() && pairingDiscovery != null) {
+                showCodeFailure("Ese código ya no sirve. Generá uno nuevo y escribilo acá.");
+            } else if (!ending.get()) {
+                finishWithError("La conexión se interrumpió. Intentá nuevamente.");
             }
-        } finally {
-            pairingInProgress.set(false);
+        }
+    }
+
+    private void showCodeFailure(String message) {
+        if (ending.get()) {
+            return;
+        }
+        pairingGuard.finish();
+        String host = pairingHost;
+        int port = pairingPort;
+        if (host != null && port > 0) {
+            rejectedEndpoint = host + ":" + port;
+            notifyCodeEntry("Ese código ya no sirve", message, PairingUiState.CODE_FAILED);
+        } else {
+            pairingUiState = PairingUiState.CODE_FAILED;
+            updateForeground("Ese código ya no sirve", message);
         }
     }
 
@@ -312,6 +384,8 @@ public final class RemotePairingService extends Service {
             return;
         }
         sessionState = SessionState.IDLE;
+        pairingUiState = PairingUiState.INACTIVE;
+        pairingGuard.finish();
         cleanupRuntime();
         stopForeground(STOP_FOREGROUND_REMOVE);
 
@@ -339,6 +413,9 @@ public final class RemotePairingService extends Service {
 
         AdbConnectionManager.resetIdentity();
         joinUri = null;
+        pairingHost = null;
+        pairingPort = -1;
+        rejectedEndpoint = null;
     }
 
     private void stopPairingDiscovery() {
