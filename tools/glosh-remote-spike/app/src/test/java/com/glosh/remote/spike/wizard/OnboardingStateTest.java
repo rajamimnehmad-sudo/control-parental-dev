@@ -10,11 +10,13 @@ public class OnboardingStateTest {
     public void followsGuidedFlowAndResets() {
         OnboardingState state = new OnboardingState();
         assertEquals(OnboardingState.Step.HOME, state.step());
-        state.requestSupport();
+        assertEquals(OnboardingState.BrokerAction.DISCOVER, state.requestSupport());
+        assertEquals(OnboardingState.Step.CHECKING_SUPPORT, state.step());
+        state.supportAvailable();
+        assertEquals(OnboardingState.Step.DEVELOPER_OPTIONS, state.step());
+        assertEquals(OnboardingState.BrokerAction.REQUEST, state.developerOptionsReady());
         assertEquals(OnboardingState.Step.REQUESTING_SUPPORT, state.step());
         state.sessionReady();
-        assertEquals(OnboardingState.Step.DEVELOPER_OPTIONS, state.step());
-        state.developerOptionsReady();
         assertEquals(OnboardingState.Step.WIRELESS_DEBUGGING, state.step());
         state.sessionStarted();
         assertEquals(OnboardingState.Step.SESSION_ACTIVE, state.step());
@@ -38,7 +40,7 @@ public class OnboardingStateTest {
         OnboardingState state = new OnboardingState();
         state.requestSupport();
         state.unavailable();
-        state.requestSupport();
-        assertEquals(OnboardingState.Step.REQUESTING_SUPPORT, state.step());
+        assertEquals(OnboardingState.BrokerAction.DISCOVER, state.requestSupport());
+        assertEquals(OnboardingState.Step.CHECKING_SUPPORT, state.step());
     }
 }

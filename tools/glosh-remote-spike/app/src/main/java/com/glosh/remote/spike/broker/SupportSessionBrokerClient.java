@@ -32,6 +32,14 @@ public final class SupportSessionBrokerClient {
         void onError();
     }
 
+    public interface AvailabilityListener {
+        void onAvailable();
+
+        void onUnavailable();
+
+        void onError();
+    }
+
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final long POLL_DELAY_MS = 1_500;
     private static final int MAX_RESPONSE_CHARS = 16_384;
@@ -51,6 +59,16 @@ public final class SupportSessionBrokerClient {
         this.baseUrl = baseUrl == null ? "" : baseUrl;
     }
 
+    public synchronized void discover(AvailabilityListener listener) {
+        cancelInternal();
+        int current = ++generation;
+        if (baseUrl.isEmpty()) {
+            post(current, listener::onUnavailable);
+            return;
+        }
+        enqueueDiscover(current, listener);
+    }
+
     public synchronized void request(DeviceMetadata device, Listener listener) {
         cancelInternal();
         int current = ++generation;
@@ -58,7 +76,7 @@ public final class SupportSessionBrokerClient {
             post(current, listener::onUnavailable);
             return;
         }
-        enqueueDiscover(current, device, listener);
+        createRequest(current, device, listener);
     }
 
     public synchronized void cancel() {
@@ -82,24 +100,44 @@ public final class SupportSessionBrokerClient {
         }
     }
 
-    private void enqueueDiscover(int current, DeviceMetadata device, Listener listener) {
+    private void enqueueDiscover(int current, AvailabilityListener listener) {
         enqueue(current, actionRequest(action("discover")),
                 new ResponseHandler() {
                     @Override
                     public void handle(Response response) throws Exception {
                         JSONObject value = responseJson(response);
                         if (!response.isSuccessful() || !value.optBoolean("available", false)) {
-                            unavailable(current, listener);
+                            availabilityUnavailable(current, listener);
                             return;
                         }
-                        createRequest(current, device, listener);
+                        post(current, listener::onAvailable);
                     }
 
                     @Override
                     public void failed() {
-                        fail(current, listener);
+                        availabilityFailed(current, listener);
                     }
                 });
+    }
+
+    private void availabilityUnavailable(int current, AvailabilityListener listener) {
+        synchronized (this) {
+            if (current != generation) {
+                return;
+            }
+            cancelInternal();
+        }
+        post(current, listener::onUnavailable);
+    }
+
+    private void availabilityFailed(int current, AvailabilityListener listener) {
+        synchronized (this) {
+            if (current != generation) {
+                return;
+            }
+            cancelInternal();
+        }
+        post(current, listener::onError);
     }
 
     private void createRequest(int current, DeviceMetadata device, Listener listener) {

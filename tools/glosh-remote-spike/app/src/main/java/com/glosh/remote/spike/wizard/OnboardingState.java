@@ -3,6 +3,7 @@ package com.glosh.remote.spike.wizard;
 public final class OnboardingState {
     public enum Step {
         HOME,
+        CHECKING_SUPPORT,
         REQUESTING_SUPPORT,
         DEVELOPER_OPTIONS,
         WIRELESS_DEBUGGING,
@@ -16,19 +17,26 @@ public final class OnboardingState {
         return step;
     }
 
-    public synchronized void requestSupport() {
+    public synchronized BrokerAction requestSupport() {
         require(Step.HOME, Step.UNAVAILABLE);
-        step = Step.REQUESTING_SUPPORT;
+        step = Step.CHECKING_SUPPORT;
+        return BrokerAction.DISCOVER;
+    }
+
+    public synchronized void supportAvailable() {
+        require(Step.CHECKING_SUPPORT);
+        step = Step.DEVELOPER_OPTIONS;
     }
 
     public synchronized void sessionReady() {
         require(Step.REQUESTING_SUPPORT, Step.HOME);
-        step = Step.DEVELOPER_OPTIONS;
+        step = Step.WIRELESS_DEBUGGING;
     }
 
-    public synchronized void developerOptionsReady() {
+    public synchronized BrokerAction developerOptionsReady() {
         require(Step.DEVELOPER_OPTIONS);
-        step = Step.WIRELESS_DEBUGGING;
+        step = Step.REQUESTING_SUPPORT;
+        return BrokerAction.REQUEST;
     }
 
     public synchronized void sessionStarted() {
@@ -37,8 +45,12 @@ public final class OnboardingState {
     }
 
     public synchronized void unavailable() {
-        require(Step.REQUESTING_SUPPORT);
+        require(Step.CHECKING_SUPPORT, Step.REQUESTING_SUPPORT);
         step = Step.UNAVAILABLE;
+    }
+
+    public synchronized void restore(Step restored) {
+        step = restored;
     }
 
     public synchronized void reset() {
@@ -52,5 +64,10 @@ public final class OnboardingState {
             }
         }
         throw new IllegalStateException("Invalid onboarding transition from " + step);
+    }
+
+    public enum BrokerAction {
+        DISCOVER,
+        REQUEST
     }
 }
