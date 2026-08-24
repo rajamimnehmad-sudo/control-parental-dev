@@ -17,17 +17,26 @@ Prototype contents:
 - PySide6 UI shell with Open Support, Close Support, Accept, Reject, PRECHECK and Disconnect;
 - backend adapter interface plus mock backend;
 - APK installation state machine;
-- bounded chunk iterator (max 192 KiB) with per-chunk SHA-256;
+- bounded chunk iterator (max 96 KiB raw) with per-chunk SHA-256;
 - full-file SHA-256 helper;
 - manifest validation for package/size/file SHA/signing-cert SHA;
-- local audit event filtering that drops pairing codes, operator keys, session keys, nonces, descriptors and ciphertext.
+- local audit event filtering that drops pairing codes, operator keys, session keys, nonces, descriptors and ciphertext;
+- explicit wire-contract models for `precheck_v1` and staged install actions;
+- PRECHECK wire parser rejects unexpected identity fields such as account email addresses and accepts coarse counts only;
+- chunk wire-size validation accounts for base64 inside encrypted payload plus outer ciphertext/base64 envelope.
+
+Why 96 KiB chunks:
+- the current relay caps a WebSocket message at 256 KiB;
+- APK bytes require base64 in the command payload;
+- the encrypted payload is then base64-encoded again in the outer envelope;
+- 96 KiB leaves conservative room for both expansions plus JSON/AES overhead.
 
 Local prototype test result:
-- 9/9 Python unit tests PASS.
-- Tests cover one-active-session enforcement, READY precheck, account USER_ACTION classification, Device Owner blocker, signing mismatch blocker, installation stage transitions, transfer completeness, chunk-size bound, full-file hashing and secret stripping from audit events.
+- 12/12 Python unit tests PASS.
+- Tests cover one-active-session enforcement, READY precheck, account USER_ACTION classification, Device Owner blocker, signing mismatch blocker, installation stage transitions, transfer completeness, chunk-size bound, full-file hashing, secret stripping from audit events, rejection of identity-bearing PRECHECK fields and wire chunk bounds.
 
 Artifact SHA-256:
-`ccaf03ca08f2e5fc4506c1ea79724473849f5b91406d64ca942e3f14f801382b`
+`a41eb13352cacf8d27fc2c885dbf1bc08652be3808c7b9e89cf5208dab2d6a0c`
 
 ## Product decisions locked
 - Mac Operator is a GUI over the existing relay/broker engine, not a replacement security protocol.
@@ -36,6 +45,7 @@ Artifact SHA-256:
 - Installation is staged: PRECHECK -> TRANSFER -> VERIFY -> INSTALL -> VERIFY INSTALL -> optional Device Owner phase.
 - No arbitrary shell exposed in normal UI; advanced DEV console remains hidden/separate.
 - APK transfer should use the existing end-to-end encrypted session, chunked and hash-verified, rather than a public APK URL.
+- PRECHECK should return coarse account/provider counts and blocker classes, not account identifiers/emails unless an explicitly separate troubleshooting action is later authorized.
 - No local-head integration should be attempted from stale GitHub code.
 
 ## Next integration when Mac/local runner is available
@@ -44,8 +54,9 @@ Artifact SHA-256:
 3. Implement an adapter over the current Supabase broker client + relay session.
 4. Add read-only remote PRECHECK actions to the allowlist/agent contract.
 5. Add chunked APK transfer/install actions with strict manifest and signature verification.
-6. Package the Operator for macOS and run local/physical gates.
-7. ChatGPT reviews the exact diff and evidence before closure.
+6. Keep message sizing consistent with the live relay envelope limit; do not raise WebSocket limits merely to move larger chunks.
+7. Package the Operator for macOS and run local/physical gates.
+8. ChatGPT reviews the exact diff and evidence before closure.
 
 ## Coordination
 - REMOTE-INSTALL-CONNECTION-00: PASS FINAL DEV / CLOSED.
