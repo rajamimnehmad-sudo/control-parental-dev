@@ -2,7 +2,15 @@
 
 ## Veredicto
 
-`PASS DEV`
+`BLOCKED REVIEW FOLLOW-UP`
+
+El gate físico integral DEV 339 documentado abajo conserva su resultado `PASS DEV`.
+La revisión final de ChatGPT detectó después un defecto real de ordering en el
+startup: la autoridad runtime se adquiría después de iniciar SOCKS y HEV. El commit
+local de remediación corrige el defecto y pasa todos los gates automáticos, pero el
+smoke DEV 340 no pudo acreditar una nueva entrega SAFE: el endpoint de httpbingo
+terminó en timeout y los intents alternativos de Chrome restauraron/reutilizaron la
+pestaña BLOCK sin producir un request SAFE nuevo (`safe=0`). No se infiere PASS.
 
 Se demostró físicamente un full-tunnel IPv4/IPv6, explícito y reversible, sobre
 el único `VpnService` Glosh. Las apps no-Chrome conservaron conectividad TCP/UDP
@@ -24,6 +32,104 @@ Production. Es el gate DEV controlado previo a esos tickets.
 - Owner: Protección Android / Codex.
 - Glosh Central se consultó como coordinación y no se modificó.
 - Sin push, PR, merge, main, Production ni publicación.
+
+## Follow-up de revisión: startup ordering DEV 340
+
+### Defecto y corrección
+
+Antes, `VpnTransportGate09A.start()` ejecutaba `socks.start()` y `engine.start()`
+antes de `VpnTransportRuntimeAuthority.begin()`. Un runtime ya `QUARANTINED` podía
+rechazar la generación sólo después de haber abierto listener, bridge/FD y thread
+nativo.
+
+Ahora `VpnTransportStartupCoordinator` adquiere la authority como primera operación,
+antes de construir o iniciar cualquier recurso de transporte. Si `begin()` rechaza,
+el callback de startup no se ejecuta: SOCKS starts, HEV starts y recursos nuevos
+quedan exactamente en cero, y el runtime sigue `QUARANTINED`.
+
+Si la authority fue adquirida pero falla el startup, el cleanup real mide:
+
+- `HevTransportEngine.stop()`: join y cleanup completo;
+- `VpnLocalSocks5Server.shutdown()`: ambos executors terminados;
+- `VpnOwnedResourceTracker`: owned FD/resources en cero.
+
+Sólo esos tres resultados limpios devuelven authority a `READY`. Join incompleto,
+SOCKS sucio, recursos vivos o una excepción del propio cleanup dejan el runtime
+`QUARANTINED`; no existe liberación incondicional en `finally`.
+
+Commit funcional del follow-up:
+`e0068181` (`fix(vpn): acquire transport authority before startup`).
+
+### Regresiones automáticas
+
+`VpnTransportStartupCoordinatorTest` acredita:
+
+1. runtime previamente `QUARANTINED`: cero callbacks SOCKS/HEV, cero recursos y
+   estado sin cambio;
+2. fallo de startup con cleanup limpio: recursos cero, `READY` y siguiente
+   generación permitida;
+3. fallo de startup con cleanup sucio: `QUARANTINED`, siguiente generación rechazada
+   y sin segundo start nativo.
+
+Suite final completa:
+
+| Gate | Resultado |
+| --- | --- |
+| `:feature-vpn:testDebugUnitTest` | PASS |
+| `:feature-vpn:compileDebugKotlin` | PASS |
+| `:feature-vpn:ktlintCheck` | PASS |
+| `:feature-vpn:lintDebug` | PASS |
+| `:app-user:testDevDebugUnitTest` | PASS |
+| `:app-user:compileDevDebugKotlin` | PASS |
+| `:app-user:lintDevDebug` | PASS |
+| `:app-user:assembleDevDebug` | PASS |
+| `git diff --check` | PASS |
+
+Gradle: `BUILD SUCCESSFUL` en 2m15s, 850 tasks. Warnings preexistentes: tooling
+SDK XML, kapt/Kotlin y APIs Firebase deprecadas.
+
+### APK DEV 340 y smoke físico estrecho
+
+- versionCode/name: `340 / 1.0.1-dev`;
+- SHA-256:
+  `d18e063d54c057aaa5ae7f7392be2846659ab008049faa96a021a630ff493437`;
+- tamaño: `158811145` bytes;
+- instalación: `adb install -r`, sin uninstall ni clear;
+- ceDataInode: `1239519`, preservado;
+- resetCount: `1`;
+- Device Owner/Affiliated: preservado.
+
+Accessibility estaba desactivada antes del smoke (`accessibility_enabled=0`) aunque
+el componente Glosh seguía instalado; se restauró exclusivamente ese componente.
+La actualización in-place volvió a poner el switch global en cero, y se reactivó
+sin alterar otros servicios. El estado final quedó enabled + bound.
+
+Resultados válidos DEV 340:
+
+- startup normal: runtime `running`, HEV y SOCKS iniciados después de authority;
+- `0.0.0.0/0` y `::/0` presentes dentro de `tun0`;
+- Samsung Internet UID `10262`: HTTPS real IPv6, `FORWARD_TO_HEV`, retorno PASS;
+- HEV DNS `0`, `protectFailures=0`, recursion `0`;
+- Chrome directo: `101` drops TCP/443 y `24` drops UDP/443 físicos;
+- BLOCK Flickr: `77187 -> 6303`, `model_filter`, placeholder; original no entregado;
+- `rawPresented=false`, stale/grid/capturas post-ready `0` según la
+  instrumentación conservada.
+
+Gate incompleto:
+
+- SAFE público httpbingo: conexiones TLS terminaron en `SocketTimeoutException`;
+- intentos SAFE alternativos fueron absorbidos por restauración/reutilización de
+  tabs y no generaron un request nuevo;
+- status final antes de STOP: `safe=0`, `blocked=4`, `engineCalls=1`.
+
+Por ello el follow-up queda `BLOCKED` exclusivamente en el canario SAFE físico; el
+ordering defect queda corregido y verificado automáticamente, y el datapath BLOCK/
+fail-close sí fue revalidado.
+
+Rollback DEV 340: PASS. STOP produjo HEV join limpio, SOCKS limpio,
+`transportRuntime=ready`, owned resources/UDP associations/protected UDP finales
+`0/0/0`; se retiraron ambas default routes y la ruta/admission del fixture, se
+restauró VPN/DNS productivo y Chrome quedó suspendido fail-closed.
 
 ## Arquitectura implementada
 
