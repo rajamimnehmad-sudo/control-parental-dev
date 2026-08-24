@@ -6,6 +6,18 @@ import kotlin.test.assertTrue
 
 class ChromePhotosProtectedSurfaceHostPolicyTest {
     @Test
+    fun `diagnostic marker is off by default and requires explicit dev gate`() {
+        ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
+        assertEquals(false, ChromePhotosProtectedSurfaceDiagnostics.isMarkerEnabled())
+
+        ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
+        assertEquals(true, ChromePhotosProtectedSurfaceDiagnostics.isMarkerEnabled())
+
+        ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
+        assertEquals(false, ChromePhotosProtectedSurfaceDiagnostics.isMarkerEnabled())
+    }
+
+    @Test
     fun `rotation keeps one square host extent without relayout`() {
         val portrait = ChromeVisualViewport(0, 66, 1_080, 2_408)
         val landscape = ChromeVisualViewport(66, 0, 2_408, 1_080)

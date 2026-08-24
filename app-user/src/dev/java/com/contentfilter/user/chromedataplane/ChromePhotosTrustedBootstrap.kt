@@ -49,6 +49,21 @@ internal object ChromePhotosTrustedBootstrapPolicy {
             !health.allReady -> ChromePhotosTrustedBootstrapAction.WaitForHealth
             else -> ChromePhotosTrustedBootstrapAction.ReleaseChrome
         }
+
+    fun failCloseReason(
+        previouslyReleased: Boolean,
+        health: ChromePhotosTrustedBootstrapHealth,
+    ): String? {
+        if (!previouslyReleased || health.allReady) return null
+        return when {
+            !health.proxyHealthy -> "proxy_lost"
+            !health.policyConfirmed -> "policy_lost"
+            !health.vpnConfirmed -> "vpn_lost"
+            !health.gloshiaReady -> "gloshia_lost"
+            !health.accessibilityBound -> "accessibility_lost"
+            else -> null
+        }
+    }
 }
 
 /** DEV-only one-time reset and Chrome availability authority for the managed lab. */

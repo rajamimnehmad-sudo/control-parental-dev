@@ -280,17 +280,24 @@ class ChromePhotosDataPlaneLabService : Service() {
                             ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed,
                             false,
                         )
+                    val bootstrapHealth =
+                        ChromePhotosTrustedBootstrapHealth(
+                            proxyHealthy = proxyHealthy,
+                            policyConfirmed = policyConfirmed,
+                            vpnConfirmed = runtime.vpnConfirmed,
+                            gloshiaReady = gloshiaReady,
+                            accessibilityBound = runtime.accessibilityBound,
+                        )
+                    ChromePhotosTrustedBootstrapPolicy.failCloseReason(
+                        previouslyReleased = wasRealWebReady,
+                        health = bootstrapHealth,
+                    )?.let { reason ->
+                        markFailClosed(reason)
+                        return@launch
+                    }
                     val chromeReleased =
                         realWebScopeConfirmed &&
-                            bootstrapController.releaseChromeIfHealthy(
-                                ChromePhotosTrustedBootstrapHealth(
-                                    proxyHealthy = proxyHealthy,
-                                    policyConfirmed = policyConfirmed,
-                                    vpnConfirmed = runtime.vpnConfirmed,
-                                    gloshiaReady = gloshiaReady,
-                                    accessibilityBound = runtime.accessibilityBound,
-                                ),
-                            )
+                            bootstrapController.releaseChromeIfHealthy(bootstrapHealth)
                     if (chromeReleased && !wasRealWebReady) {
                         lifecycle.presentationReady()
                         labPreferences().edit()

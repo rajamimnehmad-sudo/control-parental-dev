@@ -30,6 +30,18 @@ internal enum class ChromePhotosProtectedSurfaceCoverResult {
     Failed,
 }
 
+/** Process-scoped DEV diagnostic switch. It is always false unless a gate explicitly enables it. */
+object ChromePhotosProtectedSurfaceDiagnostics {
+    @Volatile
+    private var markerEnabled = false
+
+    fun setMarkerEnabledForExplicitDevGate(enabled: Boolean) {
+        markerEnabled = enabled
+    }
+
+    internal fun isMarkerEnabled(): Boolean = markerEnabled
+}
+
 /**
  * One opaque, non-touchable accessibility surface for the whole protected Chrome viewport.
  *
@@ -44,6 +56,8 @@ internal enum class ChromePhotosProtectedSurfaceCoverResult {
 internal class ChromePhotosProtectedSurface(
     private val service: AccessibilityService,
     private val onHostPublicationChanged: () -> Unit = {},
+    private val diagnosticMarkerEnabled: () -> Boolean =
+        ChromePhotosProtectedSurfaceDiagnostics::isMarkerEnabled,
 ) : AutoCloseable {
     private var view: ProtectedSurfaceView? = null
     private var host: ChromePhotosProtectedSurfaceHost? = null
@@ -183,7 +197,7 @@ internal class ChromePhotosProtectedSurface(
         val visualContext =
             ChromePhotosProtectedSurfaceHostFactory.visualContext(service)
                 ?: return ChromePhotosProtectedSurfaceHostResult.Failed
-        val hostedView = ProtectedSurfaceView(visualContext)
+        val hostedView = ProtectedSurfaceView(visualContext, diagnosticMarkerEnabled)
         val createdHost =
             ChromePhotosProtectedSurfaceHostFactory.create(
                 service = service,
@@ -221,6 +235,7 @@ internal class ChromePhotosProtectedSurface(
 
     private class ProtectedSurfaceView(
         context: Context,
+        private val diagnosticMarkerEnabled: () -> Boolean,
     ) : View(context), AutoCloseable {
         private val framePaint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val frameDestination = Rect()
@@ -306,7 +321,7 @@ internal class ChromePhotosProtectedSurface(
                     statusPaint,
                 )
             }
-            drawSurfaceMarkerLattice(canvas)
+            if (diagnosticMarkerEnabled()) drawSurfaceMarkerLattice(canvas)
         }
 
         fun authorityEpoch(): Long = minimumEpoch

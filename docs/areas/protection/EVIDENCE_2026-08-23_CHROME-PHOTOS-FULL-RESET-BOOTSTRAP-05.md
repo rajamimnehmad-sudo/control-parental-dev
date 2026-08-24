@@ -210,3 +210,129 @@ deliberadamente destructiva para todos los datos locales de Chrome y requiere UX
 consentimiento, migración/versionado de bootstrap y hardening de producción antes de
 cualquier publicación. No se probó un Service Worker público separado antes del reset;
 la garantía de limpieza de esa capa deriva del full reset de user data completo.
+
+## Corrección 05A: fail-close dinámico y retiro de la grilla DEV
+
+La revisión del cierre DEV 326 encontró dos defectos acotados. El health completo ya
+exigía Accessibility para la primera liberación, pero una pérdida posterior podía dejar
+`realWebScopeConfirmed=true` porque ese scope sólo agregaba proxy, policy y VPN. Además,
+`ChromePhotosProtectedSurface.ProtectedSurfaceView.onDraw()` ejecutaba
+`drawSurfaceMarkerLattice()` incondicionalmente: esa retícula cian era el marcador de
+evidencia histórico y se repintaba con cada invalidación de la vista.
+
+La corrección mantiene una sola instancia de `ChromePhotosTrustedBootstrapHealth` por
+ciclo del watchdog. Antes de la primera liberación, health incompleto sigue esperando
+con Chrome suspendido. Después de una liberación, la pérdida de cualquier dependencia
+obligatoria retorna una razón específica y ejecuta `markFailClosed()` antes de salir del
+watchdog. La pérdida de Accessibility queda registrada como `accessibility_lost`,
+suspende Chrome mediante Device Owner, invalida attestation/heartbeat y revoca la lease.
+No cambia ni reinicia la generación de bootstrap.
+
+La retícula se convirtió en diagnóstico DEV opt-in y process-scoped. Su estado inicial
+es `false`; START sin el extra booleano explícito
+`chrome_photos_surface_marker_enabled=true`, STOP, boot y package replacement la dejan
+apagada. Scroll, tap, cambios de ventana, rotación, epochs y reattach no pueden
+encenderla. La superficie protegida, el host único, epochs, stale protection,
+attachment tracking y `rawPresented` permanecen intactos.
+
+### Gates automáticos 05A
+
+PASS:
+
+- tests dirigidos de `ChromePhotosTrustedBootstrapPolicyTest` y
+  `ChromePhotosProtectedSurfaceHostPolicyTest`;
+- `:feature-accessibility:testDebugUnitTest`;
+- `:feature-accessibility:testReleaseUnitTest`;
+- `:app-user:testDevDebugUnitTest`;
+- `:feature-accessibility:ktlintCheck`;
+- `:app-user:lintDevDebug`;
+- `:app-user:compileDevDebugKotlin`;
+- `:app-user:assembleDevDebug`.
+
+APK 05A:
+
+- versionCode `327`, versionName `1.0.1-dev`;
+- SHA-256 `47bee36e2389f3e98fe50f8f016496bd0b833a02e327aa7881f21080de0c308c`;
+- instalación `adb install -r`: `Success`;
+- App Usuario `ceDataInode=1239519` antes/después;
+- Device Owner y Affiliated preservados.
+
+### Gate visual A23 05A
+
+En Samsung A23 `SM-A235M`, Android 14/API 34 y Chrome 151 se ejecutaron taps,
+navegación, teclado, scroll y rotación landscape -> portrait con el marcador apagado
+por defecto. Se extrajeron 42 fotogramas a intervalos de 0,5 s de una grabación válida
+de 20,563 s y se analizaron además 10 screenshots lossless de rotación y los dos
+canarios finales. La firma exacta de la retícula (`#00C8FF`) y el patrón de líneas
+largas dieron:
+
+- apariciones visibles de grilla/retícula/marcador: `0`;
+- frames/capturas válidos analizados: `54`;
+- pixels exactos `#00C8FF`: `0`;
+- candidatos con línea horizontal o vertical de media pantalla: `0`.
+
+La evidencia local quedó en `/private/tmp/chrome-photos-05a-evidence/`; no se incorporó
+el video al repo.
+
+### Pérdida y recuperación de Accessibility
+
+Estado original guardado exactamente:
+
+- `enabled_accessibility_services=com.contentfilter.user.dev/com.contentfilter.feature.accessibility.service.ProtectorAccessibilityService`;
+- `accessibility_enabled=1`.
+
+Al retirar únicamente ese componente:
+
+- `accessibilityBound=false`;
+- `bootstrap=chrome_blocked reason=accessibility_lost`;
+- `phase=fail_closed reason=accessibility_lost`;
+- Chrome `suspended=true` detectado en `366,853 ms` desde el cambio ADB;
+- el intento de abrir Chrome mostró `ActionDisabledByAdminDialog`;
+- lease/heartbeat quedaron inválidos y `rawPresented` permaneció `false`;
+- `bootstrapResetCount=1`, sin nuevo reset.
+
+Los dos valores originales fueron restaurados exactamente y Accessibility volvió a
+quedar enabled y bound. El STOP seguro terminó su rollback antes del nuevo START. La
+recuperación generó una sesión/CA nuevas, registró
+`bootstrap=chrome_reset_skipped generation=1 resetCount=1` y sólo después de health
+completo emitió `phase=presentation_ready scope=real_web`; Chrome quedó
+`suspended=false` sin repetir el reset.
+
+### Canarios y métricas finales 05A
+
+SAFE público `https://httpbingo.org/image/png`:
+
+- upstream h2;
+- `bytesIn=8090`, `bytesOut=8090`;
+- `decision=safe`, `reason=model_allow`;
+- visible normalmente y byte-idéntico.
+
+BLOCK público de Flickr ya usado en el gate:
+
+- upstream h2;
+- `bytesIn=77187`, `bytesOut=6303`;
+- `decision=block`, `reason=model_filter`, probabilidad `0.6040119`;
+- Chrome mostró el placeholder PNG, nunca el original.
+
+Instrumentación final de superficie:
+
+- probe lines `62`;
+- epochs monotónicos observados `7..24`;
+- máximo `attachmentCount=1`;
+- `captureRequestsSincePresentationReady=0`;
+- `errorCode3>0=0`;
+- `rawPresented=true=0`;
+- stale commits/results `0`.
+
+Crash/ANR/OOM atribuibles a DEV 327: `0/0/0`. Los dos ANR que conserva
+`ApplicationExitInfo` son anteriores a la instalación de DEV 327; la salida más
+reciente corresponde solamente a `PACKAGE UPDATED` durante `adb install -r`.
+
+Estado final 05A:
+
+- `bootstrapResetGeneration=1`, `bootstrapCompleteGeneration=1`, `resetCount=1`;
+- Device Owner `com.contentfilter.user.dev`, Affiliated;
+- Accessibility enabled y bound;
+- VPN activa y validada;
+- App Usuario versionCode 327, datos preservados;
+- Chrome protegido y usable con health completo.

@@ -40,6 +40,59 @@ class ChromePhotosTrustedBootstrapPolicyTest {
     }
 
     @Test
+    fun `accessibility missing before first release waits without fabricating fail close`() {
+        assertEquals(
+            null,
+            ChromePhotosTrustedBootstrapPolicy.failCloseReason(
+                previouslyReleased = false,
+                health = healthy(accessibilityBound = false),
+            ),
+        )
+    }
+
+    @Test
+    fun `accessibility loss after release fails closed with explicit reason`() {
+        assertEquals(
+            "accessibility_lost",
+            ChromePhotosTrustedBootstrapPolicy.failCloseReason(
+                previouslyReleased = true,
+                health = healthy(accessibilityBound = false),
+            ),
+        )
+    }
+
+    @Test
+    fun `healthy released Chrome does not fail closed`() {
+        assertEquals(
+            null,
+            ChromePhotosTrustedBootstrapPolicy.failCloseReason(
+                previouslyReleased = true,
+                health = healthy(),
+            ),
+        )
+    }
+
+    @Test
+    fun `existing required dependency losses keep explicit fail close reasons`() {
+        assertEquals(
+            "proxy_lost",
+            ChromePhotosTrustedBootstrapPolicy.failCloseReason(true, healthy(proxyHealthy = false)),
+        )
+        assertEquals(
+            "policy_lost",
+            ChromePhotosTrustedBootstrapPolicy.failCloseReason(true, healthy(policyConfirmed = false)),
+        )
+        assertEquals(
+            "vpn_lost",
+            ChromePhotosTrustedBootstrapPolicy.failCloseReason(true, healthy(vpnConfirmed = false)),
+        )
+        assertEquals(
+            "gloshia_lost",
+            ChromePhotosTrustedBootstrapPolicy.failCloseReason(true, healthy(gloshiaReady = false)),
+        )
+    }
+
+    @Test
     fun `verified current generation releases Chrome without requiring another reset`() {
         val completed =
             state(
