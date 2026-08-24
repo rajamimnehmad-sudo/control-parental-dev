@@ -1,85 +1,238 @@
 # Glosh Remote — Live Settings Guide
 
-Updated: 2026-08-24 11:06 ART
+Updated: 2026-08-24 11:15 ART
 
 ## REMOTE-INSTALL-LIVE-GUIDE-03
 
-Status: DESIGN APPROVED / IMPLEMENTATION LOCAL PENDING.
+Status: DESIGN FINAL / IMPLEMENTATION LOCAL PENDING.
 
-Supersedes the simpler static OEM animation-only direction of `REMOTE-INSTALL-OEM-GUIDANCE-02` before implementation. The already validated no-link connection/broker path remains untouched and PASS FINAL DEV.
+This supersedes the static animation-only onboarding direction before implementation. The validated no-link broker/relay/ADB connection remains PASS FINAL DEV and must not be changed by this task.
 
 ### Product goal
-A totally non-technical Android user should never feel abandoned inside Settings. Glosh Remote should accompany the user in real time while Settings is open, detect the current Settings screen, automatically scroll until the next required row is visible, draw a lime highlight/arrow over the real target, and advance guidance when the user moves to the next screen.
+A totally non-technical Android user should never feel abandoned inside Settings. Glosh Remote accompanies the user in real time while Settings is open, detects the current Settings screen, automatically scrolls until the next required row is visible, draws a lime highlight/arrow over the real target, and advances guidance when the user moves to the next screen.
 
-### Authority / implementation
-- Use a dedicated `AccessibilityService` only for the temporary Glosh Remote installer guide.
-- Enable window-content retrieval and listen only while an explicit Glosh Remote onboarding session is active.
-- Scope observation to Android/OEM Settings surfaces; ignore all unrelated apps/windows.
-- Render guidance with `TYPE_ACCESSIBILITY_OVERLAY`; do not require a generic `SYSTEM_ALERT_WINDOW` overlay if the accessibility overlay is sufficient.
-- Highlight layer must be pass-through/non-touchable so Settings remains fully interactive.
-- Small Glosh assistant card may be touchable for `ME PERDÍ`, `MOSTRAR DE NUEVO`, `VOLVER A GLOSH` and minimize/expand.
-- Never collect, upload or persist arbitrary Accessibility tree contents.
-- Never log Settings text dumps.
-- Never persist sensitive nodes, pairing codes, nonces or cryptographic material.
-- Shut down/remove the overlay when guidance ends or the user leaves Settings.
+### Final flow
+1. User taps `CONECTAR CON SOPORTE`.
+2. Glosh performs broker `discover` only. No request/RSA identity yet.
+3. If support is available, Glosh explains once that it needs temporary guidance access and opens Accessibility settings.
+4. User enables the dedicated Glosh Remote guide service.
+5. Glosh starts `1 de 3 · Preparar el teléfono` and opens the closest Settings screen.
+6. Live guide identifies the active Settings page, scrolls to the real target, highlights it, and tells the user exactly what to tap.
+7. Developer-options guidance completes without consuming broker request TTL.
+8. Only after that, Glosh creates the real ephemeral support request and waits for explicit operator acceptance.
+9. `2 de 3 · Abrir conexión`: guide opens/locates Wireless Debugging, auto-scrolls to it, highlights it, then guides `Emparejar dispositivo con código`.
+10. `3 de 3 · Ingresar código`: best-effort read the six-digit pairing code locally from the expected pairing dialog; if high-confidence detection is unavailable, fall back automatically to six large in-app boxes and RemoteInput notification.
+11. All code-entry paths call the same pairing entrypoint with single-submit authority.
+12. On `CONNECTED`, overlay disappears, temporary guide state is cleared, and the guide AccessibilityService calls `disableSelf()` when supported.
+
+### Accessibility scope and privacy
+- Dedicated `AccessibilityService` used only for temporary installer guidance.
+- Declare `BIND_ACCESSIBILITY_SERVICE` and `canRetrieveWindowContent=true`.
+- Use `FLAG_REPORT_VIEW_IDS` and `FLAG_RETRIEVE_INTERACTIVE_WINDOWS` only if required by the matching engine.
+- Do not statically observe the whole phone. At runtime, resolve the actual package(s) handling Android Settings intents on that device and set `AccessibilityServiceInfo.packageNames` dynamically to only those trusted Settings package(s) while onboarding is active.
+- Outside an active onboarding, do no tree scanning and render no overlay.
+- Ignore Chrome, Gmail, WhatsApp, keyboards, notifications and all unrelated apps/windows.
+- Never take screenshots for this guide.
+- Never collect, upload, persist or log Accessibility-tree dumps, Settings text, pairing codes, nonces or cryptographic material.
 
 ### Live target engine
-For each OEM recipe step:
-1. Inspect the active Settings accessibility tree.
-2. Match the expected target using bounded OEM-specific labels/synonyms plus structural hints.
-3. If target is visible, obtain its screen bounds and draw a lime pulse/outline + arrow on the real row.
-4. If target exists but is off-screen, first try `ACTION_SHOW_ON_SCREEN`.
-5. Otherwise locate the nearest scrollable container and use bounded `ACTION_SCROLL_FORWARD` / `ACTION_SCROLL_DOWN` until the target appears.
-6. Re-scan after each `TYPE_VIEW_SCROLLED` / content/window event.
-7. Stop immediately when the target is visible, the screen changes, no further scroll is possible, or a bounded attempt limit is reached.
-8. Never perform `ACTION_CLICK` on Settings targets. User taps switches/rows/system confirmations themselves.
+For every guide step:
+1. Determine current OEM recipe + expected screen + expected target.
+2. Traverse the active Settings tree only.
+3. Score candidates using bounded signals: exact label, localized aliases, stable view/resource id when present, content description, parent/child context, screen title/context and clickability/role.
+4. Require a confidence threshold. If two candidates are similarly plausible, do not highlight either; enter rescue mode.
+5. If target is already visible, obtain bounds in screen coordinates and highlight the real row.
+6. If target exists but is off-screen, call `ACTION_SHOW_ON_SCREEN` first.
+7. Otherwise find the nearest scrollable ancestor/container and perform bounded `ACTION_SCROLL_DOWN` or `ACTION_SCROLL_FORWARD`.
+8. Wait for `TYPE_VIEW_SCROLLED`, `TYPE_WINDOW_CONTENT_CHANGED`, `TYPE_WINDOW_STATE_CHANGED` or `TYPE_WINDOWS_CHANGED`, debounce, then re-scan.
+9. Stop immediately when target becomes visible, the screen changes, no movement occurs, scrolling is unsupported, service is disabled or the bounded attempt limit is reached.
+10. Never `ACTION_CLICK` Settings targets. User taps rows, switches and system confirmations.
 
-Auto-scroll is an explicitly approved requirement.
+Auto-scroll is a required feature, not optional best effort. Use strict limits (for example maximum 6 scroll actions per target, plus no-progress detection) so the guide cannot loop.
+
+### Overlay geometry
+- Use `TYPE_ACCESSIBILITY_OVERLAY`; do not require generic `SYSTEM_ALERT_WINDOW` if accessibility overlay is sufficient.
+- Highlight layer is full-screen, transparent, NOT_TOUCHABLE and NOT_FOCUSABLE.
+- Draw a soft lime outline/pulse around the target bounds plus a small arrow/hand indicator.
+- Account for display insets, status/navigation bars, rotation and density when mapping node bounds to overlay coordinates.
+- Recompute bounds after every scroll/window/layout change.
+- Floating Glosh card is a separate small touchable overlay, automatically placed away from the target; it can minimize to a small Glosh bubble.
+- Respect `ValueAnimator.areAnimatorsEnabled()`; reduced-motion mode uses a static highlight.
 
 ### OEM recipes
-Initial live recipes:
+Initial recipes:
 - Samsung: `Acerca del teléfono → Información de software → Número de compilación ×7`.
 - Motorola: `Acerca del teléfono` or `Sistema → Acerca del teléfono → Número de compilación ×7`.
 - Xiaomi/Redmi/POCO: `Acerca del teléfono → Información detallada y especificaciones → versión OS/MIUI repetidamente`, then `Ajustes adicionales → Opciones de desarrollador`.
-- Generic Android fallback when OEM recipe does not match reliably.
+- Generic Android fallback when the OEM recipe cannot be matched confidently.
 
-Second-stage universal recipe:
-`Opciones de desarrollador → Depuración inalámbrica → activar → Emparejar dispositivo con código`.
+Recipes must support localized/variant labels through explicit bounded aliases, not broad fuzzy matching. Architecture must allow later variants by OEM/Android version without rewriting the engine.
+
+### Developer-options stage
+- Samsung/Motorola: locate/scroll/highlight `Número de compilación`.
+- Xiaomi family: locate the appropriate OS/MIUI/HyperOS version item only when recipe/context confidence is high.
+- Best-effort count target click events to show `1 de 7`, `2 de 7`, etc.; never depend solely on click counting to advance.
+- If the OEM exposes the system confirmation/toast text indicating developer mode is enabled, advance automatically only when confidence is high; otherwise use the existing simple human confirmation fallback.
+
+### Wireless Debugging stage
+- Open the most specific resolvable Settings route available; fallback is `Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS`.
+- Live scanner locates `Depuración inalámbrica`; if necessary auto-scrolls and highlights it.
+- User toggles it.
+- Scanner then locates/highlights `Emparejar dispositivo con código` and scrolls as needed.
+- Never auto-toggle or auto-click either control.
 
 ### Six-digit pairing code
-When the Android pairing-code dialog is visible:
-- Best-effort detect the six-digit code locally from the Accessibility tree only when the current expected step is the Wireless Debugging pairing dialog and surrounding semantics identify it as a pairing code.
-- If confidently detected, feed it directly to the same `RemotePairingService` entrypoint used by the app/notificaton and auto-start pairing.
-- Do not log, persist, upload or expose the code to Supabase/broker.
-- If code cannot be read confidently, fall back to the existing six large in-app boxes and RemoteInput notification.
-- Keep anti-double-submit authority: at most one pairing attempt active.
+Only attempt auto-detection while the current expected state is specifically the Wireless Debugging pairing-code dialog/window.
 
-### UX
-- First-time requirement: user must explicitly enable the Glosh Remote guidance AccessibilityService. Open the most specific accessibility settings page available; explain in plain language that it is temporary and used only to guide setup.
-- Once enabled, the service should immediately recognize Settings and start the live guide.
-- Floating card examples: `Tocá Información de software`, then `Ahora tocá Número de compilación 7 veces`.
-- Overlay moves away from the highlighted row and can minimize to a small Glosh bubble.
-- Progress remains `1 de 3`, `2 de 3`, `3 de 3`.
-- `ME PERDÍ` triggers a fresh tree scan, bounded auto-scroll and OEM-specific rescue copy without resetting the secure session.
-- If Accessibility is turned off mid-guide, fail gracefully to the already-designed animation/static OEM guide; do not block the user permanently.
+High-confidence code detection requires:
+- exactly six decimal digits;
+- expected pairing-dialog state;
+- nearby semantic context indicating pairing/wireless-debugging/code;
+- no competing six-digit candidates.
 
-### Security / policy boundaries
-- Accessibility guide is temporary installer functionality, not a permanent remote-control backdoor.
-- No arbitrary screen scraping and no observation outside the Settings packages/surfaces needed for onboarding.
+If confidence is high:
+- keep code only in memory;
+- feed it into the same `RemotePairingService` entrypoint used by in-app input and notification RemoteInput;
+- immediately clear references/buffers where practical;
+- never log, persist, upload or send it to Supabase/broker.
+
+If confidence is not high:
+- do nothing automatic;
+- show six large numeric boxes in Glosh;
+- auto-submit exactly at six digits;
+- keep RemoteInput notification as an alternative.
+
+Pairing authority:
+- at most one pairing attempt active;
+- duplicate code/app-notification-accessibility races must not start a second pairing;
+- failure releases the guard and allows a new code;
+- success clears all code state.
+
+### Rescue / correction behavior
+`ME PERDÍ` never resets the secure session.
+
+On tap:
+1. re-scan current Settings window;
+2. infer current recipe step only from bounded known screens/targets;
+3. if recognized, auto-scroll/highlight the correct target again;
+4. if unrecognized, remove highlight and show `Volvamos al punto correcto` with `ABRIR AJUSTES CORRECTOS`.
+
+If user navigates to the wrong Settings page, the assistant should say a short corrective message, not highlight unrelated controls.
+
+### State and recovery
+Keep a dedicated UX state machine separate from crypto/session state, for example:
+- GUIDE_PERMISSION
+- DEV_OPTIONS_ROUTE
+- DEV_OPTIONS_TARGET
+- SUPPORT_PREPARING
+- WIRELESS_DEBUGGING_TARGET
+- PAIR_CODE_TARGET
+- PAIRING
+- CONNECTED
+
+Persist only non-sensitive UX state needed for Activity recreation (OEM family, guide step, confirmation flags). Never persist RSA private key, nonce, descriptor, session key or pairing code.
+
+If process death destroys ephemeral crypto state, fail closed and resume from the nearest safe UX checkpoint with human copy instead of pretending the secure session survived.
+
+### Broker TTL timing
+Preserve the previously approved timing:
+- `CONECTAR CON SOPORTE` performs `discover` only;
+- no real broker request while the user is learning Developer Options;
+- create request/identity/nonce only after the guide reaches the connection stage;
+- keep the validated bounded expired-request renewal (max 5 attempts) unchanged.
+
+### End of guide
+When service state becomes `CONNECTED`:
+- remove all accessibility overlays immediately;
+- clear live-guide state and any code reference;
+- dynamically clear package/event interest where appropriate;
+- call `AccessibilityService.disableSelf()` on supported API levels;
+- show `Guía terminada ✓` briefly in Glosh.
+
+If Accessibility is turned off early or OEM nodes are unusable, fall back to the static OEM animation/manual guide. Accessibility improves UX but is never the only path to completion.
+
+### Modularity
+Keep new code isolated under cohesive packages, e.g.:
+- `guide/accessibility/LiveGuideAccessibilityService`
+- `guide/accessibility/SettingsPackageResolver`
+- `guide/accessibility/SettingsTreeScanner`
+- `guide/accessibility/TargetMatcher`
+- `guide/accessibility/AutoScrollController`
+- `guide/accessibility/HighlightOverlayController`
+- `guide/accessibility/GuideBubbleController`
+- `guide/oem/OemDetector`
+- `guide/oem/OemRecipe*`
+- `guide/state/GuideStateMachine`
+- `guide/pairing/PairingCodeDetector`
+
+Do not inflate `MainActivity` or `RemotePairingService` with guide-specific responsibilities.
+
+### Security boundaries / non-regression
+- No screenshot capture.
+- No arbitrary screen scraping.
+- No observation outside resolved Settings packages during active onboarding.
 - No automatic taps on permission toggles, Developer Options, Wireless Debugging or pairing confirmation.
-- Auto-scroll and highlight are allowed; user remains responsible for explicit Android confirmations.
-- Existing broker Supabase, RSA/OAEP, HMAC/AES, relay, allowlist, retry-expired logic, `FLAG_SECURE`, IDLE/PREPARING/CONNECTED state authority and no-link architecture must not change.
+- Existing Supabase broker, RSA/OAEP, HMAC/AES, relay, allowlist, retry-expired logic, `FLAG_SECURE`, IDLE/PREPARING/CONNECTED authority and no-link architecture must not change.
 
-### Required gates
-- Unit tests: OEM detector/recipes, target matching, bounds/highlight mapping, bounded scroll, no-scroll termination, no click actions, reduced motion, Accessibility-off fallback, six-digit confident detection/fallback, anti-double-submit, privacy/no-persistence invariants.
-- Existing Android + Python/broker tests no regression.
-- lintDebug 0 errors; assembleDebug PASS.
-- Physical Samsung S22 gate first: enable guide service, live detect Settings screen, auto-scroll to targets, highlight correct rows, guide Build Number x7, guide Wireless Debugging, highlight Pair with code, best-effort auto-read 6-digit code, connect, cancel, no crash/ANR.
-- Motorola/Xiaomi recipes implemented + unit-tested only until physical hardware exists.
+### Required tests
+- OEM detector: Samsung, Motorola, Xiaomi, Redmi, POCO, Generic.
+- Settings-package resolver and dynamic package scoping.
+- Target matcher exact/alias/context/id scoring.
+- Ambiguous candidate rejection.
+- Wrong-screen rejection.
+- Bounds mapping with insets/rotation.
+- `ACTION_SHOW_ON_SCREEN` success.
+- Fallback scroll down/forward.
+- target after N scrolls.
+- bounded max-attempt stop.
+- no-progress stop.
+- screen-change stop.
+- service-disabled stop.
+- no `ACTION_CLICK` path anywhere.
+- reduced motion.
+- non-Settings package ignored.
+- Accessibility-off fallback.
+- guide UX state recreation with no secrets persisted.
+- process/ephemeral-session loss fail-closed.
+- six-digit contextual detection success.
+- random six-digit rejection.
+- ambiguous multiple-code rejection.
+- in-app fallback input.
+- one pairing attempt across Accessibility/app/notification race.
+- failure allows retry; success clears code.
+- `CONNECTED` removes overlay and requests `disableSelf()`.
+- all existing Android + Python/broker tests remain green.
+
+### Physical gate — Samsung S22
+Validate:
+1. enable temporary guide service;
+2. dynamic scoping resolves Settings package(s);
+3. detect Samsung;
+4. open About phone;
+5. auto-scroll to real `Información de software` if needed;
+6. highlight bounds align with real row;
+7. user taps;
+8. auto-scroll/highlight real `Número de compilación`;
+9. guide x7;
+10. broker request still absent during learning stage;
+11. request begins only at support-preparing stage;
+12. open Developer Settings;
+13. auto-scroll/highlight Wireless Debugging;
+14. user enables it;
+15. auto-scroll/highlight Pair with code;
+16. user opens dialog;
+17. attempt high-confidence six-digit auto-detection;
+18. if detected, pair automatically; otherwise manual fallback must work;
+19. CONNECTED;
+20. overlay removed and guide service auto-disabled;
+21. cancel/revoke still PASS;
+22. no crash/ANR and no broker/crypto regression.
+
+Motorola/Xiaomi recipes are implemented + unit-tested only until physical hardware exists.
 
 ### Coordination
-- `REMOTE-INSTALL-CONNECTION-00` remains PASS FINAL DEV / CLOSED.
-- `REMOTE-INSTALL-LIVE-GUIDE-03` becomes the immediate UX task before adaptive install pilots.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01` waits for the Samsung physical live-guide gate.
+- `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
+- `REMOTE-INSTALL-LIVE-GUIDE-03`: immediate UX task.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits for Samsung physical live-guide gate.
 - Work only under `tools/glosh-remote-spike/**`; do not touch Chrome, GloshIA, DAG, App Usuario/Admin, Device Owner production logic or existing Supabase functions.
 - No push/PR/merge/deploy without explicit authorization.
