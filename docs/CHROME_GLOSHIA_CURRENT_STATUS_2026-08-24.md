@@ -16,6 +16,8 @@ Mientras Codex mantiene ownership de escritura sobre el cierre UDP, ChatGPT prep
 
 - `CHROME_VPN_FULL_TUNNEL_CONTROLLED_10A_DESIGN.md`: diseño ejecutable del próximo full-tunnel controlado, commit `279eb6af343ec32b93e3636bdc14fcc6494ba3db`.
 - `CHROME_PROXY_WEB_SEMANTICS_11A_CONTRACT.md`: contrato del proxy web general, commit `1e40a6a2e447318237e9f2921d808b16c4f30035`.
+- `CHROME_IMAGE_CONTENT_AUTHORITY_11B_DESIGN.md`: diseño completo de autoridad visual por MIME+magic+decode bounded, compresión, Range/206, formatos still/animados, SVG y cache generation-bound; commit `a6ea2446ef6e3b272abf09837115bb991813f8c6`.
+- `CHROME_IMAGE_CONTENT_AUTHORITY_11B_CODEX_DRAFT.md`: prompt Codex preparado para usar sólo después de PASS de 10A+11A, commit `75e8ee855429505ad4917724db2dd7df1aa319b2`.
 - `CHROME_PROVENANCE_GAP_13A_FIXTURE_MATRIX.md`: matriz de fixtures para `data:`, `blob:`, canvas, WebGL, SVG y Service Worker, commit `cc5902f3dcf87958b73851cd83b2bf0d08dfeb3b`.
 - `CHROME_PROCESS_DEATH_GUARD_10B_DESIGN.md`: diseño de guard independiente ante crash/kill/reboot/update, commit `f1274fd9b48ff894e19ef7bbb5a02ef0a83aa5f6`.
 - `CHROME_GENERAL_WEB_PERF_14_PLAN.md`: plan de benchmark p50/p95/p99, memoria, batería, térmica y long-run, commit `b2a07e0b69c0849bb70d97b5526a4e98270b30ae`.
@@ -31,9 +33,10 @@ Bloqueos de producto vigentes:
 1. cerrar UDP físico y aceptar/rechazar HEV;
 2. full-tunnel seguro con un único VPN y autoridad por UID;
 3. preservar semántica web completa en el proxy;
-4. cubrir `data:`, `blob:`, canvas, WebGL, SVG inline y Service Worker/synthetic responses;
-5. guard independiente ante process death;
-6. rendimiento/compatibilidad amplia.
+4. autoridad de imagen robusta frente a MIME incorrecto, compresión, Range y formatos animados;
+5. cubrir `data:`, `blob:`, canvas, WebGL, SVG inline y Service Worker/synthetic responses;
+6. guard independiente ante process death;
+7. rendimiento/compatibilidad amplia.
 
 ## Ruta inmediata
 
