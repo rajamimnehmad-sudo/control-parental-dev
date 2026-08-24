@@ -1,6 +1,6 @@
 # Glosh Remote — Supabase broker status
 
-Updated: 2026-08-24 09:27 ART
+Updated: 2026-08-24 09:49 ART
 
 ## REMOTE-INSTALL-NOLINK-GUIDED-03A
 
@@ -55,12 +55,34 @@ Timeout retry fix:
 - Unit tests PASS.
 - Full physical TTL-expiry renewal was not exercised because the accepted physical request completed immediately; this remains a narrow residual validation, not a blocker for connection PASS.
 
-Security debt before product:
-- The operator credential used during DEV coordination was exposed in the private chat transcript. Rotation was explicitly deferred by the user for the DEV gate; rotate before product/general release.
-- Anonymous rendezvous still lacks cryptographic customer identity before pairing; explicit operator acceptance mitigates accidental connection but install-scoped/user-verifiable binding remains product hardening.
+## REMOTE-INSTALL-OEM-GUIDANCE-02
 
-Next route:
+Status: NEXT / IN PROGRESS DESIGN — completar antes de iniciar pilotos adaptativos reales.
+
+Objetivo aprobado por usuario:
+- Glosh Remote detecta automáticamente fabricante/modelo/Android/SDK.
+- Animación nativa en loop dentro de Glosh, no GIF pesado ni copia exacta de Ajustes.
+- Tres recetas iniciales: Samsung, Motorola y Xiaomi/Redmi/POCO; fallback Android genérico para otros OEM.
+- Samsung: `Ajustes → Acerca del teléfono → Información de software → Número de compilación ×7`.
+- Motorola: `Ajustes → Acerca del teléfono` o `Ajustes → Sistema → Acerca del teléfono → Número de compilación ×7`.
+- Xiaomi/Redmi/POCO: `Ajustes → Acerca del teléfono → Información detallada y especificaciones → versión OS/MIUI varias veces`; luego `Ajustes adicionales → Opciones de desarrollador`.
+- Después de Developer Options, intentar apertura directa de Wireless Debugging cuando el intent/resolución del OEM lo permita; fallback a Developer Settings.
+- Segunda animación específica: `Opciones de desarrollador → Depuración inalámbrica → Activar → Emparejar dispositivo con código`.
+- El código de 6 dígitos debe poder ingresarse tanto dentro de Glosh Remote como desde la notificación; ambos caminos comparten el mismo estado y al completar 6 dígitos se intenta pairing automáticamente.
+- La animación resalta secuencialmente sólo el elemento que el usuario debe tocar, con flecha/pulso, y se detiene/respeta `ValueAnimator.areAnimatorsEnabled()`.
+- No overlays sobre Ajustes, no Accessibility adicional para controlar Settings, no taps automatizados dentro de Settings.
+- UX actual, broker, crypto, relay, allowlist y estados IDLE/PREPARING/CONNECTED deben permanecer intactos.
+
+Fuentes oficiales verificadas 2026-08-24: Samsung Developer/Samsung Support, Motorola Support, Xiaomi Global Support y Android Developers.
+
+## Next route
+
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
-- Advance `REMOTE-ADAPTIVE-INSTALL-PILOT-01` to the next active route: use the proven no-link remote ADB path to perform real Glosh installations manually/adaptively by OEM/model, with Codex scanning accounts/profiles/restrictions and documenting recipes before further automation.
+- `REMOTE-INSTALL-OEM-GUIDANCE-02`: prioridad inmediata antes de pilotos.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: queda en espera hasta terminar y validar físicamente el nuevo guiado OEM.
 
-No Chrome, GloshIA, DAG, App Usuario/Admin or pre-existing Edge Function was modified by the physical gate.
+Security debt before product:
+- Rotate the operator credential before product/general release.
+- Add install-scoped/user-verifiable binding for anonymous rendezvous before general release.
+
+No Chrome, GloshIA, DAG, App Usuario/Admin or pre-existing Edge Function should be modified by this UX task.
