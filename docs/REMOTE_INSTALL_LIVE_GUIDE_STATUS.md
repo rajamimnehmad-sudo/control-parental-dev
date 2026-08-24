@@ -1,6 +1,6 @@
 # Glosh Remote — Live Settings Guide
 
-Updated: 2026-08-24 17:49 ART
+Updated: 2026-08-24 18:33 ART
 
 ## REMOTE-INSTALL-LIVE-GUIDE-03
 
@@ -73,21 +73,37 @@ Reference integrity:
 - Handoff manifest: `095317612340860640b7a38f32402b0c68e3127bd8e37dc1770a49472646d7e1`, 3309 bytes.
 - Samsung fixture: `c0bc2ab22c3dff7028c9b8ab0a59809193bdf5e7db191ce6aa44abb368e38eac`, 1788 bytes.
 
+### Physical route approved
+
+Use the Samsung A23 as the instrumented lab device for the heavy technical gate. USB/ADB is allowed there only for installation, logs, repeated navigation and evidence. This does not change the no-PC product architecture.
+
+A23 technical route:
+- Samsung SM-A235M / Android 14 / API 34;
+- implement V2 and run all technical gates;
+- Gate A guide-only first;
+- if Gate A passes, continue Gate B pairing UX and Gate C full remote session on A23 where useful;
+- stop at the first reproducible failure and preserve evidence.
+
+S22 product-experience route:
+- after the A23 technical gates are green, generate the exact V2 APK and send it to the S22 without using USB for the user-experience trial;
+- user performs the flow as a real remote customer and reports the visual/interaction experience;
+- S22 is the final real-world Samsung UX confirmation, not the primary instrumentation device.
+
 Immediate next step:
-1. Codex fetches only `coordination/remote-install-live-guide-v2` metadata/files without checkout/merge over the Android worktree;
-2. verifies the text-file hashes above;
-3. implements V2 only under `tools/glosh-remote-spike/**`;
-4. runs technical tests/lint/assemble;
-5. executes physical Gate A Samsung first and stops at the first reproducible failure;
-6. Gate B and Gate C only after Gate A PASS;
+1. Codex verifies the text-only GitHub handoff;
+2. implements V2 only under `tools/glosh-remote-spike/**`;
+3. runs Android tests + Python/broker + lint + assemble;
+4. uses A23 as the instrumented device for Gate A, then B/C only after prior gates pass;
+5. produces exact APK path/size/SHA and evidence;
+6. sends final candidate to S22 for cable-free remote UX verification;
 7. ChatGPT reviews exact diff/evidence before final closure.
 
 ## Coordination
 
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
-- `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: text-only GitHub handoff ready; implementation is active route.
+- `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: text-only GitHub handoff ready; A23 technical implementation/gate is the active route.
 - `REMOTE-INSTALL-MAC-OPERATOR-04`: preserved; waits for V2 guide stability.
 - `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved; integration waits for V2 gate.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waiting for V2 Samsung gate.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waiting for V2 A23 technical gate + S22 UX confirmation.
 - Do not touch Chrome, GloshIA, DAG, App Usuario/Admin, Supabase or production Device Owner logic.
