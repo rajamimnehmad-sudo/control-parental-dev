@@ -40,6 +40,7 @@ public final class SupportSessionBrokerClient {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final String baseUrl;
     private final SecureRandom random = new SecureRandom();
+    private final BrokerWaitPolicy waitPolicy = new BrokerWaitPolicy();
     private int generation;
     private String requestId;
     private String nonce;
@@ -107,6 +108,10 @@ public final class SupportSessionBrokerClient {
                 return;
             }
             try {
+                if (!waitPolicy.startNextRequest()) {
+                    unavailable(current, listener);
+                    return;
+                }
                 identity = RendezvousIdentity.generate();
                 requestId = randomToken(18);
                 nonce = randomToken(24);
@@ -118,14 +123,18 @@ public final class SupportSessionBrokerClient {
                         .put("manufacturer", safe(device.manufacturer(), 40))
                         .put("model", safe(device.model(), 80))
                         .put("android_version", safe(device.androidVersion(), 30));
-                enqueueCreate(current, actionRequest(body), listener);
+                enqueueCreate(current, device, actionRequest(body), listener);
             } catch (Throwable error) {
                 fail(current, listener);
             }
         }
     }
 
-    private void enqueueCreate(int current, Request request, Listener listener) {
+    private void enqueueCreate(
+            int current,
+            DeviceMetadata device,
+            Request request,
+            Listener listener) {
         enqueue(current, request, new ResponseHandler() {
             @Override
             public void handle(Response response) {
@@ -138,7 +147,7 @@ public final class SupportSessionBrokerClient {
                     return;
                 }
                 post(current, () -> listener.onPending(currentRequestId(current)));
-                schedulePoll(current, listener);
+                schedulePoll(current, device, listener);
             }
 
             @Override
@@ -148,11 +157,11 @@ public final class SupportSessionBrokerClient {
         });
     }
 
-    private void schedulePoll(int current, Listener listener) {
-        main.postDelayed(() -> poll(current, listener), POLL_DELAY_MS);
+    private void schedulePoll(int current, DeviceMetadata device, Listener listener) {
+        main.postDelayed(() -> poll(current, device, listener), POLL_DELAY_MS);
     }
 
-    private void poll(int current, Listener listener) {
+    private void poll(int current, DeviceMetadata device, Listener listener) {
         JSONObject body = boundAction(current, "poll");
         if (body == null) {
             return;
@@ -167,9 +176,11 @@ public final class SupportSessionBrokerClient {
                 JSONObject value = responseJson(response);
                 String state = value.optString("state", value.optString("status", ""));
                 if ("pending".equals(state)) {
-                    schedulePoll(current, listener);
+                    schedulePoll(current, device, listener);
                 } else if ("accepted".equals(state) || "ready".equals(state)) {
                     claim(current, listener);
+                } else if (shouldRenew(current, state)) {
+                    renewExpiredRequest(current, device, listener);
                 } else {
                     unavailable(current, listener);
                 }
@@ -180,6 +191,23 @@ public final class SupportSessionBrokerClient {
                 fail(current, listener);
             }
         });
+    }
+
+    private void renewExpiredRequest(int current, DeviceMetadata device, Listener listener) {
+        synchronized (this) {
+            if (current != generation) {
+                return;
+            }
+            destroyIdentity();
+            requestId = null;
+            nonce = null;
+            activeCall = null;
+        }
+        createRequest(current, device, listener);
+    }
+
+    private synchronized boolean shouldRenew(int current, String state) {
+        return current == generation && waitPolicy.shouldRenew(state);
     }
 
     private void claim(int current, Listener listener) {
@@ -347,6 +375,7 @@ public final class SupportSessionBrokerClient {
         destroyIdentity();
         requestId = null;
         nonce = null;
+        waitPolicy.reset();
     }
 
     private void destroyIdentity() {
