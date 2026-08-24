@@ -19,16 +19,18 @@ The normal client flow discovers a waiting operator through a stable, explicitly
 `BROKER_BASE_URL`. Android sends only a random request ID, random nonce, ephemeral RSA-3072 public key,
 manufacturer/model and Android version. It sends no account, IMEI, Android ID or persistent identity.
 
-The operator registers one waiting relay session and must explicitly run `accept <request-id>`. The Mac
+The operator opens one waiting support window and must explicitly run `accept <request-id>`. The Mac
 then seals the internal descriptor with RSA-OAEP SHA-256 for that request's public key. The plaintext
 descriptor remains on the Mac and Android only. The broker receives and transfers ciphertext.
 
 Requests have a short TTL, are rate-limited and can be revoked. A ciphertext can be accepted once and
 claimed once; consumed, expired and revoked request IDs become temporary tombstones to reject replay.
-The sealed plaintext binds protocol version, request ID, nonce and descriptor.
+The sealed plaintext binds protocol version, request ID, the SHA-256 context
+`SHA-256(request_id + ":" + nonce)` and descriptor. The broker gives the operator only that context;
+Android recomputes it from its in-memory nonce before accepting the descriptor.
 
-The included broker is an in-memory DEV reference implementation. A stable public broker is required
-before the no-link flow can pass a physical Internet gate; this ticket does not deploy one.
+The included broker is an in-memory reference implementation of the deployed action-POST contract.
+The physical no-link and cross-network gates remain separate from this HTTP integration gate.
 
 ## Internal join descriptor
 

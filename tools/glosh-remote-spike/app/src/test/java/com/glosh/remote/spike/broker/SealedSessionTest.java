@@ -48,6 +48,20 @@ public class SealedSessionTest {
         }
     }
 
+    @Test
+    public void sealContextForAnotherNonceIsRejected() throws Exception {
+        RendezvousIdentity identity = RendezvousIdentity.generate();
+        String ciphertext = seal(identity, REQUEST_ID, NONCE, DESCRIPTOR);
+        try {
+            SealedSession.open(identity, ciphertext, REQUEST_ID, "nonce_other_abcdefghijkl");
+            fail("Expected nonce context binding failure");
+        } catch (Exception expected) {
+            // expected
+        } finally {
+            identity.destroy();
+        }
+    }
+
     private static String seal(
             RendezvousIdentity identity,
             String requestId,
@@ -55,7 +69,8 @@ public class SealedSessionTest {
             String descriptor) throws Exception {
         byte[] encoded = Base64.getUrlDecoder().decode(identity.encodedPublicKey());
         PublicKey publicKey = KeyFactory.getInstance("RSA").generatePublic(new X509EncodedKeySpec(encoded));
-        String payload = SealedSession.PREFIX + "\n" + requestId + "\n" + nonce + "\n" + descriptor;
+        String payload = SealedSession.PREFIX + "\n" + requestId + "\n"
+                + SealedSession.sealContext(requestId, nonce) + "\n" + descriptor;
         Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
         cipher.init(
                 Cipher.ENCRYPT_MODE,
