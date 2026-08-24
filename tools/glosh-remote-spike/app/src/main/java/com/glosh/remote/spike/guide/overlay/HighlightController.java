@@ -9,24 +9,31 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.view.View;
 import android.view.WindowManager;
-import android.view.accessibility.AccessibilityEvent;
 
-public final class HighlightOverlayController {
+import com.glosh.remote.spike.guide.accessibility.ScanGenerationGuard;
+import com.glosh.remote.spike.guide.accessibility.SettingsSnapshot;
+
+public final class HighlightController {
     private static final int LIME = Color.rgb(190, 242, 84);
 
     private final WindowManager windowManager;
+    private final ScanGenerationGuard guard;
     private final HighlightView view;
     private boolean attached;
 
-    public HighlightOverlayController(Context context) {
-        windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+    public HighlightController(Context context, ScanGenerationGuard guard) {
+        windowManager = context.getSystemService(WindowManager.class);
+        this.guard = guard;
         view = new HighlightView(context);
     }
 
-    public void show(Rect bounds) {
-        if (bounds == null || bounds.isEmpty()) {
+    public boolean show(
+            ScanGenerationGuard.Token token,
+            SettingsSnapshot snapshot,
+            Rect bounds) {
+        if (!guard.isCurrent(token, snapshot) || bounds == null || bounds.isEmpty()) {
             clear();
-            return;
+            return false;
         }
         view.setTarget(bounds);
         if (!attached) {
@@ -42,6 +49,7 @@ public final class HighlightOverlayController {
             attached = true;
         }
         view.startPulse();
+        return true;
     }
 
     public void clear() {
@@ -57,8 +65,8 @@ public final class HighlightOverlayController {
     }
 
     private static final class HighlightView extends View {
-        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Paint arrow = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint framePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint markerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF target = new RectF();
         private final RectF frame = new RectF();
         private ValueAnimator animator;
@@ -67,18 +75,11 @@ public final class HighlightOverlayController {
         HighlightView(Context context) {
             super(context);
             setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
-            setAccessibilityDelegate(new AccessibilityDelegate() {
-                @Override
-                public void onInitializeAccessibilityEvent(View host, AccessibilityEvent event) {
-                    super.onInitializeAccessibilityEvent(host, event);
-                    event.setContentDescription(null);
-                }
-            });
-            paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(dp(4));
-            paint.setColor(LIME);
-            arrow.setStyle(Paint.Style.FILL);
-            arrow.setColor(LIME);
+            framePaint.setStyle(Paint.Style.STROKE);
+            framePaint.setStrokeWidth(dp(4));
+            framePaint.setColor(LIME);
+            markerPaint.setStyle(Paint.Style.FILL);
+            markerPaint.setColor(LIME);
         }
 
         void setTarget(Rect bounds) {
@@ -93,8 +94,8 @@ public final class HighlightOverlayController {
                 invalidate();
                 return;
             }
-            animator = ValueAnimator.ofFloat(0.55f, 1f);
-            animator.setDuration(900);
+            animator = ValueAnimator.ofFloat(0.58f, 1f);
+            animator.setDuration(950);
             animator.setRepeatMode(ValueAnimator.REVERSE);
             animator.setRepeatCount(ValueAnimator.INFINITE);
             animator.addUpdateListener(value -> {
@@ -114,16 +115,13 @@ public final class HighlightOverlayController {
         @Override
         protected void onDraw(Canvas canvas) {
             super.onDraw(canvas);
-            paint.setAlpha(Math.round(alpha * 255));
+            framePaint.setAlpha(Math.round(alpha * 255));
             float padding = dp(5);
-            frame.set(
-                    target.left - padding,
-                    target.top - padding,
-                    target.right + padding,
-                    target.bottom + padding);
-            canvas.drawRoundRect(frame, dp(13), dp(13), paint);
-            arrow.setAlpha(paint.getAlpha());
-            canvas.drawCircle(frame.left + dp(12), frame.centerY(), dp(6), arrow);
+            frame.set(target.left - padding, target.top - padding,
+                    target.right + padding, target.bottom + padding);
+            canvas.drawRoundRect(frame, dp(13), dp(13), framePaint);
+            markerPaint.setAlpha(framePaint.getAlpha());
+            canvas.drawCircle(frame.left + dp(12), frame.centerY(), dp(6), markerPaint);
         }
 
         private float dp(int value) {

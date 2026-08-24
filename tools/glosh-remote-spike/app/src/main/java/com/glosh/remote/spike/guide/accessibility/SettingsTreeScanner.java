@@ -11,31 +11,26 @@ import java.util.List;
 public final class SettingsTreeScanner {
     private static final int MAX_NODES = 500;
 
-    public record NodeRecord(AccessibilityNodeInfo node, TargetCandidate candidate) {
-    }
-
-    public record ScanResult(
-            String screenTitle,
-            List<NodeRecord> nodes,
-            List<PairingCodeDetector.VisibleText> visibleText) {
-    }
-
-    public ScanResult scan(AccessibilityNodeInfo root) {
+    public SettingsSnapshot scan(AccessibilityNodeInfo root, int windowId) {
         if (root == null) {
-            return new ScanResult("", List.of(), List.of());
+            return null;
         }
+        String packageName = string(root.getPackageName());
         String title = findTitle(root);
-        List<NodeRecord> nodes = new ArrayList<>();
-        List<PairingCodeDetector.VisibleText> text = new ArrayList<>();
-        walk(root, title, nodes, text);
-        return new ScanResult(title, List.copyOf(nodes), List.copyOf(text));
+        List<NodeSnapshot> nodes = new ArrayList<>();
+        List<PairingCodeDetector.VisibleText> visibleText = new ArrayList<>();
+        walk(root, title, List.of(), nodes, visibleText);
+        String fingerprint = fingerprint(title, nodes);
+        return new SettingsSnapshot(
+                windowId, packageName, title, fingerprint, nodes, visibleText);
     }
 
     private void walk(
             AccessibilityNodeInfo node,
             String title,
-            List<NodeRecord> nodes,
-            List<PairingCodeDetector.VisibleText> text) {
+            List<Integer> path,
+            List<NodeSnapshot> nodes,
+            List<PairingCodeDetector.VisibleText> visibleText) {
         if (node == null || nodes.size() >= MAX_NODES) {
             return;
         }
@@ -53,24 +48,41 @@ public final class SettingsTreeScanner {
                 string(node.getClassName()),
                 node.isClickable(),
                 bounds);
-        nodes.add(new NodeRecord(node, candidate));
+        nodes.add(new NodeSnapshot(path, candidate, node.isScrollable()));
         if (!candidate.text().isEmpty()) {
-            text.add(new PairingCodeDetector.VisibleText(candidate.text(), parent, title));
+            visibleText.add(new PairingCodeDetector.VisibleText(candidate.text(), parent, title));
         }
         if (!candidate.contentDescription().isEmpty()) {
-            text.add(new PairingCodeDetector.VisibleText(candidate.contentDescription(), parent, title));
+            visibleText.add(new PairingCodeDetector.VisibleText(
+                    candidate.contentDescription(), parent, title));
         }
         for (int index = 0; index < node.getChildCount(); index++) {
-            walk(node.getChild(index), title, nodes, text);
+            List<Integer> childPath = new ArrayList<>(path);
+            childPath.add(index);
+            walk(node.getChild(index), title, childPath, nodes, visibleText);
         }
+    }
+
+    private String fingerprint(String title, List<NodeSnapshot> nodes) {
+        StringBuilder logical = new StringBuilder(TargetMatcher.normalize(title));
+        logical.append('|').append(nodes.size());
+        for (NodeSnapshot node : nodes) {
+            TargetCandidate candidate = node.candidate();
+            if (!candidate.text().isEmpty() || !candidate.contentDescription().isEmpty()) {
+                logical.append('|')
+                        .append(TargetMatcher.normalize(candidate.text()))
+                        .append(':')
+                        .append(TargetMatcher.normalize(candidate.contentDescription()))
+                        .append(':')
+                        .append(candidate.viewId() == null ? "" : candidate.viewId());
+            }
+        }
+        return Integer.toHexString(logical.toString().hashCode()) + ":" + logical.length();
     }
 
     private String findTitle(AccessibilityNodeInfo root) {
         String identified = findTitleById(root, false);
-        if (!identified.isEmpty()) {
-            return identified;
-        }
-        return firstVisibleText(root);
+        return identified.isEmpty() ? firstVisibleText(root) : identified;
     }
 
     private String findTitleById(AccessibilityNodeInfo node, boolean insideTitleContainer) {
@@ -78,8 +90,8 @@ public final class SettingsTreeScanner {
             return "";
         }
         String own = textOf(node);
-        String viewId = node.getViewIdResourceName();
-        boolean titleContext = insideTitleContainer || SettingsTitleDetector.isTitleContainer(viewId);
+        boolean titleContext = insideTitleContainer
+                || SettingsTitleDetector.isTitleContainer(node.getViewIdResourceName());
         if (!own.isEmpty() && titleContext) {
             return own;
         }
@@ -113,8 +125,7 @@ public final class SettingsTreeScanner {
         StringBuilder value = new StringBuilder();
         int limit = Math.min(node.getChildCount(), 4);
         for (int index = 0; index < limit; index++) {
-            AccessibilityNodeInfo child = node.getChild(index);
-            String text = textOf(child);
+            String text = textOf(node.getChild(index));
             if (!text.isEmpty()) {
                 if (value.length() > 0) {
                     value.append(' ');

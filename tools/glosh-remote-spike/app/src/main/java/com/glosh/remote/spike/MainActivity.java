@@ -4,7 +4,6 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,10 +12,10 @@ import android.view.WindowManager;
 
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.guide.accessibility.GuideServiceStatus;
+import com.glosh.remote.spike.guide.accessibility.GuideOnlyDebugIntentHandler;
 import com.glosh.remote.spike.guide.accessibility.SettingsPackageResolver;
 import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
-import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.DeveloperGuidePhase;
@@ -459,22 +458,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void consumeDebugIntent(Intent intent) {
-        if (!BuildConfig.DEBUG || intent == null) {
-            return;
-        }
-        Uri data = intent.getData();
-        if (data == null || !"gloshremote".equalsIgnoreCase(data.getScheme())) {
-            return;
-        }
-        try {
-            String raw = data.toString();
-            JoinDescriptor descriptor = JoinDescriptor.parse(raw);
-            descriptor.destroy();
-            coordinator.seedDebugDescriptor(raw);
-        } catch (Throwable ignored) {
-            // Hidden DEV fallback; malformed descriptors fail closed.
-        } finally {
-            intent.setData(null);
-        }
+        GuideOnlyDebugIntentHandler.consume(
+                this, intent, coordinator, settingsNavigator, settingsPackageResolver);
     }
 }
