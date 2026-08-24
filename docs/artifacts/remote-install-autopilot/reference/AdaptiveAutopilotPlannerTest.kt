@@ -11,6 +11,11 @@ private fun o(vararg x: Pair<String, Any?>): Observation {
         accessibilityEnabled = m["accessibilityEnabled"] as? Boolean ?: true,
         adbConnected = m["adbConnected"] as? Boolean ?: false,
         supportConnected = m["supportConnected"] as? Boolean ?: false,
+        restrictedSettingsRequired = m["restrictedSettingsRequired"] as? Boolean ?: false,
+        wifiReady = m["wifiReady"] as? Boolean ?: true,
+        wirelessPolicyBlocked = m["wirelessPolicyBlocked"] as? Boolean ?: false,
+        previousPairingKnown = m["previousPairingKnown"] as? Boolean ?: false,
+        reconnectAttempted = m["reconnectAttempted"] as? Boolean ?: false,
         screen = m["screen"] as? Screen ?: Screen.UNKNOWN,
         authority = if (m.containsKey("authority")) m["authority"] as SnapshotAuthority? else SAFE,
         candidate = m["candidate"] as Candidate?,
@@ -57,5 +62,10 @@ fun main() {
     expect(Action.FALLBACK_GUIDE, o("screen" to Screen.ABOUT_PHONE, "candidate" to c("software_info", fresh=false)))
     expect(Action.WAIT_STABLE, o("screen" to Screen.WIRELESS_DEBUGGING, "candidate" to c("pair_with_code")))
     expect(Action.WAIT_STABLE, o("screen" to Screen.PAIRING_DIALOG, "authority" to SnapshotAuthority(true,1,true,true,true), "pairCodeCandidates" to listOf("123456"), "pairingContextHigh" to true))
+    expect(Action.ASK_ALLOW_RESTRICTED_SETTINGS, o("accessibilityEnabled" to false, "restrictedSettingsRequired" to true))
+    expect(Action.ASK_CONNECT_WIFI, o("wifiReady" to false))
+    expect(Action.POLICY_BLOCKED, o("wirelessPolicyBlocked" to true))
+    expect(Action.TRY_ADB_RECONNECT, o("previousPairingKnown" to true, "reconnectAttempted" to false))
+    expect(Action.OPEN_DEVELOPER_SETTINGS, o("previousPairingKnown" to true, "reconnectAttempted" to true, "screen" to Screen.APP))
     println("PASS $n Kotlin reference checks")
 }
