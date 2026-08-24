@@ -1,6 +1,6 @@
 # Glosh Remote — Supabase broker status
 
-Updated: 2026-08-24 09:55 ART
+Updated: 2026-08-24 10:00 ART
 
 ## REMOTE-INSTALL-NOLINK-GUIDED-03A
 
@@ -54,6 +54,18 @@ Status: DESIGN FINAL / IMPLEMENTATION LOCAL PENDING — prioridad inmediata ante
 
 Objetivo: una persona sin conocimientos técnicos debe poder completar el emparejamiento siguiendo una sola acción por pantalla.
 
+### Flujo final aprobado
+1. Usuario toca `CONECTAR CON SOPORTE`.
+2. Glosh hace sólo `discover` para confirmar que soporte está disponible. Todavía NO crea request, identidad RSA ni relay session para ese teléfono.
+3. `Paso 1 de 3 · Preparar el teléfono`: Glosh detecta OEM y guía Developer Options con animación propia. El usuario puede tardar sin consumir TTL de request.
+4. Al volver, Glosh pregunta de forma humana `¿Viste el mensaje “Ya sos desarrollador”?`; `SÍ, SEGUIR` avanza. No usar falsa autodetección del setting.
+5. Recién ahora crear request efímera al broker. Operador recibe/acepta. Mientras tanto mostrar `Soporte se está preparando…`.
+6. Cuando descriptor está listo: `Paso 2 de 3 · Abrir conexión`; animación `Depuración inalámbrica → Activar → Emparejar dispositivo con código`; abrir Settings.
+7. `Paso 3 de 3 · Ingresar código`: los 6 dígitos se pueden ingresar desde notificación mientras se mira Ajustes o desde Glosh; ambos llaman al mismo pairing entrypoint y auto-submit al sexto dígito.
+8. Estado final `¡Listo, Glosher! Soporte ya está conectado de forma segura.`
+
+Si soporte deja de estar disponible mientras el usuario completa Paso 1, al tocar `SÍ, SEGUIR` el request falla limpio y se muestra `Soporte se desconectó. Tocá REINTENTAR.` No se pierde el progreso visual del OEM.
+
 ### Detección y recetas
 - Detectar `Build.MANUFACTURER`, `Build.BRAND`, modelo, Android y SDK; normalizar case/espacios.
 - Samsung → receta Samsung.
@@ -78,10 +90,11 @@ Objetivo: una persona sin conocimientos técnicos debe poder completar el empare
 - No usar en copy normal: ADB, descriptor, nonce, broker, endpoint, RSA, WSS, Developer API.
 - Sí usar el nombre exacto que verá en Android cuando sea imprescindible: `Número de compilación`, `Opciones de desarrollador`, `Depuración inalámbrica`, `Emparejar dispositivo con código`.
 - Mensaje tranquilizador breve: `No cambies nada más. Glosh te indica exactamente qué tocar.`
-- En paso 1, CTA principal `MOSTRARME DÓNDE`/`ABRIR AJUSTES`; secundario discreto `YA LO TENGO ACTIVADO`.
-- Al volver de Ajustes, no fingir detección automática: pantalla `¿Viste el mensaje “Ya sos desarrollador”?` con CTA único `SÍ, SEGUIR` y ayuda `NO ME APARECIÓ` que repite la animación de ese OEM.
-- Agregar `ME PERDÍ`/`MOSTRAR DE NUEVO` como escape en cada etapa, sin salir del flujo.
+- En paso 1, CTA principal `ABRIR AJUSTES`; secundario discreto `YA LO TENGO ACTIVADO`.
+- Al volver de Ajustes: `¿Viste el mensaje “Ya sos desarrollador”?` → `SÍ, SEGUIR`; `NO ME APARECIÓ` repite la animación específica.
+- Agregar `ME PERDÍ`/`MOSTRAR DE NUEVO` como escape en cada etapa.
 - Notificación durante Ajustes con una sola instrucción contextual y acción `VOLVER A GLOSH`.
+- No mostrar múltiples decisiones técnicas ni pedir copiar/pegar nada.
 
 ### Apertura de Settings
 - Usar intents oficiales donde existan y resolverlos con PackageManager.
@@ -100,12 +113,13 @@ Objetivo: una persona sin conocimientos técnicos debe poder completar el empare
 - `NO VEO EL CÓDIGO` vuelve a mostrar animación `Activar → Emparejar con código` y reabre Settings.
 
 ### Preservar arquitectura validada
-- No cambiar broker Supabase, crypto, RSA/OAEP, HMAC/AES, relay, allowlist ni retry de requests expiradas.
+- No cambiar backend/broker Supabase, crypto, RSA/OAEP, HMAC/AES, relay, allowlist ni retry de requests expiradas.
+- El cambio de timing `discover → guía → request` es sólo orquestación Android; contrato HTTP permanece intacto.
 - Mantener `FLAG_SECURE` y estados autoritativos IDLE/PREPARING/CONNECTED.
 - No tocar Chrome, GloshIA, DAG, App Usuario/Admin ni Device Owner.
 
 ### Gates esperados
-- Tests unitarios de clasificación OEM, secuencia de recetas, reduced-motion, submit 6 dígitos, doble-submit y timeout/fallo.
+- Tests unitarios de clasificación OEM, secuencia de recetas, reduced-motion, orquestación `discover-before-request`, soporte desaparece durante Paso 1, submit 6 dígitos, doble-submit y timeout/fallo.
 - Tests existentes Android/Python sin regresiones.
 - lintDebug 0 errores; assembleDebug PASS.
 - APK nueva para gate visual Samsung S22 primero.
