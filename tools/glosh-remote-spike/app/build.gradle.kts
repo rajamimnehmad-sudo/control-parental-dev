@@ -2,7 +2,9 @@ plugins {
     id("com.android.application")
 }
 
-val brokerBaseUrl = providers.gradleProperty("brokerBaseUrl").orElse("").get()
+val brokerBaseUrl = providers.gradleProperty("brokerBaseUrl")
+    .orElse("https://syeycayasyufedwoprea.supabase.co/functions/v1/glosh-remote-broker")
+    .get()
 val escapedBrokerBaseUrl = brokerBaseUrl
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")

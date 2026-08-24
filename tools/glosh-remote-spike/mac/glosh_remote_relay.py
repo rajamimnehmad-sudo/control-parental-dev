@@ -401,7 +401,7 @@ async def async_main(args: argparse.Namespace) -> int:
 
             descriptor = session.join_uri(public_url)
             if args.broker_url:
-                broker = BrokerOperatorClient(args.broker_url, args.broker_token, session.sid)
+                broker = BrokerOperatorClient(args.broker_url, args.operator_key)
                 await asyncio.get_running_loop().run_in_executor(
                     None,
                     broker.register,
@@ -463,11 +463,7 @@ def parse_args() -> argparse.Namespace:
         default=os.environ.get("BROKER_BASE_URL", ""),
         help="Endpoint estable HTTPS del Support Session Broker.",
     )
-    parser.add_argument(
-        "--broker-token",
-        default=os.environ.get("BROKER_OPERATOR_TOKEN", ""),
-        help="Token efímero del operador para el broker DEV.",
-    )
+    parser.set_defaults(operator_key=os.environ.get("GLOSH_REMOTE_OPERATOR_KEY", ""))
     args = parser.parse_args()
     if not (1 <= args.port <= 65535):
         parser.error("--port fuera de rango")
@@ -475,8 +471,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("--session-minutes debe estar entre 1 y 120")
     if args.public_url and not args.public_url.startswith("https://"):
         parser.error("--public-url debe ser HTTPS")
-    if bool(args.broker_url) != bool(args.broker_token):
-        parser.error("--broker-url y --broker-token deben configurarse juntos")
+    if bool(args.broker_url) != bool(args.operator_key):
+        parser.error("--broker-url requiere GLOSH_REMOTE_OPERATOR_KEY")
     if args.broker_url:
         parsed_broker = urllib.parse.urlparse(args.broker_url)
         loopback_dev = parsed_broker.scheme == "http" and parsed_broker.hostname in {"127.0.0.1", "localhost"}

@@ -55,7 +55,8 @@ For a temporary installation bridge this is preferable to leaving a reusable ADB
 
 ## Support Session Broker
 
-`BROKER_BASE_URL` is an explicit build-time configuration supplied with:
+`BROKER_BASE_URL` defaults in this DEV candidate to the deployed Supabase Edge Function and can be
+overridden at build time with:
 
 ```bash
 ./gradlew -p tools/glosh-remote-spike \
@@ -63,17 +64,18 @@ For a temporary installation bridge this is preferable to leaving a reusable ADB
   :app:assembleDebug
 ```
 
-No endpoint is hardcoded. With no stable HTTPS broker configured, the normal button fails cleanly with
+With no stable HTTPS broker configured, the normal button fails cleanly with
 “Soporte remoto no está disponible en este momento.” It never falls back to asking the client for a link.
 
-The DEV broker is in-memory, TTL-bound, single-use and rate-limited. It stores request metadata, the
+The broker contract is TTL-bound, single-use and rate-limited. It stores request metadata, the
 ephemeral Android public key and an RSA-OAEP ciphertext after explicit operator acceptance. The join
 descriptor and its 256-bit session key never reach the broker in plaintext. Cancellation destroys the
 Android private-key reference and revokes the pending request best-effort.
 
-## Why the lab relay is not Supabase yet
+## Relay and rendezvous separation
 
-The first gate should test the difficult part — same-device ADB pairing plus remote control — without adding a persistent backend.
+The stable rendezvous endpoint is a Supabase Edge Function. The relay remains a separate, temporary
+Mac process; the broker only transfers metadata and ciphertext and never sees the descriptor plaintext.
 
 The Mac relay binds only to `127.0.0.1`; `cloudflared` creates an outbound Quick Tunnel with a random HTTPS/WSS endpoint. Neither Mac nor Android needs an inbound router port.
 
@@ -95,7 +97,7 @@ tools/glosh-remote-spike/app/build/outputs/apk/debug/app-debug.apk
 
 The actual Android SDK/JitPack build is the point where this ticket hands off to Codex on the Mac.
 
-## Mac relay and DEV broker
+## Mac relay and broker
 
 Requires Python 3.9+ and `cloudflared` for the physical internet gate.
 
@@ -109,17 +111,14 @@ python -m unittest test_broker.py
 python glosh_remote_relay.py
 ```
 
-For the local broker integration gate, start the broker, expose it only through a DEV tunnel and pass
-that explicit URL to both the APK build and relay:
+For a local contract gate, start the in-memory reference broker:
 
 ```bash
-export BROKER_OPERATOR_TOKEN='<random-base64url-token>'
-python support_session_broker.py --operator-token "$BROKER_OPERATOR_TOKEN"
-cloudflared tunnel --url http://127.0.0.1:8787
+export GLOSH_REMOTE_OPERATOR_KEY='<random-base64url-token>'
+python support_session_broker.py --operator-key "$GLOSH_REMOTE_OPERATOR_KEY"
 
 python glosh_remote_relay.py \
-  --broker-url https://temporary-dev-broker.trycloudflare.com \
-  --broker-token "$BROKER_OPERATOR_TOKEN"
+  --broker-url http://127.0.0.1:8766
 ```
 
 In broker mode the relay does not print the descriptor. It prints pending requests and requires
@@ -179,7 +178,7 @@ Run `glosh_remote_relay.py` in one terminal and `mock_agent.py '<descriptor>'` i
 ## Known limitations / next gates
 
 - Android 11+ only for V0.
-- A stable public HTTPS broker has not been deployed or configured. Therefore no-link Internet UX is not yet a physical PASS.
+- The stable DEV broker is configured, but the no-link physical Internet and cross-network gates remain pending.
 - Wireless debugging remains enabled during V0. After this path passes, the next architecture experiment can start a short-lived shell-side bridge and ask the user to turn Wireless debugging off earlier.
 - Some OEMs may change Developer options or mDNS behavior; real pilots will build manufacturer/model recipes before automation.
 - Android 17 local-network permission changes are deferred until the target SDK is raised to API 37.
