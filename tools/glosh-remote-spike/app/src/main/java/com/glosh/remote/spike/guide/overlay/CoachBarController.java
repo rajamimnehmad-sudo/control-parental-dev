@@ -20,7 +20,6 @@ import com.glosh.remote.spike.wizard.GuidePresentation;
 /** Compact, non-modal coach shown above Android Settings. */
 public final class CoachBarController {
     private static final int LIME = Color.rgb(190, 242, 84);
-    private static final int GRAPHITE = Color.rgb(27, 30, 26);
     private static final int MUTED = Color.rgb(191, 198, 186);
     private static final int SEGMENT_OFF = Color.rgb(76, 82, 72);
 
@@ -35,6 +34,8 @@ public final class CoachBarController {
     private final TextView hide;
     private final View[] progressSegments = new View[4];
     private boolean attached;
+    private boolean userHidden;
+    private String presentationKey = "";
     private Rect targetBounds;
 
     /**
@@ -76,7 +77,7 @@ public final class CoachBarController {
         hide.setText("×");
         hide.setGravity(Gravity.CENTER);
         hide.setPadding(dp(10), 0, dp(4), 0);
-        hide.setOnClickListener(view -> clear());
+        hide.setOnClickListener(view -> hideForCurrentStep());
         progressRow.addView(hide, new LinearLayout.LayoutParams(dp(38), dp(30)));
         card.addView(progressRow, matchWrap());
 
@@ -135,7 +136,20 @@ public final class CoachBarController {
         render(GuidePresentation.recovery(LiveGuideRuntime.stage(), message));
     }
 
+    /** Clears visual state programmatically; a later presentation may appear normally. */
     public void clear() {
+        userHidden = false;
+        presentationKey = "";
+        detach();
+        targetBounds = null;
+    }
+
+    private void hideForCurrentStep() {
+        userHidden = true;
+        detach();
+    }
+
+    private void detach() {
         cue.onHostPause();
         if (attached) {
             try {
@@ -145,10 +159,17 @@ public final class CoachBarController {
             }
             attached = false;
         }
-        targetBounds = null;
     }
 
     private void render(GuidePresentation presentation) {
+        String nextKey = presentation.step()
+                + "|" + presentation.title()
+                + "|" + presentation.body()
+                + "|" + presentation.cue();
+        if (!nextKey.equals(presentationKey)) {
+            presentationKey = nextKey;
+            userHidden = false;
+        }
         progress.setText("Glosh · " + presentation.progressLabel());
         title.setText(presentation.title());
         body.setText(presentation.body());
@@ -157,6 +178,10 @@ public final class CoachBarController {
             progressSegments[index].setBackground(rounded(
                     index < presentation.progressValue() ? LIME : SEGMENT_OFF,
                     3));
+        }
+        if (userHidden) {
+            cue.onHostPause();
+            return;
         }
         attachOrUpdate();
         cue.onHostResume();
