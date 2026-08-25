@@ -4,12 +4,10 @@ import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.provider.Settings;
 import android.view.WindowManager;
 
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
@@ -83,7 +81,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         setContentView(ui.view());
         consumeIntent(getIntent());
 
-        // A previous Accessibility/PiP build may have left a stale wizard checkpoint.
+        // A previous Accessibility/PiP/overlay build may have left a stale wizard checkpoint.
         if (RemotePairingService.getSessionState() == SessionState.IDLE
                 && !guideStore.active()
                 && coordinator.step() != OnboardingState.Step.HOME
@@ -173,7 +171,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         OnboardingState.Step onboarding = coordinator.step();
         SamsungGuideStep guide = guideStore.step();
         String key = session + ":" + pairing + ":" + onboarding + ":" + guideStore.active()
-                + ":" + guide + ":overlay=" + !needsOverlayPermission();
+                + ":" + guide + ":bubble=" + !needsOverlayPermission();
         if (key.equals(lastRenderKey)) {
             return;
         }
@@ -231,11 +229,11 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         guideNotification.clear();
         ui.showScreen(
                 "Una sola vez",
-                "Permití la guía flotante",
-                "Glosh necesita “Mostrar sobre otras apps” para dejar una tarjeta pequeña encima de los Ajustes reales de Samsung.",
-                "Este permiso no toca Ajustes por vos ni lee la pantalla. Activá “Permitir” para Glosh Remote y, al volver, continuamos automáticamente.");
+                "Permití las burbujas de Glosh",
+                "Samsung oculta las ventanas flotantes comunes encima de Ajustes. Glosh usa ahora una burbuja administrada por Android para que la guía sí pueda quedar visible.",
+                "En la pantalla que se abre, permití que Glosh Remote muestre burbujas. Si Samsung ofrece opciones, elegí permitir todas las conversaciones de Glosh.");
         ui.clearVisual();
-        ui.showPrimary("PERMITIR GUÍA FLOTANTE", view -> requestOverlayPermission(), true);
+        ui.showPrimary("PERMITIR BURBUJAS", view -> requestOverlayPermission(), true);
         ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
@@ -287,7 +285,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
 
-        String info = "Cuando abras Ajustes, Glosh deja una tarjeta pequeña arriba con la instrucción, Atrás y Ya está. Podés arrastrarla desde el encabezado.";
+        String info = "Cuando abras Ajustes, Android deja la burbuja de Glosh visible encima. Al abrirla tenés la instrucción, Atrás y Ya está con diseño propio de Glosh.";
         if (step == SamsungGuideStep.WIRELESS_DEBUGGING
                 && onboarding == OnboardingState.Step.REQUESTING_SUPPORT) {
             info = "Podés ir dejando abierta Depuración inalámbrica. Glosh está preparando la sesión de soporte en segundo plano.";
@@ -301,8 +299,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderCodeStep(PairingUiState pairing) {
-        guideNotification.clear();
-        String info = "La notificación de Glosh permite responder los 6 números sin salir de Ajustes. Si no aparece, escribilos acá.";
+        String info = "La burbuja de Glosh permite escribir los 6 números dejando el código de Samsung visible detrás. La notificación sigue como respaldo.";
         ui.showSamsungStep(SamsungGuideStep.ENTER_CODE, info);
         boolean retry = pairing == PairingUiState.CODE_FAILED;
         if (pairing == PairingUiState.WAITING_FOR_CODE || retry) {
@@ -311,10 +308,11 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             ui.showScreen(
                     "Paso 7 de 7",
                     "Esperando el código",
-                    "En Depuración inalámbrica tocá “Vincular dispositivo con código”. Cuando Android muestre los seis números, Glosh habilita el ingreso automáticamente.",
+                    "En Depuración inalámbrica tocá “Vincular dispositivo con código”. Podés escribir los seis números en la burbuja incluso si Glosh todavía está detectando el endpoint.",
                     info);
             ui.showGuide(SamsungGuideStep.PAIR_DEVICE.visual());
         }
+        guideNotification.showBubbleStep(SamsungGuideStep.ENTER_CODE, false);
         ui.showPrimary("VOLVER A DEPURACIÓN INALÁMBRICA", view -> openWirelessSettings(), false);
         ui.showTertiary("ATRÁS", view -> guideBack(false));
     }
@@ -412,7 +410,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
         if (current == SamsungGuideStep.PAIR_DEVICE) {
             guideStore.setStep(SamsungGuideStep.ENTER_CODE);
-            guideNotification.clear();
             syncGuideSurfaces(fromOverlay);
             return;
         }
@@ -456,7 +453,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             renderOverlayPermission();
             return;
         }
-        guideNotification.showStep(step);
         settingsNavigator.openForStep(this, step);
     }
 
@@ -466,7 +462,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             renderOverlayPermission();
             return;
         }
-        guideNotification.clear();
         settingsNavigator.openWirelessDebugging(this);
     }
 
@@ -478,7 +473,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         if (descriptor == null) {
             return false;
         }
-        guideNotification.clear();
         startForegroundService(new Intent(this, RemotePairingService.class)
                 .setAction(RemotePairingService.ACTION_START)
                 .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
@@ -511,7 +505,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 || pairing == PairingUiState.CONNECTING)
                 && guideStore.step().ordinal() < SamsungGuideStep.ENTER_CODE.ordinal()) {
             guideStore.setStep(SamsungGuideStep.ENTER_CODE);
-            guideNotification.clear();
             if (guideOverlay.isVisible()) {
                 guideOverlay.updateStep(SamsungGuideStep.ENTER_CODE);
             }
@@ -558,22 +551,11 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private boolean needsOverlayPermission() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this);
+        return guideOverlay == null || !guideOverlay.canShow();
     }
 
     private void requestOverlayPermission() {
-        Intent intent = new Intent(
-                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:" + getPackageName()));
-        try {
-            startActivity(intent);
-        } catch (Throwable firstFailure) {
-            try {
-                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
-            } catch (Throwable ignored) {
-                // The permission screen is a platform surface; render() will remain on the safe gate.
-            }
-        }
+        guideNotification.openBubbleSettings(this);
     }
 
     private void consumeIntent(Intent intent) {
