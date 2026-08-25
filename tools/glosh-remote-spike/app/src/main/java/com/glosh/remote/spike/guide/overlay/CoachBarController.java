@@ -8,66 +8,117 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-import com.glosh.remote.spike.R;
+import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
+import com.glosh.remote.spike.wizard.GuidePresentation;
 
+/** Compact, non-modal coach shown above Android Settings. */
 public final class CoachBarController {
     private static final int LIME = Color.rgb(190, 242, 84);
+    private static final int GRAPHITE = Color.rgb(27, 30, 26);
+    private static final int MUTED = Color.rgb(191, 198, 186);
+    private static final int SEGMENT_OFF = Color.rgb(76, 82, 72);
 
     private final Context context;
     private final WindowManager windowManager;
-    private final LinearLayout bar;
-    private final TextView copy;
-    private final TextView showMe;
-    private final TextView rescue;
-    private final TextView close;
-    private final Runnable onShowMe;
-    private final Runnable onRescue;
-    private final Runnable onClose;
+    private final FrameLayout root;
+    private final LinearLayout card;
+    private final GuideCueView cue;
+    private final TextView progress;
+    private final TextView title;
+    private final TextView body;
+    private final TextView hide;
+    private final View[] progressSegments = new View[4];
     private boolean attached;
-    private boolean confirmingClose;
     private Rect targetBounds;
 
+    /**
+     * The legacy callbacks remain in the constructor for binary/source compatibility. Guided mode
+     * deliberately exposes no MOSTRARME/ME PERDÍ actions; the notification is the persistent
+     * fallback and the × only hides this card.
+     */
     public CoachBarController(
             Context context,
-            Runnable onShowMe,
-            Runnable onRescue,
-            Runnable onClose) {
+            Runnable ignoredShowMe,
+            Runnable ignoredRescue,
+            Runnable ignoredClose) {
         this.context = context;
-        this.onShowMe = onShowMe;
-        this.onRescue = onRescue;
-        this.onClose = onClose;
         windowManager = context.getSystemService(WindowManager.class);
 
-        bar = new LinearLayout(context);
-        bar.setOrientation(LinearLayout.HORIZONTAL);
-        bar.setGravity(Gravity.CENTER_VERTICAL);
-        bar.setPadding(dp(14), dp(8), dp(10), dp(8));
-        bar.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        root = new FrameLayout(context);
+        root.setPadding(dp(12), dp(10), dp(12), dp(10));
+        root.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+
+        card = new LinearLayout(context);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(14), dp(12), dp(12), dp(12));
         GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.rgb(43, 47, 42));
-        background.setCornerRadius(dp(16));
-        bar.setBackground(background);
+        background.setColor(Color.argb(248, 27, 30, 26));
+        background.setCornerRadius(dp(20));
+        background.setStroke(dp(1), Color.argb(72, 190, 242, 84));
+        card.setBackground(background);
+        card.setElevation(dp(10));
+        root.addView(card, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT));
 
-        copy = text(15, Color.WHITE, true);
-        bar.addView(copy, new LinearLayout.LayoutParams(0, dp(44), 1f));
+        LinearLayout progressRow = new LinearLayout(context);
+        progressRow.setOrientation(LinearLayout.HORIZONTAL);
+        progressRow.setGravity(Gravity.CENTER_VERTICAL);
+        progress = text(11, LIME, Typeface.BOLD);
+        progressRow.addView(progress, new LinearLayout.LayoutParams(0, dp(22), 1f));
+        hide = text(19, MUTED, Typeface.NORMAL);
+        hide.setText("×");
+        hide.setGravity(Gravity.CENTER);
+        hide.setPadding(dp(10), 0, dp(4), 0);
+        hide.setOnClickListener(view -> clear());
+        progressRow.addView(hide, new LinearLayout.LayoutParams(dp(38), dp(30)));
+        card.addView(progressRow, matchWrap());
 
-        showMe = action(R.string.live_guide_coach_show_me);
-        showMe.setOnClickListener(view -> onShowMe.run());
-        bar.addView(showMe);
+        LinearLayout segments = new LinearLayout(context);
+        segments.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams segmentParams = new LinearLayout.LayoutParams(0, dp(3), 1f);
+        segmentParams.setMargins(0, 0, dp(5), 0);
+        for (int index = 0; index < progressSegments.length; index++) {
+            View segment = new View(context);
+            progressSegments[index] = segment;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(segmentParams);
+            if (index == progressSegments.length - 1) {
+                params.setMargins(0, 0, 0, 0);
+            }
+            segments.addView(segment, params);
+        }
+        LinearLayout.LayoutParams segmentsLayout = matchWrap();
+        segmentsLayout.setMargins(0, 0, 0, dp(10));
+        card.addView(segments, segmentsLayout);
 
-        rescue = action(R.string.live_guide_coach_rescue);
-        rescue.setOnClickListener(view -> onRescue.run());
-        bar.addView(rescue);
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.HORIZONTAL);
+        content.setGravity(Gravity.CENTER_VERTICAL);
+        cue = new GuideCueView(context);
+        LinearLayout.LayoutParams cueParams = new LinearLayout.LayoutParams(dp(50), dp(50));
+        cueParams.setMargins(0, 0, dp(12), 0);
+        content.addView(cue, cueParams);
 
-        close = action(R.string.live_guide_coach_close);
-        close.setTextSize(22);
-        close.setTextColor(Color.rgb(215, 220, 211));
-        close.setOnClickListener(view -> confirmClose());
-        bar.addView(close);
+        LinearLayout copy = new LinearLayout(context);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        title = text(16, Color.WHITE, Typeface.BOLD);
+        title.setMaxLines(2);
+        body = text(13, MUTED, Typeface.NORMAL);
+        body.setMaxLines(3);
+        body.setLineSpacing(dp(2), 1f);
+        copy.addView(title, matchWrap());
+        LinearLayout.LayoutParams bodyParams = matchWrap();
+        bodyParams.setMargins(0, dp(3), 0, 0);
+        copy.addView(body, bodyParams);
+        content.addView(copy, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        card.addView(content, matchWrap());
     }
 
     public void show(String instruction, boolean revealAvailable) {
@@ -75,56 +126,40 @@ public final class CoachBarController {
     }
 
     public void show(String instruction, boolean revealAvailable, Rect targetBounds) {
-        confirmingClose = false;
         this.targetBounds = targetBounds == null ? null : new Rect(targetBounds);
-        copy.setText(instruction);
-        showMe.setVisibility(revealAvailable ? View.VISIBLE : View.GONE);
-        rescue.setVisibility(View.VISIBLE);
-        rescue.setText(R.string.live_guide_coach_rescue);
-        rescue.setOnClickListener(view -> onRescue.run());
-        close.setText(R.string.live_guide_coach_close);
-        close.setOnClickListener(view -> confirmClose());
-        attachOrUpdate();
+        render(GuidePresentation.forStage(LiveGuideRuntime.stage(), instruction));
     }
 
     public void showRecovery(String message) {
-        confirmingClose = false;
         targetBounds = null;
-        copy.setText(message);
-        showMe.setVisibility(View.GONE);
-        rescue.setVisibility(View.VISIBLE);
-        rescue.setText(R.string.live_guide_coach_rescue);
-        rescue.setOnClickListener(view -> onRescue.run());
-        close.setText(R.string.live_guide_coach_close);
-        close.setOnClickListener(view -> confirmClose());
-        attachOrUpdate();
+        render(GuidePresentation.recovery(LiveGuideRuntime.stage(), message));
     }
 
     public void clear() {
+        cue.onHostPause();
         if (attached) {
-            windowManager.removeView(bar);
+            try {
+                windowManager.removeView(root);
+            } catch (Throwable ignored) {
+                // The system may already have detached the accessibility overlay.
+            }
             attached = false;
         }
-        confirmingClose = false;
         targetBounds = null;
     }
 
-    private void confirmClose() {
-        if (confirmingClose) {
-            onClose.run();
-            return;
+    private void render(GuidePresentation presentation) {
+        progress.setText("Glosh · " + presentation.progressLabel());
+        title.setText(presentation.title());
+        body.setText(presentation.body());
+        cue.setCue(presentation.cue());
+        for (int index = 0; index < progressSegments.length; index++) {
+            progressSegments[index].setBackground(rounded(
+                    index < presentation.progressValue() ? LIME : SEGMENT_OFF,
+                    3));
         }
-        confirmingClose = true;
-        copy.setText(R.string.live_guide_coach_close_confirm);
-        showMe.setVisibility(View.GONE);
-        rescue.setText(R.string.live_guide_coach_continue);
-        rescue.setOnClickListener(view -> {
-            rescue.setText(R.string.live_guide_coach_rescue);
-            rescue.setOnClickListener(ignored -> onRescue.run());
-            confirmingClose = false;
-            onRescue.run();
-        });
-        close.setText(R.string.live_guide_coach_close_confirm_action);
+        attachOrUpdate();
+        cue.onHostResume();
     }
 
     private void attachOrUpdate() {
@@ -133,50 +168,56 @@ public final class CoachBarController {
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 android.graphics.PixelFormat.TRANSLUCENT);
         Rect display = windowManager.getCurrentWindowMetrics().getBounds();
         Insets insets = windowManager.getCurrentWindowMetrics()
                 .getWindowInsets()
                 .getInsetsIgnoringVisibility(
-                        android.view.WindowInsets.Type.systemBars()
-                                | android.view.WindowInsets.Type.displayCutout());
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
         boolean atTop = OverlayGeometry.coachAtTop(
                 targetBounds == null ? null : new OverlayGeometry.Box(
-                        targetBounds.left, targetBounds.top, targetBounds.right, targetBounds.bottom),
+                        targetBounds.left,
+                        targetBounds.top,
+                        targetBounds.right,
+                        targetBounds.bottom),
                 new OverlayGeometry.Box(display.left, display.top, display.right, display.bottom),
                 new OverlayGeometry.EdgeInsets(
                         insets.left, insets.top, insets.right, insets.bottom),
-                dp(68), dp(12));
+                dp(112),
+                dp(10));
         params.gravity = atTop ? Gravity.TOP : Gravity.BOTTOM;
-        params.horizontalMargin = 0.025f;
-        params.y = dp(12);
+        params.y = dp(8);
         if (attached) {
-            windowManager.updateViewLayout(bar, params);
+            windowManager.updateViewLayout(root, params);
         } else {
-            windowManager.addView(bar, params);
+            windowManager.addView(root, params);
             attached = true;
         }
     }
 
-    private TextView action(int label) {
-        TextView view = text(11, LIME, true);
-        view.setText(label);
-        view.setGravity(Gravity.CENTER);
-        view.setPadding(dp(8), 0, dp(8), 0);
-        return view;
-    }
-
-    private TextView text(int sizeSp, int color, boolean bold) {
+    private TextView text(float sizeSp, int color, int style) {
         TextView view = new TextView(context);
         view.setTextSize(sizeSp);
         view.setTextColor(color);
+        view.setTypeface(Typeface.DEFAULT, style);
         view.setGravity(Gravity.CENTER_VERTICAL);
         view.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
-        if (bold) {
-            view.setTypeface(Typeface.DEFAULT_BOLD);
-        }
         return view;
+    }
+
+    private LinearLayout.LayoutParams matchWrap() {
+        return new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+    }
+
+    private GradientDrawable rounded(int color, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        return drawable;
     }
 
     private int dp(int value) {
