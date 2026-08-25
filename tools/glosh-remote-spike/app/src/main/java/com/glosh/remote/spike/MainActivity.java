@@ -140,10 +140,13 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             coordinator.reset();
             return;
         }
-        boolean restrictedPreflight = RestrictedSettingsPreflight.required(this);
+        boolean accessibilityEnabled = GuideServiceStatus.isEnabled(this);
+        boolean restrictedRecovery = RestrictedSettingsPreflight.shouldOfferRecovery(
+                this,
+                accessibilityEnabled);
         String key = session + ":" + pairing + ":" + step + ":"
-                + GuideServiceStatus.isEnabled(this) + ":" + LiveGuideRuntime.stage()
-                + ":restricted=" + restrictedPreflight;
+                + accessibilityEnabled + ":" + LiveGuideRuntime.stage()
+                + ":restrictedRecovery=" + restrictedRecovery;
         if (key.equals(lastRenderKey)) {
             return;
         }
@@ -167,7 +170,10 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private void renderHome() {
         guideNotification.clear();
-        ui.showHome(view -> coordinator.requestSupport());
+        ui.showHome(view -> {
+            RestrictedSettingsPreflight.clearAttempt(this);
+            coordinator.requestSupport();
+        });
     }
 
     private void renderCheckingSupport() {
@@ -180,19 +186,23 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderGuidePermission() {
-        if (RestrictedSettingsPreflight.required(this)) {
-            GuidePresentation presentation = GuidePresentation.restrictedSettings();
+        boolean accessibilityEnabled = GuideServiceStatus.isEnabled(this);
+        if (RestrictedSettingsPreflight.shouldOfferRecovery(this, accessibilityEnabled)) {
+            GuidePresentation presentation = GuidePresentation.restrictedSettingsRecovery();
             showPresentation(presentation,
-                    "Esto aparece en Android 13 o superior cuando la app fue instalada manualmente. Se hace una sola vez.");
+                    "Esta ayuda aparece sólo después de volver de un intento de Accesibilidad que no quedó activado.");
             guideNotification.show(presentation);
             ui.showPrimary(
-                    "1 · ABRIR INFORMACIÓN DE LA APP",
+                    "RESOLVER BLOQUEO DE ANDROID",
                     view -> openRestrictedSettingsInfo(),
                     true);
             ui.showSecondary(
-                    "2 · YA LO PERMITÍ · CONTINUAR",
-                    view -> confirmRestrictedSettingsAndContinue());
-            ui.showTertiary("CANCELAR", view -> coordinator.reset());
+                    "INTENTAR ACCESIBILIDAD DE NUEVO",
+                    view -> activateGuide());
+            ui.showTertiary("CANCELAR", view -> {
+                RestrictedSettingsPreflight.clearAttempt(this);
+                coordinator.reset();
+            });
             return;
         }
 
@@ -200,7 +210,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 GuideStage.GUIDE_PERMISSION,
                 "Activá el interruptor de Glosh Remote. Al hacerlo, seguimos automáticamente.");
         showPresentation(presentation,
-                "Glosh observa únicamente las pantallas de Ajustes necesarias durante esta sesión.");
+                "Primero probamos Accesibilidad normalmente. Si Android la bloquea, Glosh te muestra cómo resolverlo.");
         guideNotification.show(presentation);
         ui.showPrimary("ABRIR ACCESIBILIDAD", view -> activateGuide(), true);
         ui.showTertiary("CANCELAR", view -> coordinator.reset());
@@ -410,6 +420,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private void cancelConnection() {
         guideNotification.clear();
+        RestrictedSettingsPreflight.clearAttempt(this);
         LiveGuideRuntime.reset();
         coordinator.reset();
         if (RemotePairingService.getSessionState() != SessionState.IDLE) {
@@ -446,23 +457,12 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void performOpenRestrictedSettingsInfo() {
-        GuidePresentation presentation = GuidePresentation.restrictedSettings();
+        GuidePresentation presentation = GuidePresentation.restrictedSettingsRecovery();
         guideNotification.show(presentation);
         settingsNavigator.openAppDetails(this);
     }
 
-    private void confirmRestrictedSettingsAndContinue() {
-        RestrictedSettingsPreflight.confirm(this);
-        lastRenderKey = null;
-        activateGuide();
-    }
-
     private void activateGuide() {
-        if (RestrictedSettingsPreflight.required(this)) {
-            lastRenderKey = null;
-            render();
-            return;
-        }
         if (needsNotificationPermission()) {
             pendingPermissionAction = PERMISSION_OPEN_ACCESSIBILITY;
             requestNotificationPermission();
@@ -472,6 +472,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void beginGuideAndOpenAccessibility() {
+        RestrictedSettingsPreflight.markAccessibilityAttempt(this);
         LiveGuideRuntime.beginPermission(
                 coordinator.profile().family(),
                 settingsPackageResolver.resolve(this));
@@ -486,6 +487,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 || !GuideServiceStatus.isEnabled(this)) {
             return;
         }
+        RestrictedSettingsPreflight.clearAttempt(this);
         LiveGuideRuntime.beginPermission(
                 coordinator.profile().family(),
                 settingsPackageResolver.resolve(this));
