@@ -22,10 +22,13 @@ public class SamsungGuideStepTest {
     }
 
     @Test
-    public void everySettingsStepKeepsSafeManualNavigation() {
+    public void settingsNavigationStartsGeneralThenUsesSafeDestinations() {
+        assertEquals(
+                SamsungGuideStep.SettingsTarget.NONE,
+                SamsungGuideStep.ABOUT_PHONE.settingsTarget());
         assertEquals(
                 SamsungGuideStep.SettingsTarget.ABOUT_PHONE,
-                SamsungGuideStep.ABOUT_PHONE.settingsTarget());
+                SamsungGuideStep.SOFTWARE_INFO.settingsTarget());
         assertEquals(
                 SamsungGuideStep.SettingsTarget.DEVELOPER_OPTIONS,
                 SamsungGuideStep.DEVELOPER_OPTIONS.settingsTarget());
