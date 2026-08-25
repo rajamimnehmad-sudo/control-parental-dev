@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-24 23:43 ART
+Updated: 2026-08-25 00:15 ART
 
 ## Connection base
 
@@ -14,121 +14,141 @@ The proven no-link stack remains frozen: broker → relay/WSS → Glosh Remote �
 
 The old guide-first UX is not the product route.
 
-## Exact Android checkpoint now accessible
+## Preserved automated checkpoint
 
 Handoff branch:
 `handoff/remote-autopilot-eaa44`
 
-Exact HEAD:
+Exact base HEAD:
 `eaa44f1ba5da204d66a720ae6f5f805699ee22ee`
 
-Commit:
-`feat(remote): add adaptive Samsung install autopilot`
-
-Reported automated gates for this exact checkpoint:
+Reported gates on that checkpoint:
 - Android 83/83 PASS;
 - Python/broker 6/6 PASS;
 - lint 0 errors / 11 pre-existing-external warnings;
 - assemble PASS;
 - clean worktree.
 
-Historical checkpoint APK:
-- `GloshRemote-LiveGuide-V2-DEV.apk`;
-- 19,287,534 bytes;
-- SHA-256 `ca222dbfabaa776a9e304c0e643923caf5ce394ad785a72481c8a58654b14920`.
+Historical checkpoint APK SHA-256:
+`ca222dbfabaa776a9e304c0e643923caf5ce394ad785a72481c8a58654b14920`.
 
-That APK is a valid automated checkpoint but **not the final S22 candidate** after product UX review.
+That APK is preserved for evidence only and is **not the final S22 candidate**.
 
-## Exact source review — result
+## Active implementation
 
-ChatGPT reviewed the handed-off source. The important automatic chain is already present and must be preserved:
-- Samsung adaptive state machine;
-- trusted Settings window/snapshot/generation guards;
-- exact automatic click transactions;
-- automatic detection of Developer Options;
-- automatic support request when Developer Options is ready;
-- automatic start of `RemotePairingService` when the broker descriptor arrives;
-- automatic Wireless Debugging navigation;
-- contextual six-digit code detection;
-- automatic submission of a unique safe code to local pairing;
-- reuse of the already-proven secure support stack after local ADB is ready.
+`REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **CODE COMPLETE BY CHATGPT / REAL GRADLE GATE PENDING**.
 
-No redesign of Autopilot/pairing/crypto is needed.
+Isolated implementation branch:
+`work/remote-install-one-tap-05-chatgpt`
 
-## Active task
+Current implementation HEAD:
+`ad292c89c7e32f277092a24973a3e22c1508f033`
 
-`REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **ACTIVE / CODE CONTRACT FROZEN / ENVIRONMENT EXECUTION PENDING**.
+Base is exactly `eaa44f1b…`; branch is ahead only and does not touch main.
 
-Authoritative implementation contract:
-`docs/REMOTE_INSTALL_ONE_TAP_HARDENING_05.md`.
+Changed runtime/test scope is limited to `tools/glosh-remote-spike/**`:
+- customer One-Tap UI;
+- Mac standby/heartbeat;
+- one-client safe autoaccept;
+- session TTL start on first authenticated Android;
+- 30-minute phone request-renewal window;
+- bounded request/poll retry;
+- explicit manual pairing fallback state;
+- narrow Java/Python tests.
 
-Two defects are being closed:
-1. customer UI still exposes old guide/lab controls and repeated technical states;
-2. Mac standby availability/session lifetime starts too early and broker presence is not heartbeated continuously.
+Implementation handoff/evidence:
+`tools/glosh-remote-spike/ONE_TAP_HARDENING_05.md`.
 
-## Frozen final UX
+## Frozen customer UX now implemented
 
 Normal compatible Samsung experience:
 
-`install → open → CONECTAR CON SOPORTE → automatic preparation → automatic Wireless Debugging → automatic six-digit capture → automatic local pairing/ADB → secure Mac session → CONECTADO`.
+`install → open → CONECTAR CON SOPORTE → automatic preparation → automatic Wireless Debugging → automatic six-digit capture → automatic local pairing/ADB → secure Mac session → Conectado con soporte`.
 
-Normal user intervention only when Android itself requires:
-- one-time Accessibility / Restricted Settings bootstrap;
-- device PIN/pattern/password;
-- true ambiguous/unsupported fallback;
-- manual six-box pairing only if automatic contextual code capture cannot be trusted.
+Normal screen:
+- one initial CTA: `CONECTAR CON SOPORTE`;
+- during work: passive progress + `CANCELAR`;
+- terminal: `Conectado con soporte` + `FINALIZAR CONEXIÓN`.
 
-Remove from normal customer path:
+Normal path no longer exposes:
 - `MOSTRARME` / `MOSTRARME DE NUEVO`;
 - `ME PERDÍ`;
 - `VOLVER AL CÓDIGO`;
-- internal `ABRIR AJUSTES` / `ABRIR DEPURACIÓN INALÁMBRICA` progression buttons;
-- `1 de 3 / 2 de 3 / 3 de 3` guide-first mental model.
+- internal manual progression buttons;
+- `1 de 3 / 2 de 3 / 3 de 3` mental model.
 
-Running state: passive progress + `CANCELAR` at most.
+Protected exceptions remain explicit:
+- first-time Accessibility bootstrap: `ACTIVAR AUTOMATIZACIÓN`;
+- Android PIN/pattern/password;
+- real fail-closed ambiguous Settings fallback;
+- six-box pairing only when automatic code capture is not safe/unique.
 
-## Availability fix
+## Availability implementation now present
 
 Mac/operator:
-- broker `operator_open` becomes a heartbeat/renewable lease while console is intentionally open;
-- standby before any authenticated Android does not consume secure-session lifetime;
-- authenticated session TTL starts when the Android agent actually authenticates;
-- first and only pending request may be auto-accepted in explicit single-client waiting mode;
-- 2+ pending requests => fail closed to explicit technician selection.
+- `operator_open` renews as heartbeat every 60 s while the console is intentionally waiting;
+- temporary heartbeat errors do not terminate standby;
+- exactly one pending request is autoaccepted once for that RemoteSession;
+- 0 requests do nothing;
+- 2+ requests fail closed to manual technician selection;
+- standby does not consume authenticated-session TTL;
+- session TTL starts only on first authenticated Android and is not extended on reconnect.
 
 Phone:
-- short request expiry renews transparently during one active support attempt;
-- overall support attempt is bounded by an appropriate wall-clock window rather than only five short request leases;
-- transient poll/network failures use bounded retry before surfacing failure;
-- cancel/revoke immediately stops renewal.
+- old five-request limit removed;
+- request renewal uses a 30-minute overall bounded window;
+- expired request creates fresh RSA identity/request id/nonce;
+- transient request/poll failures use bounded backoff (500 ms → 1 s → 2 s → 4 s → 5 s, max six consecutive failures);
+- a successful broker response resets retry budget;
+- cancel/revoke stops renewal and destroys local rendezvous identity;
+- claim remains intentionally fail-closed on ambiguous transport failure because it consumes one-time ciphertext.
 
-No Supabase/schema change is required for this cycle.
+No Supabase/schema change was made.
 
-## Remaining technical execution
+## ChatGPT validation completed
 
-The remaining work requires the Mac/Android build environment:
-1. apply the frozen One-Tap hardening only under `tools/glosh-remote-spike/**`;
-2. add narrow tests for heartbeat/session-start/auto-accept/request renewal/UI progression;
-3. run Android tests + Python/broker tests + lint + assemble;
-4. make one clean local commit;
-5. produce exact APK path/size/SHA-256;
-6. expose that exact APK for ChatGPT delivery/review.
+Independent smoke validation outside the Android build environment:
+- `BrokerWaitPolicy` compiled with JDK and passed >5 renewals, 30-minute cutoff and retry reset/backoff cases;
+- Mac heartbeat continued after a simulated transient failure;
+- 0/1/2+ request autoaccept policy behaved fail-closed as designed;
+- standby/session TTL logic did not consume lifetime before client authentication.
 
-No phone is required for this technical closure.
+Repository compare from `eaa44f1b…` confirms runtime/test changes remain under `tools/glosh-remote-spike/**` plus this task documentation.
+
+These smokes are useful evidence but **do not replace the real Gradle gate**.
+
+## Remaining technical gate
+
+Required before technical PASS:
+
+```bash
+./gradlew -p tools/glosh-remote-spike :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
+and:
+
+```bash
+cd tools/glosh-remote-spike/mac
+python -m unittest test_protocol.py test_broker.py test_one_tap_standby.py
+```
+
+Then report exact APK path, byte size and SHA-256.
+
+No A23/S22 is required for this build gate.
 
 ## Final physical gate
 
-After technical PASS, only the new post-hardening APK goes to S22, cable-free, with zero wrong automatic clicks and one-tap UX confirmation.
+After Gradle/Python PASS and ChatGPT review, only the new post-hardening APK goes to S22 cable-free for the real One-Tap UX gate.
 
 ## Coordination
 
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
 - `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: automated checkpoint preserved at `eaa44f1b…`; superseded as final candidate by One-Tap hardening.
-- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: ACTIVE; exact source reviewed, contract frozen, environment execution next.
-- `REMOTE-INSTALL-MAC-OPERATOR-04`: partially absorbed by One-Tap standby/heartbeat hardening.
+- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE on isolated ChatGPT branch; pending real Gradle/Python gate, therefore not PASS yet.
+- `REMOTE-INSTALL-MAC-OPERATOR-04`: standby/heartbeat portion absorbed into One-Tap hardening; richer operator product remains later.
 - `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved for later install pipeline.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits for post-hardening APK + S22 cable-free gate.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits post-hardening technical PASS + S22 cable-free UX gate.
 
 Do not touch Chrome, GloshIA, DAG, App Usuario/Admin, Supabase or production Device Owner logic.
 No merge/deploy/Production.
