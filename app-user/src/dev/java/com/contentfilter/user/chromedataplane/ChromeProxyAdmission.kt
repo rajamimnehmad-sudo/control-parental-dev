@@ -1,6 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
 import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.RejectedExecutionHandler
 import java.util.concurrent.ThreadFactory
@@ -27,6 +28,7 @@ internal class ChromeProxyAdmission(
     threadNamePrefix: String = "chrome-web-proxy-worker",
 ) : AutoCloseable {
     private val closed = AtomicBoolean(false)
+    private val tasks = ConcurrentHashMap.newKeySet<AdmittedTask>()
     private val executor: ThreadPoolExecutor
 
     init {
@@ -59,12 +61,19 @@ internal class ChromeProxyAdmission(
             return ChromeProxyAdmissionResult.Closed
         }
 
-        val task = AdmittedTask(onDiscard, block)
+        val task = AdmittedTask(onDiscard, block) { completed -> tasks.remove(completed) }
+        tasks += task
+        if (closed.get()) {
+            task.cancel()
+            task.finish()
+            return ChromeProxyAdmissionResult.Closed
+        }
         return try {
             executor.execute(task)
             ChromeProxyAdmissionResult.Accepted
         } catch (_: RejectedExecutionException) {
-            task.discard()
+            task.cancel()
+            task.finish()
             if (closed.get() || executor.isShutdown) {
                 ChromeProxyAdmissionResult.Closed
             } else {
@@ -77,8 +86,12 @@ internal class ChromeProxyAdmission(
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        tasks.toList().forEach(AdmittedTask::cancel)
         executor.shutdownNow().forEach { runnable ->
-            (runnable as? AdmittedTask)?.discard()
+            (runnable as? AdmittedTask)?.apply {
+                cancel()
+                finish()
+            }
         }
     }
 
@@ -99,7 +112,7 @@ internal class ChromeProxyAdmission(
                 throw RejectedExecutionException("Proxy admission interrupted", error)
             }
             if ((closed.get() || executor.isShutdown) && executor.remove(runnable)) {
-                (runnable as? AdmittedTask)?.discard()
+                (runnable as? AdmittedTask)?.cancel()
                 throw RejectedExecutionException("Proxy admission closed during enqueue")
             }
         }
@@ -108,20 +121,27 @@ internal class ChromeProxyAdmission(
     private class AdmittedTask(
         private val onDiscard: () -> Unit,
         private val block: () -> Unit,
+        private val onFinished: (AdmittedTask) -> Unit,
     ) : Runnable {
+        private val cancelled = AtomicBoolean(false)
         private val finished = AtomicBoolean(false)
 
         override fun run() {
             try {
-                block()
+                if (!cancelled.get()) block()
             } finally {
-                finished.compareAndSet(false, true)
+                finish()
             }
         }
 
-        fun discard() {
-            if (!finished.compareAndSet(false, true)) return
+        fun cancel() {
+            if (!cancelled.compareAndSet(false, true)) return
             runCatching(onDiscard)
+        }
+
+        fun finish() {
+            if (!finished.compareAndSet(false, true)) return
+            onFinished(this)
         }
     }
 }
