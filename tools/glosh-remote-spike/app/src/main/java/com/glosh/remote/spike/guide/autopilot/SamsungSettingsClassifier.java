@@ -189,7 +189,16 @@ public final class SamsungSettingsClassifier {
                 && node.enabled()
                 && !node.checkable()
                 && !isSwitchControl(candidate)
-                && !candidate.bounds().isEmpty();
+                && hasPositiveBounds(candidate);
+    }
+
+    /**
+     * Keep pure JVM tests independent from Android's stubbed Rect methods. TargetCandidate already
+     * snapshots the Rect, so direct field comparison is equivalent to !Rect.isEmpty().
+     */
+    private static boolean hasPositiveBounds(TargetCandidate candidate) {
+        android.graphics.Rect bounds = candidate.bounds();
+        return bounds.right > bounds.left && bounds.bottom > bounds.top;
     }
 
     private MatchedTarget match(
