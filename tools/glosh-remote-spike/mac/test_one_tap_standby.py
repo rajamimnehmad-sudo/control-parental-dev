@@ -6,7 +6,7 @@ import time
 import unittest
 
 from broker_client import PendingRequest
-from broker_console import announce_pending_requests, maintain_operator_presence
+from broker_console import accept_request, announce_pending_requests, maintain_operator_presence
 from glosh_remote_relay import RemoteSession, hmac_b64
 
 
@@ -14,6 +14,8 @@ class FakeSession:
     def __init__(self) -> None:
         self.stop_event = asyncio.Event()
         self.agent = None
+        self.support_slot_claimed = False
+        self.accepted_request_id = None
 
 
 class FakeBroker:
@@ -97,7 +99,7 @@ class OneTapStandbyTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual([], broker.accepted)
 
-    async def test_exactly_one_request_autoaccepts_once(self) -> None:
+    async def test_exactly_one_request_autoaccepts_once_and_claims_slot(self) -> None:
         session = FakeSession()
         request = PendingRequest("request-one", "", "", "Samsung", "S22", "16", 60)
         broker = FakeBroker(session, [request], stop_after_pending=4)
@@ -105,6 +107,8 @@ class OneTapStandbyTest(unittest.IsolatedAsyncioTestCase):
             session, broker, "gloshremote://secret", poll_interval_seconds=0.001
         )
         self.assertEqual([("request-one", "gloshremote://secret")], broker.accepted)
+        self.assertTrue(session.support_slot_claimed)
+        self.assertEqual("request-one", session.accepted_request_id)
 
     async def test_multiple_requests_fail_closed_without_autoaccept(self) -> None:
         session = FakeSession()
@@ -113,6 +117,38 @@ class OneTapStandbyTest(unittest.IsolatedAsyncioTestCase):
             PendingRequest("request-two", "", "", "Samsung", "A23", "14", 60),
         ]
         broker = FakeBroker(session, requests, stop_after_pending=2)
+        await announce_pending_requests(
+            session, broker, "gloshremote://secret", poll_interval_seconds=0.001
+        )
+        self.assertEqual([], broker.accepted)
+        self.assertFalse(session.support_slot_claimed)
+
+    async def test_manual_accept_claims_slot_and_blocks_second_customer(self) -> None:
+        session = FakeSession()
+        first = PendingRequest("request-one", "", "", "Samsung", "S22", "16", 60)
+        second = PendingRequest("request-two", "", "", "Samsung", "A23", "14", 60)
+        broker = FakeBroker(session, [first, second], stop_after_pending=999)
+
+        result = await accept_request(
+            broker, "request-one", "gloshremote://secret", session
+        )
+        self.assertIn("solicitud aceptada", result)
+        self.assertTrue(session.support_slot_claimed)
+
+        broker.requests = [second]
+        blocked = await accept_request(
+            broker, "request-two", "gloshremote://secret", session
+        )
+        self.assertEqual("Esta sesión ya aceptó un cliente.", blocked)
+        self.assertEqual([("request-one", "gloshremote://secret")], broker.accepted)
+
+    async def test_claimed_slot_never_autoaccepts_new_single_request(self) -> None:
+        session = FakeSession()
+        session.support_slot_claimed = True
+        session.accepted_request_id = "already-accepted"
+        request = PendingRequest("request-two", "", "", "Samsung", "A23", "14", 60)
+        broker = FakeBroker(session, [request], stop_after_pending=2)
+
         await announce_pending_requests(
             session, broker, "gloshremote://secret", poll_interval_seconds=0.001
         )
