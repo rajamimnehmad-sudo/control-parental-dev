@@ -3,6 +3,7 @@ package com.glosh.remote.spike.wizard;
 import android.app.Activity;
 import android.content.ComponentName;
 import android.content.Intent;
+import android.net.Uri;
 import android.provider.Settings;
 
 import com.glosh.remote.spike.guide.accessibility.LiveGuideAccessibilityService;
@@ -35,6 +36,13 @@ public final class SettingsNavigator {
                 details,
                 new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
                 new Intent(Settings.ACTION_SETTINGS));
+    }
+
+    public void openAppDetails(Activity activity) {
+        Intent details = new Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:" + activity.getPackageName()));
+        open(activity, details, new Intent(Settings.ACTION_SETTINGS));
     }
 
     private void open(Activity activity, Intent... intents) {
