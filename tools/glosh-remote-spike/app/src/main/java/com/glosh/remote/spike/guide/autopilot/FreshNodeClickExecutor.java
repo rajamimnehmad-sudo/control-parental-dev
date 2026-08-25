@@ -10,7 +10,7 @@ import com.glosh.remote.spike.guide.autopilot.AutopilotUiModel.TargetKey;
 import java.util.Set;
 
 public final class FreshNodeClickExecutor {
-    public enum Result { CLICKED, STALE, REJECTED, ACTION_FAILED }
+    public enum Result { ACTION_DISPATCHED, STALE, REJECTED, ACTION_FAILED }
 
     private final SettingsWindowAuthority authority;
     private final ScanGenerationGuard generationGuard;
@@ -46,8 +46,8 @@ public final class FreshNodeClickExecutor {
         if (!actionGate.authorize(originalToken, current, target, expectedKey)) {
             return Result.REJECTED;
         }
-        boolean clicked = authority.performClickAtPath(
+        boolean dispatched = authority.performClickAtPath(
                 fresh.windowId(), target.node().path(), target.node().candidate(), trustedPackages);
-        return clicked ? Result.CLICKED : Result.ACTION_FAILED;
+        return dispatched ? Result.ACTION_DISPATCHED : Result.ACTION_FAILED;
     }
 }
