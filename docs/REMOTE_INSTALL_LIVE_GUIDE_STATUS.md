@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-25 00:49 ART
+Updated: 2026-08-25 01:08 ART
 
 ## Connection base
 
@@ -34,14 +34,14 @@ Historical checkpoint APK SHA-256:
 
 That APK is preserved for evidence only and is **not the final S22 candidate**.
 
-## Active implementation
+## One-Tap implementation
 
-`REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **CODE COMPLETE BY CHATGPT / REAL GRADLE GATE PENDING**.
+`REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **PASS AUTOMATED / PENDING S22 PHYSICAL GATE**.
 
 Isolated implementation branch:
 `work/remote-install-one-tap-05-chatgpt`
 
-Current implementation HEAD:
+Exact gated HEAD:
 `59f6b39be1b39005bacdc848ff0717240b43ed67`
 
 Base is exactly `eaa44f1b…`; branch is ahead-only and does not touch `main`.
@@ -63,7 +63,7 @@ Implementation handoff/evidence:
 Automated local-environment gate:
 `tools/glosh-remote-spike/verify_one_tap.sh`.
 
-## Frozen customer UX now implemented
+## Frozen customer UX implemented
 
 Normal compatible Samsung experience:
 
@@ -79,7 +79,7 @@ Normal path no longer exposes:
 - `ME PERDÍ`;
 - `VOLVER AL CÓDIGO`;
 - internal manual progression buttons;
-- `1 de 3 / 2 de 3 / 3 de 3` mental model.
+- `1 de 3 / 2 de 3 / 3 de 3` guide-first mental model.
 
 Protected exceptions remain explicit:
 - first-time Accessibility bootstrap: `ACTIVAR AUTOMATIZACIÓN`;
@@ -87,7 +87,7 @@ Protected exceptions remain explicit:
 - real fail-closed ambiguous Settings fallback;
 - six-box pairing only when automatic code capture is not safe/unique.
 
-## Availability implementation now present
+## Availability implementation
 
 Mac/operator:
 - `operator_open` renews as heartbeat every 60 s while the console is intentionally waiting;
@@ -100,7 +100,7 @@ Mac/operator:
 - standby does not consume authenticated-session TTL;
 - session TTL starts only on first authenticated Android and is not extended on reconnect.
 
-The shared customer slot closes a race discovered during ChatGPT review: with two pending phones, a manual accept of A must never make remaining B eligible for automatic acceptance.
+The shared customer slot closes the race discovered during ChatGPT review: with two pending phones, a manual accept of A must never make remaining B eligible for automatic acceptance.
 
 Phone:
 - old five-request limit removed;
@@ -113,65 +113,51 @@ Phone:
 
 No Supabase/schema change was made.
 
-## ChatGPT validation completed
+## Automated gate — PASS
 
-Independent smoke validation outside the Android build environment:
-- `BrokerWaitPolicy` compiled with JDK and passed >5 renewals, 30-minute cutoff and retry reset/backoff cases;
-- Mac heartbeat continued after a simulated transient failure;
-- 0/1/2+ request autoaccept policy behaved fail-closed as designed;
-- manual acceptance and autoaccept share the one-customer slot in dedicated tests;
-- standby/session TTL logic did not consume lifetime before client authentication.
+The first real execution stopped before Gradle because the system Python lacked `websockets`; this was a verification-script bootstrap defect, not a product/runtime failure. HEAD `59f6b39b…` fixed the gate by creating a temporary isolated venv and installing exactly `mac/requirements.txt`.
 
-Repository compare from `eaa44f1b…` confirms all runtime/test/document/build-script changes remain under `tools/glosh-remote-spike/**`.
+The corrected gate then completed successfully on the Mac/local Android build environment:
 
-These smokes are useful evidence but **do not replace the real Gradle gate**.
+- HEAD: `59f6b39be1b39005bacdc848ff0717240b43ed67`;
+- Python protocol/broker/standby tests: **PASS**;
+- Android JVM unit tests: **PASS**;
+- lint: **PASS**;
+- assemble: **PASS**;
+- git status: **clean**.
 
-## Gate incident resolved in-source
+Exact generated APK:
+- filename: `GloshRemote-OneTap-DEV.apk`;
+- path at gate: `/private/tmp/glosh-one-tap-build-59f6b39b/tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-OneTap-DEV.apk`;
+- size: `19,287,534` bytes;
+- SHA-256: `23c26d864d8ad9d3d6b3e00ae2149307a520f20b5172ccba02ce5df30f1e6390`.
 
-First real execution of `verify_one_tap.sh` stopped before Gradle because the macOS system Python did not have the `websockets` package installed. The project already declared the dependency in `mac/requirements.txt`; the gate script was incorrectly assuming those dependencies existed globally.
+This exact APK is now the **only authorized S22 One-Tap physical-gate candidate**. Do not rebuild or substitute a different artifact before the physical gate unless a new code change is intentionally made.
 
-HEAD `59f6b39b…` fixes the gate itself:
-- creates a temporary isolated Python venv with `python3 -m venv`;
-- installs exactly `mac/requirements.txt` (`websockets==14.2`, `cryptography>=44,<47`);
-- executes all Python tests through that venv;
-- removes the temporary venv on exit;
-- does not modify the global/system Python installation.
+## Artifact delivery note
 
-This was an environment-bootstrap defect in the verification script, not a Remote Installer runtime failure. Gate status remains **pending rerun**, not failed product code.
-
-## Remaining technical gate
-
-Single command on the Mac/local Android build environment:
-
-```bash
-ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk bash tools/glosh-remote-spike/verify_one_tap.sh
-```
-
-The script now runs:
-- isolated Python venv + `mac/requirements.txt` bootstrap;
-- Python protocol/broker/standby tests;
-- `:app:testDebugUnitTest`;
-- `:app:lintDebug`;
-- `:app:assembleDebug`;
-- copies the result as `GloshRemote-OneTap-DEV.apk`;
-- calculates byte size + SHA-256;
-- writes `REMOTE-INSTALL-ONE-TAP-HARDENING-05-report.txt`.
-
-No A23/S22 is required for this build gate.
+Codex exposed the exact APK and report through a temporary Cloudflare Quick Tunnel after the PASS. ChatGPT's current execution runtime could not resolve the `trycloudflare.com` domain, so ChatGPT could not independently copy the APK into its own sandbox attachment storage in this cycle. This is an artifact-transfer limitation only; it does not change the automated gate result or APK identity above.
 
 ## Final physical gate
 
-After Gradle/Python PASS and ChatGPT review, only the new post-hardening APK goes to S22 cable-free for the real One-Tap UX gate.
+Only remaining product gate for this cycle:
+- install the exact APK with SHA-256 `23c26d864d8ad9d3d6b3e00ae2149307a520f20b5172ccba02ce5df30f1e6390` on S22;
+- no USB / cable-free customer-like run;
+- user taps `CONECTAR CON SOPORTE` once;
+- verify automatic shortest-path Samsung navigation, Wireless Debugging, contextual six-digit capture, local pairing/ADB and secure Mac session;
+- zero wrong automatic clicks;
+- protected OS credential prompts may require the user, then Autopilot resumes;
+- ambiguous state must fail closed to minimal fallback, not blind click.
 
 ## Coordination
 
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
 - `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: automated checkpoint preserved at `eaa44f1b…`; superseded as final candidate by One-Tap hardening.
-- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE at `59f6b39b…` on isolated ChatGPT branch; verification-script dependency bootstrap fixed after first gate attempt; real Gradle/Python rerun pending, therefore not PASS yet.
+- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **PASS AUTOMATED at `59f6b39b…`; exact APK frozen; pending S22 physical gate only**.
 - `REMOTE-INSTALL-MAC-OPERATOR-04`: standby/heartbeat portion absorbed into One-Tap hardening; richer operator product remains later.
 - `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved for later install pipeline.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits post-hardening technical PASS + S22 cable-free UX gate.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: next action is the exact post-hardening APK on S22 cable-free.
 
 Do not touch Chrome, GloshIA, DAG, App Usuario/Admin, Supabase or production Device Owner logic.
 No merge/deploy/Production.
