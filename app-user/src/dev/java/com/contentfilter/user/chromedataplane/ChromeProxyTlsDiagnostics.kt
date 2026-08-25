@@ -25,6 +25,7 @@ internal data class ChromeProxyTlsFailure(
     val errorClass: String,
     val rootCauseClass: String,
     val causeChain: String,
+    val isHandshake: Boolean,
 ) {
     fun logLine(context: ChromeProxyTlsContext): String =
         buildString {
@@ -60,6 +61,7 @@ internal object ChromeProxyTlsDiagnostics {
             errorClass = tlsError.safeClassName(),
             rootCauseClass = chain.last().safeClassName(),
             causeChain = chain.joinToString(separator = ">") { it.safeClassName() },
+            isHandshake = tlsError is SSLHandshakeException,
         )
     }
 
