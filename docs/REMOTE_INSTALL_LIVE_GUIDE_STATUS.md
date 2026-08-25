@@ -1,138 +1,135 @@
-# Glosh Remote — Professional Guided Assistant
+# Glosh Remote — Samsung PiP Guided Installer
 
-Updated: 2026-08-25 13:42 ART
+Updated: 2026-08-25 15:23 ART
 
 ## Executive status
 
-`REMOTE-INSTALL-GUIDED-ASSISTANT-08`: **PASS AUTOMATED / NEW S22 PHYSICAL RETEST CANDIDATE FROZEN**.
-
-`REMOTE-INSTALL-RESTRICTED-RECOVERY-09`: **PASS AUTOMATED / PENDING S22 PHYSICAL RETEST**.
+`REMOTE-SAMSUNG-PIP-GUIDE-10`: **PASS AUTOMATED / PENDING S22 PHYSICAL RETEST**.
 
 `REMOTE-INSTALL-CONNECTION-00`: **PASS FINAL DEV / CLOSED**.
 
-The secure connection stack remains unchanged. This cycle corrects only the customer guidance around Android restricted settings / Accessibility plus the previously observed One UI 8 UX defects.
+The previous Accessibility-based Guided Assistant line, including `690dac8… / 624f8127…`, is **SUPERSEDED BY PRODUCT DECISION**. The secure broker, local Wireless ADB pairing and Mac relay connection remain unchanged.
 
-## Latest physical evidence
+## Product route now
 
-On the S22 Ultra / One UI 8 / Android 16 the proactive App Info instruction was proven invalid: the `⋮` overflow that exposes `Permitir configuración restringida` is **not guaranteed to exist before Android has actually rejected an Accessibility enable attempt**.
+Glosh Remote is Samsung-only for this phase and no longer requires Accessibility for the connection workflow.
 
-Therefore the previous candidate:
+Customer flow:
 
-- source HEAD `1c25d36de83964bb6284c493e427efa3c5476f28`;
-- APK SHA-256 `d63ea7afb5464d96f9364261625591df95eccc80cf5d40dc240bcdafb48c49f2`;
+1. Open Glosh Remote and tap `COMENZAR`.
+2. Follow a seven-step Samsung visual guide.
+3. When Glosh opens real Samsung Settings, Glosh remains available as a native Picture-in-Picture instructor when the device/user PiP policy permits it.
+4. The PiP exposes native `Atrás` and step-specific `Ya está / Siguiente` actions.
+5. A persistent synchronized notification is the fallback/control surface if PiP is unavailable or disabled.
+6. Build Number has an animated tap effect progressing to ×7.
+7. Safe Settings intents are used only as navigation accelerators; the customer performs every Android-protected tap.
+8. When Wireless Debugging pairing exposes the local mDNS endpoint, Glosh advances automatically to the code stage.
+9. The customer keeps Android's six-digit code visible and enters it through the Glosh notification `RemoteInput` without returning to the app. The in-app six-digit field remains as fallback.
+10. Pairing, local ADB and secure Mac relay then continue automatically.
 
-is **SUPERSEDED FOR PHYSICAL UX** and must not be reused.
+No Accessibility service is declared in the current manifest. The dormant Accessibility service/debug/status entry points were removed from this installer route.
 
-The older `1313eea… / 14ed9879…` candidate remains superseded as well.
+## Interaction boundaries
 
-## Correct restricted-settings flow
+Current route intentionally has:
 
-Glosh no longer sends every Android 13+ sideload user proactively to App Info.
+- automatic Settings clicks: **0**;
+- programmatic Settings scrolls: **0**;
+- coordinate gestures: **0**;
+- OCR / MediaProjection for the six digits: **0**;
+- root: **0**;
+- public ADB / `adb tcpip 5555`: **0**.
 
-The flow is now reactive:
+If the device is not Samsung, this phase fails safely rather than guessing another OEM's Settings structure.
 
-1. Step 1 opens Glosh Remote Accessibility normally.
-2. The customer attempts to enable Glosh Remote.
-3. If the Accessibility service becomes enabled, that real Android system state is the only success authority and Glosh continues automatically.
-4. Only if the customer returns with Accessibility still disabled does Glosh offer the restricted-settings recovery.
-5. Recovery says, conditionally:
-   - if Android showed `A la app se le negó el acceso`, open App Info;
-   - **if** `⋮` exists, choose `Permitir configuración restringida`;
-   - **if it does not exist**, return to Accessibility and attempt the blocked activation again before retrying recovery.
-6. No local “confirmed” bit can bypass or substitute the actual Accessibility enabled state.
-7. Attempt state is cleared after true Accessibility enable, cancellation, or a new guided run.
+## Improvements included in this cycle
 
-This directly matches the physical S22 evidence and no longer promises that Samsung will expose a menu before Android is ready to show it.
+Beyond the requested Samsung walkthrough, this candidate includes:
 
-## Other S22 UX fixes retained
-
-The same candidate retains the previous physical-evidence fixes:
-
-- One UI 8 / Android 16 semantic recognition for About phone, Software information, Developer options and Wireless debugging;
-- Developer Options authoritative detection through `Settings.Global.DEVELOPMENT_SETTINGS_ENABLED`;
-- automatic skip of build-number ×7 when Developer mode is already enabled;
-- finite Developer→Wireless deep-link policy: no reopen loop, at most one user-driven retry, then stable visual fallback;
-- no duplicate build-number copy;
-- credential/PIN/IME-safe floating coach at the top of the screen;
-- proper `Esperá… / Verificando…` wait states;
-- zero automatic Settings clicks;
-- zero programmatic Settings scrolls;
-- zero coordinate gestures.
+- native PiP instead of a custom Accessibility overlay;
+- redundant native PiP entry paths: Android 12+ auto-enter plus explicit `onUserLeaveHint()` fallback;
+- notification fallback if PiP is unavailable;
+- a lightweight native/vector-style animated coach instead of GIF assets, avoiding decode/memory/quality dependency;
+- durable current-step persistence so returning from Settings resumes the same instruction;
+- PiP and notification `Atrás`/`Siguiente` actions;
+- broker preparation started while the customer follows the developer steps so later connection work overlaps the manual setup;
+- mDNS-driven automatic transition to code entry;
+- six-digit notification reply and in-app fallback;
+- pending-code handling if the customer replies just before the pairing endpoint is fully discovered.
 
 ## Frozen source
 
-Exact product-code checkpoint:
+Implementation branch:
 
-`690dac8ca7d2a9537316987d46cad728d83454a9`
+`work/remote-samsung-pip-guide-10-chatgpt`
 
-Immutable physical gate branch:
+Exact final HEAD:
 
-`gate/remote-guided-restricted-recovery-690dac8`
+`d2a801a931b713202579fb47b83eaeb02a94c22b`
 
-Implementation branch contains later documentation-only commits; they do not change this APK candidate. Any product-code SHA other than `690dac8…` requires a new automated gate.
+Immutable gate branch:
 
-## Automated gate
+`gate/remote-samsung-pip-d2a801a`
+
+Any product-code SHA other than `d2a801a…` is a different physical candidate.
+
+## Automated gate — PASS
 
 GitHub Actions run:
 
-`32872587243`
+`32882544807`
 
-The first attempt stopped at one timing-sensitive unchanged Mac heartbeat test. No broker/relay/heartbeat implementation had changed in this batch. The exact same source job was rerun without code changes and completed successfully.
+Final result:
 
-Final rerun result:
-
-- HEAD: `690dac8ca7d2a9537316987d46cad728d83454a9`;
-- product architecture guard: **PASS** (`direct-route + observe/explain only`);
+- product architecture guard: **PASS** — Samsung-only + PiP + user-confirmed Settings + no Accessibility;
 - Python protocol/broker/standby: **14/14 PASS**;
-- Android JVM unit tests: **PASS**, including restricted-recovery and S22 physical-evidence tests;
+- Android JVM unit suite: **PASS**, including the Samsung seven-step contract;
 - Android lint: **PASS**;
 - Android assemble: **PASS**;
 - artifact upload: **PASS**.
 
-The first heartbeat failure is classified as timing flakiness, not a product regression, because the exact unchanged source and implementation passed on immediate rerun and the connection stack was untouched.
+The report's dirty `git status` is only the workflow's `chmod +x` on `verify_guided_assistant.sh`; it is not source drift and does not change the APK.
 
-## Frozen APK — only authorized S22 candidate
+## Frozen APK — only authorized Samsung/S22 candidate
 
-- delivered filename: `GloshRemote-Professional-S22-Reactive-Fixed.apk`;
-- source artifact: `GloshRemote-Guided-DEV.apk`;
-- HEAD: `690dac8ca7d2a9537316987d46cad728d83454a9`;
-- size: `19,303,950` bytes;
-- SHA-256: `624f8127dfd3152e6883204b4995b0ad73f43daa915992bd98711ca9e06a35a9`;
-- artifact ID: `9572893860`;
-- artifact ZIP digest: `sha256:f3e5eed68c272f087523e1e13dd6d82f87f477b80fa0115a5c141ca8eacf6214`.
+- delivered filename: `GloshRemote-Samsung-PiP-S22.apk`;
+- source artifact: `GloshRemote-Samsung-PiP-DEV.apk`;
+- HEAD: `d2a801a931b713202579fb47b83eaeb02a94c22b`;
+- size: `19,287,362` bytes;
+- SHA-256: `0b97e3a7b41cd5fe064a0202ee6cc65040d119b76b016ce3489b16fdb3193475`;
+- workflow run: `32882544807`;
+- artifact ID: `9576402195`;
+- artifact ZIP digest: `sha256:41abffcd05fa38aa5c0cbe5e31edfac3d64d058381ba75a44f45f796492fbdd3`.
 
 Do not rebuild or substitute this APK before the S22 physical retest.
 
-## Next physical retest
+## Next physical gate — S22 customer-like
 
-Use the exact candidate above on the S22 as a customer-like run.
+Validate the exact frozen APK above:
 
-Critical Step 1 expectations:
+- no Accessibility or restricted-settings prompt appears in the main route;
+- `COMENZAR` launches the Samsung guide cleanly;
+- all seven visual steps are understandable;
+- Build Number clearly shows the ×7 tap effect;
+- PiP appears over real Samsung Settings when PiP is permitted;
+- PiP `Atrás` and `Ya está / Siguiente` actions work;
+- notification progress stays synchronized and remains useful if PiP is disabled;
+- safe Settings destinations behave acceptably on One UI 8 / Android 16;
+- Wireless Debugging can be activated manually without loops;
+- pairing mDNS transitions automatically to step 7;
+- six digits can be submitted from the notification while the Android code remains visible;
+- in-app code entry works as fallback;
+- pairing → local ADB → secure Mac relay completes;
+- cancel/finish leaves no residual temporary connection;
+- non-Samsung fails safely.
 
-- first attempt goes to Accessibility, **not App Info**;
-- if Accessibility enables normally, Glosh immediately continues;
-- if Android denies access, returning to Glosh reveals the recovery;
-- recovery never claims `⋮` must exist;
-- if `⋮` exists, customer can choose `Permitir configuración restringida`;
-- if `⋮` does not exist, guidance returns the customer to Accessibility to trigger the Android denial path;
-- Glosh advances only after the service is truly enabled.
-
-Then validate the already-retained flow:
-
-- Developer mode already enabled is auto-detected and skipped;
-- One UI 8 screens are recognized without stale instructions;
-- PIN coach does not cover keyboard;
-- waiting states are explicit;
-- Developer→Wireless reopen loop = 0;
-- pairing code auto-read/fallback works;
-- local ADB and secure Mac support work;
-- residual overlay = 0 on cancel/finish.
+Physical PASS is not claimed until this run is completed on the S22.
 
 ## Coordination
 
 - connection base: PASS FINAL DEV / CLOSED;
-- previous S22 candidate `d63ea7af…`: SUPERSEDED by physical evidence;
-- reactive restricted-settings candidate `624f8127…`: PASS AUTOMATED / FROZEN;
+- Accessibility route `690dac8… / 624f8127…`: SUPERSEDED BY PRODUCT DECISION;
+- Samsung/PiP route `d2a801a… / 0b97e3a7…`: PASS AUTOMATED / FROZEN;
 - S22 physical retest: next;
 - no active Remote writer after this cycle;
 - no merge, PR, Production, deploy or Supabase mutation performed.
