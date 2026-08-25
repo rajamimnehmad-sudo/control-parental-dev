@@ -11,9 +11,6 @@
 
     <queries>
         <intent>
-            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
-        </intent>
-        <intent>
             <action android:name="android.settings.DEVICE_INFO_SETTINGS" />
         </intent>
         <intent>
@@ -24,12 +21,6 @@
         </intent>
         <intent>
             <action android:name="android.settings.SETTINGS" />
-        </intent>
-        <intent>
-            <action android:name="android.settings.ACCESSIBILITY_DETAILS_SETTINGS" />
-        </intent>
-        <intent>
-            <action android:name="android.settings.ACCESSIBILITY_SETTINGS" />
         </intent>
     </queries>
 
@@ -42,8 +33,11 @@
 
         <activity
             android:name=".MainActivity"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -63,19 +57,6 @@
             android:name=".RemotePairingService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
-
-        <service
-            android:name=".guide.accessibility.LiveGuideAccessibilityService"
-            android:exported="true"
-            android:label="Glosh Remote"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/glosh_remote_guide_accessibility_service" />
-        </service>
     </application>
 
 </manifest>
