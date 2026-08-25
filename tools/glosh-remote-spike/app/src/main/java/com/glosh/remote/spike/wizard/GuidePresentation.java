@@ -178,7 +178,7 @@ public record GuidePresentation(
     }
 
     private static String preferred(String first, String fallback) {
-        return first == null || first.isBlank() ? fallback : first;
+        return first == null || first.trim().isEmpty() ? fallback : first;
     }
 
     private static String clean(String value) {
