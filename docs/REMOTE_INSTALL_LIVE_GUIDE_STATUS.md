@@ -1,296 +1,179 @@
 # Glosh Remote — Professional Guided Assistant
 
-Updated: 2026-08-25 10:25 ART
+Updated: 2026-08-25 11:04 ART
 
-## Connection base
+## Executive status
+
+`REMOTE-INSTALL-GUIDED-ASSISTANT-08`: **PASS AUTOMATED / PENDING A23 PHYSICAL GATE**.
+
+The connection base remains separately closed:
 
 `REMOTE-INSTALL-CONNECTION-00`: **PASS FINAL DEV / CLOSED**.
 
-The proven no-link stack remains frozen:
+The previous auto-click One-Tap route remains superseded. The active product is:
 
-`Supabase broker → temporary Mac relay/WSS → Glosh Remote → local Wireless ADB`
+**Glosh opens the exact destination → the customer performs the protected Android tap → Glosh observes the trusted result → Glosh opens the next destination.**
 
-Preserved unchanged:
-- RSA-OAEP rendezvous sealing;
-- mutual HMAC authentication;
-- AES-256-GCM command/results;
-- fixed read-only allowlist;
-- ephemeral ADB identity;
-- no public ADB and no `adb tcpip 5555`;
-- operator heartbeat, bounded phone request renewal and single-customer standby slot.
-
-This cycle changes only the customer preparation experience.
-
-## Product decision
-
-The previous auto-click One-Tap route is **SUPERSEDED AS PRODUCT UX**.
-
-Physical A23 evidence showed that trying to automate Samsung Settings rows and switches created brittle behavior:
-- an internal Switch was previously selected instead of the navigable preference row;
-- the row-only repair then failed on deep Samsung accessibility ancestry and performed three unwanted scrolls;
-- a rescue overlay remained visible until cleanup.
-
-The correct product is now:
-
-**Glosh opens → customer confirms → Glosh observes → Glosh opens the next screen.**
-
-The user may make simple Android taps. Reliability and clarity take priority over eliminating every tap.
-
-## Active implementation
-
-Task:
-`REMOTE-INSTALL-GUIDED-ASSISTANT-08`
+## Frozen source
 
 Implementation branch:
+
 `work/remote-install-guided-assistant-08-chatgpt`
 
-Exact current HEAD:
+Immutable gate branch:
+
+`gate/remote-guided-1313eea`
+
+Exact HEAD:
+
 `1313eea1324903348c6e375b3ce9327120b31ff9`
 
 Base:
+
 `b4a559b2707bd3040642208be643a8eefc6922ec`
 
-Branch relation:
-- ahead-only;
-- 38 commits ahead;
-- 0 behind;
-- all changes remain under `tools/glosh-remote-spike/**`.
+All Guided Assistant code changes remain under:
 
-Status:
-**CODE COMPLETE BY CHATGPT / AUTOMATED GATE RERUN PENDING**.
+`tools/glosh-remote-spike/**`
 
-No APK from this route is authorized yet.
+No Chrome, GloshIA, DAG, App Usuario/Admin, Supabase, Production or Device Owner code was modified.
 
-## First automated gate attempt
+## Automated gate — PASS
 
-Exact attempted HEAD:
-`6945d9728dc72a78c87fee334a078db5145eb080`
-
-Result:
-**BLOCKED before lint/assemble by four narrow JVM test failures**.
-
-Evidence:
-- Python protocol/broker/standby: **14/14 PASS**;
-- Android JVM tests: 96 executed, 4 failed;
-- lint: not run;
-- assemble: not run;
-- no APK generated;
-- no physical session started;
-- worktree clean.
-
-Root causes:
-
-1. Three historical Samsung matcher tests reached `android.graphics.Rect.isEmpty()` from a plain JVM unit test. This was a testability boundary defect: semantic classification was calling an Android framework geometry method outside an Android/Robolectric runtime.
-2. `GuidePresentation` correctly titled the default fourth step as `Tocá “Vincular dispositivo con código”`, but its microanimation defaulted to the six-code-box cue. The product contract and test correctly require a tap cue before the dialog opens; the code-box cue begins only while reading or entering the six digits.
-
-Corrections at current HEAD `1313eea…`:
-- `SamsungSettingsClassifier` is now fully independent of Android `Rect` methods and geometry. Bounds validation remains in the real overlay/execution authority, not semantic classification.
-- default `PAIR_CODE_TARGET` now uses `Cue.TAP`;
-- explicit read/enter-code instructions continue to use `Cue.CODE`;
-- detected/waiting-code states continue to use `Cue.WAIT`;
-- existing tests remain authoritative; no expectation was weakened or rewritten to hide the defect.
-
-## Four-step customer experience
-
-### Preparing — support availability
-
-Before step 1, Glosh checks whether a Mac support console is available.
-
-UI label:
-`Preparando`
-
-This does not consume a fake numbered step.
-
-### Step 1 of 4 — Activate Glosh Remote
-
-Glosh attempts the exact accessibility-service details destination:
-
-`android.settings.ACCESSIBILITY_DETAILS_SETTINGS`
-
-with the Glosh service `ComponentName`, then safely falls back to:
-- general Accessibility settings;
-- general Settings.
-
-Customer action:
-`Activá Glosh Remote`.
-
-As soon as the service becomes active, Glosh continues automatically. There is no Continue button.
-
-### Step 2 of 4 — Developer options
-
-Glosh opens Developer options directly.
-
-If Developer options already exist:
-- Glosh immediately probes the direct Wireless Debugging destination.
-
-If they do not exist:
-- Samsung fallback opens About phone;
-- compact coach + highlight guide the customer through:
-  - Information of software;
-  - Build number ×7;
-- customer performs the taps;
-- Glosh observes the real resulting screen/state;
-- device PIN/pattern/password, if requested, is entered only by the customer and is never read by Glosh.
-
-### Step 3 of 4 — Wireless debugging
-
-Glosh prioritizes the exact route:
-
-`android.settings.WIRELESS_DEBUGGING_SETTINGS`
-
-Customer actions:
-- activate Wireless debugging;
-- tap `Allow` if Android asks to trust the Wi-Fi network.
-
-Glosh detects the state change and advances.
-
-The guided coordinator owns:
-- no Settings click executor;
-- no Settings scroll executor;
-- no coordinate gestures.
-
-If the direct route is unavailable, Accessibility remains only a visual/observational fallback.
-
-### Step 4 of 4 — Pairing code
-
-Glosh highlights:
-`Pair device with pairing code`.
-
-The customer taps it.
-
-Then:
-- a unique contextual six-digit code is read locally and submitted automatically;
-- if the broker descriptor or mDNS pairing endpoint is still arriving, the code is retained in memory until both are ready;
-- the open code step is preserved when broker acceptance completes, so Glosh does not regress to Wireless Debugging or close the dialog;
-- if automatic reading is ambiguous, the existing six-box app input and notification `RemoteInput` remain available.
-
-Local ADB pairing and the already-proven secure Mac session then continue unchanged.
-
-## Visual system
-
-The app, notification and floating coach share one `GuidePresentation` model:
-- exactly four stable steps;
-- one action sentence at a time;
-- graphite compact card with lime progress segments;
-- small native microanimations:
-  - tap;
-  - switch;
-  - seven taps;
-  - six code boxes;
-  - waiting spinner;
-  - success check;
-  - attention state;
-- reduced-motion support via `ValueAnimator.areAnimatorsEnabled()`;
-- floating `×` hides only the card for the current instruction;
-- repeated Settings events cannot force the hidden card to reappear;
-- a new instruction may show the card again;
-- persistent notification remains as fallback;
-- notification and overlay always mirror the same step.
-
-Removed from normal UX:
-- `ME PERDÍ`;
-- `MOSTRARME`;
-- `MOSTRARME DE NUEVO`;
-- `VOLVER AL CÓDIGO`;
-- automatic reveal scroll;
-- automatic row/switch clicks;
-- repeated technical states.
-
-## Code and tests added
-
-Runtime:
-- `GuidePresentation`;
-- `GuideCueView`;
-- compact `CoachBarController`;
-- persistent step-aware `GuideNotification`;
-- exact Accessibility and Wireless Debugging routes;
-- observer-only `AdaptiveInstallCoordinator`;
-- observer/highlight-only `LiveGuideAccessibilityService`;
-- guided four-step `MainActivity` / `WizardLayout`;
-- pending pairing-code buffering inside `RemotePairingService`;
-- broker-ready stage preservation inside `SupportSessionCoordinator`.
-
-Tests:
-- `GuidePresentationTest` locks step numbers, copy and cue selection;
-- `GuidedAssistantArchitectureTest` forbids click/scroll authority in the guided coordinator;
-- `SettingsRouteTest` requires exact Accessibility and Wireless Debugging routes first;
-- all previous protocol, broker, crypto, pairing and Android tests remain.
-
-Documentation/gate:
-- `tools/glosh-remote-spike/GUIDED_ASSISTANT_08.md`;
-- `tools/glosh-remote-spike/verify_guided_assistant.sh`;
-- canonical README updated.
-
-## Required automated gate rerun
-
-Run on exact HEAD `1313eea1324903348c6e375b3ce9327120b31ff9`:
+Command executed from a new detached worktree on the immutable gate branch:
 
 ```bash
 ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk \
   bash tools/glosh-remote-spike/verify_guided_assistant.sh
 ```
 
-The gate must pass:
-- source architecture guard: no click/scroll authority;
-- Python protocol/broker/standby tests;
-- Android JVM unit tests;
-- Android lint;
-- Android assemble;
-- exact APK byte size and SHA-256 report.
+Result:
 
-Expected artifact name:
-`GloshRemote-Guided-DEV.apk`.
+- source architecture guard: **PASS**;
+- Python protocol/broker/standby: **14/14 PASS**;
+- Android JVM tests: **96/96 PASS**;
+- Android lint: **PASS**;
+- Android assemble: **PASS**;
+- physical gate: **not run**;
+- worktree: **clean**.
 
-If the build fails, Codex must stop and report; ChatGPT owns corrections.
+The architecture guard confirms that the active guided coordinator owns no Settings click executor and no Settings scroll executor.
 
-## Required physical order
+## Frozen APK candidate
 
-Only after automated PASS:
+This is now the **only authorized A23 Guided Assistant candidate**:
 
-### A23 Samsung laboratory
+- filename: `GloshRemote-Guided-DEV.apk`;
+- path at gate: `/private/tmp/glosh-guided-gate-1313/tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Guided-DEV.apk`;
+- size: `19,287,538` bytes;
+- SHA-256: `14ed9879f2b18559fdbef914fa2a89e572bef2b98082c1c10e935d3e0a6ecd10`;
+- report: `/private/tmp/glosh-guided-gate-1313/tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-INSTALL-GUIDED-ASSISTANT-08-report.txt`.
 
-Requirements:
+Do not rebuild, rename by rebuilding, substitute another APK or change code before the A23 gate. A different byte size or SHA is a different candidate and requires a new automated gate.
+
+## Product flow under test
+
+### Preparing
+
+Glosh checks whether a Mac support console is available. This is displayed as `Preparando`, not as a fake numbered step.
+
+### Step 1 of 4 — Accessibility
+
+Glosh attempts the exact accessibility-service detail destination and safely falls back to general Accessibility settings.
+
+Customer action:
+
+`Activá Glosh Remote`.
+
+Glosh must continue automatically when the service becomes active; no Continue button.
+
+### Step 2 of 4 — Developer options
+
+Glosh opens Developer options directly.
+
+If they are unavailable, Samsung visual fallback guides the customer through:
+
+`Acerca del teléfono → Información de software → Número de compilación ×7`.
+
+The customer performs the taps. Glosh observes only. Device PIN/pattern/password is never read.
+
+### Step 3 of 4 — Wireless debugging
+
+Glosh prioritizes:
+
+`android.settings.WIRELESS_DEBUGGING_SETTINGS`
+
+The customer activates Wireless debugging and confirms `Permitir` if Android asks to trust the Wi-Fi network.
+
+Normal guided mode performs:
+
 - zero automatic Settings clicks;
 - zero programmatic Settings scrolls;
+- zero coordinate gestures.
+
+### Step 4 of 4 — Pairing code
+
+Glosh highlights `Vincular dispositivo con código` and the customer taps it.
+
+A unique contextual six-digit code is read locally and submitted automatically. If descriptor or mDNS endpoint arrives later, the code remains only in memory until pairing can start. If automatic reading is ambiguous, the six-box app input and notification `RemoteInput` remain available.
+
+The already-proven local ADB and encrypted Mac relay continue unchanged.
+
+## Visual contract
+
+App, floating coach and notification share `GuidePresentation`:
+
+- four stable steps;
+- one instruction at a time;
+- compact graphite/lime card;
+- microanimations for tap, switch, seven taps, code, wait, success and attention;
+- reduced-motion support;
+- floating `×` hides the card for the current instruction;
+- repeated events from the same instruction cannot force it to reappear;
+- notification remains as persistent fallback;
+- no `ME PERDÍ`, `MOSTRARME`, `MOSTRARME DE NUEVO` or `VOLVER AL CÓDIGO`.
+
+## Next gate — A23 Samsung laboratory
+
+Use the exact APK SHA above. USB/ADB is permitted only for installation, logs, evidence and cleanup; it must not simulate customer taps.
+
+Required physical outcomes:
+
+- `AUTOMATIC_SETTINGS_CLICKS=0`;
+- `PROGRAMMATIC_SETTINGS_SCROLLS=0`;
+- `COORDINATE_GESTURES=0`;
 - exact Accessibility route or safe fallback;
 - direct Developer options probe;
 - direct Wireless Debugging route;
-- user switch/confirmation detected;
-- compact coach does not obstruct target;
-- hiding the coach persists for the current instruction;
-- notification mirrors all four steps;
-- pair-code row highlighted clearly;
-- unique six-digit code submitted automatically;
-- notification/manual code fallback works;
-- local ADB and Mac support connect;
-- overlay clears on cancel/finish;
-- Content Filter, animations and Device Owner restored.
+- customer switch/confirmation detected;
+- compact coach does not obscure the target;
+- hidden coach remains hidden for the current instruction;
+- notification mirrors every step;
+- pairing row guidance is clear;
+- unique code submits automatically;
+- manual code fallback remains usable;
+- local ADB connects;
+- Mac support authenticates;
+- crash/ANR = 0;
+- residual overlays = 0;
+- full cleanup restores Content Filter, animation scales, Wireless Debugging OFF and Device Owner intact.
 
-### S22 cable-free customer gate
+Only after A23 PASS may this exact APK be used on S22 cable-free as a real customer UX gate.
 
-Use the exact same gated A23 APK, without USB, and evaluate:
-- instructions understood without verbal technical coaching;
-- no confusing/repeated buttons;
-- no residual overlay;
-- no wrong automatic action;
-- pairing/code experience clear;
-- secure Mac connection successful.
+## Superseded evidence
 
-## Superseded checkpoints
-
-- APK SHA `23c26d…`: FAILED physical A23; never use again.
-- HEAD `54df3995…`: blocked physical A23; superseded.
-- HEAD `b4a559b…`: deep-row auto-click repair retained only as historical base; product route superseded by Guided Assistant.
-- HEAD `6945d972…`: first Guided Assistant automated attempt; superseded by the narrow JVM/cue fixes in `1313eea…`.
+- APK SHA `23c26d…`: failed physical auto-click route; never use again.
+- HEAD `54df3995…`: blocked physical auto-click repair; superseded.
+- HEAD `b4a559b…`: historical deep-row repair/base; auto-click product route superseded.
+- HEAD `6945d972…`: first Guided Assistant gate attempt; four narrow JVM failures corrected in `1313eea…`.
 
 ## Coordination
 
 - connection base: PASS FINAL DEV / CLOSED;
-- Guided Assistant code: corrected at `1313eea…`;
-- first automated gate: blocked by four narrow tests, fixes committed;
-- automated gate rerun: pending;
-- A23 guided physical gate: pending after automated PASS;
-- S22 cable-free gate: pending after A23 PASS;
-- Motorola/Xiaomi adapters: later, based on real evidence and without rewriting the shared guide engine;
-- no Chrome, GloshIA, DAG, App Usuario/Admin, Supabase or production Device Owner changes;
-- no merge, PR, deploy or Production action.
+- Guided Assistant automated gate: PASS at `1313eea…`;
+- exact APK: frozen at SHA-256 `14ed9879…ecd10`;
+- A23 physical gate: next;
+- S22 cable-free gate: after A23 PASS;
+- Motorola/Xiaomi adapters: later, based on physical evidence without rewriting the shared guide engine;
+- no writer is active in Remote after this coordination update;
+- no merge, PR, deploy, Production or Supabase mutation is authorized.
