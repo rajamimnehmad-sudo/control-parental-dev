@@ -1,9 +1,9 @@
-name: Remote Guided Assistant APK
+name: Remote Samsung PiP Guide APK
 
 on:
   push:
     branches:
-      - work/remote-install-guided-assistant-08-chatgpt
+      - work/remote-samsung-pip-guide-10-chatgpt
     paths:
       - "tools/glosh-remote-spike/**"
       - ".github/workflows/remote-guided-artifact.yml"
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  build-remote-guided:
+  build-remote-samsung-pip:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -38,7 +38,7 @@ jobs:
           chmod +x ./gradlew
           chmod +x tools/glosh-remote-spike/verify_guided_assistant.sh
 
-      - name: Run full Guided Assistant gate
+      - name: Run full Samsung PiP gate
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
         run: bash tools/glosh-remote-spike/verify_guided_assistant.sh
@@ -46,9 +46,9 @@ jobs:
       - name: Preserve exact APK and report
         uses: actions/upload-artifact@v4
         with:
-          name: GloshRemote-Guided-Professional-${{ github.sha }}
+          name: GloshRemote-Samsung-PiP-${{ github.sha }}
           path: |
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Guided-DEV.apk
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-INSTALL-GUIDED-ASSISTANT-08-report.txt
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Samsung-PiP-DEV.apk
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-SAMSUNG-PIP-GUIDE-10-report.txt
           if-no-files-found: error
           retention-days: 14
