@@ -1,12 +1,12 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-25 01:08 ART
+Updated: 2026-08-25 03:00 ART
 
 ## Connection base
 
 `REMOTE-INSTALL-CONNECTION-00`: **PASS FINAL DEV / CLOSED**.
 
-The proven no-link stack remains frozen: broker → relay/WSS → Glosh Remote → local Wireless ADB, with HMAC/AES, fixed allowlist and no direct ADB exposure. One-Tap hardening reuses this stack and does not redesign it.
+The proven no-link stack remains frozen: broker → relay/WSS → Glosh Remote → local Wireless ADB, with HMAC/AES, fixed allowlist and no direct ADB exposure.
 
 ## Superseded guide
 
@@ -14,150 +14,102 @@ The proven no-link stack remains frozen: broker → relay/WSS → Glosh Remote �
 
 The old guide-first UX is not the product route.
 
-## Preserved automated checkpoint
+## One-Tap checkpoint that just failed physically
 
-Handoff branch:
-`handoff/remote-autopilot-eaa44`
-
-Exact base HEAD:
-`eaa44f1ba5da204d66a720ae6f5f805699ee22ee`
-
-Reported gates on that checkpoint:
-- Android 83/83 PASS;
-- Python/broker 6/6 PASS;
-- lint 0 errors / 11 pre-existing-external warnings;
-- assemble PASS;
-- clean worktree.
-
-Historical checkpoint APK SHA-256:
-`ca222dbfabaa776a9e304c0e643923caf5ce394ad785a72481c8a58654b14920`.
-
-That APK is preserved for evidence only and is **not the final S22 candidate**.
-
-## One-Tap implementation
-
-`REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **PASS AUTOMATED / PENDING S22 PHYSICAL GATE**.
-
-Isolated implementation branch:
-`work/remote-install-one-tap-05-chatgpt`
-
-Exact gated HEAD:
+Previous gated HEAD:
 `59f6b39be1b39005bacdc848ff0717240b43ed67`
 
-Base is exactly `eaa44f1b…`; branch is ahead-only and does not touch `main`.
+Previous APK:
+- `GloshRemote-OneTap-DEV.apk`;
+- 19,287,534 bytes;
+- SHA-256 `23c26d864d8ad9d3d6b3e00ae2149307a520f20b5172ccba02ce5df30f1e6390`.
 
-Changed runtime/test scope remains limited to `tools/glosh-remote-spike/**`:
-- customer One-Tap UI;
-- Mac standby/heartbeat;
-- one-client safe autoaccept;
-- session TTL start on first authenticated Android;
-- 30-minute phone request-renewal window;
-- bounded request/poll retry;
-- explicit manual pairing fallback state;
-- narrow Java/Python tests;
-- one-command verification/build script with isolated Python dependency bootstrap.
+Automated gate for that APK had passed Python, Android unit tests, lint and assemble, but the physical A23 run is now **FAILED reproducibly**. Therefore that APK is superseded and must not be used for S22 final validation.
 
-Implementation handoff/evidence:
-`tools/glosh-remote-spike/ONE_TAP_HARDENING_05.md`.
+### Physical A23 failure — confirmed root cause
 
-Automated local-environment gate:
-`tools/glosh-remote-spike/verify_one_tap.sh`.
+On Samsung Developer Options, Glosh correctly found the label `Depuración inalámbrica`, but the generic matcher scored the internal clickable Switch higher than the navigable preference row:
 
-## Frozen customer UX implemented
+- navigable row via descendant label: score 88;
+- internal `switch_background`: score 90.
 
-Normal compatible Samsung experience:
+Observed evidence:
 
-`install → open → CONECTAR CON SOPORTE → automatic preparation → automatic Wireless Debugging → automatic six-digit capture → automatic local pairing/ADB → secure Mac session → Conectado con soporte`.
+`decision screen=DEVELOPER_OPTIONS action=CLICK_WIRELESS_DEBUGGING`
 
-Normal screen:
-- one initial CTA: `CONECTAR CON SOPORTE`;
-- during work: passive progress + `CANCELAR`;
-- terminal: `Conectado con soporte` + `FINALIZAR CONEXIÓN`.
+`click target=WIRELESS_DEBUGGING result=CLICKED`
 
-Normal path no longer exposes:
-- `MOSTRARME` / `MOSTRARME DE NUEVO`;
-- `ME PERDÍ`;
-- `VOLVER AL CÓDIGO`;
-- internal manual progression buttons;
-- `1 de 3 / 2 de 3 / 3 de 3` guide-first mental model.
+Android returned success from `ACTION_CLICK`, but `DevelopmentSettingsDashboardActivity` remained on screen and Wireless Debugging did not open. Treating `performAction()` as a completed navigation was therefore incorrect.
 
-Protected exceptions remain explicit:
-- first-time Accessibility bootstrap: `ACTIVAR AUTOMATIZACIÓN`;
-- Android PIN/pattern/password;
-- real fail-closed ambiguous Settings fallback;
-- six-box pairing only when automatic code capture is not safe/unique.
+A23 cleanup after the failed reproduction:
+- restored to Content Filter;
+- animations restored to 1.0;
+- relay closed;
+- broker `available=false`;
+- Device Owner intact;
+- APK worktree clean.
 
-## Availability implementation
+## Active fix
 
-Mac/operator:
-- `operator_open` renews as heartbeat every 60 s while the console is intentionally waiting;
-- temporary heartbeat errors do not terminate standby;
-- exactly one pending request is autoaccepted once for that RemoteSession;
-- 0 requests do nothing;
-- 2+ requests fail closed to manual technician selection;
-- manual and automatic acceptance share one session-level customer slot;
-- once either path accepts one request, that RemoteSession cannot deliver its descriptor to a second phone;
-- standby does not consume authenticated-session TTL;
-- session TTL starts only on first authenticated Android and is not extended on reconnect.
+`REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **PHYSICAL FAIL CONFIRMED / FIX IMPLEMENTED BY CHATGPT / BUILD + A23 REGRESSION GATE PENDING**.
 
-The shared customer slot closes the race discovered during ChatGPT review: with two pending phones, a manual accept of A must never make remaining B eligible for automatic acceptance.
+Implementation branch:
+`work/remote-install-one-tap-05-chatgpt`
 
-Phone:
-- old five-request limit removed;
-- request renewal uses a 30-minute overall bounded window;
-- expired request creates fresh RSA identity/request id/nonce;
-- transient request/poll failures use bounded backoff (500 ms → 1 s → 2 s → 4 s → 5 s, max six consecutive failures);
-- a successful broker response resets retry budget;
-- cancel/revoke stops renewal and destroys local rendezvous identity;
-- claim remains intentionally fail-closed on ambiguous transport failure because it consumes one-time ciphertext.
+Current fix HEAD:
+`54df3995b2070380f72cbf9c15548630eac07347`
 
-No Supabase/schema change was made.
+Changes are isolated to `tools/glosh-remote-spike/**`.
 
-## Automated gate — PASS
+### Fix 1 — target the navigable row
 
-The first real execution stopped before Gradle because the system Python lacked `websockets`; this was a verification-script bootstrap defect, not a product/runtime failure. HEAD `59f6b39b…` fixed the gate by creating a temporary isolated venv and installing exactly `mac/requirements.txt`.
+`SamsungSettingsClassifier` now uses a dedicated navigable-row matcher for `CLICK_WIRELESS_DEBUGGING` on `DEVELOPER_OPTIONS`.
 
-The corrected gate then completed successfully on the Mac/local Android build environment:
+The navigation target must:
+- be clickable;
+- be enabled;
+- be non-checkable;
+- not be a Switch class;
+- not be `switch_widget` or `switch_background`;
+- contain the exact Wireless Debugging label directly or as descendant text;
+- remain HIGH-confidence / unique before authorization.
 
-- HEAD: `59f6b39be1b39005bacdc848ff0717240b43ed67`;
-- Python protocol/broker/standby tests: **PASS**;
-- Android JVM unit tests: **PASS**;
-- lint: **PASS**;
-- assemble: **PASS**;
-- git status: **clean**.
+If no unique safe navigable row exists, Autopilot fails closed instead of touching the switch.
 
-Exact generated APK:
-- filename: `GloshRemote-OneTap-DEV.apk`;
-- path at gate: `/private/tmp/glosh-one-tap-build-59f6b39b/tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-OneTap-DEV.apk`;
-- size: `19,287,534` bytes;
-- SHA-256: `23c26d864d8ad9d3d6b3e00ae2149307a520f20b5172ccba02ce5df30f1e6390`.
+### Fix 2 — dispatch is not navigation success
 
-This exact APK is now the **only authorized S22 One-Tap physical-gate candidate**. Do not rebuild or substitute a different artifact before the physical gate unless a new code change is intentionally made.
+`FreshNodeClickExecutor` no longer logs a successful `performAction()` as if the screen transition had completed. A dispatched click is surfaced as `ACTION_DISPATCHED`.
 
-## Artifact delivery note
+The existing transition guard remains authoritative after dispatch:
+- for `CLICK_WIRELESS_DEBUGGING`, expected postcondition is screen `WIRELESS_DEBUGGING`;
+- remaining on `DEVELOPER_OPTIONS` returns WAIT and authorizes no second click;
+- if the expected screen is still not reached by timeout, the action is rejected/fail-closed;
+- only an actual subsequent trusted snapshot of the expected screen permits Autopilot to continue.
 
-Codex exposed the exact APK and report through a temporary Cloudflare Quick Tunnel after the PASS. ChatGPT's current execution runtime could not resolve the `trycloudflare.com` domain, so ChatGPT could not independently copy the APK into its own sandbox attachment storage in this cycle. This is an artifact-transfer limitation only; it does not change the automated gate result or APK identity above.
+### Regression tests added
 
-## Final physical gate
+`AutopilotUiPureTest` now includes:
+1. Samsung fixture with both the navigable Wireless Debugging row and internal switch carrying the same label; the row must win and the switch must never be selected.
+2. Transition test proving a dispatch while still on `DEVELOPER_OPTIONS` is WAIT, then REJECT at timeout; only real `WIRELESS_DEBUGGING` screen is ACCEPT.
 
-Only remaining product gate for this cycle:
-- install the exact APK with SHA-256 `23c26d864d8ad9d3d6b3e00ae2149307a520f20b5172ccba02ce5df30f1e6390` on S22;
-- no USB / cable-free customer-like run;
-- user taps `CONECTAR CON SOPORTE` once;
-- verify automatic shortest-path Samsung navigation, Wireless Debugging, contextual six-digit capture, local pairing/ADB and secure Mac session;
-- zero wrong automatic clicks;
-- protected OS credential prompts may require the user, then Autopilot resumes;
-- ambiguous state must fail closed to minimal fallback, not blind click.
+## Next gate
+
+Before another physical run:
+1. run Python tests + Android unit tests + lint + assemble on exact HEAD `54df3995b2070380f72cbf9c15548630eac07347`;
+2. freeze new APK path/size/SHA-256;
+3. perform a targeted A23 regression run first, because A23 reproduced the bug;
+4. require zero click on internal Switch, one navigation-row dispatch, and actual transition to Wireless Debugging;
+5. continue the same run through automatic pairing/support if the regression passes;
+6. only after A23 PASS, use that exact APK on S22 cable-free.
+
+No push/PR/merge/deploy/Production/Supabase mutation is required for the gate. Do not alter Device Owner to make the test pass.
 
 ## Coordination
 
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
-- `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: automated checkpoint preserved at `eaa44f1b…`; superseded as final candidate by One-Tap hardening.
-- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: **PASS AUTOMATED at `59f6b39b…`; exact APK frozen; pending S22 physical gate only**.
-- `REMOTE-INSTALL-MAC-OPERATOR-04`: standby/heartbeat portion absorbed into One-Tap hardening; richer operator product remains later.
-- `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved for later install pipeline.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: next action is the exact post-hardening APK on S22 cable-free.
+- One-Tap APK SHA `23c26d…`: **FAILED PHYSICAL A23 / SUPERSEDED**.
+- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: fix implemented at `54df3995…`; build + targeted A23 regression pending.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: S22 final gate is paused until the A23 regression passes with the new exact APK.
 
 Do not touch Chrome, GloshIA, DAG, App Usuario/Admin, Supabase or production Device Owner logic.
-No merge/deploy/Production.
