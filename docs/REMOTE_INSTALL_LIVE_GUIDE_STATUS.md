@@ -1,6 +1,6 @@
 # Glosh Remote — Professional Guided Assistant
 
-Updated: 2026-08-25 09:45 ART
+Updated: 2026-08-25 10:25 ART
 
 ## Connection base
 
@@ -45,21 +45,50 @@ Implementation branch:
 `work/remote-install-guided-assistant-08-chatgpt`
 
 Exact current HEAD:
-`6945d9728dc72a78c87fee334a078db5145eb080`
+`1313eea1324903348c6e375b3ce9327120b31ff9`
 
 Base:
 `b4a559b2707bd3040642208be643a8eefc6922ec`
 
 Branch relation:
 - ahead-only;
-- 35 commits ahead;
+- 38 commits ahead;
 - 0 behind;
 - all changes remain under `tools/glosh-remote-spike/**`.
 
 Status:
-**CODE COMPLETE BY CHATGPT / REAL ANDROID TEST-LINT-ASSEMBLE GATE PENDING**.
+**CODE COMPLETE BY CHATGPT / AUTOMATED GATE RERUN PENDING**.
 
 No APK from this route is authorized yet.
+
+## First automated gate attempt
+
+Exact attempted HEAD:
+`6945d9728dc72a78c87fee334a078db5145eb080`
+
+Result:
+**BLOCKED before lint/assemble by four narrow JVM test failures**.
+
+Evidence:
+- Python protocol/broker/standby: **14/14 PASS**;
+- Android JVM tests: 96 executed, 4 failed;
+- lint: not run;
+- assemble: not run;
+- no APK generated;
+- no physical session started;
+- worktree clean.
+
+Root causes:
+
+1. Three historical Samsung matcher tests reached `android.graphics.Rect.isEmpty()` from a plain JVM unit test. This was a testability boundary defect: semantic classification was calling an Android framework geometry method outside an Android/Robolectric runtime.
+2. `GuidePresentation` correctly titled the default fourth step as `Tocá “Vincular dispositivo con código”`, but its microanimation defaulted to the six-code-box cue. The product contract and test correctly require a tap cue before the dialog opens; the code-box cue begins only while reading or entering the six digits.
+
+Corrections at current HEAD `1313eea…`:
+- `SamsungSettingsClassifier` is now fully independent of Android `Rect` methods and geometry. Bounds validation remains in the real overlay/execution authority, not semantic classification.
+- default `PAIR_CODE_TARGET` now uses `Cue.TAP`;
+- explicit read/enter-code instructions continue to use `Cue.CODE`;
+- detected/waiting-code states continue to use `Cue.WAIT`;
+- existing tests remain authoritative; no expectation was weakened or rewritten to hide the defect.
 
 ## Four-step customer experience
 
@@ -192,9 +221,9 @@ Documentation/gate:
 - `tools/glosh-remote-spike/verify_guided_assistant.sh`;
 - canonical README updated.
 
-## Required automated gate
+## Required automated gate rerun
 
-Run on exact HEAD `6945d972…`:
+Run on exact HEAD `1313eea1324903348c6e375b3ce9327120b31ff9`:
 
 ```bash
 ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk \
@@ -252,12 +281,14 @@ Use the exact same gated A23 APK, without USB, and evaluate:
 - APK SHA `23c26d…`: FAILED physical A23; never use again.
 - HEAD `54df3995…`: blocked physical A23; superseded.
 - HEAD `b4a559b…`: deep-row auto-click repair retained only as historical base; product route superseded by Guided Assistant.
+- HEAD `6945d972…`: first Guided Assistant automated attempt; superseded by the narrow JVM/cue fixes in `1313eea…`.
 
 ## Coordination
 
 - connection base: PASS FINAL DEV / CLOSED;
-- Guided Assistant code: complete at `6945d972…`;
-- automated build gate: pending;
+- Guided Assistant code: corrected at `1313eea…`;
+- first automated gate: blocked by four narrow tests, fixes committed;
+- automated gate rerun: pending;
 - A23 guided physical gate: pending after automated PASS;
 - S22 cable-free gate: pending after A23 PASS;
 - Motorola/Xiaomi adapters: later, based on real evidence and without rewriting the shared guide engine;
