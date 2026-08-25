@@ -6,10 +6,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
-FINAL_APK="$APK_DIR/GloshRemote-Guided-DEV.apk"
-REPORT="$APK_DIR/REMOTE-INSTALL-GUIDED-ASSISTANT-08-report.txt"
+FINAL_APK="$APK_DIR/GloshRemote-Samsung-PiP-DEV.apk"
+REPORT="$APK_DIR/REMOTE-SAMSUNG-PIP-GUIDE-10-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-guided-python.XXXXXX")"
+VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-samsung-pip-python.XXXXXX")"
 
 cleanup() {
   rm -rf "$VENV_DIR"
@@ -34,17 +34,37 @@ file_size() {
   fi
 }
 
-printf '\n=== Glosh Remote Guided Assistant gate ===\n'
+printf '\n=== Glosh Remote Samsung PiP guide gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
 printf '\n[1/5] Product architecture guard\n'
-GUIDED_COORDINATOR="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/guide/autopilot/AdaptiveInstallCoordinator.java"
-if grep -Eq 'FreshNodeClickExecutor|FreshSettingsScrollExecutor|performAction|ACTION_CLICK|scrollForward' "$GUIDED_COORDINATOR"; then
-  echo "ERROR: el coordinador guiado volvió a adquirir autoridad de click/scroll." >&2
+MANIFEST="$SCRIPT_DIR/app/src/main/AndroidManifest.xml"
+MAIN="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/MainActivity.java"
+SERVICE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/RemotePairingService.java"
+SAMSUNG_STEP="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/SamsungGuideStep.java"
+
+if grep -Eq 'BIND_ACCESSIBILITY_SERVICE|LiveGuideAccessibilityService|ACCESSIBILITY_SETTINGS|ACCESSIBILITY_DETAILS_SETTINGS' "$MANIFEST"; then
+  echo "ERROR: Accessibility volvió al manifiesto del instalador Samsung." >&2
   exit 3
 fi
-printf 'PASS: direct-route + observe/explain only\n'
+if grep -Eq 'GuideServiceStatus|LiveGuideRuntime|ACTION_CLICK|performAction|scrollForward|FreshNodeClickExecutor|FreshSettingsScrollExecutor' "$MAIN"; then
+  echo "ERROR: MainActivity recuperó autoridad de Accessibility/click/scroll." >&2
+  exit 3
+fi
+if grep -Eq 'LiveGuideRuntime|GuideStage' "$SERVICE"; then
+  echo "ERROR: pairing service volvió a depender del runtime de Accessibility." >&2
+  exit 3
+fi
+if ! grep -q 'supportsPictureInPicture="true"' "$MANIFEST"; then
+  echo "ERROR: falta soporte Picture-in-Picture." >&2
+  exit 3
+fi
+if ! grep -q 'TOTAL_STEPS = 7' "$SAMSUNG_STEP"; then
+  echo "ERROR: el contrato Samsung de 7 pasos cambió sin actualizar el gate." >&2
+  exit 3
+fi
+printf 'PASS: Samsung-only + PiP + user-confirmed Settings + no Accessibility\n'
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -79,7 +99,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" status --short)"
 
 {
-  echo "TASK=REMOTE-INSTALL-GUIDED-ASSISTANT-08"
+  echo "TASK=REMOTE-SAMSUNG-PIP-GUIDE-10"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
