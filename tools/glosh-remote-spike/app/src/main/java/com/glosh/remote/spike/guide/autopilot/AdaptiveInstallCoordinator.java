@@ -277,6 +277,7 @@ public final class AdaptiveInstallCoordinator {
             }
             case SHOW_MANUAL_PAIR_CODE -> {
                 terminalWaiting = true;
+                LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_FALLBACK);
                 host.showManualPairingFallback();
             }
             case WAIT_USER_CREDENTIAL -> {
