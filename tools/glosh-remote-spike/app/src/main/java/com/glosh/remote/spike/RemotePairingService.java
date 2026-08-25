@@ -66,6 +66,7 @@ public final class RemotePairingService extends Service {
     private volatile String pairingHost;
     private volatile int pairingPort = -1;
     private volatile String rejectedEndpoint;
+    private volatile String pendingPairingCode;
 
     public static SessionState getSessionState() {
         return sessionState;
@@ -213,6 +214,15 @@ public final class RemotePairingService extends Service {
         pairingHost = host;
         pairingPort = port;
         LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
+
+        String pendingCode = pendingPairingCode;
+        if (PairingPin.isValid(pendingCode)) {
+            pendingPairingCode = null;
+            pairingUiState = PairingUiState.WAITING_FOR_CODE;
+            handlePairingCode(pendingCode);
+            return;
+        }
+
         notifyCodeEntry(
                 "Glosh · Paso 4 de 4",
                 "Glosh intenta leer el código automáticamente. Si no, ingresá los 6 números acá.",
@@ -268,22 +278,30 @@ public final class RemotePairingService extends Service {
 
     private void handlePairingCode(String rawCode) {
         String code = rawCode == null ? "" : rawCode.trim();
+        if (!PairingPin.isValid(code)) {
+            showCodeFailure("Ingresá exactamente los 6 números que muestra Android.");
+            return;
+        }
+
         String host = pairingHost;
         int port = pairingPort;
+        if (sessionState == SessionState.PREPARING
+                && joinUri != null
+                && (host == null || port <= 0)) {
+            pendingPairingCode = code;
+            updateForeground(
+                    4,
+                    "Código detectado",
+                    "Esperando el endpoint local de Android para continuar automáticamente…");
+            return;
+        }
+
         if (!PairingAuthorityPolicy.canSubmit(
                 sessionState,
                 pairingUiState,
                 pairingGuard.isActive(),
                 host != null && port > 0,
                 joinUri != null)) {
-            return;
-        }
-        if (!PairingPin.isValid(code)) {
-            showCodeFailure("Ingresá exactamente los 6 números que muestra Android.");
-            return;
-        }
-        if (host == null || port <= 0 || joinUri == null) {
-            showCodeFailure("Ese código ya no sirve. Generá uno nuevo y escribilo acá.");
             return;
         }
         if (!pairingGuard.tryStart()) {
@@ -396,6 +414,7 @@ public final class RemotePairingService extends Service {
         if (ending.get()) {
             return;
         }
+        pendingPairingCode = null;
         pairingGuard.finish();
         LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
         String host = pairingHost;
@@ -456,6 +475,7 @@ public final class RemotePairingService extends Service {
         pairingHost = null;
         pairingPort = -1;
         rejectedEndpoint = null;
+        pendingPairingCode = null;
     }
 
     private void stopPairingDiscovery() {
