@@ -290,8 +290,9 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderPairing(PairingUiState pairing) {
-        boolean manualFallback = LiveGuideRuntime.stage() == GuideStage.AUTOPILOT_FALLBACK
-                || pairing == PairingUiState.CODE_FAILED;
+        boolean manualFallback = pairing != PairingUiState.CONNECTING
+                && (LiveGuideRuntime.stage() == GuideStage.AUTOPILOT_FALLBACK
+                || pairing == PairingUiState.CODE_FAILED);
         if (!manualFallback) {
             ui.showScreen(
                     "",
