@@ -10,9 +10,9 @@ import android.os.Build;
 /**
  * Compatibility controller for the floating Samsung instructor.
  *
- * The previous implementation owned a TYPE_APPLICATION_OVERLAY window, but Samsung Settings
- * physically hides those windows. The controller now delegates the same lifecycle contract to a
- * system-managed notification Bubble, whose expanded content is GuideBubbleActivity.
+ * The previous implementation owned a third-party application overlay window, but Samsung
+ * Settings physically hides those windows. The controller now delegates the same lifecycle
+ * contract to a system-managed notification Bubble, whose expanded content is GuideBubbleActivity.
  */
 public final class GuideOverlayController {
     public static final String ACTION_BUBBLE_BACK =
