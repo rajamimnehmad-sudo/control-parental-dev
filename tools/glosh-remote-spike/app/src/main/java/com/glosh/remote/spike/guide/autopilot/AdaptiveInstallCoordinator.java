@@ -28,6 +28,7 @@ public final class AdaptiveInstallCoordinator {
         void startSupportStackIfReady();
         void submitPairingCode(String code);
         void showManualPairingFallback();
+        void showInstruction(String message);
         void showRecovery(String message);
         void clearVisuals();
         void invalidateAndRescan();
@@ -69,19 +70,19 @@ public final class AdaptiveInstallCoordinator {
         }
         if (stage == GuideStage.AUTOPILOT_PROBE) {
             resetProbe();
-            host.showRecovery("Si están apagadas, activá las opciones de desarrollador.");
+            host.showInstruction("Si están apagadas, activá las opciones de desarrollador.");
             host.openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS);
             scheduleAboutFallback();
             return;
         }
         if (stage == GuideStage.AUTOPILOT_CREDENTIAL) {
-            host.showRecovery("Ingresá el PIN, patrón o contraseña que Android te pide.");
+            host.showInstruction("Ingresá el PIN, patrón o contraseña que Android te pide.");
             return;
         }
         if (stage == GuideStage.WIRELESS_DEBUGGING) {
             lastDeveloperFingerprint = "";
             host.startSupportStackIfReady();
-            host.showRecovery("Activá Depuración inalámbrica. Glosh detectará el cambio.");
+            host.showInstruction("Activá Depuración inalámbrica. Glosh detectará el cambio.");
             host.openSettings(SettingsRoute.WIRELESS_DEBUGGING);
         }
     }
@@ -96,8 +97,7 @@ public final class AdaptiveInstallCoordinator {
                 }
             }, FALLBACK_DELAY_MS);
         } else if (stage == GuideStage.WIRELESS_DEBUGGING) {
-            host.showRecovery("Volvamos a Depuración inalámbrica.");
-            host.openSettings(SettingsRoute.WIRELESS_DEBUGGING);
+            host.showRecovery("No encuentro Depuración inalámbrica. Volvé a Glosh para abrirla otra vez.");
         }
     }
 
@@ -112,7 +112,7 @@ public final class AdaptiveInstallCoordinator {
 
         if (classified.screen() == AutopilotContract.Screen.CREDENTIAL_PROMPT) {
             LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_CREDENTIAL);
-            host.showRecovery("Ingresá el PIN, patrón o contraseña que Android te pide.");
+            host.showInstruction("Ingresá el PIN, patrón o contraseña que Android te pide.");
             return;
         }
         if (stage == GuideStage.AUTOPILOT_CREDENTIAL) {
@@ -141,7 +141,7 @@ public final class AdaptiveInstallCoordinator {
         }
         if (classified.screen() == AutopilotContract.Screen.DEVELOPER_OPTIONS) {
             aboutFallbackScheduled = false;
-            host.showRecovery("Si están apagadas, activá las opciones de desarrollador.");
+            host.showInstruction("Si están apagadas, activá las opciones de desarrollador.");
             openWirelessWhenStateChanges(snapshot);
             return;
         }
@@ -156,9 +156,9 @@ public final class AdaptiveInstallCoordinator {
         host.startSupportStackIfReady();
         switch (classified.screen()) {
             case NETWORK_CONFIRMATION ->
-                    host.showRecovery("Tocá “Permitir” para usar esta red Wi‑Fi.");
+                    host.showInstruction("Tocá “Permitir” para usar esta red Wi‑Fi.");
             case DEVELOPER_OPTIONS -> {
-                host.showRecovery("Activá las opciones de desarrollador si están apagadas.");
+                host.showInstruction("Activá las opciones de desarrollador si están apagadas.");
                 openWirelessWhenStateChanges(snapshot);
             }
             case WIRELESS_DEBUGGING -> {
@@ -167,14 +167,15 @@ public final class AdaptiveInstallCoordinator {
                     LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
                     host.rescanAfter(180L);
                 } else {
-                    host.showRecovery("Activá Depuración inalámbrica. Glosh seguirá automáticamente.");
+                    host.showInstruction(
+                            "Activá Depuración inalámbrica. Glosh seguirá automáticamente.");
                 }
             }
             case PAIRING_DIALOG -> {
                 LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
                 host.rescanAfter(100L);
             }
-            default -> host.showRecovery(
+            default -> host.showInstruction(
                     "Glosh abrió la pantalla correcta. Seguí la indicación de la notificación.");
         }
     }
