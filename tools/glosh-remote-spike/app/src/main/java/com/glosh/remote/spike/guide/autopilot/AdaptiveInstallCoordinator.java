@@ -7,13 +7,11 @@ import android.provider.Settings;
 import android.util.Log;
 
 import com.glosh.remote.spike.BuildConfig;
-import com.glosh.remote.spike.RemotePairingService;
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.guide.accessibility.ScanGenerationGuard;
 import com.glosh.remote.spike.guide.accessibility.SettingsSnapshot;
 import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
-import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.SettingsRoute;
 
@@ -48,16 +46,10 @@ public final class AdaptiveInstallCoordinator {
     private String lastDeveloperFingerprint = "";
     private boolean aboutFallbackScheduled;
 
-    /**
-     * The click/scroll parameters remain only to keep the service construction stable while the old
-     * Autopilot implementation is retired. They are intentionally unused in guided mode.
-     */
     public AdaptiveInstallCoordinator(
             Context context,
             Handler handler,
             ScanGenerationGuard generationGuard,
-            FreshNodeClickExecutor ignoredClickExecutor,
-            FreshSettingsScrollExecutor ignoredScrollExecutor,
             Host host) {
         this.context = context.getApplicationContext();
         this.handler = handler;
