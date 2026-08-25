@@ -34,11 +34,15 @@ file_size() {
   fi
 }
 
+normalize_digest() {
+  tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:'
+}
+
 printf '\n=== Glosh Remote Samsung system Bubble guide gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
-printf '\n[1/5] Product architecture guard\n'
+printf '\n[1/5] Product architecture + stable DEV signing guard\n'
 MANIFEST="$SCRIPT_DIR/app/src/main/AndroidManifest.xml"
 MAIN="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/MainActivity.java"
 SERVICE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/RemotePairingService.java"
@@ -46,6 +50,8 @@ SAMSUNG_STEP="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/Samsun
 BUBBLE_NOTIFICATION="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/GuideNotification.java"
 BUBBLE_ACTIVITY="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/GuideBubbleActivity.java"
 FLOATING_CONTROLLER="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/GuideOverlayController.java"
+BUILD_GRADLE="$SCRIPT_DIR/app/build.gradle.kts"
+DEV_SIGNER_SOURCE="$SCRIPT_DIR/dev-signing/glosh-remote-dev.p12.b64"
 
 if grep -Eq 'BIND_ACCESSIBILITY_SERVICE|LiveGuideAccessibilityService|ACCESSIBILITY_SETTINGS|ACCESSIBILITY_DETAILS_SETTINGS' "$MANIFEST"; then
   echo "ERROR: Accessibility volvió al manifiesto del instalador Samsung." >&2
@@ -97,7 +103,17 @@ if grep -R -Eq 'SamsungPipCoachView|PictureInPictureParams|RemoteAction' \
   echo "ERROR: quedan dependencias de la UX PiP superseded." >&2
   exit 3
 fi
-printf 'PASS: Samsung-only + system Bubble + user-confirmed Settings + no Accessibility/PiP/app-overlay\n'
+if [[ ! -s "$DEV_SIGNER_SOURCE" ]]; then
+  echo "ERROR: falta la identidad DEV estable." >&2
+  exit 3
+fi
+if ! grep -q 'create("stableDev")' "$BUILD_GRADLE" \
+  || ! grep -q 'versionCode = 13' "$BUILD_GRADLE" \
+  || ! grep -q 'signingConfig = signingConfigs.getByName("stableDev")' "$BUILD_GRADLE"; then
+  echo "ERROR: Bubble debug no está fijada a stableDev/versionCode 13." >&2
+  exit 3
+fi
+printf 'PASS: Samsung-only + system Bubble + no Accessibility/PiP/app-overlay + stable DEV signing\n'
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -117,13 +133,46 @@ printf '\n[3/5] Android JVM unit tests\n'
 printf '\n[4/5] Android lint\n'
 "$REPO_ROOT/gradlew" -p "$SCRIPT_DIR" :app:lintDebug
 
-printf '\n[5/5] Android assemble\n'
+printf '\n[5/5] Android assemble + signer verification\n'
 "$REPO_ROOT/gradlew" -p "$SCRIPT_DIR" :app:assembleDebug
 
 if [[ ! -f "$SOURCE_APK" ]]; then
   echo "ERROR: APK no encontrada en $SOURCE_APK" >&2
   exit 2
 fi
+
+SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+if [[ -z "$SDK_ROOT" ]]; then
+  echo "ERROR: ANDROID_HOME/ANDROID_SDK_ROOT no disponible para verificar firma." >&2
+  exit 2
+fi
+APKSIGNER="$(find "$SDK_ROOT/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)"
+if [[ -z "$APKSIGNER" || ! -x "$APKSIGNER" ]]; then
+  echo "ERROR: apksigner no disponible." >&2
+  exit 2
+fi
+DEV_KEYSTORE="$SCRIPT_DIR/app/build/stable-dev-signing/glosh-remote-dev.p12"
+if [[ ! -f "$DEV_KEYSTORE" ]]; then
+  echo "ERROR: keystore DEV decodificado no encontrado." >&2
+  exit 2
+fi
+APK_CERT_SHA256="$($APKSIGNER verify --print-certs "$SOURCE_APK" \
+  | awk -F': ' '/Signer #1 certificate SHA-256 digest:/{print $2; exit}' \
+  | normalize_digest)"
+KEYSTORE_CERT_SHA256="$(keytool -list -v \
+  -keystore "$DEV_KEYSTORE" \
+  -storetype PKCS12 \
+  -storepass 'GloshRemoteDev2026!' \
+  -alias 'glosh-remote-dev' \
+  | awk -F': ' '/SHA256:/{print $2; exit}' \
+  | normalize_digest)"
+if [[ -z "$APK_CERT_SHA256" || -z "$KEYSTORE_CERT_SHA256" \
+  || "$APK_CERT_SHA256" != "$KEYSTORE_CERT_SHA256" ]]; then
+  echo "ERROR: APK no quedó firmada por la identidad DEV estable." >&2
+  echo "APK=$APK_CERT_SHA256 KEYSTORE=$KEYSTORE_CERT_SHA256" >&2
+  exit 3
+fi
+printf 'PASS: stable DEV signer %s\n' "$APK_CERT_SHA256"
 
 cp -f "$SOURCE_APK" "$FINAL_APK"
 APK_SHA="$(sha256_file "$FINAL_APK")"
@@ -134,7 +183,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 {
-  echo "TASK=REMOTE-SAMSUNG-BUBBLE-GUIDE-12"
+  echo "TASK=REMOTE-SAMSUNG-BUBBLE-STABLE-SIGNING-13"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
@@ -142,6 +191,8 @@ STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
   echo "ANDROID_UNIT_TESTS=PASS"
   echo "LINT=PASS"
   echo "ASSEMBLE=PASS"
+  echo "VERSION_CODE=13"
+  echo "DEV_SIGNER_SHA256=$APK_CERT_SHA256"
   echo "APK=$FINAL_APK"
   echo "APK_SIZE_BYTES=$APK_SIZE"
   echo "APK_SHA256=$APK_SHA"
@@ -156,6 +207,7 @@ STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 printf '\nPASS_AUTOMATED\n'
 printf 'HEAD: %s\n' "$HEAD_SHA"
+printf 'DEV_SIGNER_SHA256: %s\n' "$APK_CERT_SHA256"
 printf 'APK: %s\n' "$FINAL_APK"
 printf 'APK_SIZE_BYTES: %s\n' "$APK_SIZE"
 printf 'APK_SHA256: %s\n' "$APK_SHA"
