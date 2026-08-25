@@ -19,14 +19,14 @@ public enum SamsungGuideStep {
             "Abrí “Información de software”",
             "Dentro de Acerca del teléfono, tocá “Información de software”.",
             "YA LO ABRÍ",
-            SettingsTarget.NONE,
+            SettingsTarget.ABOUT_PHONE,
             visual("Acerca del teléfono", "Información de software", false)),
     BUILD_NUMBER(
             3,
             "Tocá 7 veces “Número de compilación”",
             "Si Android pide tu PIN, ingresalo. Glosh nunca lo ve ni lo guarda.",
             "MODO DESARROLLADOR ACTIVADO",
-            SettingsTarget.NONE,
+            SettingsTarget.ABOUT_PHONE,
             visual("Información de software", "Número de compilación", true)),
     DEVELOPER_OPTIONS(
             4,
@@ -47,14 +47,14 @@ public enum SamsungGuideStep {
             "Tocá “Vincular dispositivo con código”",
             "Dejá abierta la pantalla donde Android muestra los 6 números. Glosh preparará el ingreso del código.",
             "YA VEO LOS 6 NÚMEROS",
-            SettingsTarget.NONE,
+            SettingsTarget.WIRELESS_DEBUGGING,
             visual("Depuración inalámbrica", "Vincular dispositivo con código", false)),
     ENTER_CODE(
             7,
             "Ingresá los 6 números",
             "Mirá el código que muestra Android y respondé la notificación de Glosh. Si volvés a la app, también podés escribirlo acá.",
             "ABRIR GLOSH",
-            SettingsTarget.NONE,
+            SettingsTarget.WIRELESS_DEBUGGING,
             visual("Código de vinculación", "6 números", false));
 
     public static final int TOTAL_STEPS = 7;
