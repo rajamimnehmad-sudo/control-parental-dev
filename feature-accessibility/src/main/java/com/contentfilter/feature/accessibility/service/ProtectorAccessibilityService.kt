@@ -15,11 +15,8 @@ import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestat
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
-import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.ProtectionAlertType
-import com.contentfilter.core.domain.model.RuleAction
-import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.InstallApprovalStore
@@ -585,45 +582,5 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val GoogleSearchPackage = "com.google.android.googlequicksearchbox"
         const val LogTag = "ProtectorAccessibility"
         val ExplicitSearchPackages = setOf("com.android.chrome", GoogleSearchPackage)
-
-        fun Long.toObservedMinutes(): Int =
-            if (this <= 0L) {
-                0
-            } else {
-                ((this + MillisPerMinute - 1) / MillisPerMinute).toInt()
-            }
-
-        fun PolicyDecision.label(): String =
-            when (this) {
-                is PolicyDecision.Allow -> "Allow"
-                is PolicyDecision.Block -> "Block"
-                is PolicyDecision.GrantExtraTime -> "GrantExtraTime"
-                is PolicyDecision.HealthWarning -> "HealthWarning"
-                is PolicyDecision.RequestAuthorization -> "RequestAuthorization"
-                is PolicyDecision.RequireActivation -> "RequireActivation"
-                is PolicyDecision.RequireUpdate -> "RequireUpdate"
-                is PolicyDecision.Warn -> "Warn"
-            }
     }
 }
-
-internal class ForegroundDecisionDiagnosticGate {
-    private var lastKey: String? = null
-
-    fun shouldRecord(key: String): Boolean {
-        if (key == lastKey) return false
-        lastKey = key
-        return true
-    }
-}
-
-internal fun hasExplicitAppApproval(
-    packageName: String,
-    rules: List<PolicyRule>,
-): Boolean =
-    rules.any {
-        it.enabled &&
-            it.scope == RuleScope.App &&
-            it.target == packageName &&
-            it.action == RuleAction.Allow
-    }
