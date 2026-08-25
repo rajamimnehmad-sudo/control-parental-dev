@@ -18,6 +18,7 @@ import com.glosh.remote.spike.GuideBubbleActivity;
 import com.glosh.remote.spike.MainActivity;
 import com.glosh.remote.spike.R;
 
+import java.util.ArrayList;
 import java.util.Collections;
 
 /**
@@ -66,40 +67,95 @@ public final class GuideNotification {
     }
 
     public boolean canBubble() {
+        return bubbleGate() == BubblePermissionPolicy.Gate.READY;
+    }
+
+    /**
+     * Opens the narrowest system setting needed for the current Bubble gate.
+     *
+     * Android has two independent user decisions: whether this app may use bubbles and whether
+     * this conversation/channel may bubble when the app is configured for selected bubbles.
+     * The previous implementation checked both before ever publishing the conversation, creating
+     * a deadlock on One UI. We now publish a bubble-capable bootstrap notification first, then
+     * open the exact conversation settings when only the second decision is missing.
+     */
+    public void openBubbleSettings(Activity activity) {
+        BubblePermissionPolicy.Gate gate = bubbleGate();
+        if (gate == BubblePermissionPolicy.Gate.CONVERSATION_BUBBLE) {
+            showBubbleSelectionBootstrap();
+            if (openConversationBubbleSettings(activity)) {
+                return;
+            }
+            openAppNotificationSettings(activity);
+            return;
+        }
+        openAppBubbleSettings(activity);
+    }
+
+    public void clear() {
+        manager.cancel(NOTIFICATION_ID);
+    }
+
+    private BubblePermissionPolicy.Gate bubbleGate() {
+        boolean appAllowed = appBubblesAllowed();
+        NotificationChannel channel = manager.getNotificationChannel(CHANNEL_ID);
+        boolean conversationAllowed = channel != null && channel.canBubble();
+        return BubblePermissionPolicy.evaluate(appAllowed, conversationAllowed);
+    }
+
+    private boolean appBubblesAllowed() {
         if (!manager.areNotificationsEnabled()) {
             return false;
         }
-        boolean appAllowed;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            appAllowed = manager.getBubblePreference() != NotificationManager.BUBBLE_PREFERENCE_NONE;
-        } else {
-            appAllowed = manager.areBubblesAllowed();
+            return manager.getBubblePreference() != NotificationManager.BUBBLE_PREFERENCE_NONE;
         }
-        if (!appAllowed) {
-            return false;
-        }
-        NotificationChannel channel = manager.getNotificationChannel(CHANNEL_ID);
-        return channel == null || channel.canBubble();
+        return manager.areBubblesAllowed();
     }
 
-    public void openBubbleSettings(Activity activity) {
+    private void showBubbleSelectionBootstrap() {
+        showStep(
+                SamsungGuideStep.ABOUT_PHONE,
+                "Activá esta conversación como burbuja para mantener la guía visible sobre Ajustes.",
+                false);
+    }
+
+    private boolean openConversationBubbleSettings(Activity activity) {
+        Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, CHANNEL_ID)
+                .putExtra(Settings.EXTRA_CONVERSATION_ID, SHORTCUT_ID);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ArrayList<String> filter = new ArrayList<>();
+            filter.add(NotificationChannel.EDIT_CONVERSATION);
+            intent.putStringArrayListExtra(Settings.EXTRA_CHANNEL_FILTER_LIST, filter);
+        }
+        try {
+            activity.startActivity(intent);
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private void openAppBubbleSettings(Activity activity) {
         Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_BUBBLE_SETTINGS)
                 .putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
         try {
             activity.startActivity(intent);
         } catch (Throwable firstFailure) {
-            Intent fallback = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
-            try {
-                activity.startActivity(fallback);
-            } catch (Throwable ignored) {
-                // The caller keeps the user on the safe permission gate.
-            }
+            openAppNotificationSettings(activity);
         }
     }
 
-    public void clear() {
-        manager.cancel(NOTIFICATION_ID);
+    private void openAppNotificationSettings(Activity activity) {
+        Intent fallback = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.getPackageName());
+        try {
+            activity.startActivity(fallback);
+        } catch (Throwable ignored) {
+            // The caller keeps the user on the safe permission gate.
+        }
     }
 
     private void showStep(SamsungGuideStep step, String overrideBody, boolean autoExpand) {
