@@ -1,6 +1,5 @@
 package com.contentfilter.user.chromedataplane
 
-import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import java.net.IDN
 import java.util.Locale
 
@@ -52,9 +51,9 @@ internal object ChromePhotosRealWebLabConfig {
             "https://$FlickrStaticHost/3200/2970012318_98f7c80583_o.jpg",
         )
 
-    val allowedHosts: Set<String> =
+    /** Historical /32 fallback only. This is not CONNECT or web-navigation authority. */
+    val controlledRouteHosts: Set<String> =
         setOf(
-            ChromePhotosDataPlaneLabContract.FixtureHost,
             HttpBingoHost,
             GoogleStaticHost,
             GitHubHost,
@@ -62,29 +61,8 @@ internal object ChromePhotosRealWebLabConfig {
             FlickrStaticHost,
         )
 
-    val realHosts: Set<String> = allowedHosts - ChromePhotosDataPlaneLabContract.FixtureHost
-
     val safeHashes: Set<String> = setOf(SafePngSha256)
     val blockedHashes: Set<String> = setOf(BlockWebpSha256)
-}
-
-internal class ChromePhotosHostAllowlist(
-    hosts: Collection<String>,
-) {
-    private val normalizedHosts = hosts.mapTo(linkedSetOf(), ::normalizeDnsHost)
-
-    init {
-        require(normalizedHosts.isNotEmpty())
-    }
-
-    fun normalizeAllowed(rawHost: String): String? =
-        runCatching { normalizeDnsHost(rawHost) }
-            .getOrNull()
-            ?.takeIf(normalizedHosts::contains)
-
-    fun isAllowed(rawHost: String): Boolean = normalizeAllowed(rawHost) != null
-
-    fun hosts(): Set<String> = normalizedHosts.toSet()
 }
 
 internal data class ChromePhotosConnectTarget(
@@ -92,10 +70,7 @@ internal data class ChromePhotosConnectTarget(
     val port: Int,
 ) {
     companion object {
-        fun parse(
-            requestLine: String,
-            allowlist: ChromePhotosHostAllowlist,
-        ): ChromePhotosConnectTarget? {
+        fun parseSyntax(requestLine: String): ChromePhotosConnectTarget? {
             val parts = requestLine.trim().split(Regex("\\s+"))
             if (
                 parts.size != 3 ||
@@ -109,7 +84,7 @@ internal data class ChromePhotosConnectTarget(
             val rawHost = authority.substringBefore(':')
             val port = authority.substringAfter(':').toIntOrNull() ?: return null
             if (port != HttpsPort) return null
-            val host = allowlist.normalizeAllowed(rawHost) ?: return null
+            val host = runCatching { normalizeDnsHost(rawHost) }.getOrNull() ?: return null
             return ChromePhotosConnectTarget(host = host, port = port)
         }
 

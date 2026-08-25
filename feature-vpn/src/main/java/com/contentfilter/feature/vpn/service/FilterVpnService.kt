@@ -131,12 +131,18 @@ class FilterVpnService : VpnService() {
         return START_STICKY
     }
 
+    override fun onCreate() {
+        super.onCreate()
+        VpnController.registerSocketProtector(this) { socket -> protect(socket) }
+    }
+
     override fun onRevoke() {
         stopVpn(StopReasonRevoked)
         super.onRevoke()
     }
 
     override fun onDestroy() {
+        VpnController.unregisterSocketProtector(this)
         if (VpnController.isRunning(this)) {
             stopVpn(StopReasonAndroid)
         }

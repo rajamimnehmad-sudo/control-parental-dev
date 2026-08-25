@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import java.net.InetAddress
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -11,7 +12,10 @@ class ChromePhotosRealResponseSanitizerTest {
     private val safe = "safe-public-image".toByteArray()
     private val blocked = "block-public-image".toByteArray()
     private val placeholder = "neutral-png-placeholder".toByteArray()
-    private val allowlist = ChromePhotosHostAllowlist(ChromePhotosRealWebLabConfig.allowedHosts)
+    private val authority =
+        ChromePublicDestinationAuthority(
+            ChromeHostResolver { listOf(InetAddress.getByName("93.184.216.34")) },
+        )
     private val transformer =
         ChromePhotosResourceTransformer(
             safeBytes = emptyList(),
@@ -20,25 +24,35 @@ class ChromePhotosRealResponseSanitizerTest {
             safeContentHashes = setOf(sha256(safe)),
             blockedContentHashes = setOf(sha256(blocked)),
         )
-    private val sanitizer = ChromePhotosRealResponseSanitizer(transformer, allowlist, placeholder)
+    private val sanitizer =
+        ChromePhotosRealResponseSanitizer(
+            transformer,
+            authority,
+            placeholder,
+            maximumImageBytes = 64,
+        )
 
     @Test
-    fun `SAFE image remains byte identical with real MIME`() {
-        val result = sanitizer.sanitize("GET", upstream("image/png", safe))
+    fun `SAFE image remains byte identical while transformed entity headers are coherent`() {
+        val result = sanitizer.sanitize("GET", upstream("image/png", safe, extraHeaders = entityHeaders()))
 
         assertEquals(ChromePhotosResourceDecision.Safe, result.decision)
         assertEquals("image/png", result.contentType)
         assertContentEquals(safe, result.bytes)
+        assertNull(result.headers.firstValue("Content-Encoding"))
+        assertNull(result.headers.firstValue("ETag"))
+        assertEquals("no-store", result.headers.firstValue("Cache-Control"))
     }
 
     @Test
-    fun `BLOCK and UNKNOWN images become PNG placeholder without original bytes`() {
+    fun `BLOCK and UNKNOWN images become placeholder without original bytes`() {
         val blockedResult = sanitizer.sanitize("GET", upstream("image/webp", blocked))
         val unknownResult = sanitizer.sanitize("GET", upstream("image/jpeg", "unknown".toByteArray()))
 
         listOf(blockedResult, unknownResult).forEach { result ->
             assertEquals("image/png", result.contentType)
             assertContentEquals(placeholder, result.bytes)
+            assertEquals(200, result.statusCode)
         }
         assertEquals(ChromePhotosResourceDecision.Block, blockedResult.decision)
         assertEquals(ChromePhotosResourceDecision.Unknown, unknownResult.decision)
@@ -46,8 +60,8 @@ class ChromePhotosRealResponseSanitizerTest {
     }
 
     @Test
-    fun `oversized or encoded image fails closed to placeholder`() {
-        val tooLarge = sanitizer.sanitize("GET", upstream("image/avif", ByteArray(0), tooLarge = true))
+    fun `oversized or encoded image fails closed before original delivery`() {
+        val tooLarge = sanitizer.sanitize("GET", upstream("image/avif", ByteArray(65)))
         val compressed = sanitizer.sanitize("GET", upstream("image/jpeg", safe, encoding = "gzip"))
 
         assertEquals(ChromePhotosResourceDecision.Unknown, tooLarge.decision)
@@ -57,84 +71,103 @@ class ChromePhotosRealResponseSanitizerTest {
     }
 
     @Test
-    fun `non image bytes pass through and HEAD never fabricates a body`() {
-        val html = "<html>public</html>".toByteArray()
-        val get = sanitizer.sanitize("GET", upstream("text/html; charset=utf-8", html))
-        val head = sanitizer.sanitize("HEAD", upstream("image/png", ByteArray(0)))
-
-        assertEquals(ChromePhotosResourceDecision.Passthrough, get.decision)
-        assertContentEquals(html, get.bytes)
-        assertEquals(0, head.bytes.size)
-        assertEquals("image/png", head.contentType)
-    }
-
-    @Test
-    fun `redirect passes only exact allowlisted HTTPS destination`() {
-        val allowed =
+    fun `HEAD and 304 never fabricate a body and retain validators`() {
+        val head =
+            sanitizer.sanitize(
+                "HEAD",
+                upstream("image/png", ByteArray(0), extraHeaders = entityHeaders()),
+            )
+        val notModified =
             sanitizer.sanitize(
                 "GET",
-                redirect("https://${ChromePhotosRealWebLabConfig.GitHubRawHost}/public/image.avif"),
+                upstream(
+                    "image/png",
+                    ByteArray(0),
+                    statusCode = 304,
+                    extraHeaders = entityHeaders(),
+                ),
             )
-        val relative = sanitizer.sanitize("GET", redirect("/image/png"))
-        val disallowed = sanitizer.sanitize("GET", redirect("https://example.com/private"))
-        val downgrade = sanitizer.sanitize("GET", redirect("http://${ChromePhotosRealWebLabConfig.HttpBingoHost}/"))
 
-        assertEquals(302, allowed.statusCode)
-        assertTrue(allowed.location!!.startsWith("https://"))
-        assertEquals("/image/png", relative.location)
-        assertEquals(502, disallowed.statusCode)
-        assertNull(disallowed.location)
+        assertEquals(0, head.bytes.size)
+        assertEquals("\"fixture\"", head.headers.firstValue("ETag"))
+        assertEquals(0, notModified.bytes.size)
+        assertEquals(304, notModified.statusCode)
+    }
+
+    @Test
+    fun `redirect preserves real status and permits dynamic HTTPS cross host only`() {
+        val allowed = sanitizer.sanitizeRedirect(redirect("https://new-public.example/path", 308))
+        val relative = sanitizer.sanitizeRedirect(redirect("/next", 307))
+        val downgrade = sanitizer.sanitizeRedirect(redirect("http://example.com/", 302))
+
+        assertEquals(308, allowed.statusCode)
+        assertEquals("https://new-public.example/path", allowed.location)
+        assertEquals("/next", relative.location)
         assertEquals(502, downgrade.statusCode)
+        assertNull(downgrade.location)
     }
 
     @Test
-    fun `upstream request policy cannot forward credentials conditionals or ranges`() {
-        val names = ChromePhotosUpstreamRequestPolicy.headers.keys.mapTo(mutableSetOf()) { it.lowercase() }
+    fun `hop by hop headers are removed but cookies and security headers remain ordered`() {
+        val headers =
+            listOf(
+                ChromeHttpHeader("Connection", "keep-alive, X-Private-Hop"),
+                ChromeHttpHeader("X-Private-Hop", "drop"),
+                ChromeHttpHeader("Transfer-Encoding", "chunked"),
+                ChromeHttpHeader("Set-Cookie", "a=1; Secure; HttpOnly"),
+                ChromeHttpHeader("Set-Cookie", "b=2; SameSite=Lax"),
+                ChromeHttpHeader("Content-Security-Policy", "default-src 'self'"),
+                ChromeHttpHeader("Access-Control-Allow-Origin", "https://example.com"),
+            )
+        val filtered = ChromeHttpHeaderPolicy.downstreamResponseHeaders(headers)
 
-        assertTrue(names.intersect(ChromePhotosUpstreamRequestPolicy.strippedRequestHeaders).isEmpty())
-        assertEquals("identity", ChromePhotosUpstreamRequestPolicy.headers["Accept-Encoding"])
-        assertEquals("no-cache", ChromePhotosUpstreamRequestPolicy.headers["Cache-Control"])
-    }
-
-    @Test
-    fun `sanitized response rebuilds entity headers and strips validators and encodings`() {
-        val response = sanitizer.sanitize("GET", upstream("image/webp", blocked))
-        val headers = ChromePhotosClientResponseHeaderPolicy.headersFor(response, response.bytes.size)
-        val normalizedNames = headers.keys.mapTo(mutableSetOf()) { it.lowercase() }
-
-        assertTrue(normalizedNames.intersect(ChromePhotosClientResponseHeaderPolicy.invalidatedEntityHeaders).isEmpty())
-        assertEquals("image/png", headers["Content-Type"])
-        assertEquals(placeholder.size.toString(), headers["Content-Length"])
-        assertEquals("no-store", headers["Cache-Control"])
+        assertEquals(2, filtered.count { it.name.equals("Set-Cookie", true) })
+        assertTrue(filtered.any { it.name == "Content-Security-Policy" })
+        assertTrue(filtered.any { it.name == "Access-Control-Allow-Origin" })
+        assertFalse(filtered.any { it.name.equals("Connection", true) || it.name == "X-Private-Hop" })
     }
 
     private fun upstream(
         contentType: String,
         bytes: ByteArray,
-        tooLarge: Boolean = false,
         encoding: String? = null,
+        statusCode: Int = 200,
+        extraHeaders: List<ChromeHttpHeader> = emptyList(),
     ) = ChromePhotosUpstreamResponse(
-        host = ChromePhotosRealWebLabConfig.HttpBingoHost,
-        statusCode = 200,
-        statusText = "OK",
-        contentType = contentType,
-        contentEncoding = encoding,
-        location = null,
-        body = bytes,
-        bodyTooLarge = tooLarge,
+        host = "example.com",
+        statusCode = statusCode,
+        statusText = if (statusCode == 304) "Not Modified" else "OK",
+        headers =
+            listOfNotNull(
+                ChromeHttpHeader("Content-Type", contentType),
+                encoding?.let { ChromeHttpHeader("Content-Encoding", it) },
+            ) + extraHeaders,
+        body = bytes.inputStream(),
+        bodyLength = bytes.size.toLong(),
         protocol = "h2",
     )
 
-    private fun redirect(location: String) =
-        ChromePhotosUpstreamResponse(
-            host = ChromePhotosRealWebLabConfig.GitHubHost,
-            statusCode = 302,
-            statusText = "Found",
-            contentType = "text/html",
-            contentEncoding = null,
-            location = location,
-            body = ByteArray(0),
-            bodyTooLarge = false,
-            protocol = "h2",
+    private fun redirect(
+        location: String,
+        statusCode: Int,
+    ) = ChromePhotosUpstreamResponse(
+        host = "source.example",
+        statusCode = statusCode,
+        statusText = "Redirect",
+        headers =
+            listOf(
+                ChromeHttpHeader("Location", location),
+                ChromeHttpHeader("Cache-Control", "max-age=10"),
+            ),
+        body = ByteArray(0).inputStream(),
+        bodyLength = 0,
+        protocol = "h2",
+    )
+
+    private fun entityHeaders() =
+        listOf(
+            ChromeHttpHeader("Content-Encoding", "identity"),
+            ChromeHttpHeader("ETag", "\"fixture\""),
+            ChromeHttpHeader("Last-Modified", "Sun, 24 Aug 2026 12:00:00 GMT"),
         )
 }

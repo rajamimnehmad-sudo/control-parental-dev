@@ -93,7 +93,7 @@ class ChromePhotosHttpsProxyCleanupTest {
         override fun execute(
             host: String,
             request: ChromePhotosProxyRequest,
-        ): ChromePhotosUpstreamResponse = throw IOException("not used")
+        ): ChromePhotosUpstreamExchange = throw IOException("not used")
 
         override fun close() {
             closeCalls.incrementAndGet()
@@ -106,7 +106,7 @@ class ChromePhotosHttpsProxyCleanupTest {
         override val sentinelImageBytes = "block".toByteArray()
         override val placeholderImageBytes = "placeholder".toByteArray()
 
-        override fun responseFor(requestTarget: String): ChromePhotosFixtureResponse =
+        override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse =
             ChromePhotosFixtureResponse(
                 resourceId = "unused",
                 contentType = "text/plain",

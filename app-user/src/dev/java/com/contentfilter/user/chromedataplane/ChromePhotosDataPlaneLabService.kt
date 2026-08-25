@@ -144,7 +144,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                         )
                         .commit()
                     val routeAddresses =
-                        ChromePhotosRealWebRouteResolver().resolve(ChromePhotosRealWebLabConfig.realHosts)
+                        if (fullTunnelDevGateEnabled) {
+                            emptySet()
+                        } else {
+                            ChromePhotosRealWebRouteResolver().resolve(ChromePhotosRealWebLabConfig.controlledRouteHosts)
+                        }
                     preferences.edit()
                         .putStringSet(
                             ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
@@ -209,7 +213,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             "model=${modelIdentity.modelVersion} modelSha=${modelIdentity.modelSha256} " +
                             "policy=${modelIdentity.policyVersion} " +
                             "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
-                            "fixture=controlled realHosts=${ChromePhotosRealWebLabConfig.realHosts.size} " +
+                            "fixture=controlled fallbackHosts=${ChromePhotosRealWebLabConfig.controlledRouteHosts.size} " +
                             "routes=${routeAddresses.size} udpFixture=${udpFixtureGate.enabled} " +
                             "udpTarget=${udpFixtureGate.address}:${udpFixtureGate.port} " +
                             "transport=${if (fullTunnelDevGateEnabled) "full_tunnel_dev" else "controlled"} " +
@@ -303,11 +307,14 @@ class ChromePhotosDataPlaneLabService : Service() {
                     val policyConfirmed =
                         runCatching {
                             policyController.isApplied(caCertificateDer) &&
-                                labPreferences()
-                                    .getStringSet(
-                                        ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
-                                        emptySet(),
-                                    ).orEmpty().isNotEmpty()
+                                (
+                                    VpnController.isDevFullTunnelGateActive(this@ChromePhotosDataPlaneLabService) ||
+                                        labPreferences()
+                                            .getStringSet(
+                                                ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
+                                                emptySet(),
+                                            ).orEmpty().isNotEmpty()
+                                )
                         }.getOrDefault(false)
                     ChromePhotosDataPlaneRuntimeAttestation.markProxyHealthy(sessionId, proxyHealthy)
                     ChromePhotosDataPlaneRuntimeAttestation.markPolicyConfirmed(sessionId, policyConfirmed)
@@ -423,7 +430,7 @@ class ChromePhotosDataPlaneLabService : Service() {
 
     private fun logStatus() {
         val preferences = labPreferences()
-        val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+        val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics()
         val decisions = metrics.decisionSession
         val bootstrap = bootstrapController.state()
         Log.i(
@@ -437,6 +444,14 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "passthrough=${metrics.passthroughResponses} cacheHits=${metrics.cacheHits} " +
                 "cacheMisses=${metrics.cacheMisses} failures=${metrics.failures} " +
                 "bytesIn=${metrics.originalBytes} bytesOut=${metrics.deliveredBytes} " +
+                "streamed=${metrics.streamedResponses} proxyQueueRejects=${metrics.queueRejected} " +
+                "proxyActivePeak=${metrics.activeConnectionsPeak} " +
+                "proxyP50Ms=${"%.3f".format(Locale.US, metrics.latencyP50Millis)} " +
+                "proxyP95Ms=${"%.3f".format(Locale.US, metrics.latencyP95Millis)} " +
+                "proxyP99Ms=${"%.3f".format(Locale.US, metrics.latencyP99Millis)} " +
+                "upstreamSockets=${metrics.upstream.protectedSocketsCreated} " +
+                "protectSuccess=${metrics.upstream.protectSuccess} protectFailure=${metrics.upstream.protectFailure} " +
+                "web11a=${metrics.webSemanticsReport} " +
                 "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
                 "engineCalls=${decisions.engineCalls} dedupeHits=${decisions.dedupeHits} " +
                 "inferencePeak=${decisions.inferencePeak} inFlightPeak=${decisions.inFlightPeak} " +
