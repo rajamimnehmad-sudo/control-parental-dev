@@ -1,6 +1,6 @@
 # Glosh Remote — Professional Guided Assistant
 
-Updated: 2026-08-25 09:40 ART
+Updated: 2026-08-25 09:45 ART
 
 ## Connection base
 
@@ -45,14 +45,14 @@ Implementation branch:
 `work/remote-install-guided-assistant-08-chatgpt`
 
 Exact current HEAD:
-`7c97fab01289a5cae511e38cb0a6375879d55a85`
+`6945d9728dc72a78c87fee334a078db5145eb080`
 
 Base:
 `b4a559b2707bd3040642208be643a8eefc6922ec`
 
 Branch relation:
 - ahead-only;
-- 34 commits ahead;
+- 35 commits ahead;
 - 0 behind;
 - all changes remain under `tools/glosh-remote-spike/**`.
 
@@ -152,7 +152,9 @@ The app, notification and floating coach share one `GuidePresentation` model:
   - success check;
   - attention state;
 - reduced-motion support via `ValueAnimator.areAnimatorsEnabled()`;
-- floating `×` hides only the card;
+- floating `×` hides only the card for the current instruction;
+- repeated Settings events cannot force the hidden card to reappear;
+- a new instruction may show the card again;
 - persistent notification remains as fallback;
 - notification and overlay always mirror the same step.
 
@@ -192,7 +194,7 @@ Documentation/gate:
 
 ## Required automated gate
 
-Run on exact HEAD `7c97fab…`:
+Run on exact HEAD `6945d972…`:
 
 ```bash
 ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk \
@@ -226,6 +228,7 @@ Requirements:
 - direct Wireless Debugging route;
 - user switch/confirmation detected;
 - compact coach does not obstruct target;
+- hiding the coach persists for the current instruction;
 - notification mirrors all four steps;
 - pair-code row highlighted clearly;
 - unique six-digit code submitted automatically;
@@ -253,7 +256,7 @@ Use the exact same gated A23 APK, without USB, and evaluate:
 ## Coordination
 
 - connection base: PASS FINAL DEV / CLOSED;
-- Guided Assistant code: complete at `7c97fab…`;
+- Guided Assistant code: complete at `6945d972…`;
 - automated build gate: pending;
 - A23 guided physical gate: pending after automated PASS;
 - S22 cable-free gate: pending after A23 PASS;
