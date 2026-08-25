@@ -4,6 +4,7 @@ import java.util.Set;
 
 public final class GuideActionPolicy {
     public enum Operation {
+        CLICK,
         SHOW_ON_SCREEN,
         SCROLL_DOWN,
         SCROLL_FORWARD

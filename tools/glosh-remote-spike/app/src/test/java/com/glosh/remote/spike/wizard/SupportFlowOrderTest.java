@@ -28,4 +28,5 @@ public class SupportFlowOrderTest {
         assertEquals(OnboardingState.Step.UNAVAILABLE, state.step());
         assertEquals(OnboardingState.BrokerAction.DISCOVER, state.requestSupport());
     }
+
 }

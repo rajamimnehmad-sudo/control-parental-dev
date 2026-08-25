@@ -3,6 +3,9 @@ package com.glosh.remote.spike.guide.state;
 public enum GuideStage {
     OFF,
     GUIDE_PERMISSION,
+    AUTOPILOT_PROBE,
+    AUTOPILOT_CREDENTIAL,
+    AUTOPILOT_FALLBACK,
     DEV_ABOUT_PHONE,
     DEV_SOFTWARE_INFO,
     DEV_BUILD_NUMBER,
@@ -13,7 +16,10 @@ public enum GuideStage {
     CONNECTED;
 
     public boolean observesSettings() {
-        return this == DEV_ABOUT_PHONE
+        return this == AUTOPILOT_PROBE
+                || this == AUTOPILOT_CREDENTIAL
+                || this == AUTOPILOT_FALLBACK
+                || this == DEV_ABOUT_PHONE
                 || this == DEV_SOFTWARE_INFO
                 || this == DEV_BUILD_NUMBER
                 || this == WIRELESS_DEBUGGING
