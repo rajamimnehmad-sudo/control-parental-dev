@@ -11,16 +11,15 @@ import android.os.Looper;
 import android.view.WindowManager;
 
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
-import com.glosh.remote.spike.guide.accessibility.GuideServiceStatus;
 import com.glosh.remote.spike.guide.accessibility.GuideOnlyDebugIntentHandler;
+import com.glosh.remote.spike.guide.accessibility.GuideServiceStatus;
 import com.glosh.remote.spike.guide.accessibility.SettingsPackageResolver;
 import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
-import com.glosh.remote.spike.wizard.DeveloperGuidePhase;
 import com.glosh.remote.spike.wizard.GuideNotification;
-import com.glosh.remote.spike.wizard.OemGuideRecipe;
+import com.glosh.remote.spike.wizard.GuidePresentation;
 import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.SettingsNavigator;
 import com.glosh.remote.spike.wizard.WizardLayout;
@@ -28,9 +27,10 @@ import com.glosh.remote.spike.wizard.WizardLayout;
 public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
     private static final int REQUEST_NOTIFICATIONS = 9001;
     private static final int PERMISSION_NONE = 0;
-    private static final int PERMISSION_DEVELOPER_SETTINGS = 1;
-    private static final int PERMISSION_START_SESSION = 2;
-    private static final long STATE_REFRESH_MS = 500;
+    private static final int PERMISSION_OPEN_ACCESSIBILITY = 1;
+    private static final int PERMISSION_OPEN_DEVELOPER = 2;
+    private static final int PERMISSION_START_SESSION = 3;
+    private static final long STATE_REFRESH_MS = 500L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final SettingsNavigator settingsNavigator = new SettingsNavigator();
@@ -49,7 +49,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private WizardLayout ui;
     private String lastRenderKey;
     private int pendingPermissionAction;
-    private boolean pairingHelp;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,8 +59,9 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         ui = new WizardLayout(this);
         setContentView(ui.view());
         if (savedInstanceState != null) {
-            pendingPermissionAction = savedInstanceState.getInt("pending_permission", PERMISSION_NONE);
-            pairingHelp = savedInstanceState.getBoolean("pairing_help", false);
+            pendingPermissionAction = savedInstanceState.getInt(
+                    "pending_permission",
+                    PERMISSION_NONE);
         }
         consumeDebugIntent(getIntent());
         render();
@@ -99,7 +99,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     @Override
     protected void onSaveInstanceState(Bundle state) {
         state.putInt("pending_permission", pendingPermissionAction);
-        state.putBoolean("pairing_help", pairingHelp);
         super.onSaveInstanceState(state);
     }
 
@@ -110,17 +109,20 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(
+            int requestCode,
+            String[] permissions,
+            int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode != REQUEST_NOTIFICATIONS) {
             return;
         }
         int action = pendingPermissionAction;
         pendingPermissionAction = PERMISSION_NONE;
-        boolean granted = grantResults.length > 0
-                && grantResults[0] == PackageManager.PERMISSION_GRANTED;
-        if (action == PERMISSION_DEVELOPER_SETTINGS) {
-            performOpenDeveloperSettings(granted);
+        if (action == PERMISSION_OPEN_ACCESSIBILITY) {
+            beginGuideAndOpenAccessibility();
+        } else if (action == PERMISSION_OPEN_DEVELOPER) {
+            performOpenDeveloperSettings();
         } else if (action == PERMISSION_START_SESSION) {
             startSupportSession();
         }
@@ -135,9 +137,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
         String key = session + ":" + pairing + ":" + step + ":"
-                + coordinator.developerPhase() + ":" + coordinator.wirelessHelp() + ":"
-                + pairingHelp + ":" + GuideServiceStatus.isEnabled(this) + ":"
-                + LiveGuideRuntime.stage();
+                + GuideServiceStatus.isEnabled(this) + ":" + LiveGuideRuntime.stage();
         if (key.equals(lastRenderKey)) {
             return;
         }
@@ -165,204 +165,106 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderCheckingSupport() {
-        ui.showScreen(
-                "",
-                "Conectando…",
-                "Estamos buscando soporte disponible.",
-                "No tenés que configurar nada todavía.");
-        ui.clearVisual();
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.SUPPORT_PREPARING,
+                "Estamos comprobando que haya una consola de soporte disponible.");
+        showPresentation(presentation,
+                "Todavía no tenés que cambiar ninguna opción del teléfono.");
         ui.showSecondary("CANCELAR", view -> coordinator.reset());
     }
 
     private void renderGuidePermission() {
-        ui.showScreen(
-                "",
-                "Activá la automatización",
-                "Android necesita que habilites Glosh una sola vez para preparar el teléfono automáticamente.",
-                "Glosh observa sólo Ajustes durante esta preparación y se desactiva al terminar.");
-        ui.clearVisual();
-        ui.showPrimary("ACTIVAR AUTOMATIZACIÓN", view -> activateGuide(), true);
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.GUIDE_PERMISSION,
+                "Activá el interruptor de Glosh Remote. Al hacerlo, seguimos automáticamente.");
+        showPresentation(presentation,
+                "Glosh observa únicamente las pantallas de Ajustes necesarias durante esta sesión.");
+        guideNotification.show(presentation);
+        ui.showPrimary("ABRIR ACCESIBILIDAD", view -> activateGuide(), true);
         ui.showTertiary("CANCELAR", view -> coordinator.reset());
     }
 
     private void renderDeveloperOptions() {
-        GuideStage liveStage = LiveGuideRuntime.stage();
-        if (automatedFlowActive()) {
-            boolean credential = liveStage == GuideStage.AUTOPILOT_CREDENTIAL;
-            ui.showScreen(
-                    "",
-                    credential ? "Confirmá tu bloqueo de pantalla" : "Preparando el teléfono…",
-                    credential
-                            ? "Android necesita que ingreses el PIN, patrón o contraseña del teléfono."
-                            : "Glosh detecta el estado real y continúa por el camino más corto.",
-                    credential
-                            ? "Glosh nunca lee ni guarda esa credencial. Al terminar, continúa solo."
-                            : "Podés dejar que Glosh continúe automáticamente.");
-            ui.clearVisual();
-            ui.showSecondary("CANCELAR", view -> cancelConnection());
-            return;
-        }
-
-        // Fail-closed fallback: preserve the proven guided controls only when Autopilot explicitly
-        // relinquishes authority because the current Settings screen cannot be resolved safely.
-        OemGuideRecipe recipe = coordinator.recipe();
-        DeveloperGuidePhase phase = coordinator.developerPhase();
-        if (phase == DeveloperGuidePhase.HELP) {
-            ui.showScreen(
-                    "Ayuda manual",
-                    "Vamos de nuevo",
-                    recipe.developerOptions().help().copy(),
-                    "Seguí sólo la fila resaltada en verde.");
-            ui.showGuide(recipe.developerOptions());
-            ui.showPrimary("MOSTRARME DE NUEVO", view -> coordinator.showDeveloperGuide(), true);
-            ui.showSecondary("ABRIR AJUSTES", view -> openDeveloperSettings());
-            ui.showTertiary("CANCELAR", view -> cancelConnection());
-            return;
-        }
-        if (phase == DeveloperGuidePhase.CONFIRMATION) {
-            ui.showScreen(
-                    "Ayuda manual",
-                    "¿Viste el mensaje “Ya sos desarrollador”?",
-                    "Si apareció, ya podemos seguir.",
-                    "Este control sólo aparece porque la automatización pidió ayuda manual.");
-            ui.showGuide(recipe.developerOptions());
-            ui.showPrimary("SÍ, SEGUIR", view -> coordinator.confirmDeveloperOptions(), true);
-            ui.showSecondary("NO ME APARECIÓ", view -> coordinator.showDeveloperGuide());
-            ui.showTertiary("CANCELAR", view -> cancelConnection());
-            return;
-        }
-        ui.showScreen(
-                "Ayuda manual",
-                recipe.developerOptions().title(),
-                recipe.developerOptions().body(),
-                "Detectamos: " + recipe.familyLabel() + " · " + coordinator.profile().model()
-                        + guideFallbackCopy());
-        ui.showGuide(recipe.developerOptions());
-        ui.showPrimary("ABRIR AJUSTES", view -> openDeveloperSettings(), true);
-        ui.showSecondary("YA LO TENGO ACTIVADO", view -> coordinator.openedDeveloperSettings());
+        GuideStage stage = normalizedDeveloperStage();
+        GuidePresentation presentation = GuidePresentation.forStage(stage, null);
+        showPresentation(presentation,
+                "En Ajustes verás la misma indicación en una tarjeta pequeña. Vos tocás; Glosh detecta y avanza.");
+        guideNotification.show(presentation);
+        ui.showPrimary("VOLVER A AJUSTES", view -> returnToDeveloperStep(stage), false);
         ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderRequestingSupport() {
-        ui.showScreen(
-                "",
-                "Preparando conexión segura…",
-                "Glosh está esperando la aceptación del soporte y mantiene la solicitud activa automáticamente.",
-                "No necesitás tocar ningún paso técnico.");
-        ui.clearVisual();
-        ui.showSecondary("CANCELAR", view -> cancelConnection());
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.WIRELESS_DEBUGGING,
+                "Podés activar Depuración inalámbrica mientras Glosh prepara la sesión segura.");
+        showPresentation(presentation,
+                "La solicitud de soporte se mantiene activa automáticamente.");
+        guideNotification.show(presentation);
+        ui.showPrimary(
+                "ABRIR DEPURACIÓN INALÁMBRICA",
+                view -> openWirelessDuringSession(),
+                false);
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderWirelessDebugging() {
-        if (automatedFlowActive()) {
-            ui.showScreen(
-                    "",
-                    "Activando conexión segura…",
-                    "Glosh está preparando la depuración inalámbrica y el emparejamiento local.",
-                    "No avances opciones manualmente mientras continúa.");
-            ui.clearVisual();
-            ui.showSecondary("CANCELAR", view -> cancelConnection());
-            return;
-        }
-
-        OemGuideRecipe recipe = coordinator.recipe();
-        if (coordinator.wirelessHelp()) {
-            ui.showScreen(
-                    "Ayuda manual",
-                    "Te muestro dónde está",
-                    recipe.wirelessDebugging().help().copy(),
-                    "No cambies ninguna otra opción.");
-            ui.showGuide(recipe.wirelessDebugging());
-            ui.showPrimary("MOSTRARME DE NUEVO", view -> coordinator.showWirelessGuide(), true);
-            ui.showSecondary("ABRIR AJUSTES", view -> prepareAndOpenWirelessDebugging());
-            ui.showTertiary("CANCELAR", view -> cancelConnection());
-            return;
-        }
-        ui.showScreen(
-                "Ayuda manual",
-                recipe.wirelessDebugging().title(),
-                recipe.wirelessDebugging().body(),
-                "Activá Depuración inalámbrica y tocá Emparejar dispositivo con código.");
-        ui.showGuide(recipe.wirelessDebugging());
-        ui.showPrimary("ABRIR DEPURACIÓN INALÁMBRICA", view -> prepareAndOpenWirelessDebugging(), true);
-        ui.showSecondary("ME PERDÍ", view -> coordinator.showWirelessHelp());
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.WIRELESS_DEBUGGING,
+                "Activá el interruptor. Cuando quede listo, Glosh mostrará el paso del código.");
+        showPresentation(presentation,
+                "No hace falta buscar esta opción: Glosh abre la pantalla directa.");
+        guideNotification.show(presentation);
+        ui.showPrimary(
+                "ABRIR DEPURACIÓN INALÁMBRICA",
+                view -> prepareAndOpenWirelessDebugging(),
+                false);
         ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderPairing(PairingUiState pairing) {
-        boolean manualFallback = pairing != PairingUiState.CONNECTING
-                && (LiveGuideRuntime.stage() == GuideStage.AUTOPILOT_FALLBACK
-                || pairing == PairingUiState.CODE_FAILED);
-        if (!manualFallback) {
-            ui.showScreen(
-                    "",
-                    pairing == PairingUiState.CONNECTING
-                            ? "Activando conexión segura…"
-                            : "Completando conexión…",
-                    pairing == PairingUiState.CONNECTING
-                            ? "Glosh ya recibió el código y está terminando el emparejamiento."
-                            : "Glosh está buscando el código de emparejamiento de Android de forma local y segura.",
-                    "Si Android requiere una confirmación protegida, te la va a mostrar directamente.");
-            ui.clearVisual();
-            ui.showSecondary("CANCELAR", view -> cancelConnection());
+        guideNotification.clear();
+        if (pairing == PairingUiState.CONNECTING) {
+            GuidePresentation presentation = GuidePresentation.forStage(
+                    GuideStage.PAIRING,
+                    "Glosh ya recibió el código y está terminando la conexión.");
+            showPresentation(presentation,
+                    "No cierres Glosh; normalmente tarda sólo unos segundos.");
+            ui.showTertiary("CANCELAR", view -> cancelConnection());
             return;
         }
 
-        if (pairingHelp) {
-            ui.showScreen(
-                    "Ayuda manual",
-                    "Busquemos el código",
-                    coordinator.recipe().wirelessDebugging().help().copy(),
-                    "Tocá Emparejar dispositivo con código. Android va a mostrar 6 números.");
-            ui.showGuide(coordinator.recipe().wirelessDebugging());
-            ui.showPrimary("ABRIR DEPURACIÓN INALÁMBRICA", view -> openWirelessDuringSession(), true);
-            ui.showSecondary("VOLVER AL CÓDIGO", view -> {
-                pairingHelp = false;
-                lastRenderKey = null;
-                render();
-            });
-            ui.showTertiary("CANCELAR", view -> cancelConnection());
-            return;
+        boolean retry = pairing == PairingUiState.CODE_FAILED;
+        String instruction = retry
+                ? "El código anterior venció. Abrí uno nuevo y escribilo acá."
+                : "Glosh intenta leer los seis dígitos automáticamente. También podés escribirlos acá.";
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.PAIR_CODE_TARGET,
+                instruction);
+        showPresentation(presentation,
+                "La notificación de Glosh también permite ingresar el código sin volver a la app.");
+        if (pairing == PairingUiState.WAITING_FOR_CODE || retry) {
+            ui.showPairingInput(this::submitPairingCode, retry);
         }
-        if (pairing == PairingUiState.WAITING_FOR_CODE || pairing == PairingUiState.CODE_FAILED) {
-            boolean failed = pairing == PairingUiState.CODE_FAILED;
-            ui.showScreen(
-                    "Ayuda manual",
-                    failed ? "Necesitamos un código nuevo" : "Ingresá los 6 números",
-                    failed
-                            ? "Generá un código nuevo en Android y escribilo acá."
-                            : "La lectura automática no fue inequívoca. Escribí los 6 números que muestra Android.",
-                    "Al ingresar el sexto número, Glosh continúa automáticamente.");
-            ui.showPairingInput(this::submitPairingCode, failed);
-            if (failed) {
-                ui.showPrimary("ABRIR DEPURACIÓN INALÁMBRICA", view -> openWirelessDuringSession(), true);
-            }
-            ui.showSecondary("NO VEO EL CÓDIGO", view -> showPairingHelp());
-            ui.showTertiary("CANCELAR", view -> cancelConnection());
-            return;
-        }
-        ui.showScreen(
-                "Ayuda manual",
-                "Esperando el código",
-                "En Android, tocá Emparejar dispositivo con código.",
-                "Cuando aparezca, Glosh intenta leerlo localmente antes de pedirte que lo escribas.");
-        ui.clearVisual();
-        ui.showSecondary("NO VEO EL CÓDIGO", view -> showPairingHelp());
+        ui.showPrimary(
+                "ABRIR PANTALLA DEL CÓDIGO",
+                view -> openWirelessDuringSession(),
+                false);
         ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderConnected() {
         guideNotification.clear();
-        ui.showScreen(
-                "",
-                "Conectado con soporte",
-                "La conexión segura ya está activa.",
-                "Es temporal y podés finalizarla cuando quieras.");
-        ui.clearVisual();
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.CONNECTED,
+                "La conexión segura y temporal ya está activa.");
+        showPresentation(presentation,
+                "Podés finalizarla en cualquier momento desde este botón.");
         ui.showSecondary("FINALIZAR CONEXIÓN", view -> cancelConnection());
     }
 
     private void renderUnavailable() {
+        guideNotification.clear();
         ui.showScreen(
                 "",
                 "Soporte no disponible",
@@ -376,62 +278,89 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         ui.showSecondary("CANCELAR", view -> coordinator.reset());
     }
 
-    private boolean automatedFlowActive() {
+    private void showPresentation(GuidePresentation presentation, String information) {
+        ui.showScreen(
+                presentation.progressLabel(),
+                presentation.title(),
+                presentation.body(),
+                information);
+        ui.showPresentation(presentation);
+    }
+
+    private GuideStage normalizedDeveloperStage() {
         GuideStage stage = LiveGuideRuntime.stage();
-        return GuideServiceStatus.isEnabled(this)
-                && LiveGuideRuntime.isActive()
-                && stage != GuideStage.OFF
-                && stage != GuideStage.CONNECTED
-                && stage != GuideStage.AUTOPILOT_FALLBACK;
+        return switch (stage) {
+            case DEV_ABOUT_PHONE, DEV_SOFTWARE_INFO, DEV_BUILD_NUMBER,
+                    AUTOPILOT_CREDENTIAL, AUTOPILOT_FALLBACK -> stage;
+            default -> GuideStage.AUTOPILOT_PROBE;
+        };
+    }
+
+    private void returnToDeveloperStep(GuideStage stage) {
+        if (stage == GuideStage.DEV_ABOUT_PHONE
+                || stage == GuideStage.DEV_SOFTWARE_INFO
+                || stage == GuideStage.DEV_BUILD_NUMBER) {
+            settingsNavigator.openAboutPhone(this);
+        } else {
+            openDeveloperSettings();
+        }
     }
 
     private void openDeveloperSettings() {
         coordinator.openedDeveloperSettings();
         if (needsNotificationPermission()) {
-            pendingPermissionAction = PERMISSION_DEVELOPER_SETTINGS;
-            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+            pendingPermissionAction = PERMISSION_OPEN_DEVELOPER;
+            requestNotificationPermission();
         } else {
-            performOpenDeveloperSettings(true);
+            performOpenDeveloperSettings();
         }
     }
 
-    private void performOpenDeveloperSettings(boolean notificationsAllowed) {
-        if (notificationsAllowed) {
-            guideNotification.show("Glosh Remote", coordinator.recipe().developerOptions().help().notificationCopy());
-        }
+    private void performOpenDeveloperSettings() {
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.AUTOPILOT_PROBE,
+                "Si están apagadas, activá las opciones de desarrollador.");
+        guideNotification.show(presentation);
         if (GuideServiceStatus.isEnabled(this)) {
-            LiveGuideRuntime.setStage(GuideStage.DEV_SOFTWARE_INFO);
+            LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
         }
-        settingsNavigator.openAboutPhone(this);
+        settingsNavigator.openDeveloperOptions(this);
     }
 
     private void prepareAndOpenWirelessDebugging() {
-        if (coordinator.descriptor() == null) {
-            coordinator.reset();
-            return;
+        GuidePresentation presentation = GuidePresentation.forStage(
+                GuideStage.WIRELESS_DEBUGGING,
+                "Activá Depuración inalámbrica. Glosh detectará el cambio.");
+        guideNotification.show(presentation);
+        if (GuideServiceStatus.isEnabled(this)) {
+            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
         }
-        if (needsNotificationPermission()) {
-            pendingPermissionAction = PERMISSION_START_SESSION;
-            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATIONS);
+        if (coordinator.descriptor() != null
+                && RemotePairingService.getSessionState() == SessionState.IDLE) {
+            if (needsNotificationPermission()) {
+                pendingPermissionAction = PERMISSION_START_SESSION;
+                requestNotificationPermission();
+            } else {
+                startSupportSession();
+            }
         } else {
-            startSupportSession();
+            settingsNavigator.openWirelessDebugging(this);
         }
     }
 
     private void startSupportSession() {
         if (RemotePairingService.getSessionState() != SessionState.IDLE) {
+            settingsNavigator.openWirelessDebugging(this);
             render();
             return;
         }
         String descriptor = coordinator.markSessionStarted();
         if (descriptor == null) {
-            coordinator.reset();
+            settingsNavigator.openWirelessDebugging(this);
             return;
         }
         guideNotification.clear();
-        if (GuideServiceStatus.isEnabled(this)) {
-            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
-        }
+        LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
         startForegroundService(new Intent(this, RemotePairingService.class)
                 .setAction(RemotePairingService.ACTION_START)
                 .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
@@ -444,11 +373,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void openWirelessDuringSession() {
-        if (GuideServiceStatus.isEnabled(this)) {
-            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
-        }
-        guideNotification.show("Glosh Remote", coordinator.recipe().wirelessDebugging().help().notificationCopy());
-        settingsNavigator.openWirelessDebugging(this);
+        prepareAndOpenWirelessDebugging();
     }
 
     private void submitPairingCode(String code) {
@@ -459,16 +384,9 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         }
     }
 
-    private void showPairingHelp() {
-        pairingHelp = true;
-        lastRenderKey = null;
-        render();
-    }
-
     private void cancelConnection() {
         guideNotification.clear();
         LiveGuideRuntime.reset();
-        pairingHelp = false;
         coordinator.reset();
         if (RemotePairingService.getSessionState() != SessionState.IDLE) {
             try {
@@ -479,44 +397,62 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             }
         }
         lastRenderKey = null;
-        handler.postDelayed(this::render, 250);
+        handler.postDelayed(this::render, 250L);
     }
 
     private boolean needsNotificationPermission() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED;
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED;
+    }
+
+    private void requestNotificationPermission() {
+        requestPermissions(
+                new String[] {Manifest.permission.POST_NOTIFICATIONS},
+                REQUEST_NOTIFICATIONS);
     }
 
     private void activateGuide() {
+        if (needsNotificationPermission()) {
+            pendingPermissionAction = PERMISSION_OPEN_ACCESSIBILITY;
+            requestNotificationPermission();
+        } else {
+            beginGuideAndOpenAccessibility();
+        }
+    }
+
+    private void beginGuideAndOpenAccessibility() {
         LiveGuideRuntime.beginPermission(
                 coordinator.profile().family(),
                 settingsPackageResolver.resolve(this));
+        guideNotification.show(GuidePresentation.forStage(
+                GuideStage.GUIDE_PERMISSION,
+                "Activá el interruptor de Glosh Remote. Después seguimos automáticamente."));
         settingsNavigator.openAccessibility(this);
     }
 
     private void synchronizeGuidePermission() {
-        if (coordinator.step() != OnboardingState.Step.GUIDE_PERMISSION) {
+        if (coordinator.step() != OnboardingState.Step.GUIDE_PERMISSION
+                || !GuideServiceStatus.isEnabled(this)) {
             return;
         }
-        if (GuideServiceStatus.isEnabled(this)) {
-            LiveGuideRuntime.beginPermission(
-                    coordinator.profile().family(),
-                    settingsPackageResolver.resolve(this));
-            LiveGuideRuntime.guideEnabled();
-            coordinator.guideReady();
-            LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
-        }
-    }
-
-    private String guideFallbackCopy() {
-        if (LiveGuideRuntime.isActive() && !GuideServiceStatus.isEnabled(this)) {
-            return "\n\nLa automatización se desactivó. Activala nuevamente para continuar.";
-        }
-        return "";
+        LiveGuideRuntime.beginPermission(
+                coordinator.profile().family(),
+                settingsPackageResolver.resolve(this));
+        LiveGuideRuntime.guideEnabled();
+        coordinator.guideReady();
+        LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
+        guideNotification.show(GuidePresentation.forStage(
+                GuideStage.AUTOPILOT_PROBE,
+                "Si están apagadas, activá las opciones de desarrollador."));
     }
 
     private void consumeDebugIntent(Intent intent) {
         GuideOnlyDebugIntentHandler.consume(
-                this, intent, coordinator, settingsNavigator, settingsPackageResolver);
+                this,
+                intent,
+                coordinator,
+                settingsNavigator,
+                settingsPackageResolver);
     }
 }
