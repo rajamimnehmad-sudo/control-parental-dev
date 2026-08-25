@@ -95,6 +95,85 @@ public class AutopilotUiPureTest {
     }
 
     @Test
+    public void developerWirelessNavigationResolvesDeepClickableAncestorByPath() {
+        NodeSnapshot row = node(
+                List.of(4),
+                candidate("", "preference_row", true),
+                false,
+                null,
+                List.of());
+        NodeSnapshot container1 = node(
+                List.of(4, 0), candidate("", "container_1", false), false, null, List.of());
+        NodeSnapshot container2 = node(
+                List.of(4, 0, 0), candidate("", "container_2", false), false, null, List.of());
+        NodeSnapshot container3 = node(
+                List.of(4, 0, 0, 0), candidate("", "container_3", false), false, null, List.of());
+        NodeSnapshot title = node(
+                List.of(4, 0, 0, 0, 0),
+                new TargetCandidate(
+                        "Depuración inalámbrica", "", "com.android.settings:id/title", "",
+                        "", "", "android.widget.TextView", false,
+                        new Rect(20, 100, 600, 160)),
+                false,
+                null,
+                List.of());
+        NodeSnapshot switchBackground = node(
+                List.of(4, 1),
+                new TargetCandidate(
+                        "", "Depuración inalámbrica", "com.android.settings:id/switch_background",
+                        "", "", "", "android.widget.Switch", true,
+                        new Rect(700, 100, 900, 160)),
+                false,
+                null,
+                List.of());
+        NodeSnapshot switchWidget = new NodeSnapshot(
+                List.of(4, 1, 0),
+                new TargetCandidate(
+                        "", "", "com.android.settings:id/switch_widget", "",
+                        "", "", "android.widget.Switch", false,
+                        new Rect(740, 105, 890, 155)),
+                false, true, false, true, true, List.of(), List.of());
+
+        SettingsSnapshot developer = snapshot("Opciones de desarrollador", List.of(
+                row, container1, container2, container3, title, switchBackground, switchWidget));
+
+        var target = classifier.classify(developer).target(TargetKey.WIRELESS_DEBUGGING);
+        assertEquals(Confidence.HIGH, target.confidence());
+        assertEquals(List.of(4), target.node().path());
+        assertEquals("com.android.settings:id/preference_row", target.node().candidate().viewId());
+        assertFalse(target.node().checkable());
+        assertFalse(target.node().candidate().className().contains("Switch"));
+    }
+
+    @Test
+    public void visibleWirelessLabelWithoutSafeAncestorIsDetectedForFailClosedNoScroll() {
+        NodeSnapshot title = node(
+                List.of(7, 0, 0, 0),
+                new TargetCandidate(
+                        "Depuración inalámbrica", "", "com.android.settings:id/title", "",
+                        "", "", "android.widget.TextView", false,
+                        new Rect(20, 100, 600, 160)),
+                false,
+                null,
+                List.of());
+        NodeSnapshot switchBackground = node(
+                List.of(7, 1),
+                new TargetCandidate(
+                        "", "Depuración inalámbrica", "com.android.settings:id/switch_background",
+                        "", "", "", "android.widget.Switch", true,
+                        new Rect(700, 100, 900, 160)),
+                false,
+                null,
+                List.of());
+
+        SettingsSnapshot developer = snapshot(
+                "Opciones de desarrollador", List.of(title, switchBackground));
+
+        assertTrue(classifier.hasVisibleWirelessDebuggingLabel(developer));
+        assertEquals(null, classifier.classify(developer).target(TargetKey.WIRELESS_DEBUGGING));
+    }
+
+    @Test
     public void snapshotCollectionsAreImmutableAndActionGateRejectsStaleToken() {
         ArrayList<Integer> path = new ArrayList<>(List.of(1));
         ArrayList<String> descendants = new ArrayList<>(List.of("Número de compilación"));
@@ -208,6 +287,16 @@ public class AutopilotUiPureTest {
         return new NodeSnapshot(
                 List.of(pathKey.hashCode()), candidate("", pathKey, true), false,
                 false, null, true, true, List.of(), List.of(label));
+    }
+
+    private NodeSnapshot node(
+            List<Integer> path,
+            TargetCandidate candidate,
+            boolean checkable,
+            Boolean checked,
+            List<String> descendants) {
+        return new NodeSnapshot(
+                path, candidate, false, checkable, checked, true, true, List.of(), descendants);
     }
 
     private NodeSnapshot toggle(boolean checked) {
