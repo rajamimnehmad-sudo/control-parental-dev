@@ -1,5 +1,5 @@
 {
-  "updatedAt": "25 de ago de 2026 · 11:36",
+  "updatedAt": "25 de ago de 2026 · 11:43",
   "sections": [
     {
       "id": "coordination",
@@ -21,7 +21,7 @@
         {"id":"gloshia-data-preservation-rule","title":"Blindar datos de entrenamiento/calibración","detail":"Regla permanente: reset operativo nunca borra datasets, muestras, labels, reviews, calibraciones, métricas ni evidencia reutilizable para entrenar/evaluar GloshIA salvo autorización explícita separada.","status":"done","priority":"critical"},
         {"id":"apps-account-product-batch-07","title":"Próximo lote Apps / cuentas","detail":"Usuario UX V4 queda pausado y preservado; Admin UX V4 quedó visualmente implementado y espera gate técnico. No hay owner escribiendo activamente en Apps ahora; se retoma cuando libere prioridad Chrome/Remote.","status":"pending","priority":"important"},
         {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Datos operativos en cero; se preservan únicamente Super Admin/Auth raíz. Regla futura: evidencia de IA queda excluida de resets operativos.","status":"done","priority":"important"},
-        {"id":"control-center-v2","title":"Control Center V2","detail":"IN PROGRESS / owner ChatGPT Central. Cambio aislado en app-control-center: el resumen superior de Pendientes, En proceso, Hechas y Bloqueadas abre la lista completa filtrada al tocarlo; segundo toque vuelve a la vista normal. Se preservan Prioridad/Secciones, expansión de tareas, sincronización y datos. Gate pendiente: compilar APK v0.4.0 por GitHub Actions. Sin cambios en backend, Chrome, Usuario/Admin ni Production.","status":"in_progress","priority":"normal"},
+        {"id":"control-center-v2","title":"Control Center V2","detail":"DONE / CHATGPT REVIEWED. El resumen superior de Pendientes, En proceso, Hechas y Bloqueadas ahora abre la lista completa filtrada al tocar cada estado; segundo toque vuelve a la vista normal. Se preservan Prioridad/Secciones, expansión de tareas, sincronización y datos; selección de estado sobrevive recreación. APK v0.4.0 compilada y subida con PASS en GitHub Actions run 32860813738 sobre 258193919fb14a905e194ba06228337b5545a385. APK SHA-256 d6a8c59d2204954bd69549431e5435f09153637c7820a422b2371206045d0883. Área afectada: app-control-center + tracker. Sin cambios en backend, Chrome, Usuario/Admin ni Production.","status":"done","priority":"normal"},
         {"id":"pro-audit","title":"Auditoría Pro y mapa técnico","detail":"Auditoría integral completada; hallazgos se cierran por lotes auditables.","status":"done","priority":"important"}
       ]
     },
