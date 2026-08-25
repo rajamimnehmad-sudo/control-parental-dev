@@ -55,8 +55,8 @@ public final class SamsungSettingsClassifier {
                 TargetKey.SOFTWARE_INFO, SOFTWARE_INFO, false, false));
         put(targets, match(snapshot, screen == Screen.SOFTWARE_INFO,
                 TargetKey.BUILD_NUMBER, BUILD_NUMBER, false, false));
-        put(targets, match(snapshot, screen == Screen.DEVELOPER_OPTIONS,
-                TargetKey.WIRELESS_DEBUGGING, WIRELESS_DEBUGGING, false, false));
+        put(targets, matchNavigableRow(snapshot, screen == Screen.DEVELOPER_OPTIONS,
+                TargetKey.WIRELESS_DEBUGGING, WIRELESS_DEBUGGING));
         put(targets, matchWirelessToggle(snapshot, screen == Screen.WIRELESS_DEBUGGING));
         put(targets, match(snapshot, screen == Screen.WIRELESS_DEBUGGING,
                 TargetKey.PAIR_WITH_CODE, PAIR_WITH_CODE, false, false));
@@ -110,6 +110,37 @@ public final class SamsungSettingsClassifier {
         return Screen.UNKNOWN;
     }
 
+    private MatchedTarget matchNavigableRow(
+            SettingsSnapshot snapshot,
+            boolean expectedScreen,
+            TargetKey key,
+            Set<String> labels) {
+        if (!expectedScreen) {
+            return null;
+        }
+        List<Scored> scored = new ArrayList<>();
+        for (NodeSnapshot node : snapshot.nodes()) {
+            TargetCandidate candidate = node.candidate();
+            boolean own = exact(labels, candidate.text())
+                    || exact(labels, candidate.contentDescription());
+            boolean descendant = node.descendantTexts().stream().anyMatch(value -> exact(labels, value));
+            if ((!own && !descendant)
+                    || !candidate.clickable()
+                    || !node.enabled()
+                    || node.checkable()
+                    || isSwitchControl(candidate)) {
+                continue;
+            }
+            int score = descendant ? 100 : 92;
+            if (candidate.className() != null
+                    && candidate.className().toLowerCase(Locale.ROOT).contains("layout")) {
+                score += 2;
+            }
+            scored.add(new Scored(node, score));
+        }
+        return scoredTarget(key, scored);
+    }
+
     private MatchedTarget match(
             SettingsSnapshot snapshot,
             boolean expectedScreen,
@@ -140,6 +171,10 @@ public final class SamsungSettingsClassifier {
             if (node.checkable()) score += 7;
             scored.add(new Scored(node, score));
         }
+        return scoredTarget(key, scored);
+    }
+
+    private MatchedTarget scoredTarget(TargetKey key, List<Scored> scored) {
         scored.sort((left, right) -> Integer.compare(right.score(), left.score()));
         if (scored.isEmpty()) {
             return null;
@@ -195,6 +230,13 @@ public final class SamsungSettingsClassifier {
                 exact(labels, node.candidate().text())
                         || exact(labels, node.candidate().contentDescription())
                         || node.descendantTexts().stream().anyMatch(value -> exact(labels, value)));
+    }
+
+    private static boolean isSwitchControl(TargetCandidate candidate) {
+        String className = candidate.className() == null ? "" : candidate.className();
+        return endsWith(candidate.viewId(), "switch_widget")
+                || endsWith(candidate.viewId(), "switch_background")
+                || className.toLowerCase(Locale.ROOT).contains("switch");
     }
 
     private static void put(EnumMap<TargetKey, MatchedTarget> targets, MatchedTarget target) {
