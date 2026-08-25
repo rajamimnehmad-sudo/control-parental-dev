@@ -23,11 +23,18 @@ public record GuidePresentation(
     }
 
     public String progressLabel() {
-        return terminal ? "Completado" : "Paso " + step + " de " + totalSteps;
+        if (terminal) {
+            return "Completado";
+        }
+        return step <= 0 ? "Preparando" : "Paso " + step + " de " + totalSteps;
     }
 
     public int progressValue() {
         return terminal ? totalSteps : Math.max(0, Math.min(totalSteps, step));
+    }
+
+    public static GuidePresentation preparing(String title, String body) {
+        return new GuidePresentation(0, 4, title, body, Cue.WAIT, false);
     }
 
     public static GuidePresentation forStage(GuideStage stage, String instruction) {
@@ -108,12 +115,16 @@ public record GuidePresentation(
     }
 
     public static GuidePresentation recovery(GuideStage stage, String message) {
-        GuidePresentation base = forStage(stage, message);
+        String cleanMessage = clean(message);
+        if (!looksLikeWarning(cleanMessage)) {
+            return forStage(stage, cleanMessage);
+        }
+        GuidePresentation base = forStage(stage, cleanMessage);
         return new GuidePresentation(
                 base.step(),
                 base.totalSteps(),
                 base.title(),
-                preferred(clean(message), base.body()),
+                preferred(cleanMessage, base.body()),
                 Cue.ATTENTION,
                 false);
     }
@@ -150,8 +161,16 @@ public record GuidePresentation(
 
     private static String titleForPairing(String instruction) {
         String normalized = normalize(instruction);
-        if (normalized.contains("obteniendo") || normalized.contains("leyendo")) {
+        if (normalized.contains("detectado")) {
+            return "Código detectado";
+        }
+        if (normalized.contains("obteniendo")
+                || normalized.contains("leyendo")
+                || normalized.contains("leer")) {
             return "Obteniendo el código";
+        }
+        if (normalized.contains("vencio") || normalized.contains("nuevo")) {
+            return "Ingresá un código nuevo";
         }
         if (normalized.contains("ingresa") || normalized.contains("escribi")) {
             return "Ingresá los 6 números";
@@ -161,10 +180,18 @@ public record GuidePresentation(
 
     private static String bodyForPairing(String instruction) {
         String normalized = normalize(instruction);
-        if (normalized.contains("obteniendo") || normalized.contains("leyendo")) {
+        if (normalized.contains("detectado") || normalized.contains("esperando")) {
+            return preferred(instruction, "Glosh lo conserva en pantalla hasta que soporte esté listo.");
+        }
+        if (normalized.contains("obteniendo")
+                || normalized.contains("leyendo")
+                || normalized.contains("leer")) {
             return preferred(instruction, "Glosh lo procesa localmente y continúa automáticamente.");
         }
-        if (normalized.contains("ingresa") || normalized.contains("escribi")) {
+        if (normalized.contains("ingresa")
+                || normalized.contains("escribi")
+                || normalized.contains("nuevo")
+                || normalized.contains("vencio")) {
             return preferred(instruction, "También podés responder directamente desde la notificación.");
         }
         return preferred(instruction, "Android mostrará seis dígitos; Glosh intentará leerlos automáticamente.");
@@ -172,9 +199,23 @@ public record GuidePresentation(
 
     private static Cue cueForPairing(String instruction) {
         String normalized = normalize(instruction);
+        if (normalized.contains("detectado") || normalized.contains("esperando")) {
+            return Cue.WAIT;
+        }
         return normalized.contains("vincular") || normalized.contains("emparejar")
                 ? Cue.TAP
                 : Cue.CODE;
+    }
+
+    private static boolean looksLikeWarning(String value) {
+        String normalized = normalize(value);
+        return normalized.startsWith("no ")
+                || normalized.startsWith("esta no")
+                || normalized.contains("no pude")
+                || normalized.contains("no encuentro")
+                || normalized.contains("volvé a glosh")
+                || normalized.contains("fallo")
+                || normalized.contains("error");
     }
 
     private static String preferred(String first, String fallback) {
