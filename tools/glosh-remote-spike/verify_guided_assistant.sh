@@ -6,10 +6,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
-FINAL_APK="$APK_DIR/GloshRemote-Samsung-PiP-DEV.apk"
-REPORT="$APK_DIR/REMOTE-SAMSUNG-PIP-GUIDE-10-report.txt"
+FINAL_APK="$APK_DIR/GloshRemote-Samsung-Overlay-DEV.apk"
+REPORT="$APK_DIR/REMOTE-SAMSUNG-OVERLAY-GUIDE-11-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-samsung-pip-python.XXXXXX")"
+VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-samsung-overlay-python.XXXXXX")"
 
 cleanup() {
   rm -rf "$VENV_DIR"
@@ -34,7 +34,7 @@ file_size() {
   fi
 }
 
-printf '\n=== Glosh Remote Samsung PiP guide gate ===\n'
+printf '\n=== Glosh Remote Samsung custom overlay guide gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
@@ -43,6 +43,7 @@ MANIFEST="$SCRIPT_DIR/app/src/main/AndroidManifest.xml"
 MAIN="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/MainActivity.java"
 SERVICE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/RemotePairingService.java"
 SAMSUNG_STEP="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/SamsungGuideStep.java"
+OVERLAY="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/GuideOverlayController.java"
 
 if grep -Eq 'BIND_ACCESSIBILITY_SERVICE|LiveGuideAccessibilityService|ACCESSIBILITY_SETTINGS|ACCESSIBILITY_DETAILS_SETTINGS' "$MANIFEST"; then
   echo "ERROR: Accessibility volvió al manifiesto del instalador Samsung." >&2
@@ -56,15 +57,32 @@ if grep -Eq 'LiveGuideRuntime|GuideStage' "$SERVICE"; then
   echo "ERROR: pairing service volvió a depender del runtime de Accessibility." >&2
   exit 3
 fi
-if ! grep -q 'supportsPictureInPicture="true"' "$MANIFEST"; then
-  echo "ERROR: falta soporte Picture-in-Picture." >&2
+if ! grep -q 'android.permission.SYSTEM_ALERT_WINDOW' "$MANIFEST"; then
+  echo "ERROR: falta el permiso explícito para la guía flotante propia." >&2
+  exit 3
+fi
+if grep -q 'supportsPictureInPicture' "$MANIFEST"; then
+  echo "ERROR: PiP volvió al manifiesto; la ruta vigente es overlay propio." >&2
+  exit 3
+fi
+if ! grep -q 'TYPE_APPLICATION_OVERLAY' "$OVERLAY"; then
+  echo "ERROR: la guía no usa TYPE_APPLICATION_OVERLAY." >&2
+  exit 3
+fi
+if ! grep -q 'Settings.canDrawOverlays' "$OVERLAY"; then
+  echo "ERROR: falta comprobación real del permiso de overlay." >&2
   exit 3
 fi
 if ! grep -q 'TOTAL_STEPS = 7' "$SAMSUNG_STEP"; then
   echo "ERROR: el contrato Samsung de 7 pasos cambió sin actualizar el gate." >&2
   exit 3
 fi
-printf 'PASS: Samsung-only + PiP + user-confirmed Settings + no Accessibility\n'
+if grep -R -Eq 'SamsungPipCoachView|PictureInPictureParams|RemoteAction' \
+    "$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike"; then
+  echo "ERROR: quedan dependencias de la UX PiP superseded." >&2
+  exit 3
+fi
+printf 'PASS: Samsung-only + custom overlay + user-confirmed Settings + no Accessibility/PiP\n'
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -99,7 +117,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" status --short)"
 
 {
-  echo "TASK=REMOTE-SAMSUNG-PIP-GUIDE-10"
+  echo "TASK=REMOTE-SAMSUNG-OVERLAY-GUIDE-11"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
