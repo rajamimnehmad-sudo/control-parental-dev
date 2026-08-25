@@ -18,6 +18,7 @@ class ChromeProtectedSocketFactoryTest {
 
         assertFailsWith<IOException> { factory.createSocket("93.184.216.34", 443) }
 
+        assertEquals(1, socket.bindAttempts)
         assertTrue(socket.closed)
         assertEquals(0, socket.connectAttempts)
         assertEquals(ChromePhotosUpstreamMetrics(1, 0, 1), factory.metrics())
@@ -30,7 +31,7 @@ class ChromeProtectedSocketFactoryTest {
         val factory =
             ChromeProtectedSocketFactory(
                 protect = {
-                    protectedBeforeConnect = socket.connectAttempts == 0
+                    protectedBeforeConnect = socket.bindAttempts == 1 && socket.connectAttempts == 0
                     true
                 },
                 delegate = SingleSocketFactory(socket),
@@ -39,14 +40,20 @@ class ChromeProtectedSocketFactoryTest {
         factory.createSocket("93.184.216.34", 443)
 
         assertTrue(protectedBeforeConnect)
+        assertEquals(1, socket.bindAttempts)
         assertEquals(1, socket.connectAttempts)
         assertFalse(socket.closed)
         assertEquals(ChromePhotosUpstreamMetrics(1, 1, 0), factory.metrics())
     }
 
     private class TrackingSocket : Socket() {
+        var bindAttempts = 0
         var connectAttempts = 0
         var closed = false
+
+        override fun bind(bindpoint: java.net.SocketAddress?) {
+            bindAttempts++
+        }
 
         override fun connect(endpoint: java.net.SocketAddress?) {
             connectAttempts++

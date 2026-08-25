@@ -157,7 +157,7 @@ internal class ChromeProtectedSocketFactory(
     private val succeeded = AtomicLong()
     private val failed = AtomicLong()
 
-    override fun createSocket(): Socket = protect(delegate.createSocket())
+    override fun createSocket(): Socket = createProtectedSocket(local = null)
 
     override fun createSocket(
         host: String,
@@ -190,6 +190,17 @@ internal class ChromeProtectedSocketFactory(
             protectFailure = failed.get(),
         )
 
+    private fun createProtectedSocket(local: SocketAddress?): Socket {
+        val socket = delegate.createSocket()
+        try {
+            socket.bind(local ?: InetSocketAddress(0))
+            return protect(socket)
+        } catch (error: Throwable) {
+            runCatching { socket.close() }
+            throw error
+        }
+    }
+
     private fun protect(socket: Socket): Socket {
         created.incrementAndGet()
         if (runCatching { protect.invoke(socket) }.getOrDefault(false)) {
@@ -205,9 +216,8 @@ internal class ChromeProtectedSocketFactory(
         remote: SocketAddress,
         local: SocketAddress?,
     ): Socket =
-        createSocket().apply {
+        createProtectedSocket(local).apply {
             try {
-                if (local != null) bind(local)
                 connect(remote)
             } catch (error: Throwable) {
                 close()
