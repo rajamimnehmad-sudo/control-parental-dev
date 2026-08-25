@@ -1,10 +1,10 @@
 # Glosh Remote — Professional Guided Assistant
 
-Updated: 2026-08-25 11:04 ART
+Updated: 2026-08-25 11:20 ART
 
 ## Executive status
 
-`REMOTE-INSTALL-GUIDED-ASSISTANT-08`: **PASS AUTOMATED / PENDING A23 PHYSICAL GATE**.
+`REMOTE-INSTALL-GUIDED-ASSISTANT-08`: **PASS AUTOMATED / PENDING DIRECT S22 PHYSICAL GATE**.
 
 The connection base remains separately closed:
 
@@ -61,7 +61,7 @@ The architecture guard confirms that the active guided coordinator owns no Setti
 
 ## Frozen APK candidate
 
-This is now the **only authorized A23 Guided Assistant candidate**:
+This is now the **only authorized Guided Assistant physical candidate**:
 
 - filename: `GloshRemote-Guided-DEV.apk`;
 - path at gate: `/private/tmp/glosh-guided-gate-1313/tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Guided-DEV.apk`;
@@ -69,7 +69,7 @@ This is now the **only authorized A23 Guided Assistant candidate**:
 - SHA-256: `14ed9879f2b18559fdbef914fa2a89e572bef2b98082c1c10e935d3e0a6ecd10`;
 - report: `/private/tmp/glosh-guided-gate-1313/tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-INSTALL-GUIDED-ASSISTANT-08-report.txt`.
 
-Do not rebuild, rename by rebuilding, substitute another APK or change code before the A23 gate. A different byte size or SHA is a different candidate and requires a new automated gate.
+Do not rebuild, rename by rebuilding, substitute another APK or change code before the physical gate. A different byte size or SHA is a different candidate and requires a new automated gate.
 
 ## Product flow under test
 
@@ -133,32 +133,54 @@ App, floating coach and notification share `GuidePresentation`:
 - notification remains as persistent fallback;
 - no `ME PERDÍ`, `MOSTRARME`, `MOSTRARME DE NUEVO` or `VOLVER AL CÓDIGO`.
 
-## Next gate — A23 Samsung laboratory
+## Physical route decision
 
-Use the exact APK SHA above. USB/ADB is permitted only for installation, logs, evidence and cleanup; it must not simulate customer taps.
+By explicit product-owner decision, the first physical UX gate moves directly to the personal Samsung S22 Ultra, delivered cable-free through Taildrop.
 
-Required physical outcomes:
+Rationale:
+
+- all automated gates are already green;
+- the remote connection base already passed with S22 and Mac on different networks;
+- the remaining unknown is the real customer guidance experience;
+- the product owner will perform the Android taps personally without technical coaching;
+- this gives the most representative first UX signal.
+
+The A23 laboratory gate is **deferred, not cancelled**. It remains available for controlled reproduction, logs and regression if the S22 gate finds a defect.
+
+## Next gate — S22 cable-free customer run
+
+Use the exact APK SHA above. Codex may only verify the artifact, send it by Taildrop and prepare the waiting Mac operator session. Codex must not install the APK on the phone, simulate taps, change phone settings remotely or rebuild the candidate.
+
+Customer-run requirements:
+
+- install the exact Taildrop APK;
+- Mac operator remains available while the flow is performed;
+- tap `CONECTAR CON SOPORTE` once;
+- follow only the app, floating coach and notification;
+- no verbal technical coaching unless the app becomes blocked;
+- record where the wording, target, animation or transition is unclear;
+- verify automatic code detection when the six-digit dialog appears;
+- verify local ADB and Mac support authenticate;
+- verify cancel/finish leaves no residual overlay or connection.
+
+Required outcomes:
 
 - `AUTOMATIC_SETTINGS_CLICKS=0`;
 - `PROGRAMMATIC_SETTINGS_SCROLLS=0`;
 - `COORDINATE_GESTURES=0`;
-- exact Accessibility route or safe fallback;
+- exact Accessibility route or understandable fallback;
 - direct Developer options probe;
 - direct Wireless Debugging route;
 - customer switch/confirmation detected;
 - compact coach does not obscure the target;
-- hidden coach remains hidden for the current instruction;
 - notification mirrors every step;
 - pairing row guidance is clear;
-- unique code submits automatically;
-- manual code fallback remains usable;
+- unique code submits automatically or the manual fallback is clear;
 - local ADB connects;
 - Mac support authenticates;
 - crash/ANR = 0;
 - residual overlays = 0;
-- full cleanup restores Content Filter, animation scales, Wireless Debugging OFF and Device Owner intact.
-
-Only after A23 PASS may this exact APK be used on S22 cable-free as a real customer UX gate.
+- closing the session removes remote access.
 
 ## Superseded evidence
 
@@ -172,8 +194,8 @@ Only after A23 PASS may this exact APK be used on S22 cable-free as a real custo
 - connection base: PASS FINAL DEV / CLOSED;
 - Guided Assistant automated gate: PASS at `1313eea…`;
 - exact APK: frozen at SHA-256 `14ed9879…ecd10`;
-- A23 physical gate: next;
-- S22 cable-free gate: after A23 PASS;
+- direct S22 Taildrop/customer gate: next;
+- A23 laboratory gate: deferred and reserved for defects/regression;
 - Motorola/Xiaomi adapters: later, based on physical evidence without rewriting the shared guide engine;
 - no writer is active in Remote after this coordination update;
 - no merge, PR, deploy, Production or Supabase mutation is authorized.
