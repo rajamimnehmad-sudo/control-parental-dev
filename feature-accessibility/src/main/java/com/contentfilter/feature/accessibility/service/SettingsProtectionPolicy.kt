@@ -12,6 +12,22 @@ class SettingsProtectionPolicy {
             packageName in PackageInstallerPackages ||
             resolvedOwnUninstaller
 
+    /**
+     * True only when tree identity cannot change a blocking decision for this screen.
+     *
+     * App-info/removal and unknown-source screens deliberately return false because the tree is
+     * needed to distinguish the protected User app from Admin/another app. Critical VPN/
+     * Accessibility/Device-Admin screens and ordinary package-install screens can be decided from
+     * class/package + current authorization state without guessing that identity.
+     */
+    fun canBlockImmediatelyWithoutTreeIdentity(
+        packageName: String,
+        className: String?,
+    ): Boolean =
+        isDeviceAdminRemovalScreen(packageName, className) ||
+            isCriticalSettingsScreen(packageName, className) ||
+            isPackageInstallScreen(packageName, className)
+
     fun shouldLeaveProtectedScreen(
         packageName: String,
         className: String?,
