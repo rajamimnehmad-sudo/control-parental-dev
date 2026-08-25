@@ -41,6 +41,8 @@ internal data class AccessibilityTreeEventMetrics(
     val submittedSettings: Long,
     val startedSearch: Long,
     val startedSettings: Long,
+    val coalescedSearch: Long,
+    val coalescedSettings: Long,
     val staleBeforeStart: Long,
 )
 
@@ -49,9 +51,11 @@ internal data class AccessibilityTreeEventMetrics(
  *
  * At most one pending Search and one pending Settings request are retained. Repeated events replace
  * the pending request of the same kind instead of growing a queue. Context generations change only
- * when the logical package context changes (or explicitly on policy/session invalidation), so a
- * continuous same-package event storm cannot indefinitely invalidate a scan that is already running.
- * AccessibilityEvent/AccessibilityNodeInfo instances are never stored across the callback boundary.
+ * when the logical package context changes (or explicitly on policy/session invalidation). Each
+ * result is also checked against the latest submitted sequence before it may diagnose or act, so a
+ * same-package navigation supersedes an older tree snapshot without permitting an old action on a
+ * new screen. AccessibilityEvent/AccessibilityNodeInfo instances are never stored across the callback
+ * boundary.
  */
 internal class AccessibilityTreeEventProcessor(
     scope: CoroutineScope,
@@ -63,10 +67,14 @@ internal class AccessibilityTreeEventProcessor(
     private val sequence = AtomicLong()
     private val searchContextGeneration = AtomicLong()
     private val settingsContextGeneration = AtomicLong()
+    private val latestSearchSequence = AtomicLong()
+    private val latestSettingsSequence = AtomicLong()
     private val submittedSearch = AtomicLong()
     private val submittedSettings = AtomicLong()
     private val startedSearch = AtomicLong()
     private val startedSettings = AtomicLong()
+    private val coalescedSearch = AtomicLong()
+    private val coalescedSettings = AtomicLong()
     private val staleBeforeStart = AtomicLong()
     private val pendingSearch = AtomicReference<SearchProtectionTrigger?>(null)
     private val pendingSettings = AtomicReference<SettingsProtectionTrigger?>(null)
@@ -83,7 +91,7 @@ internal class AccessibilityTreeEventProcessor(
 
                     pendingSettings.getAndSet(null)?.let { trigger ->
                         didWork = true
-                        if (isSettingsContextCurrent(trigger)) {
+                        if (isSettingsCurrentAndLatest(trigger)) {
                             startedSettings.incrementAndGet()
                             processSettings(trigger)
                         } else {
@@ -93,7 +101,7 @@ internal class AccessibilityTreeEventProcessor(
 
                     pendingSearch.getAndSet(null)?.let { trigger ->
                         didWork = true
-                        if (isSearchContextCurrent(trigger)) {
+                        if (isSearchCurrentAndLatest(trigger)) {
                             startedSearch.incrementAndGet()
                             processSearch(trigger)
                         } else {
@@ -118,14 +126,17 @@ internal class AccessibilityTreeEventProcessor(
             }
             lastSearchPackageName = packageName
             val nextSequence = sequence.incrementAndGet()
-            pendingSearch.set(
-                SearchProtectionTrigger(
-                    sequence = nextSequence,
-                    contextGeneration = searchContextGeneration.get(),
-                    packageName = packageName,
-                    eventLabel = eventLabel,
-                ),
-            )
+            latestSearchSequence.set(nextSequence)
+            val replaced =
+                pendingSearch.getAndSet(
+                    SearchProtectionTrigger(
+                        sequence = nextSequence,
+                        contextGeneration = searchContextGeneration.get(),
+                        packageName = packageName,
+                        eventLabel = eventLabel,
+                    ),
+                )
+            if (replaced != null) coalescedSearch.incrementAndGet()
             submittedSearch.incrementAndGet()
             wakeups.trySend(Unit)
             nextSequence
@@ -148,29 +159,43 @@ internal class AccessibilityTreeEventProcessor(
             }
             lastSettingsPackageName = packageName
             val nextSequence = sequence.incrementAndGet()
-            pendingSettings.set(
-                SettingsProtectionTrigger(
-                    sequence = nextSequence,
-                    contextGeneration = settingsContextGeneration.get(),
-                    packageName = packageName,
-                    eventLabel = eventLabel,
-                    eventType = eventType,
-                    className = className,
-                    eventSignals = eventSignals,
-                    fallbackAttempt = fallbackAttempt,
-                    urgent = urgent,
-                ),
-            )
+            latestSettingsSequence.set(nextSequence)
+            val replaced =
+                pendingSettings.getAndSet(
+                    SettingsProtectionTrigger(
+                        sequence = nextSequence,
+                        contextGeneration = settingsContextGeneration.get(),
+                        packageName = packageName,
+                        eventLabel = eventLabel,
+                        eventType = eventType,
+                        className = className,
+                        eventSignals = eventSignals,
+                        fallbackAttempt = fallbackAttempt,
+                        urgent = urgent,
+                    ),
+                )
+            if (replaced != null) coalescedSettings.incrementAndGet()
             submittedSettings.incrementAndGet()
             wakeups.trySend(Unit)
             nextSequence
         }
 
+    fun invalidateSearchContext() {
+        synchronized(lock) {
+            if (closed || (lastSearchPackageName == null && pendingSearch.get() == null)) return
+            searchContextGeneration.incrementAndGet()
+            lastSearchPackageName = null
+            latestSearchSequence.set(0L)
+            pendingSearch.set(null)
+        }
+    }
+
     fun invalidateSettingsContext() {
         synchronized(lock) {
-            if (closed) return
+            if (closed || (lastSettingsPackageName == null && pendingSettings.get() == null)) return
             settingsContextGeneration.incrementAndGet()
             lastSettingsPackageName = null
+            latestSettingsSequence.set(0L)
             pendingSettings.set(null)
         }
     }
@@ -189,12 +214,20 @@ internal class AccessibilityTreeEventProcessor(
                 trigger.packageName == lastSettingsPackageName
         }
 
+    fun isSearchCurrentAndLatest(trigger: SearchProtectionTrigger): Boolean =
+        isSearchContextCurrent(trigger) && latestSearchSequence.get() == trigger.sequence
+
+    fun isSettingsCurrentAndLatest(trigger: SettingsProtectionTrigger): Boolean =
+        isSettingsContextCurrent(trigger) && latestSettingsSequence.get() == trigger.sequence
+
     fun metrics(): AccessibilityTreeEventMetrics =
         AccessibilityTreeEventMetrics(
             submittedSearch = submittedSearch.get(),
             submittedSettings = submittedSettings.get(),
             startedSearch = startedSearch.get(),
             startedSettings = startedSettings.get(),
+            coalescedSearch = coalescedSearch.get(),
+            coalescedSettings = coalescedSettings.get(),
             staleBeforeStart = staleBeforeStart.get(),
         )
 
@@ -206,6 +239,8 @@ internal class AccessibilityTreeEventProcessor(
             settingsContextGeneration.incrementAndGet()
             lastSearchPackageName = null
             lastSettingsPackageName = null
+            latestSearchSequence.set(0L)
+            latestSettingsSequence.set(0L)
             pendingSearch.set(null)
             pendingSettings.set(null)
             wakeups.close()
