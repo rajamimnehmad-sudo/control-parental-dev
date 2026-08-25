@@ -111,19 +111,23 @@ public final class WizardLayout {
 
     public void showHome(View.OnClickListener connect) {
         progress.setVisibility(View.GONE);
-        title.setText("¡Bienvenido, Glosher!");
-        body.setText("Te estábamos esperando.\n\nGlosh detecta tu teléfono y te muestra exactamente qué tocar.");
+        title.setText("Soporte remoto Glosh");
+        body.setText(
+                "Conectate con soporte en un toque.\n\n"
+                        + "Glosh prepara el teléfono automáticamente y sólo te pide intervenir "
+                        + "si Android necesita una confirmación protegida.");
         information.setVisibility(View.GONE);
         clearVisual();
         homeDetails.setVisibility(View.VISIBLE);
-        showPrimary("INICIAR", connect, true);
+        showPrimary("CONECTAR CON SOPORTE", connect, true);
         hide(secondary);
         hide(tertiary);
     }
 
     public void showScreen(String progressCopy, String titleCopy, String bodyCopy, String infoCopy) {
-        progress.setText(progressCopy);
-        progress.setVisibility(View.VISIBLE);
+        progress.setText(progressCopy == null ? "" : progressCopy);
+        progress.setVisibility(
+                progressCopy == null || progressCopy.isEmpty() ? View.GONE : View.VISIBLE);
         title.setText(titleCopy);
         body.setText(bodyCopy);
         information.setText(infoCopy);
@@ -196,36 +200,15 @@ public final class WizardLayout {
         reassurance.setGravity(Gravity.CENTER);
         reassurance.setPadding(dp(14), dp(11), dp(14), dp(11));
         add(details, reassurance, 0, 26);
-        add(details, text("Así de simple", 21, COLOR_GRAPHITE, Typeface.BOLD), 0, 16);
-        addStep(details, "1", "Preparamos tu teléfono");
-        addStep(details, "2", "Abrimos la conexión");
-        addStep(details, "3", "Ingresás 6 números");
-        add(details, divider(), 18, 22);
         add(details, text("Tu privacidad primero", 21, COLOR_GRAPHITE, Typeface.BOLD), 0, 12);
         add(details, text(
-                "• La conexión es temporal.\n"
+                "• La conexión empieza sólo cuando vos la pedís.\n"
                         + "• Podés cancelarla cuando quieras.\n"
-                        + "• No dejamos acceso permanente en tu teléfono.",
+                        + "• No dejamos acceso remoto permanente en tu teléfono.",
                 16,
                 COLOR_MUTED,
                 Typeface.NORMAL), 0, 0);
         return details;
-    }
-
-    private void addStep(LinearLayout parent, String number, String label) {
-        LinearLayout row = new LinearLayout(activity);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        TextView badge = text(number, 16, COLOR_GRAPHITE, Typeface.BOLD);
-        badge.setGravity(Gravity.CENTER);
-        badge.setBackground(rounded(COLOR_LIME, 18));
-        row.addView(badge, new LinearLayout.LayoutParams(dp(36), dp(36)));
-        TextView copy = text(label, 17, COLOR_GRAPHITE, Typeface.BOLD);
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        params.setMargins(dp(14), 0, 0, 0);
-        row.addView(copy, params);
-        add(parent, row, 0, 14);
     }
 
     private Button button(boolean primaryStyle) {
@@ -236,7 +219,7 @@ public final class WizardLayout {
         button.setGravity(Gravity.CENTER);
         button.setMinHeight(dp(primaryStyle ? 58 : 48));
         button.setPadding(dp(18), dp(8), dp(18), dp(8));
-        button.setTextColor(primaryStyle ? COLOR_GRAPHITE : COLOR_GRAPHITE);
+        button.setTextColor(COLOR_GRAPHITE);
         button.setBackground(primaryStyle ? rounded(COLOR_LIME, 18) : rounded(Color.TRANSPARENT, 18));
         return button;
     }
