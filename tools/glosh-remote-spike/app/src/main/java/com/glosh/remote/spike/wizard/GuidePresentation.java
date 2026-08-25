@@ -37,6 +37,27 @@ public record GuidePresentation(
         return new GuidePresentation(0, 4, title, body, Cue.WAIT, false);
     }
 
+    public static GuidePresentation waiting(GuideStage stage, String body) {
+        GuidePresentation base = forStage(stage, null);
+        return new GuidePresentation(
+                base.step(),
+                base.totalSteps(),
+                "Esperá…",
+                preferred(clean(body), "Verificando el siguiente paso."),
+                Cue.WAIT,
+                false);
+    }
+
+    public static GuidePresentation restrictedSettings() {
+        return new GuidePresentation(
+                1,
+                4,
+                "Primero permití el acceso",
+                "En Información de la app tocá ⋮ y elegí “Permitir configuración restringida”. Después volvé a Glosh.",
+                Cue.ATTENTION,
+                false);
+    }
+
     public static GuidePresentation forStage(GuideStage stage, String instruction) {
         GuideStage safeStage = stage == null ? GuideStage.OFF : stage;
         String safeInstruction = clean(instruction);
@@ -44,7 +65,8 @@ public record GuidePresentation(
             case GUIDE_PERMISSION -> presentation(
                     1,
                     "Activá Glosh Remote",
-                    preferred(safeInstruction,
+                    secondary(safeInstruction,
+                            "Activá Glosh Remote",
                             "Usá el interruptor de esta pantalla. Cuando quede activo, Glosh continúa solo."),
                     Cue.TOGGLE);
             case AUTOPILOT_PROBE, AUTOPILOT_CREDENTIAL -> presentation(
@@ -52,27 +74,36 @@ public record GuidePresentation(
                     safeStage == GuideStage.AUTOPILOT_CREDENTIAL
                             ? "Confirmá tu bloqueo de pantalla"
                             : "Prepará las opciones de desarrollador",
-                    preferred(safeInstruction,
-                            safeStage == GuideStage.AUTOPILOT_CREDENTIAL
-                                    ? "Ingresá el PIN, patrón o contraseña que Android te pide. Glosh nunca lo lee."
-                                    : "Si están apagadas, activalas. Glosh abrirá automáticamente el próximo paso."),
+                    safeStage == GuideStage.AUTOPILOT_CREDENTIAL
+                            ? secondary(safeInstruction,
+                                    "Confirmá tu bloqueo de pantalla",
+                                    "Ingresá tu PIN, patrón o contraseña. Glosh nunca lo lee.")
+                            : secondary(safeInstruction,
+                                    "Prepará las opciones de desarrollador",
+                                    "Glosh verificará el estado y abrirá el próximo paso automáticamente."),
                     safeStage == GuideStage.AUTOPILOT_CREDENTIAL
                             ? Cue.ATTENTION
                             : Cue.TOGGLE);
             case DEV_ABOUT_PHONE -> presentation(
                     2,
                     "Tocá “Acerca del teléfono”",
-                    preferred(safeInstruction, "Está dentro de Ajustes. Glosh te acompaña en pantalla."),
+                    secondary(safeInstruction,
+                            "Tocá “Acerca del teléfono”",
+                            "Después Glosh buscará Información de software."),
                     Cue.TAP);
             case DEV_SOFTWARE_INFO -> presentation(
                     2,
                     "Tocá “Información de software”",
-                    preferred(safeInstruction, "Después te mostramos el último paso para activar desarrollo."),
+                    secondary(safeInstruction,
+                            "Tocá “Información de software”",
+                            "Después Glosh te señalará Número de compilación."),
                     Cue.TAP);
             case DEV_BUILD_NUMBER -> presentation(
                     2,
                     "Tocá 7 veces “Número de compilación”",
-                    preferred(safeInstruction, "Android avisará cuando las opciones de desarrollador estén listas."),
+                    secondary(safeInstruction,
+                            "Tocá 7 veces “Número de compilación”",
+                            "Android te avisará cuando quede habilitado. Glosh lo verificará automáticamente."),
                     Cue.MULTI_TAP);
             case SUPPORT_PREPARING -> preparing(
                     "Preparando la conexión",
@@ -90,24 +121,32 @@ public record GuidePresentation(
             case PAIRING -> presentation(
                     4,
                     "Completando la conexión",
-                    preferred(safeInstruction, "Glosh está sincronizando ADB local con la sesión segura de la Mac."),
+                    secondary(safeInstruction,
+                            "Completando la conexión",
+                            "Glosh está sincronizando ADB local con la sesión segura de la Mac."),
                     Cue.WAIT);
             case CONNECTED -> new GuidePresentation(
                     4,
                     4,
                     "Conectado con soporte",
-                    preferred(safeInstruction, "La conexión temporal ya está activa."),
+                    secondary(safeInstruction,
+                            "Conectado con soporte",
+                            "La conexión temporal ya está activa."),
                     Cue.SUCCESS,
                     true);
             case AUTOPILOT_FALLBACK -> presentation(
                     2,
                     "Te acompañamos manualmente",
-                    preferred(safeInstruction, "Seguí la indicación visible. Glosh no tocará nada por vos."),
+                    secondary(safeInstruction,
+                            "Te acompañamos manualmente",
+                            "Seguí la indicación visible. Glosh no tocará nada por vos."),
                     Cue.ATTENTION);
             case OFF -> presentation(
                     1,
                     "Soporte remoto Glosh",
-                    preferred(safeInstruction, "Abrí la conexión y te guiamos paso a paso."),
+                    secondary(safeInstruction,
+                            "Soporte remoto Glosh",
+                            "Abrí la conexión y te guiamos paso a paso."),
                     Cue.WAIT);
         };
     }
@@ -117,7 +156,7 @@ public record GuidePresentation(
         if (!looksLikeWarning(cleanMessage)) {
             return forStage(stage, cleanMessage);
         }
-        GuidePresentation base = forStage(stage, cleanMessage);
+        GuidePresentation base = forStage(stage, null);
         return new GuidePresentation(
                 base.step(),
                 base.totalSteps(),
@@ -136,6 +175,9 @@ public record GuidePresentation(
         if (normalized.contains("permitir")) {
             return "Confirmá “Permitir”";
         }
+        if (normalized.contains("busca") || normalized.contains("tocá “depuracion")) {
+            return "Tocá “Depuración inalámbrica”";
+        }
         if (normalized.contains("opciones de desarrollador")) {
             return "Activá las opciones de desarrollador";
         }
@@ -145,16 +187,31 @@ public record GuidePresentation(
     private static String bodyForWireless(String instruction) {
         String normalized = normalize(instruction);
         if (normalized.contains("permitir")) {
-            return preferred(instruction, "Android necesita confirmar esta red Wi‑Fi una sola vez.");
+            return secondary(instruction,
+                    "Confirmá “Permitir”",
+                    "Android necesita confirmar esta red Wi‑Fi una sola vez.");
+        }
+        if (normalized.contains("busca") || normalized.contains("tocá “depuracion")) {
+            return secondary(instruction,
+                    "Tocá “Depuración inalámbrica”",
+                    "Samsung no abrió esta pantalla directamente; tocala en la lista y Glosh continuará.");
         }
         if (normalized.contains("opciones de desarrollador")) {
-            return preferred(instruction, "Cuando queden activas, Glosh abrirá esta pantalla nuevamente.");
+            return secondary(instruction,
+                    "Activá las opciones de desarrollador",
+                    "Cuando queden activas, Glosh avanzará automáticamente.");
         }
-        return preferred(instruction, "Tocá el interruptor. Glosh detectará el cambio y seguirá solo.");
+        return secondary(instruction,
+                "Activá “Depuración inalámbrica”",
+                "Tocá el interruptor. Glosh detectará el cambio y seguirá solo.");
     }
 
     private static Cue cueForWireless(String instruction) {
-        return normalize(instruction).contains("permitir") ? Cue.TAP : Cue.TOGGLE;
+        String normalized = normalize(instruction);
+        if (normalized.contains("permitir") || normalized.contains("busca")) {
+            return Cue.TAP;
+        }
+        return Cue.TOGGLE;
     }
 
     private static String titleForPairing(String instruction) {
@@ -179,20 +236,28 @@ public record GuidePresentation(
     private static String bodyForPairing(String instruction) {
         String normalized = normalize(instruction);
         if (normalized.contains("detectado") || normalized.contains("esperando")) {
-            return preferred(instruction, "Glosh lo conserva en pantalla hasta que soporte esté listo.");
+            return secondary(instruction,
+                    "Código detectado",
+                    "Glosh lo conserva en memoria hasta que soporte esté listo.");
         }
         if (normalized.contains("obteniendo")
                 || normalized.contains("leyendo")
                 || normalized.contains("leer")) {
-            return preferred(instruction, "Glosh lo procesa localmente y continúa automáticamente.");
+            return secondary(instruction,
+                    "Obteniendo el código",
+                    "Glosh lo procesa localmente y continúa automáticamente.");
         }
         if (normalized.contains("ingresa")
                 || normalized.contains("escribi")
                 || normalized.contains("nuevo")
                 || normalized.contains("vencio")) {
-            return preferred(instruction, "También podés responder directamente desde la notificación.");
+            return secondary(instruction,
+                    "Ingresá los 6 números",
+                    "También podés responder directamente desde la notificación.");
         }
-        return preferred(instruction, "Android mostrará seis dígitos; Glosh intentará leerlos automáticamente.");
+        return secondary(instruction,
+                "Tocá “Vincular dispositivo con código”",
+                "Android mostrará seis dígitos; Glosh intentará leerlos automáticamente.");
     }
 
     private static Cue cueForPairing(String instruction) {
@@ -217,6 +282,26 @@ public record GuidePresentation(
                 || normalized.contains("volvé a glosh")
                 || normalized.contains("fallo")
                 || normalized.contains("error");
+    }
+
+    private static String secondary(String instruction, String title, String fallback) {
+        String cleanInstruction = clean(instruction);
+        if (cleanInstruction.isEmpty()) {
+            return fallback;
+        }
+        String normalizedInstruction = normalize(cleanInstruction)
+                .replace("“", "")
+                .replace("”", "")
+                .replace("\"", "");
+        String normalizedTitle = normalize(title)
+                .replace("“", "")
+                .replace("”", "")
+                .replace("\"", "");
+        if (normalizedInstruction.equals(normalizedTitle)
+                || normalizedInstruction.equals(normalizedTitle + ".")) {
+            return fallback;
+        }
+        return cleanInstruction;
     }
 
     private static String preferred(String first, String fallback) {
