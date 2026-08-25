@@ -9,12 +9,12 @@ Antes de cualquier tarea en este repositorio:
 5. No revisar todo el repo salvo pedido explicito.
 6. No tocar areas no relacionadas.
 7. Diagnosticar causa raiz antes de escribir codigo.
-8. Modificar la menor cantidad posible de archivos.
-9. Si solo cambian docs, no compilar, no incrementar versionCode y no publicar APK.
+8. Modificar la menor cantidad razonable de archivos.
+9. Si solo cambian docs/reglas, no compilar, no incrementar versionCode y no publicar APK.
 
 Para planificacion, captura de ideas o seleccion de tickets:
 
-- Leer `docs/BACKLOG_PRODUCTO.md`.
+- Leer `docs/BACKLOG_PRODUCTO.md` solo cuando realmente se este planificando/priorizando.
 - Tratar Glosh Central / Control Center como verdad de coordinacion y GitHub como verdad compartida de codigo, commits, ramas, PR y evidencia.
 - `docs/HANDOFF_ACTUAL.md` puede aportar contexto tecnico, pero no debe contradecir el estado vigente de Central/GitHub.
 - No escribir codigo sin una tarea/autorizacion vigente del usuario o de ChatGPT Central dentro del alcance ya autorizado.
@@ -59,14 +59,6 @@ Regla transversal permanente del proyecto, autorizada por el usuario el 2026-08-
 - Si el resultado es BLOCKED o FAILED, puede publicarse una rama de preservacion/review cuando sea necesario para que ChatGPT pueda inspeccionar el estado exacto, sin ocultar el fallo ni continuar ampliando scope.
 - ChatGPT revisa el diff remoto, archivos criticos, tests y evidencia; despues decide PASS FINAL / follow-up y sincroniza Central en el mismo ciclo.
 - PR, merge, cambios directos a `main` que no sean documentacion de reglas expresamente solicitada, Production, deploy, publicaciones de producto, borrados destructivos y gastos siguen requiriendo autorizacion especifica/controlada. La preautorizacion anterior NO los incluye.
-
-## Ticket Android autorizado por el usuario (2026-07-14)
-
-- Area: `feature-accessibility`, barrera antimanipulacion tipo Rimon.
-- Implementar en tickets pequenos, empezando por navegacion segura desde Ajustes protegidos.
-- Se permite modificar Android, ejecutar tests/builds, incrementar el `versionCode` de cada app afectada, hacer commit/push y publicar esas APKs solo en DEV. Usuario y Admin versionan de forma independiente; coordinar ambos solo cuando el cambio entra en las dos apps.
-- Para alertas remotas se permite usar exclusivamente Supabase DEV `syeycayasyufedwoprea`.
-- No tocar Production, no borrar datos y no incluir Service Role Key en Android.
 
 ## Flujo local vigente
 
