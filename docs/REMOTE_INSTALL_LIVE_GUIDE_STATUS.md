@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-25 00:15 ART
+Updated: 2026-08-25 00:22 ART
 
 ## Connection base
 
@@ -42,9 +42,9 @@ Isolated implementation branch:
 `work/remote-install-one-tap-05-chatgpt`
 
 Current implementation HEAD:
-`ad292c89c7e32f277092a24973a3e22c1508f033`
+`90fd8dddaf1a66db93313c0cadb7806629c9e2eb`
 
-Base is exactly `eaa44f1b…`; branch is ahead only and does not touch main.
+Base is exactly `eaa44f1ba5da204d66a720ae6f5f805699ee22ee`; compare is **ahead 15 / behind 0** and does not touch `main`.
 
 Changed runtime/test scope is limited to `tools/glosh-remote-spike/**`:
 - customer One-Tap UI;
@@ -91,8 +91,12 @@ Mac/operator:
 - exactly one pending request is autoaccepted once for that RemoteSession;
 - 0 requests do nothing;
 - 2+ requests fail closed to manual technician selection;
+- manual and automatic acceptance share one session-level customer slot;
+- once either path accepts one request, that RemoteSession cannot deliver its descriptor to a second phone;
 - standby does not consume authenticated-session TTL;
 - session TTL starts only on first authenticated Android and is not extended on reconnect.
+
+The shared customer slot closes a race discovered during ChatGPT review: with two pending phones, a manual accept of A must never make remaining B eligible for automatic acceptance.
 
 Phone:
 - old five-request limit removed;
@@ -111,9 +115,10 @@ Independent smoke validation outside the Android build environment:
 - `BrokerWaitPolicy` compiled with JDK and passed >5 renewals, 30-minute cutoff and retry reset/backoff cases;
 - Mac heartbeat continued after a simulated transient failure;
 - 0/1/2+ request autoaccept policy behaved fail-closed as designed;
+- manual acceptance and autoaccept share the one-customer slot in dedicated tests;
 - standby/session TTL logic did not consume lifetime before client authentication.
 
-Repository compare from `eaa44f1b…` confirms runtime/test changes remain under `tools/glosh-remote-spike/**` plus this task documentation.
+Repository compare from `eaa44f1b…` confirms all runtime/test/document changes remain under `tools/glosh-remote-spike/**`.
 
 These smokes are useful evidence but **do not replace the real Gradle gate**.
 
@@ -145,7 +150,7 @@ After Gradle/Python PASS and ChatGPT review, only the new post-hardening APK goe
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
 - `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: automated checkpoint preserved at `eaa44f1b…`; superseded as final candidate by One-Tap hardening.
-- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE on isolated ChatGPT branch; pending real Gradle/Python gate, therefore not PASS yet.
+- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE at `90fd8ddd…` on isolated ChatGPT branch; pending real Gradle/Python gate, therefore not PASS yet.
 - `REMOTE-INSTALL-MAC-OPERATOR-04`: standby/heartbeat portion absorbed into One-Tap hardening; richer operator product remains later.
 - `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved for later install pipeline.
 - `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits post-hardening technical PASS + S22 cable-free UX gate.
