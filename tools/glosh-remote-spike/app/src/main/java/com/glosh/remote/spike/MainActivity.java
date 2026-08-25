@@ -173,14 +173,13 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         super.onUserLeaveHint();
         if (!launchingSettings
                 || Build.VERSION.SDK_INT < Build.VERSION_CODES.O
-                || Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
                 || isInPictureInPictureMode()) {
             return;
         }
         try {
             enterPictureInPictureMode(buildPipParams(guideStore.step(), false));
         } catch (Throwable ignored) {
-            // Notification remains the fallback guide if PiP is unavailable or disabled.
+            // Android 12+ also has auto-enter enabled; notification remains the final fallback.
         }
     }
 
