@@ -261,3 +261,125 @@ proxy/protect/guard y no afirma un nuevo gate full-tunnel.
 
 PASS de Codex no equivale a cierre final: ChatGPT debe revisar el diff, archivos
 críticos, tests, evidencia, aislamiento y gate físico.
+
+## SNIFF-STREAM-GUARD-02
+
+### Coordinación y alcance
+
+- Follow-up: `CHROME-IMAGE-CONTENT-AUTHORITY-11B-SNIFF-STREAM-GUARD-02`.
+- Base remota verificada:
+  `4f41f7d298ef080f9613aff930774ae841800a6c`
+  (`review/chrome-image-content-authority-11b-dev349-final`).
+- Commit funcional DEV350:
+  `e7d1bfcac3c818a9a9909300a2faa4b69613b69f`.
+- Rama: `work/chrome-image-content-authority-11b-sniff-stream-02`.
+- Worktree:
+  `/Users/yejielnehmad/Developer/glosh-chrome-image-content-authority-11b-sniff-stream-02`.
+- Central canónico confirmó este follow-up como siguiente paso y sin otro writer
+  Chrome sobre las rutas. Central no fue modificado.
+- El diff funcional queda aislado a `ChromeImageContentAuthority`, tests del
+  dataplane, fixture DEV y versionCode. No cambió transformer, modelo, ONNX,
+  thresholds, VPN, HEV, DNS, guard 10B, Device Owner ni Accessibility.
+- `ChromeImageContentAuthority.kt` queda en 561 líneas porque conserva una única
+  responsabilidad cohesionada: clasificación MIME, sniffing/formato y admisión
+  de cuerpos antes de cualquier entrega. No se agregó datapath ni transformación.
+
+### Defectos y corrección
+
+1. El prefix peek anterior intentaba llenar hasta 512 bytes. En un upstream lento
+   o incremental podía retener una respuesta no-imagen aunque la firma ya fuera
+   imposible. El nuevo sniffer es progresivo: MIME explícitamente no-imagen
+   consume cero bytes; JPEG se confirma en 3, PNG en 8 y WebP/ISO-BMFF sólo leen
+   la firma necesaria. Contenido ambiguo claramente no-imagen se descarta tras
+   5 bytes y HTML ambiguo al completar el root (`<html>`, 6 bytes). El límite de
+   512 queda sólo como máximo duro para SVG/XML/ISO-BMFF realmente ambiguos.
+2. MIME ausente/genérico más `Content-Encoding` no identity antes podía pasar raw
+   porque no era posible magic-sniffear bytes codificados. Ahora se convierte en
+   candidate y termina UNKNOWN/placeholder. `image/*` e image-intent codificados
+   conservan el mismo fail-close. MIME explícito no-imagen (por ejemplo
+   `text/html`, JSON, JS, CSS o `text/event-stream`) conserva passthrough y no se
+   consume para sniffing, incluso con gzip/br.
+3. SVG ya no se identifica por encontrar `<svg` en cualquier punto. Tras BOM y
+   whitespace sólo se permiten declaración XML, comments y doctype bounded; el
+   primer elemento real debe tener root local `svg`. XHTML, feeds y XML con SVG
+   hijo no se clasifican como documento SVG.
+4. Todo prefijo consumido se repone mediante `SequenceInputStream`; tests
+   byte-identical confirman no drop, duplicate ni reorder.
+
+La fixture 11A histórica declaraba el canario gzip como `text/plain`, MIME que
+11B deliberadamente considera ambiguo porque una imagen real mal etiquetada así
+ya está dentro de la autoridad. Para que el canario mida la regla correcta de
+este follow-up —MIME explícito no-imagen codificado conserva semántica web— se
+cambió sólo esa fixture a `text/html`; el body y la validación `gzip-pass` no
+cambiaron.
+
+### Regresiones deterministas y gates
+
+- MIME explícito `text/event-stream`, HTML, JSON, CSS y JavaScript: passthrough
+  con 0 prefix reads.
+- XHTML/XML con SVG inline o hijo: no SVG; root SVG real con XML/comment/doctype:
+  SVG y posterior fail-close.
+- MIME ausente + JPEG fragmentado de a un byte: candidate tras exactamente 3
+  reads y replay completo.
+- MIME ausente/octet-stream + texto o HTML incremental: decisión temprana en
+  5/6 reads; los streams instrumentados fallan si se intenta seguir hasta 512.
+- MIME ausente + gzip: candidate y placeholder; declared image + gzip continúa
+  UNKNOWN; HTML + gzip continúa passthrough con 0 reads.
+- Prefix replay, formatos PNG/JPEG/WebP/AVIF, mislabeled, SVG/animated/206/304,
+  oversize y cache generation/MIME existentes: PASS.
+- La prueba 11A de fallo chunked usa ahora `application/json` explícitamente
+  no-imagen para seguir llegando al writer y conservar su objetivo original.
+- Suite final: 169 tests, 0 failures, 0 errors.
+- `testDevDebugUnitTest`, `compileDevDebugKotlin`, ktlint DEV/testDev,
+  `lintDevDebug`, `assembleDevDebug`: `BUILD SUCCESSFUL`.
+- `git diff --check`: PASS.
+- Warnings observados son los heredados ya documentados: Kotlin annotation
+  targets/deprecations y native libraries no strippeables; no apareció warning
+  nuevo atribuible al follow-up.
+
+### APK y smoke físico DEV350
+
+- versionCode/versionName: `350` / `1.0.1-dev`.
+- APK: `app-user/build/outputs/apk/dev/debug/app-user-dev-debug.apk`.
+- Tamaño: `158,876,997` bytes.
+- SHA-256:
+  `9bf9ae397be65cc0c9d11505551d2b9c2b2ac6ff46cdfba817f7366fb7dbcf6e`.
+- A23 `SM-A235M`, Android 14/API34, instalación in-place con `adb install -r`.
+- Package data inode: `1239519` antes/después; resetCount=1.
+- DO/Affiliated preservado; Accessibility exacta enabled/bound.
+- Fixture final fresca:
+  `https://glosh-photos.test/web11b?nonce=sniff_stream_dev350_final_20260825_1441`.
+- Reporte visible y status interno:
+  `NORMALIZATION:PASS`, `SAFE:PASS`, mislabeled 3/3 PASS, fail-closed 8/8 PASS,
+  `GZIP/CHUNKED/RANGE/ETAG/DOWNLOAD:PASS`.
+- SAFE fixture: 6,768 -> 6,768, `model_allow`, original y MIME canónico.
+- SVG/GIF/APNG/encoded/206/304/oversize: placeholder, ningún original raw.
+- HTTPS normal: `example.com` 200, `text/html`, 318 bytes, streaming chunked.
+- Guard 10B: proceso separado PID 22223, lease current generation 23 durante
+  operación, stale/wrong-caller rejects 0.
+- Proxy: failures=0, queue rejects=0, image admission rejects=0, protect 1/1,
+  protectFailure=0. Transporte: recursion=0, owner timeout/queue drops=0.
+- Surface: `rawPresented=false`, captureRequests=0,
+  captureRequestsSincePresentationReady=0, errorCode3=0; no stale/grid event.
+- BLOCK no se reejecutó después del ajuste exclusivamente de fixture. Se hereda
+  el BLOCK real DEV349 y además una solicitud real en la primera instalación
+  DEV350, con la misma autoridad productiva, volvió a dar 77,187 -> 6,303,
+  `model_filter` 0.6040119. Modelo/transformer no fueron tocados.
+
+La primera apertura física fue inválida porque el equipo entró en `Dozing`; se
+despertó sin clear/uninstall/reset y se repitió sólo la navegación. Una primera
+versión del canario gzip evidenció la ambigüedad `text/plain` descrita arriba; se
+alineó la fixture con `text/html`, se reconstruyó la misma DEV350 y la corrida
+final completa quedó PASS.
+
+### Rollback y residuales
+
+- STOP verificó suspensión de Chrome, revocación del guard, proxy/CA limpios y
+  `phase=stopped rollback=complete cache=cleared`.
+- Transporte final `inactive`, runtime `ready`, ownedFdResources=0,
+  activeProtectedUdpSockets=0; rutas/VPN/DNS productivos restaurados.
+- resetCount=1, inode 1239519, DO/Affiliated y Accessibility enabled/bound.
+- Permanecen los residuales ya declarados: no se decodifican gzip/br/zstd de
+  candidates ambiguos; `data:`, blob/canvas/WebGL/Service Worker/CacheStorage y
+  píxeles generados pertenecen a 13A.
+- Resultado: **PASS técnico Codex; pendiente de revisión final ChatGPT**.
