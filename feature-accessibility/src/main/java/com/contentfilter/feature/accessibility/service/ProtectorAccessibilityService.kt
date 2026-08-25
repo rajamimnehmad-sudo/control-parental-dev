@@ -324,6 +324,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     dangerousSettingsActionVisible = eventSignals.dangerousSettingsActionVisible,
                 )
         if (
+            urgent &&
             shouldLeaveSettingsScreen(
                 packageName = packageName,
                 className = className,
@@ -333,7 +334,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 nowEpochMillis = nowEpochMillis,
             )
         ) {
-            performInitialSettingsProtection(packageName, urgent, elapsedRealtimeMillis)
+            performInitialSettingsProtection(packageName, urgent = true, elapsedRealtimeMillis)
             return true
         }
 
