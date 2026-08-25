@@ -9,6 +9,29 @@
                 android:value="chrome_photos_https_data_plane_dev_lab" />
         </service>
 
+        <service
+            android:name=".chromeguard.ChromeGuardService"
+            android:directBootAware="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:process=":chrome_guard">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="chrome_process_death_guard_dev" />
+        </service>
+
+        <receiver
+            android:name=".chromeguard.ChromeGuardBootReceiver"
+            android:directBootAware="true"
+            android:exported="false"
+            android:process=":chrome_guard">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
         <receiver
             android:name=".chromedataplane.ChromePhotosDataPlaneLabReceiver"
             android:directBootAware="true"
@@ -22,6 +45,11 @@
                 <action android:name="com.contentfilter.user.chromedataplane.command.TRANSPORT_STRESS" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.FULL_TUNNEL_START" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.FULL_TUNNEL_STOP" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.MAIN_PROCESS_KILL" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.MAIN_JAVA_CRASH" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.GUARD_PROCESS_KILL" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.GUARD_STATUS" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.PREPARE_UPDATE" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

@@ -14,6 +14,10 @@ import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.R
+import com.contentfilter.user.chromeguard.ChromeGuardClient
+import com.contentfilter.user.chromeguard.ChromeGuardClientSession
+import com.contentfilter.user.chromeguard.ChromeGuardContract
+import com.contentfilter.user.chromeguard.ChromeGuardHealth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,12 +40,19 @@ class ChromePhotosDataPlaneLabService : Service() {
     private var vpnRollbackCompleted = false
     private lateinit var policyController: ChromePhotosLabPolicyController
     private lateinit var bootstrapController: ChromePhotosTrustedBootstrapController
+    private lateinit var guardClient: ChromeGuardClient
+    private var guardSession: ChromeGuardClientSession? = null
+    private var lastGuardHeartbeatElapsed = 0L
 
     override fun onCreate() {
         super.onCreate()
         policyController = ChromePhotosLabPolicyController(this)
         bootstrapController = ChromePhotosTrustedBootstrapController(this)
         serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        guardClient =
+            ChromeGuardClient(this) {
+                serviceScope?.launch { markFailClosed("guard_lost") }
+            }
     }
 
     override fun onStartCommand(
@@ -61,6 +72,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        guardClient.revoke("service_destroyed")
         markFailClosed("service_destroyed")
         healthJob?.cancel()
         runCatching { proxy?.close() }
@@ -71,6 +83,8 @@ class ChromePhotosDataPlaneLabService : Service() {
         serviceScope?.cancel()
         serviceScope = null
         currentSessionId = ""
+        guardSession = null
+        guardClient.disconnect()
         ChromePhotosDataPlaneRuntimeAttestation.clear()
         super.onDestroy()
     }
@@ -104,6 +118,13 @@ class ChromePhotosDataPlaneLabService : Service() {
                     val sessionId = UUID.randomUUID().toString()
                     currentSessionId = sessionId
                     ChromePhotosDataPlaneRuntimeAttestation.beginSession(sessionId)
+                    guardSession =
+                        guardClient.openSession(
+                            sessionId = sessionId,
+                            mainProcessNonce = UUID.randomUUID().toString(),
+                            bootstrapGeneration = ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration,
+                        )
+                    lastGuardHeartbeatElapsed = 0L
                     bootstrapController.preserveAcrossSessionReset(preferences.edit().clear())
                         .putString(ChromePhotosDataPlaneLabContract.KeySessionId, sessionId)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyActive, false)
@@ -201,6 +222,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                     proxy = null
                     runCatching { policyController.rollbackOwnedPolicyAndCa() }
                     runCatching { restoreVpnStateAfterLab() }
+                    guardClient.stopGuard("start_failed")
+                    guardSession = null
+                    guardClient.disconnect()
                     Log.e(LogTag, "phase=start_failed error=${error.javaClass.simpleName}")
                 }
             }
@@ -219,6 +243,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                 restoreVpnStateAfterLab()
                 lifecycle.stop()
                 currentSessionId = ""
+                guardClient.stopGuard("manual_stop")
+                guardSession = null
+                guardClient.disconnect()
                 ChromePhotosDataPlaneRuntimeAttestation.clear()
                 Log.i(LogTag, "phase=stopped rollback=complete cache=cleared")
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -246,6 +273,7 @@ class ChromePhotosDataPlaneLabService : Service() {
 
     private fun markFailClosed(reason: String) {
         gloshiaReady = false
+        guardClient.revoke(reason)
         runCatching { bootstrapController.requireDevOwnerAndBlockChrome(reason) }
             .onFailure { error ->
                 Log.e(LogTag, "bootstrap=chrome_block_failed error=${error.javaClass.simpleName}")
@@ -324,7 +352,13 @@ class ChromePhotosDataPlaneLabService : Service() {
                     }
                     val chromeReleased =
                         realWebScopeConfirmed &&
-                            bootstrapController.releaseChromeIfHealthy(bootstrapHealth)
+                            bootstrapController.markChromeReleaseEligibleIfHealthy(bootstrapHealth) &&
+                            publishGuardHeartbeatIfDue(
+                                now = now,
+                                health = bootstrapHealth,
+                                realWebScopeConfirmed = realWebScopeConfirmed,
+                            ) &&
+                            !bootstrapController.isChromeSuspended()
                     if (chromeReleased && !wasRealWebReady) {
                         lifecycle.presentationReady()
                         labPreferences().edit()
@@ -358,6 +392,35 @@ class ChromePhotosDataPlaneLabService : Service() {
             }
     }
 
+    private fun publishGuardHeartbeatIfDue(
+        now: Long,
+        health: ChromePhotosTrustedBootstrapHealth,
+        realWebScopeConfirmed: Boolean,
+    ): Boolean {
+        val session = guardSession ?: return false
+        if (now - lastGuardHeartbeatElapsed >= ChromeGuardContract.HeartbeatIntervalMillis) {
+            val published =
+                guardClient.publishHeartbeat(
+                    session = session,
+                    health =
+                        ChromeGuardHealth(
+                            vpnHealthy = health.vpnConfirmed,
+                            transportHealthy = realWebScopeConfirmed && health.vpnConfirmed,
+                            proxyHealthy = health.proxyHealthy,
+                            policyHealthy = health.policyConfirmed,
+                            gloshiaHealthy = health.gloshiaReady,
+                            accessibilityHealthy = health.accessibilityBound,
+                            bootstrapHealthy =
+                                bootstrapController.state().resetGeneration ==
+                                    ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration,
+                        ),
+                )
+            if (!published) return false
+            lastGuardHeartbeatElapsed = now
+        }
+        return true
+    }
+
     private fun logStatus() {
         val preferences = labPreferences()
         val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -388,7 +451,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "bootstrapResetGeneration=${bootstrap.resetGeneration} " +
                 "bootstrapCompleteGeneration=${bootstrap.completeGeneration} " +
                 "bootstrapResetCount=${bootstrap.resetCount} " +
-                "chromeSuspended=${bootstrapController.isChromeSuspended()}",
+                "chromeSuspended=${bootstrapController.isChromeSuspended()} " +
+                "guardSession=${guardSession?.protectionGeneration ?: 0L} " +
+                "guardHeartbeatSequence=${guardSession?.heartbeatSequence ?: 0L}",
         )
     }
 

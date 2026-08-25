@@ -96,6 +96,9 @@ class UserApplication :
 
     override fun onCreate() {
         super.onCreate()
+        // The DEV-only Chrome guard is a minimal independent process. It must not
+        // duplicate VPN, sync, Room or remote coordinators from the main process.
+        if (Application.getProcessName().endsWith(ChromeGuardProcessSuffix)) return
         runCatching { VpnController.enableDevProtection(this) }
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
@@ -230,5 +233,6 @@ class UserApplication :
         const val WebDomainListRefreshIntervalMillis = 6 * 60 * 60 * 1_000L
         const val ProtectionControlRefreshIntervalMillis = 60_000L
         const val ProtectionHealthCheckIntervalMillis = 30_000L
+        const val ChromeGuardProcessSuffix = ":chrome_guard"
     }
 }

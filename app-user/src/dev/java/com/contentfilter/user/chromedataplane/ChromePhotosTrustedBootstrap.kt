@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import com.contentfilter.feature.accessibility.service.ProtectionDeviceAdminReceiver
+import com.contentfilter.user.chromeguard.ChromeSuspensionAuthority
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 
@@ -73,6 +74,7 @@ internal class ChromePhotosTrustedBootstrapController(
     private val appContext = context.applicationContext
     private val devicePolicyManager = appContext.getSystemService(DevicePolicyManager::class.java)
     private val admin = ComponentName(appContext, ProtectionDeviceAdminReceiver::class.java)
+    private val suspensionAuthority = ChromeSuspensionAuthority(appContext)
     private val preferences =
         appContext.getSharedPreferences(
             ChromePhotosDataPlaneLabContract.PreferencesName,
@@ -82,7 +84,7 @@ internal class ChromePhotosTrustedBootstrapController(
     fun requireDevOwnerAndBlockChrome(reason: String) {
         check(appContext.packageName.endsWith(".dev")) { "DEV package required" }
         check(devicePolicyManager.isDeviceOwnerApp(appContext.packageName)) { "Device Owner required" }
-        check(setChromeSuspended(true)) { "Chrome suspension failed" }
+        check(suspensionAuthority.ensureSuspended(reason)) { "Chrome suspension failed" }
         Log.i(LogTag, "bootstrap=chrome_blocked reason=${reason.take(MaxReasonLength)}")
     }
 
@@ -127,18 +129,14 @@ internal class ChromePhotosTrustedBootstrapController(
         )
     }
 
-    fun releaseChromeIfHealthy(health: ChromePhotosTrustedBootstrapHealth): Boolean {
+    fun markChromeReleaseEligibleIfHealthy(health: ChromePhotosTrustedBootstrapHealth): Boolean {
         val current = state()
         if (ChromePhotosTrustedBootstrapPolicy.nextAction(current, health) !=
             ChromePhotosTrustedBootstrapAction.ReleaseChrome
         ) {
             return false
         }
-        if (!isChromeSuspended() &&
-            current.completeGeneration == ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration
-        ) {
-            return true
-        }
+        if (current.completeGeneration == ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration) return true
         if (!preferences.edit()
                 .putInt(
                     ChromePhotosDataPlaneLabContract.KeyTrustedBootstrapCompleteGeneration,
@@ -148,16 +146,10 @@ internal class ChromePhotosTrustedBootstrapController(
         ) {
             return false
         }
-        if (!setChromeSuspended(false)) {
-            preferences.edit()
-                .putInt(ChromePhotosDataPlaneLabContract.KeyTrustedBootstrapCompleteGeneration, 0)
-                .commit()
-            return false
-        }
         Log.i(
             LogTag,
-            "bootstrap=chrome_released generation=${ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration} " +
-                "health=verified",
+            "bootstrap=chrome_release_eligible generation=${ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration} " +
+                "health=verified authority=chrome_guard",
         )
         return true
     }
@@ -177,10 +169,7 @@ internal class ChromePhotosTrustedBootstrapController(
             resetCount = preferences.getInt(ChromePhotosDataPlaneLabContract.KeyTrustedBootstrapResetCount, 0),
         )
 
-    fun isChromeSuspended(): Boolean =
-        runCatching {
-            appContext.packageManager.isPackageSuspended(ChromePhotosDataPlaneLabContract.ChromePackage)
-        }.getOrDefault(false)
+    fun isChromeSuspended(): Boolean = suspensionAuthority.isSuspended() == true
 
     fun preserveAcrossSessionReset(editor: SharedPreferences.Editor): SharedPreferences.Editor {
         val current = state()
@@ -196,16 +185,6 @@ internal class ChromePhotosTrustedBootstrapController(
             .putInt(ChromePhotosDataPlaneLabContract.KeyTrustedBootstrapResetCount, current.resetCount)
     }
 
-    private fun setChromeSuspended(suspended: Boolean): Boolean {
-        val failures =
-            devicePolicyManager.setPackagesSuspended(
-                admin,
-                arrayOf(ChromePhotosDataPlaneLabContract.ChromePackage),
-                suspended,
-            )
-        return failures.isEmpty() && isChromeSuspended() == suspended
-    }
-
     private companion object {
         const val ClearDataTimeoutMillis = 180_000L
         const val MaxReasonLength = 80
@@ -218,20 +197,7 @@ internal object ChromePhotosTrustedBootstrapBootGuard {
     fun blockChrome(context: Context): Boolean {
         val appContext = context.applicationContext
         if (!appContext.packageName.endsWith(".dev")) return false
-        val devicePolicyManager = appContext.getSystemService(DevicePolicyManager::class.java)
-        if (!devicePolicyManager.isDeviceOwnerApp(appContext.packageName)) return false
-        val admin = ComponentName(appContext, ProtectionDeviceAdminReceiver::class.java)
-        val failures =
-            devicePolicyManager.setPackagesSuspended(
-                admin,
-                arrayOf(ChromePhotosDataPlaneLabContract.ChromePackage),
-                true,
-            )
-        val suspended =
-            runCatching {
-                appContext.packageManager.isPackageSuspended(ChromePhotosDataPlaneLabContract.ChromePackage)
-            }.getOrDefault(false)
-        val blocked = failures.isEmpty() && suspended
+        val blocked = ChromeSuspensionAuthority(appContext).ensureSuspended("boot_guard")
         Log.i(LogTag, "bootstrap=locked_boot_guard blocked=$blocked")
         return blocked
     }
