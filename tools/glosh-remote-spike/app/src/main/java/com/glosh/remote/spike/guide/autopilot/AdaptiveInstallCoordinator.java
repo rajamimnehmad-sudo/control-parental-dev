@@ -44,9 +44,9 @@ public final class AdaptiveInstallCoordinator {
     private final ScanGenerationGuard generationGuard;
     private final Host host;
     private final SamsungSettingsClassifier classifier = new SamsungSettingsClassifier();
+    private final WirelessDirectRoutePolicy wirelessRoutePolicy = new WirelessDirectRoutePolicy();
 
     private long probeStartedAtMs;
-    private String lastDeveloperFingerprint = "";
     private boolean aboutFallbackScheduled;
 
     public AdaptiveInstallCoordinator(
@@ -91,10 +91,9 @@ public final class AdaptiveInstallCoordinator {
             return;
         }
         if (stage == GuideStage.WIRELESS_DEBUGGING) {
-            lastDeveloperFingerprint = "";
+            wirelessRoutePolicy.reset();
             host.startSupportStackIfReady();
-            host.showInstruction("Activá Depuración inalámbrica. Glosh detectará el cambio.");
-            host.openSettings(SettingsRoute.WIRELESS_DEBUGGING);
+            openWirelessDirect();
         }
     }
 
@@ -108,7 +107,8 @@ public final class AdaptiveInstallCoordinator {
                 }
             }, FALLBACK_DELAY_MS);
         } else if (stage == GuideStage.WIRELESS_DEBUGGING) {
-            host.showRecovery("No encuentro Depuración inalámbrica. Volvé a Glosh para abrirla otra vez.");
+            host.showRecovery(
+                    "No encuentro la pantalla esperada. Volvé a Glosh para abrir Depuración inalámbrica nuevamente.");
         }
     }
 
@@ -119,7 +119,8 @@ public final class AdaptiveInstallCoordinator {
         AutopilotUiModel.ClassifiedScreen classified = classifier.classify(snapshot);
         debug("guided stage=" + stage
                 + " screen=" + classified.screen()
-                + " wireless=" + classified.wirelessEnabled());
+                + " wireless=" + classified.wirelessEnabled()
+                + " directAttempts=" + wirelessRoutePolicy.attempts());
 
         if (classified.screen() == AutopilotContract.Screen.CREDENTIAL_PROMPT) {
             LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_CREDENTIAL);
@@ -131,15 +132,13 @@ public final class AdaptiveInstallCoordinator {
             return;
         }
         if (stage == GuideStage.AUTOPILOT_PROBE) {
-            handleDeveloperProbe(snapshot, classified);
+            handleDeveloperProbe(classified);
         } else if (stage == GuideStage.WIRELESS_DEBUGGING) {
             handleWirelessDebugging(snapshot, classified);
         }
     }
 
-    private void handleDeveloperProbe(
-            SettingsSnapshot snapshot,
-            AutopilotUiModel.ClassifiedScreen classified) {
+    private void handleDeveloperProbe(AutopilotUiModel.ClassifiedScreen classified) {
         SupportSessionCoordinator support = SupportSessionCoordinator.get(context);
         if (classified.screen() == AutopilotContract.Screen.WIRELESS_DEBUGGING) {
             aboutFallbackScheduled = false;
@@ -152,8 +151,13 @@ public final class AdaptiveInstallCoordinator {
         }
         if (classified.screen() == AutopilotContract.Screen.DEVELOPER_OPTIONS) {
             aboutFallbackScheduled = false;
-            host.showInstruction("Si están apagadas, activá las opciones de desarrollador.");
-            openWirelessWhenStateChanges(snapshot);
+            // Reaching Developer options itself completes step 2. The wireless route belongs to
+            // step 3 and is started exactly once from that stage transition.
+            if (support.step() == OnboardingState.Step.DEVELOPER_OPTIONS) {
+                support.confirmDeveloperOptions();
+            } else {
+                LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
+            }
             return;
         }
         if (SystemClock.elapsedRealtime() - probeStartedAtMs >= FALLBACK_DELAY_MS) {
@@ -168,10 +172,7 @@ public final class AdaptiveInstallCoordinator {
         switch (classified.screen()) {
             case NETWORK_CONFIRMATION ->
                     host.showInstruction("Tocá “Permitir” para usar esta red Wi‑Fi.");
-            case DEVELOPER_OPTIONS -> {
-                host.showInstruction("Activá las opciones de desarrollador si están apagadas.");
-                openWirelessWhenStateChanges(snapshot);
-            }
+            case DEVELOPER_OPTIONS -> handleDirectRouteReturnedToDeveloperOptions(snapshot);
             case WIRELESS_DEBUGGING -> {
                 if (Boolean.TRUE.equals(classified.wirelessEnabled())) {
                     host.clearVisuals();
@@ -187,16 +188,31 @@ public final class AdaptiveInstallCoordinator {
                 host.rescanAfter(100L);
             }
             default -> host.showInstruction(
-                    "Glosh abrió la pantalla correcta. Seguí la indicación de la notificación.");
+                    "Seguí la indicación de Glosh. No hace falta volver a activar opciones de desarrollador.");
         }
     }
 
-    private void openWirelessWhenStateChanges(SettingsSnapshot snapshot) {
-        String fingerprint = snapshot.fingerprint() == null ? "" : snapshot.fingerprint();
-        if (fingerprint.equals(lastDeveloperFingerprint)) {
-            return;
+    private void handleDirectRouteReturnedToDeveloperOptions(SettingsSnapshot snapshot) {
+        WirelessDirectRoutePolicy.Decision decision =
+                wirelessRoutePolicy.onDeveloperOptions(snapshot.fingerprint());
+        debug("wireless direct fallback=" + decision
+                + " fingerprint=" + snapshot.fingerprint());
+        switch (decision) {
+            case WAIT_FOR_USER -> host.showInstruction(
+                    "Samsung no abrió Depuración inalámbrica directamente. Si Opciones de desarrollador está apagado, activalo. Después buscá y tocá “Depuración inalámbrica” en esta lista. Glosh seguirá solo.");
+            case RETRY_DIRECT_ONCE -> {
+                host.showInstruction(
+                        "Listo. Vuelvo a intentar abrir Depuración inalámbrica una sola vez.");
+                openWirelessDirect();
+            }
+            case VISUAL_FALLBACK -> host.showInstruction(
+                    "Buscá y tocá “Depuración inalámbrica” en esta lista. Glosh ya no volverá a abrir Opciones de desarrollador ni hará scroll por vos.");
         }
-        lastDeveloperFingerprint = fingerprint;
+    }
+
+    private void openWirelessDirect() {
+        wirelessRoutePolicy.markDirectAttempt();
+        host.showInstruction("Activá Depuración inalámbrica. Glosh detectará el cambio.");
         host.openSettings(SettingsRoute.WIRELESS_DEBUGGING);
     }
 
@@ -224,8 +240,8 @@ public final class AdaptiveInstallCoordinator {
 
     private void resetProbe() {
         probeStartedAtMs = SystemClock.elapsedRealtime();
-        lastDeveloperFingerprint = "";
         aboutFallbackScheduled = false;
+        wirelessRoutePolicy.reset();
     }
 
     private void debug(String message) {
