@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-25 00:25 ART
+Updated: 2026-08-25 00:49 ART
 
 ## Connection base
 
@@ -42,9 +42,9 @@ Isolated implementation branch:
 `work/remote-install-one-tap-05-chatgpt`
 
 Current implementation HEAD:
-`7258b131d6e9079b9bb8cfb552024d1d82526438`
+`59f6b39be1b39005bacdc848ff0717240b43ed67`
 
-Base is exactly `eaa44f1ba5da204d66a720ae6f5f805699ee22ee`; branch is ahead-only and does not touch `main`.
+Base is exactly `eaa44f1b…`; branch is ahead-only and does not touch `main`.
 
 Changed runtime/test scope remains limited to `tools/glosh-remote-spike/**`:
 - customer One-Tap UI;
@@ -55,7 +55,7 @@ Changed runtime/test scope remains limited to `tools/glosh-remote-spike/**`:
 - bounded request/poll retry;
 - explicit manual pairing fallback state;
 - narrow Java/Python tests;
-- one-command verification/build script.
+- one-command verification/build script with isolated Python dependency bootstrap.
 
 Implementation handoff/evidence:
 `tools/glosh-remote-spike/ONE_TAP_HARDENING_05.md`.
@@ -126,16 +126,30 @@ Repository compare from `eaa44f1b…` confirms all runtime/test/document/build-s
 
 These smokes are useful evidence but **do not replace the real Gradle gate**.
 
+## Gate incident resolved in-source
+
+First real execution of `verify_one_tap.sh` stopped before Gradle because the macOS system Python did not have the `websockets` package installed. The project already declared the dependency in `mac/requirements.txt`; the gate script was incorrectly assuming those dependencies existed globally.
+
+HEAD `59f6b39b…` fixes the gate itself:
+- creates a temporary isolated Python venv with `python3 -m venv`;
+- installs exactly `mac/requirements.txt` (`websockets==14.2`, `cryptography>=44,<47`);
+- executes all Python tests through that venv;
+- removes the temporary venv on exit;
+- does not modify the global/system Python installation.
+
+This was an environment-bootstrap defect in the verification script, not a Remote Installer runtime failure. Gate status remains **pending rerun**, not failed product code.
+
 ## Remaining technical gate
 
 Single command on the Mac/local Android build environment:
 
 ```bash
-bash tools/glosh-remote-spike/verify_one_tap.sh
+ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk bash tools/glosh-remote-spike/verify_one_tap.sh
 ```
 
-The script runs:
-- `python3 -m unittest test_protocol.py test_broker.py test_one_tap_standby.py`;
+The script now runs:
+- isolated Python venv + `mac/requirements.txt` bootstrap;
+- Python protocol/broker/standby tests;
 - `:app:testDebugUnitTest`;
 - `:app:lintDebug`;
 - `:app:assembleDebug`;
@@ -154,7 +168,7 @@ After Gradle/Python PASS and ChatGPT review, only the new post-hardening APK goe
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
 - `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: automated checkpoint preserved at `eaa44f1b…`; superseded as final candidate by One-Tap hardening.
-- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE at `7258b131…` on isolated ChatGPT branch; pending real Gradle/Python gate, therefore not PASS yet.
+- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE at `59f6b39b…` on isolated ChatGPT branch; verification-script dependency bootstrap fixed after first gate attempt; real Gradle/Python rerun pending, therefore not PASS yet.
 - `REMOTE-INSTALL-MAC-OPERATOR-04`: standby/heartbeat portion absorbed into One-Tap hardening; richer operator product remains later.
 - `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved for later install pipeline.
 - `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits post-hardening technical PASS + S22 cable-free UX gate.
