@@ -1,59 +1,60 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-24 21:15 ART
+Updated: 2026-08-24 22:47 ART
 
 ## Connection base
 
 `REMOTE-INSTALL-CONNECTION-00`: **PASS FINAL DEV / CLOSED**.
 
-The already proven no-link connection remains frozen: broker → relay/WSS → Glosh Remote → local Wireless ADB, with HMAC/AES, allowlist and no direct ADB exposure. Autopilot must not redesign this stack.
+The proven no-link stack remains frozen: broker → relay/WSS → Glosh Remote → local Wireless ADB, with HMAC/AES, fixed allowlist and no direct ADB exposure. Adaptive Autopilot must reuse it, not redesign it.
 
-## Old guide
+## Superseded guide
 
 `REMOTE-INSTALL-LIVE-GUIDE-03`: **FAILED UX PHYSICAL / SUPERSEDED**.
 
-Historical pre-Autopilot implementation chain:
+Historical implementation chain before Autopilot:
 `475bd35b... → 1a537f7a... → 99fcf2bb... → 122c45b9... → 93735b1c...`
 
-The read-only Codex audit at `93735b1c2a9f493dcd491556b23920c50c3d66f2` confirmed the structural risks already recorded: active-root authority, live node retention, missing generation/window/fingerprint guard, stale callbacks and uncontrolled scrolling.
+A prior Codex run left a technically buildable guide-first candidate and proposed rerunning Android/Python tests, `lintDebug`, `assembleDebug`, generating an APK and doing a physical S22 trial. That candidate is preserved but **must not be used as the final UX trial**, because guide-first was superseded afterward by Adaptive Autopilot.
 
-## Active route — Adaptive Autopilot
+## Active product route — Adaptive Autopilot
 
-`REMOTE-INSTALL-LIVE-GUIDE-V2-04`: **PRE-CODEX REFERENCE COMPLETE / SAMSUNG ANDROID PORT PENDING**.
+`REMOTE-INSTALL-LIVE-GUIDE-V2-04`: **PAUSED / PRE-CODEX REFERENCE COMPLETE / ANDROID PORT PENDING**.
+
+Pause reason: the available phones are currently reserved by another project front. This is an intentional resource pause, not a functional BLOCKED state and not a failure.
 
 Product direction is frozen as:
 
-**Samsung-first implementation + universal state engine + minimal guided fallback.**
+**Samsung-first implementation + universal state engine + shortest-path Autopilot + minimal guided fallback.**
 
-Normal UX after one-time Accessibility bootstrap:
+Normal target UX after the one-time Accessibility bootstrap:
 
-`INICIAR → detect real state → shortest safe Settings path → enable Wireless Debugging if needed → open pairing dialog → auto-read exactly one contextual 6-digit code when possible → existing local pairing/ADB → existing secure support connection`.
+`INICIAR → detect real state → shortest safe path → enable Wireless Debugging only if needed → open pairing dialog → auto-read one contextual 6-digit code when safe → existing local pairing/ADB → existing secure support connection`.
 
-Shortest-path prerequisites/shortcuts are mandatory:
+Mandatory shortcuts/preconditions:
 - support already connected → DONE;
 - valid local ADB → skip Settings/pairing;
-- previous pairing exists → try reconnect before opening Settings;
-- Accessibility blocked by Restricted Settings → user clears that prerequisite first;
+- previous pairing → try reconnect before opening Settings;
+- Restricted Settings blocks Accessibility → user clears prerequisite;
 - Accessibility disabled → user enables it once;
-- no usable Wi-Fi → stop and ask for Wi-Fi;
-- Wireless Debugging blocked by device/admin policy → BLOCKED, no guessed workaround;
+- no usable Wi-Fi → request Wi-Fi;
+- Wireless Debugging blocked by policy → safe BLOCKED result;
 - Developer Options already available → skip Build Number;
-- Wireless Debugging already ON → skip toggle/confirmation;
+- Wireless Debugging already ON → skip its toggle;
 - pairing dialog already open → pair immediately;
-- credential prompt → user enters credential, then Autopilot resumes from a fresh probe.
-
-Do not infer Developer Options from `Settings.Global.DEVELOPMENT_SETTINGS_ENABLED`; Android reports it as 0 to third-party apps. Use public Settings intents + trusted UI classification.
+- credential prompt → wait for user credential, then resume from a fresh probe.
 
 ## Authoritative GitHub reference
 
 Branch:
 `coordination/remote-install-live-guide-v2`
 
-Architecture:
+Architecture/status:
 - `docs/REMOTE_INSTALL_ADAPTIVE_AUTOPILOT_ARCHITECTURE.md`
 - `docs/REMOTE_INSTALL_AUTOPILOT_DECISION.md`
+- `docs/REMOTE_INSTALL_LIVE_GUIDE_STATUS.md`
 
-Planner/state reference:
+Reference implementation:
 - `docs/artifacts/remote-install-autopilot/reference/AUTOPILOT_STATE_MACHINE.json`
 - `docs/artifacts/remote-install-autopilot/reference/SAMSUNG_RECIPE_V1.json`
 - `docs/artifacts/remote-install-autopilot/reference/SCENARIO_MATRIX.md`
@@ -61,8 +62,6 @@ Planner/state reference:
 - `docs/artifacts/remote-install-autopilot/reference/test_adaptive_engine.py`
 - `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlanner.kt`
 - `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlannerTest.kt`
-
-Pure Kotlin UI/safety reference:
 - `docs/artifacts/remote-install-autopilot/reference/AutopilotUiModel.kt`
 - `docs/artifacts/remote-install-autopilot/reference/SettingsWindowSelector.kt`
 - `docs/artifacts/remote-install-autopilot/reference/SamsungSettingsClassifier.kt`
@@ -70,66 +69,42 @@ Pure Kotlin UI/safety reference:
 - `docs/artifacts/remote-install-autopilot/reference/AutopilotActionGate.kt`
 - `docs/artifacts/remote-install-autopilot/reference/AutopilotUiPureTest.kt`
 - `docs/artifacts/remote-install-autopilot/reference/CODEX_MINIMAL_PORT.md`
+- `docs/artifacts/remote-install-autopilot/reference/REFERENCE_VALIDATION.md`
 
-Reference validation by ChatGPT:
-- Python planner/state: **38/38 tests PASS**;
-- Kotlin planner: **40 reference checks PASS** after successful `kotlinc` compilation;
-- Kotlin pure UI/safety layer: **18/18 checks PASS** after successful `kotlinc` compilation.
-
-The old binary `glosh_remote_live_guide_v2_prototype.zip` is deprecated and must not be used.
+Reference validation completed by ChatGPT:
+- Python planner/state: **38/38 PASS**;
+- Kotlin planner: **40/40 reference checks PASS** after `kotlinc` compilation;
+- Kotlin pure UI/safety layer: **18/18 PASS** after `kotlinc` compilation.
 
 ## Safety/action contract
 
-Every automatic click is a separate verified transaction:
+Every automatic click is a verified transaction:
 
-`stable trusted Settings snapshot → classify HIGH/unique → fresh node reacquisition → exactly one ACTION_CLICK → invalidate generation → observe allowed next state`.
+`stable trusted Settings snapshot → HIGH/unique classification → fresh live-node reacquisition → one ACTION_CLICK → invalidate generation → observe an allowed next state`.
 
-Requirements:
-- exactly one trusted Settings `TYPE_APPLICATION` window;
-- overlay/IME/unrelated apps excluded;
-- immutable logical snapshots;
-- current generation/window/fingerprint token;
-- OEM recipe allows the target;
-- HIGH confidence, unique winner, margin over second candidate;
-- fresh live node before action;
-- known expected next-state set;
-- one wrong automatic click = FAIL.
+One wrong automatic click = FAIL. PIN/password/pattern are never automated or captured. Ambiguity causes a safe stop/fallback.
 
-Never automate device PIN/password/pattern. Never guess an ambiguous screen or pairing code.
+## Device strategy after pause
 
-## Samsung v1 path
+### A23
+Samsung SM-A235M / Android 14 / API 34 is currently unsuitable for the Accessibility physical gate because its existing Device Owner policy blocks the Glosh Remote AccessibilityService. Do not change/remove Device Owner merely to make this test pass while the A23 is serving another front.
 
-Fast path first:
-1. Existing ADB/reconnect probe.
-2. `ACTION_APPLICATION_DEVELOPMENT_SETTINGS`.
-3. If Developer Options recognized → `Depuración inalámbrica`.
-4. If unavailable → `ACTION_DEVICE_INFO_SETTINGS` → `Información de software` → `Número de compilación` up to 7 individually revalidated taps.
-5. Credential prompt, if any, pauses for user.
-6. Re-open Developer Settings directly.
-7. Enable Wireless Debugging only if OFF.
-8. Accept exact expected network confirmation when safely classified.
-9. Open `Vincular dispositivo con código de vinculación`.
-10. Exactly one contextual 6-digit code → existing pairing service automatically; otherwise six-box manual fallback.
-11. Existing secure connection stack takes over once ADB is ready.
+### S22
+Use the S22 later as the primary cable-free real-user Samsung UX gate once it is available. No USB is required for that product-experience trial.
 
-## Scope / universality
+## Resume sequence
 
-The core state engine is universal. Samsung is the only OEM-specific automatic enable-development recipe implemented in this cycle. Unsupported OEMs may still use common fast paths when Developer Options/Wireless Debugging are already reachable; otherwise they fail closed into guided fallback. Motorola/Xiaomi become later adapter additions, not state-machine rewrites.
-
-## Next work that genuinely requires Codex/Mac
-
-Only Android/environment-bound work remains:
-1. verify actual current local Remote Installer HEAD/worktree and owner;
-2. port the frozen planner + pure UI classes into `tools/glosh-remote-spike/**`, preserving useful current guide/pairing code;
-3. implement the thin Android adapter from `AccessibilityWindowInfo`/`AccessibilityNodeInfo` into the immutable reference model and fresh live-node resolver before `ACTION_CLICK`;
-4. port full reference coverage to Android/JVM tests;
-5. compile/lint/regression tests;
-6. use Samsung A23 SM-A235M / Android 14 / API 34 as instrumented lab device;
-7. physically validate all important start states with **zero wrong automatic clicks**;
-8. verify automatic code pairing when unambiguous and manual six-box fallback otherwise;
-9. reuse the frozen PASS connection base once local ADB is ready;
-10. generate exact APK and send the same candidate to S22 for cable-free real-user UX validation;
-11. return diff/tests/evidence for ChatGPT review.
+When the front is resumed:
+1. Codex checks the actual Remote Installer branch/worktree/owner and preserves any interrupted local work.
+2. Port the frozen planner + pure UI reference into `tools/glosh-remote-spike/**`; do not redesign.
+3. Implement only the Android binding from `AccessibilityWindowInfo`/`AccessibilityNodeInfo` to immutable snapshots and fresh-node click execution.
+4. Run all Android/JVM tests plus Python/broker regressions.
+5. Run `lintDebug` and `assembleDebug`.
+6. Create a clean local commit and exact APK path/size/SHA-256.
+7. Do not spend a physical trial on the superseded guide-first APK.
+8. When S22 is free, send the exact Adaptive Autopilot APK to it and run one cable-free real-user gate.
+9. Reuse the frozen PASS connection stack once local ADB is ready.
+10. Return diff/tests/evidence to ChatGPT for review before final closure.
 
 No push/PR/merge/deploy/Production/Supabase.
 
@@ -137,8 +112,8 @@ No push/PR/merge/deploy/Production/Supabase.
 
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
-- `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: PRE-CODEX REFERENCE COMPLETE; Samsung Android port is next.
+- `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: PAUSED intentionally; reference complete, Android port pending, no active writer now.
 - `REMOTE-INSTALL-MAC-OPERATOR-04`: preserved; waits for installer UX stability.
 - `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits for A23 Autopilot physical gate + S22 cable-free UX confirmation.
+- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: pending Adaptive Autopilot S22 cable-free gate.
 - Do not touch Chrome, GloshIA, DAG, App Usuario/Admin, Supabase or production Device Owner logic.
