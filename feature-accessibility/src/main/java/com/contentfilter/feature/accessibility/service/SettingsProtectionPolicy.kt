@@ -25,7 +25,7 @@ class SettingsProtectionPolicy {
         settingsAuthorized: Boolean,
         removalAuthorized: Boolean,
         trustedInstallAuthorized: Boolean,
-        elapsedRealtimeMillis: Long,
+        @Suppress("UNUSED_PARAMETER") elapsedRealtimeMillis: Long,
     ): Boolean {
         val requiredScope =
             protectedScope(
@@ -64,9 +64,6 @@ class SettingsProtectionPolicy {
         }
         if (requiredScope == ProtectionAuthorizationScope.Settings && settingsAuthorized) return false
         if (requiredScope == ProtectionAuthorizationScope.Removal && removalAuthorized) return false
-        if (elapsedRealtimeMillis - lastActionAtElapsedMillis >= MinActionIntervalMillis) {
-            lastActionAtElapsedMillis = elapsedRealtimeMillis
-        }
         return true
     }
 
@@ -168,14 +165,11 @@ class SettingsProtectionPolicy {
             ownAppIdentityVisible &&
             className.orEmpty().contains(GenericSubSettingsClassHint, ignoreCase = true)
 
-    private var lastActionAtElapsedMillis: Long = -MinActionIntervalMillis
-
     private companion object {
         const val AndroidSettingsPackage = "com.android.settings"
         const val SamsungAccessibilityPackage = "com.samsung.accessibility"
         const val SamsungSubSettingsClassHint = "SubSettings"
         const val GenericSubSettingsClassHint = "SubSettings"
-        const val MinActionIntervalMillis = 2_000L
         val PackageInstallerPackages =
             setOf(
                 "com.android.packageinstaller",
