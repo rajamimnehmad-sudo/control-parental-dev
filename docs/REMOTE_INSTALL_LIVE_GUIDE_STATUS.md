@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-24 21:05 ART
+Updated: 2026-08-24 21:15 ART
 
 ## Connection base
 
@@ -53,7 +53,7 @@ Architecture:
 - `docs/REMOTE_INSTALL_ADAPTIVE_AUTOPILOT_ARCHITECTURE.md`
 - `docs/REMOTE_INSTALL_AUTOPILOT_DECISION.md`
 
-Executable/text reference:
+Planner/state reference:
 - `docs/artifacts/remote-install-autopilot/reference/AUTOPILOT_STATE_MACHINE.json`
 - `docs/artifacts/remote-install-autopilot/reference/SAMSUNG_RECIPE_V1.json`
 - `docs/artifacts/remote-install-autopilot/reference/SCENARIO_MATRIX.md`
@@ -61,11 +61,20 @@ Executable/text reference:
 - `docs/artifacts/remote-install-autopilot/reference/test_adaptive_engine.py`
 - `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlanner.kt`
 - `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlannerTest.kt`
+
+Pure Kotlin UI/safety reference:
+- `docs/artifacts/remote-install-autopilot/reference/AutopilotUiModel.kt`
+- `docs/artifacts/remote-install-autopilot/reference/SettingsWindowSelector.kt`
+- `docs/artifacts/remote-install-autopilot/reference/SamsungSettingsClassifier.kt`
+- `docs/artifacts/remote-install-autopilot/reference/PairingCodeDetector.kt`
+- `docs/artifacts/remote-install-autopilot/reference/AutopilotActionGate.kt`
+- `docs/artifacts/remote-install-autopilot/reference/AutopilotUiPureTest.kt`
 - `docs/artifacts/remote-install-autopilot/reference/CODEX_MINIMAL_PORT.md`
 
 Reference validation by ChatGPT:
-- Python: **38/38 tests PASS**;
-- Kotlin: **40 reference checks PASS** after successful `kotlinc` compilation.
+- Python planner/state: **38/38 tests PASS**;
+- Kotlin planner: **40 reference checks PASS** after successful `kotlinc` compilation;
+- Kotlin pure UI/safety layer: **18/18 checks PASS** after successful `kotlinc` compilation.
 
 The old binary `glosh_remote_live_guide_v2_prototype.zip` is deprecated and must not be used.
 
@@ -109,17 +118,18 @@ The core state engine is universal. Samsung is the only OEM-specific automatic e
 
 ## Next work that genuinely requires Codex/Mac
 
-Only environment-bound work remains:
+Only Android/environment-bound work remains:
 1. verify actual current local Remote Installer HEAD/worktree and owner;
-2. port the frozen Kotlin planner and Android bindings into `tools/glosh-remote-spike/**`, preserving useful current guide/pairing code;
-3. port the full reference coverage to Android/JVM tests;
-4. compile/lint/regression tests;
-5. use Samsung A23 SM-A235M / Android 14 / API 34 as instrumented lab device;
-6. physically validate all important start states with **zero wrong automatic clicks**;
-7. verify automatic code pairing when unambiguous and manual six-box fallback otherwise;
-8. reuse the frozen PASS connection base once local ADB is ready;
-9. generate exact APK and send the same candidate to S22 for cable-free real-user UX validation;
-10. return diff/tests/evidence for ChatGPT review.
+2. port the frozen planner + pure UI classes into `tools/glosh-remote-spike/**`, preserving useful current guide/pairing code;
+3. implement the thin Android adapter from `AccessibilityWindowInfo`/`AccessibilityNodeInfo` into the immutable reference model and fresh live-node resolver before `ACTION_CLICK`;
+4. port full reference coverage to Android/JVM tests;
+5. compile/lint/regression tests;
+6. use Samsung A23 SM-A235M / Android 14 / API 34 as instrumented lab device;
+7. physically validate all important start states with **zero wrong automatic clicks**;
+8. verify automatic code pairing when unambiguous and manual six-box fallback otherwise;
+9. reuse the frozen PASS connection base once local ADB is ready;
+10. generate exact APK and send the same candidate to S22 for cable-free real-user UX validation;
+11. return diff/tests/evidence for ChatGPT review.
 
 No push/PR/merge/deploy/Production/Supabase.
 
