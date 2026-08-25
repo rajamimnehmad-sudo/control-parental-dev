@@ -1,201 +1,137 @@
 # Glosh Remote — Professional Guided Assistant
 
-Updated: 2026-08-25 11:20 ART
+Updated: 2026-08-25 11:58 ART
 
 ## Executive status
 
-`REMOTE-INSTALL-GUIDED-ASSISTANT-08`: **PASS AUTOMATED / PENDING DIRECT S22 PHYSICAL GATE**.
-
-The connection base remains separately closed:
+`REMOTE-INSTALL-GUIDED-ASSISTANT-08`: **S22 PHYSICAL FAIL AT DEVELOPER→WIRELESS TRANSITION / FIX IMPLEMENTED / NEW AUTOMATED GATE PENDING**.
 
 `REMOTE-INSTALL-CONNECTION-00`: **PASS FINAL DEV / CLOSED**.
 
-The previous auto-click One-Tap route remains superseded. The active product is:
+The secure connection stack remains unchanged. The defect is isolated to the guided Settings transition.
 
-**Glosh opens the exact destination → the customer performs the protected Android tap → Glosh observes the trusted result → Glosh opens the next destination.**
+## Failed physical candidate
 
-## Frozen source
+Previously frozen candidate:
+
+- HEAD: `1313eea1324903348c6e375b3ce9327120b31ff9`;
+- APK: `GloshRemote-Guided-DEV.apk`;
+- size: `19,287,538` bytes;
+- SHA-256: `14ed9879f2b18559fdbef914fa2a89e572bef2b98082c1c10e935d3e0a6ecd10`.
+
+Automated gates on that candidate were all PASS:
+- architecture PASS;
+- Python 14/14 PASS;
+- Android 96/96 PASS;
+- lint PASS;
+- assemble PASS.
+
+Physical S22 result: **FAILED UX / REPRODUCIBLE LOOP**.
+
+Observed behavior:
+- user enabled Developer options;
+- Glosh kept returning to Developer options instead of advancing;
+- the Samsung Wireless Debugging deep-link resolves back to Developer options on this device/firmware;
+- the coordinator treated the repeated Developer-options screen as a reason to relaunch the same direct route.
+
+That APK is now **superseded and must not be reused**.
+
+## Root cause
+
+The prior coordinator used screen fingerprint changes to decide whether to reopen:
+
+`DEVELOPER_OPTIONS → open WIRELESS_DEBUGGING_SETTINGS → Samsung returns DEVELOPER_OPTIONS → repeat`.
+
+This was still an unbounded state-machine error even though Glosh performed no automatic Settings clicks or scrolls.
+
+## Fix implemented
 
 Implementation branch:
 
 `work/remote-install-guided-assistant-08-chatgpt`
 
+Current fix HEAD:
+
+`7af909c193234a2f07c6102b8588468327c86295`
+
 Immutable gate branch:
 
-`gate/remote-guided-1313eea`
+`gate/remote-guided-s22-loopfix-7af909c`
+
+Changes are isolated to `tools/glosh-remote-spike/**`.
+
+### Correct finite transition
+
+Step 2 now ends as soon as Glosh trusts and recognizes the Developer options screen.
+
+Then step 3 starts separately:
+
+1. attempt `android.settings.WIRELESS_DEBUGGING_SETTINGS` once;
+2. if Samsung returns to Developer options, Glosh does **not** relaunch immediately;
+3. customer receives a clear instruction to activate Developer options if needed and then manually tap `Depuración inalámbrica` in the current list;
+4. a second direct attempt is allowed only after a genuinely different trusted Developer-options fingerprint, representing a user-driven state change such as enabling the master Developer options switch;
+5. if that second attempt also returns to Developer options, the route becomes permanent visual fallback for that run;
+6. no third attempt exists;
+7. no automatic click, scroll or coordinate gesture is introduced.
+
+When the customer manually enters Wireless Debugging, the existing observer detects the actual `WIRELESS_DEBUGGING` screen and resumes the normal step-3 logic automatically.
+
+## New pure policy
+
+`WirelessDirectRoutePolicy` owns the bounded direct-route state:
+
+- same Developer snapshot repeated indefinitely → `WAIT_FOR_USER`;
+- one real user-driven fingerprint change → `RETRY_DIRECT_ONCE`;
+- second return → `VISUAL_FALLBACK` permanently;
+- reset only when a new guided run starts.
+
+Regression tests explicitly prove:
+- repeated same Developer screen cannot loop;
+- exactly one user-driven retry is possible;
+- after two attempts, all future Developer snapshots are fallback-only;
+- reset creates a fresh bounded session.
+
+## Required new automated gate
+
+Run only from:
+
+`gate/remote-guided-s22-loopfix-7af909c`
 
 Exact HEAD:
 
-`1313eea1324903348c6e375b3ce9327120b31ff9`
+`7af909c193234a2f07c6102b8588468327c86295`
 
-Base:
-
-`b4a559b2707bd3040642208be643a8eefc6922ec`
-
-All Guided Assistant code changes remain under:
-
-`tools/glosh-remote-spike/**`
-
-No Chrome, GloshIA, DAG, App Usuario/Admin, Supabase, Production or Device Owner code was modified.
-
-## Automated gate — PASS
-
-Command executed from a new detached worktree on the immutable gate branch:
+Command:
 
 ```bash
 ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk \
   bash tools/glosh-remote-spike/verify_guided_assistant.sh
 ```
 
-Result:
+Must pass architecture, Python, Android JVM tests including the new loop-policy tests, lint and assemble. Freeze a new APK path/size/SHA. Do not reuse `14ed9879…ecd10`.
 
-- source architecture guard: **PASS**;
-- Python protocol/broker/standby: **14/14 PASS**;
-- Android JVM tests: **96/96 PASS**;
-- Android lint: **PASS**;
-- Android assemble: **PASS**;
-- physical gate: **not run**;
-- worktree: **clean**.
+## Next physical gate
 
-The architecture guard confirms that the active guided coordinator owns no Settings click executor and no Settings scroll executor.
+After automated PASS, send the exact new APK to the S22 by Taildrop and repeat only the customer flow.
 
-## Frozen APK candidate
+Critical physical requirement:
 
-This is now the **only authorized Guided Assistant physical candidate**:
+`DEVELOPER_OPTIONS_REOPEN_LOOP=0`.
 
-- filename: `GloshRemote-Guided-DEV.apk`;
-- path at gate: `/private/tmp/glosh-guided-gate-1313/tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Guided-DEV.apk`;
-- size: `19,287,538` bytes;
-- SHA-256: `14ed9879f2b18559fdbef914fa2a89e572bef2b98082c1c10e935d3e0a6ecd10`;
-- report: `/private/tmp/glosh-guided-gate-1313/tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-INSTALL-GUIDED-ASSISTANT-08-report.txt`.
+If Samsung returns from the direct Wireless route to Developer options:
+- no immediate relaunch;
+- stable instruction remains visible;
+- user manually taps Wireless Debugging;
+- once inside Wireless Debugging, Glosh resumes automatically.
 
-Do not rebuild, rename by rebuilding, substitute another APK or change code before the physical gate. A different byte size or SHA is a different candidate and requires a new automated gate.
-
-## Product flow under test
-
-### Preparing
-
-Glosh checks whether a Mac support console is available. This is displayed as `Preparando`, not as a fake numbered step.
-
-### Step 1 of 4 — Accessibility
-
-Glosh attempts the exact accessibility-service detail destination and safely falls back to general Accessibility settings.
-
-Customer action:
-
-`Activá Glosh Remote`.
-
-Glosh must continue automatically when the service becomes active; no Continue button.
-
-### Step 2 of 4 — Developer options
-
-Glosh opens Developer options directly.
-
-If they are unavailable, Samsung visual fallback guides the customer through:
-
-`Acerca del teléfono → Información de software → Número de compilación ×7`.
-
-The customer performs the taps. Glosh observes only. Device PIN/pattern/password is never read.
-
-### Step 3 of 4 — Wireless debugging
-
-Glosh prioritizes:
-
-`android.settings.WIRELESS_DEBUGGING_SETTINGS`
-
-The customer activates Wireless debugging and confirms `Permitir` if Android asks to trust the Wi-Fi network.
-
-Normal guided mode performs:
-
-- zero automatic Settings clicks;
-- zero programmatic Settings scrolls;
-- zero coordinate gestures.
-
-### Step 4 of 4 — Pairing code
-
-Glosh highlights `Vincular dispositivo con código` and the customer taps it.
-
-A unique contextual six-digit code is read locally and submitted automatically. If descriptor or mDNS endpoint arrives later, the code remains only in memory until pairing can start. If automatic reading is ambiguous, the six-box app input and notification `RemoteInput` remain available.
-
-The already-proven local ADB and encrypted Mac relay continue unchanged.
-
-## Visual contract
-
-App, floating coach and notification share `GuidePresentation`:
-
-- four stable steps;
-- one instruction at a time;
-- compact graphite/lime card;
-- microanimations for tap, switch, seven taps, code, wait, success and attention;
-- reduced-motion support;
-- floating `×` hides the card for the current instruction;
-- repeated events from the same instruction cannot force it to reappear;
-- notification remains as persistent fallback;
-- no `ME PERDÍ`, `MOSTRARME`, `MOSTRARME DE NUEVO` or `VOLVER AL CÓDIGO`.
-
-## Physical route decision
-
-By explicit product-owner decision, the first physical UX gate moves directly to the personal Samsung S22 Ultra, delivered cable-free through Taildrop.
-
-Rationale:
-
-- all automated gates are already green;
-- the remote connection base already passed with S22 and Mac on different networks;
-- the remaining unknown is the real customer guidance experience;
-- the product owner will perform the Android taps personally without technical coaching;
-- this gives the most representative first UX signal.
-
-The A23 laboratory gate is **deferred, not cancelled**. It remains available for controlled reproduction, logs and regression if the S22 gate finds a defect.
-
-## Next gate — S22 cable-free customer run
-
-Use the exact APK SHA above. Codex may only verify the artifact, send it by Taildrop and prepare the waiting Mac operator session. Codex must not install the APK on the phone, simulate taps, change phone settings remotely or rebuild the candidate.
-
-Customer-run requirements:
-
-- install the exact Taildrop APK;
-- Mac operator remains available while the flow is performed;
-- tap `CONECTAR CON SOPORTE` once;
-- follow only the app, floating coach and notification;
-- no verbal technical coaching unless the app becomes blocked;
-- record where the wording, target, animation or transition is unclear;
-- verify automatic code detection when the six-digit dialog appears;
-- verify local ADB and Mac support authenticate;
-- verify cancel/finish leaves no residual overlay or connection.
-
-Required outcomes:
-
-- `AUTOMATIC_SETTINGS_CLICKS=0`;
-- `PROGRAMMATIC_SETTINGS_SCROLLS=0`;
-- `COORDINATE_GESTURES=0`;
-- exact Accessibility route or understandable fallback;
-- direct Developer options probe;
-- direct Wireless Debugging route;
-- customer switch/confirmation detected;
-- compact coach does not obscure the target;
-- notification mirrors every step;
-- pairing row guidance is clear;
-- unique code submits automatically or the manual fallback is clear;
-- local ADB connects;
-- Mac support authenticates;
-- crash/ANR = 0;
-- residual overlays = 0;
-- closing the session removes remote access.
-
-## Superseded evidence
-
-- APK SHA `23c26d…`: failed physical auto-click route; never use again.
-- HEAD `54df3995…`: blocked physical auto-click repair; superseded.
-- HEAD `b4a559b…`: historical deep-row repair/base; auto-click product route superseded.
-- HEAD `6945d972…`: first Guided Assistant gate attempt; four narrow JVM failures corrected in `1313eea…`.
+The A23 remains available only as controlled regression hardware if needed.
 
 ## Coordination
 
 - connection base: PASS FINAL DEV / CLOSED;
-- Guided Assistant automated gate: PASS at `1313eea…`;
-- exact APK: frozen at SHA-256 `14ed9879…ecd10`;
-- direct S22 Taildrop/customer gate: next;
-- A23 laboratory gate: deferred and reserved for defects/regression;
-- Motorola/Xiaomi adapters: later, based on physical evidence without rewriting the shared guide engine;
-- no writer is active in Remote after this coordination update;
-- no merge, PR, deploy, Production or Supabase mutation is authorized.
+- previous Guided APK `14ed9879…ecd10`: FAILED PHYSICAL S22 / SUPERSEDED;
+- current fix: `7af909c…`;
+- new automated gate: pending;
+- new S22 Taildrop candidate: only after automated PASS;
+- no Chrome, GloshIA, DAG, App Usuario/Admin, Supabase, Production or Device Owner changes;
+- no merge, PR or deploy authorized.
