@@ -82,8 +82,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private val searchEngineScreenDetector = SearchEngineScreenDetector()
     private val webActionDebouncer = AccessibilityWebActionDebouncer()
     private val explicitSearchClassifier = ExplicitSearchClassifier()
+    private val browserPageScanner = AccessibilityBrowserPageScanner()
     private val browserCandidateCache = mutableMapOf<String, Boolean>()
     private var serviceScope: CoroutineScope? = null
+    private var searchEventProcessor: AccessibilitySearchEventProcessor? = null
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
     private var extraTimeExpiryAtEpochMillis: Long? = null
@@ -110,17 +112,19 @@ class ProtectorAccessibilityService : AccessibilityService() {
         serviceScope = scope
         chromeVisualProbeController = ChromeVisualProbeController(this, scope)
         chromeVisualController = ChromeVisualController(this, scope)
+        searchEventProcessor =
+            AccessibilitySearchEventProcessor(scope) { trigger ->
+                processSearchEngineProtection(trigger)
+            }
         scope.launch {
             syncScheduler.requestSync()
             snapshotProvider.refresh()
             snapshotProvider.start(scope)
             launch {
                 snapshotProvider.observe().collect {
-                    withContext(Dispatchers.Main.immediate) {
-                        val packageName = rootInActiveWindow?.packageName?.toString()
-                        if (packageName != null) {
-                            handleSearchEngineProtection(packageName, PolicyChangedEventLabel)
-                        }
+                    val packageName = rootInActiveWindow?.packageName?.toString()?.takeIf { it.isNotBlank() }
+                    if (packageName != null) {
+                        scheduleSearchEngineProtection(packageName, PolicyChangedEventLabel)
                     }
                 }
             }
@@ -165,7 +169,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             return
         }
         if (blockRetryPackageName != packageName) clearBlockRetry()
-        if (handleSearchEngineProtection(packageName, AccessibilityEventFilter.label(event.eventType))) return
+        scheduleSearchEngineProtection(packageName, AccessibilityEventFilter.label(event.eventType))
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         serviceScope?.let { scope ->
@@ -234,7 +238,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (packageName == GoogleSearchPackage) {
             return "search" in viewId || "query" in viewId || className?.toString()?.contains("EditText") == true
         }
-        return AddressBarViewIdParts.any { viewId.endsWith("/id/$it") || viewId.endsWith(":id/$it") } ||
+        return AccessibilityAddressBarViewIdParts.any { viewId.endsWith("/id/$it") || viewId.endsWith(":id/$it") } ||
             "search" in viewId
     }
 
@@ -248,6 +252,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         chromeVisualProbeController = null
         chromeVisualController?.close()
         chromeVisualController = null
+        searchEventProcessor?.close()
+        searchEventProcessor = null
         webActionDebouncer.clear()
         clearSettingsEscape()
         val elapsed = clock.elapsedRealtimeMillis()
@@ -502,11 +508,22 @@ class ProtectorAccessibilityService : AccessibilityService() {
         return values.any { it.matchesAdminAppIdentity() }
     }
 
-    private fun handleSearchEngineProtection(
+    private fun scheduleSearchEngineProtection(
         packageName: String,
         eventLabel: String,
-    ): Boolean {
-        val page = rootInActiveWindow.browserPageObservation()
+    ) {
+        searchEventProcessor?.submit(packageName, eventLabel)
+    }
+
+    private suspend fun processSearchEngineProtection(trigger: SearchProtectionTrigger) {
+        val processor = searchEventProcessor ?: return
+        if (!processor.isCurrent(trigger.generation)) return
+        val root = rootInActiveWindow ?: return
+        if (root.packageName?.toString() != trigger.packageName) return
+        val scan = browserPageScanner.scan(AndroidAccessibilityNodeReader(root))
+        if (!processor.isCurrent(trigger.generation)) return
+
+        val page = scan.observation
         val snapshot = snapshotProvider.current().snapshot
         val recentSearchEngine =
             SearchProtectionSignals
@@ -514,64 +531,83 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 ?.takeIf { it.policyRevision == snapshot.version }
         val diagnosis =
             searchEngineScreenDetector.diagnose(
-                packageName = packageName,
+                packageName = trigger.packageName,
                 snapshot = snapshot,
                 currentHost = page.host,
                 addressBarFocused = page.addressBarFocused,
                 recentSearchEngineId = recentSearchEngine?.engineId,
-                browserCandidate = isBrowserCandidate(packageName),
+                browserCandidate = isBrowserCandidate(trigger.packageName),
                 elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
             )
         Log.i(
             LogTag,
-            "Search protection layer=accessibility event=$eventLabel " +
-                "package=$packageName policyVersion=${snapshot.version} " +
+            "Search protection layer=accessibility event=${trigger.eventLabel} " +
+                "package=${trigger.packageName} policyVersion=${snapshot.version} " +
                 "webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
                 "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
                 "protectedBrowserRequired=${snapshot.rules.protectedBrowserRequired()} " +
                 "safeSearch=${snapshot.rules.safeSearchEnabled()} " +
                 "searchEngine=${diagnosis.searchEngineId ?: "none"} " +
-                "action=${diagnosis.action} reason=${diagnosis.reason}",
+                "action=${diagnosis.action} reason=${diagnosis.reason} " +
+                "scanNodes=${scan.visitedNodes} nodeBudget=${scan.nodeBudgetExhausted} " +
+                "timeBudget=${scan.timeBudgetExhausted}",
         )
-        serviceScope?.launch {
-            telemetryReporter.recordSearchProtection(
-                eventLabel = eventLabel,
-                packageName = packageName,
-                packageCategory = diagnosis.packageCategory,
-                reason = diagnosis.reason,
-                searchEngineId = diagnosis.searchEngineId,
-                action = diagnosis.action.name,
-                policyRevision = diagnosis.policyRevision,
-            )
+        telemetryReporter.recordSearchProtection(
+            eventLabel = trigger.eventLabel,
+            packageName = trigger.packageName,
+            packageCategory = diagnosis.packageCategory,
+            reason = diagnosis.reason,
+            searchEngineId = diagnosis.searchEngineId,
+            action = diagnosis.action.name,
+            policyRevision = diagnosis.policyRevision,
+        )
+        if (diagnosis.action == SearchNavigationAction.Allow) return
+        if (!processor.isCurrent(trigger.generation)) return
+
+        var actionApplied = false
+        withContext(Dispatchers.Main.immediate) {
+            if (!processor.isCurrent(trigger.generation)) return@withContext
+            val activePackageName = rootInActiveWindow?.packageName?.toString()
+            val currentPolicyRevision = snapshotProvider.current().snapshot.version
+            if (
+                activePackageName != trigger.packageName ||
+                currentPolicyRevision != diagnosis.policyRevision
+            ) {
+                Log.i(
+                    LogTag,
+                    "Search protection action stale package=${trigger.packageName} " +
+                        "policyVersion=${diagnosis.policyRevision}",
+                )
+                return@withContext
+            }
+            if (
+                !webActionDebouncer.shouldPerform(
+                    packageName = trigger.packageName,
+                    host = page.host,
+                    policyRevision = diagnosis.policyRevision,
+                    action = diagnosis.action,
+                    elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
+                )
+            ) {
+                Log.i(
+                    LogTag,
+                    "Search protection action suppressed package=${trigger.packageName} " +
+                        "policyVersion=${diagnosis.policyRevision} action=${diagnosis.action}",
+                )
+                return@withContext
+            }
+            when (diagnosis.action) {
+                SearchNavigationAction.Allow -> Unit
+                SearchNavigationAction.GoBack -> performGlobalAction(GLOBAL_ACTION_BACK)
+                SearchNavigationAction.GoHome -> performGlobalAction(GLOBAL_ACTION_HOME)
+            }
+            actionApplied = true
         }
-        if (
-            diagnosis.action != SearchNavigationAction.Allow &&
-            !webActionDebouncer.shouldPerform(
-                packageName = packageName,
-                host = page.host,
-                policyRevision = diagnosis.policyRevision,
-                action = diagnosis.action,
-                elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
-            )
-        ) {
-            Log.i(
-                LogTag,
-                "Search protection action suppressed package=$packageName " +
-                    "policyVersion=${diagnosis.policyRevision} action=${diagnosis.action}",
-            )
-            return true
-        }
-        when (diagnosis.action) {
-            SearchNavigationAction.Allow -> return false
-            SearchNavigationAction.GoBack -> performGlobalAction(GLOBAL_ACTION_BACK)
-            SearchNavigationAction.GoHome -> performGlobalAction(GLOBAL_ACTION_HOME)
-        }
-        serviceScope?.launch {
+        if (actionApplied) {
             telemetryReporter.recordServiceState(
                 "Search protection action=${diagnosis.action} reason=${diagnosis.reason}.",
             )
         }
-        return true
     }
 
     private fun isBrowserCandidate(packageName: String): Boolean {
@@ -917,50 +953,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 is PolicyDecision.RequireUpdate -> "RequireUpdate"
                 is PolicyDecision.Warn -> "Warn"
             }
-
-        fun AccessibilityNodeInfo?.browserPageObservation(): BrowserPageObservation {
-            if (this == null) return BrowserPageObservation()
-            var observation = BrowserPageObservation()
-            var visited = 0
-
-            fun visit(node: AccessibilityNodeInfo?) {
-                if (node == null || visited >= MaxBrowserNodes) return
-                visited++
-                if (node.viewIdResourceName.isAddressBarViewId()) {
-                    val address =
-                        SearchEngineScreenDetector.addressObservationFromAddressBarText(node.text)
-                            ?: SearchEngineScreenDetector.addressObservationFromAddressBarText(node.contentDescription)
-                    if (address != null && (observation.host == null || node.isFocused)) {
-                        observation =
-                            observation.copy(
-                                host = address.host,
-                                addressBarFocused = node.isFocused,
-                            )
-                    }
-                }
-                for (index in 0 until node.childCount) {
-                    visit(node.getChild(index))
-                    if (visited >= MaxBrowserNodes) return
-                }
-            }
-            visit(this)
-            return observation
-        }
-
-        fun String?.isAddressBarViewId(): Boolean {
-            val value = this?.lowercase() ?: return false
-            return AddressBarViewIdParts.any { part -> value.endsWith("/id/$part") || value.endsWith(":id/$part") } ||
-                (("url" in value || "address" in value || "location" in value) && "bar" in value)
-        }
-
-        const val MaxBrowserNodes = 500
-        val AddressBarViewIdParts =
-            setOf(
-                "url_bar",
-                "location_bar_edit_text",
-                "address_bar",
-                "mozac_browser_toolbar_url_view",
-            )
     }
 }
 
@@ -984,8 +976,3 @@ internal fun hasExplicitAppApproval(
             it.target == packageName &&
             it.action == RuleAction.Allow
     }
-
-private data class BrowserPageObservation(
-    val host: String? = null,
-    val addressBarFocused: Boolean = false,
-)
