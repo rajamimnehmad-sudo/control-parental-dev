@@ -6,7 +6,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.RemoteInput;
 import android.app.Service;
-import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
 import android.os.Build;
@@ -16,8 +15,6 @@ import android.util.Log;
 
 import com.glosh.remote.spike.adb.AdbConnectionManager;
 import com.glosh.remote.spike.adb.AdbShell;
-import com.glosh.remote.spike.guide.state.GuideStage;
-import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.relay.RelayClient;
@@ -25,6 +22,7 @@ import com.glosh.remote.spike.session.PairingAuthorityPolicy;
 import com.glosh.remote.spike.session.PairingSubmissionGuard;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
+import com.glosh.remote.spike.wizard.SamsungGuideStep;
 
 import java.net.InetAddress;
 import java.util.concurrent.ExecutorService;
@@ -49,7 +47,7 @@ public final class RemotePairingService extends Service {
     private static final int FINAL_NOTIFICATION_ID = 7402;
     private static final int REQUEST_REPLY = 7411;
     private static final int REQUEST_STOP = 7412;
-    private static final int TOTAL_STEPS = 4;
+    private static final int TOTAL_STEPS = SamsungGuideStep.TOTAL_STEPS;
     private static final long CONNECT_TIMEOUT_MS = 15_000L;
     private static volatile SessionState sessionState = SessionState.IDLE;
     private static volatile PairingUiState pairingUiState = PairingUiState.INACTIVE;
@@ -108,14 +106,14 @@ public final class RemotePairingService extends Service {
             return START_NOT_STICKY;
         }
 
-        int initialStep = ACTION_START.equals(action) ? 3 : 4;
+        int initialStep = ACTION_START.equals(action) ? 6 : 7;
         startForeground(
                 NOTIFICATION_ID,
                 statusNotification(
                         initialStep,
-                        "Glosh · Paso " + initialStep + " de 4",
-                        initialStep == 3
-                                ? "Activá Depuración inalámbrica. Después tocá Vincular dispositivo con código."
+                        "Glosh · Paso " + initialStep + " de " + TOTAL_STEPS,
+                        initialStep == 6
+                                ? "Tocá Vincular dispositivo con código. Glosh detectará el endpoint local automáticamente."
                                 : "Glosh está completando la conexión segura."));
 
         if (ACTION_STOP.equals(action)) {
@@ -151,7 +149,6 @@ public final class RemotePairingService extends Service {
     public void onDestroy() {
         sessionState = SessionState.IDLE;
         pairingUiState = PairingUiState.INACTIVE;
-        LiveGuideRuntime.reset();
         cleanupRuntime();
         executor.shutdownNow();
         super.onDestroy();
@@ -180,9 +177,9 @@ public final class RemotePairingService extends Service {
         }
 
         updateForeground(
-                3,
-                "Glosh · Paso 3 de 4",
-                "Activá Depuración inalámbrica. Después tocá Vincular dispositivo con código.");
+                6,
+                "Glosh · Paso 6 de " + TOTAL_STEPS,
+                "Tocá Vincular dispositivo con código. Cuando Android abra el código, Glosh habilita el ingreso automáticamente.");
         startPairingDiscovery();
     }
 
@@ -213,7 +210,6 @@ public final class RemotePairingService extends Service {
         }
         pairingHost = host;
         pairingPort = port;
-        LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
 
         String pendingCode = pendingPairingCode;
         if (PairingPin.isValid(pendingCode)) {
@@ -224,8 +220,8 @@ public final class RemotePairingService extends Service {
         }
 
         notifyCodeEntry(
-                "Glosh · Paso 4 de 4",
-                "Glosh intenta leer el código automáticamente. Si no, ingresá los 6 números acá.",
+                "Glosh · Paso 7 de " + TOTAL_STEPS,
+                "Mirá los 6 números que muestra Android y escribilos acá. No hace falta volver a Glosh.",
                 PairingUiState.WAITING_FOR_CODE);
     }
 
@@ -257,11 +253,12 @@ public final class RemotePairingService extends Service {
                 .build();
 
         Notification notification = baseNotification()
+                .setOnlyAlertOnce(false)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))
                 .setSubText("Último paso")
-                .setProgress(TOTAL_STEPS, 4, false)
+                .setProgress(TOTAL_STEPS, 7, false)
                 .setOngoing(true)
                 .addAction(replyAction)
                 .addAction(stopAction())
@@ -290,8 +287,8 @@ public final class RemotePairingService extends Service {
                 && (host == null || port <= 0)) {
             pendingPairingCode = code;
             updateForeground(
-                    4,
-                    "Código detectado",
+                    7,
+                    "Código recibido",
                     "Esperando el endpoint local de Android para continuar automáticamente…");
             return;
         }
@@ -309,10 +306,9 @@ public final class RemotePairingService extends Service {
         }
 
         pairingUiState = PairingUiState.CONNECTING;
-        LiveGuideRuntime.setStage(GuideStage.PAIRING);
         updateForeground(
-                4,
-                "Glosh · Paso 4 de 4",
+                7,
+                "Glosh · Paso 7 de " + TOTAL_STEPS,
                 "Código recibido. Completando la conexión segura…");
         executor.execute(() -> pairAndConnect(host, port, code));
     }
@@ -330,8 +326,8 @@ public final class RemotePairingService extends Service {
             pairingHost = null;
             pairingPort = -1;
             updateForeground(
-                    4,
-                    "Glosh · Paso 4 de 4",
+                    7,
+                    "Glosh · Paso 7 de " + TOTAL_STEPS,
                     "Emparejamiento listo. Abriendo el canal local seguro…");
 
             boolean connected = manager.connectTls(this, CONNECT_TIMEOUT_MS);
@@ -346,8 +342,8 @@ public final class RemotePairingService extends Service {
             }
 
             updateForeground(
-                    4,
-                    "Glosh · Paso 4 de 4",
+                    7,
+                    "Glosh · Paso 7 de " + TOTAL_STEPS,
                     "ADB local listo. Conectando de forma segura con soporte…");
             RelayClient client = new RelayClient(shell);
             relayClient = client;
@@ -357,8 +353,8 @@ public final class RemotePairingService extends Service {
                     Log.d(TAG, "Relay state: " + state);
                     if (!ending.get()) {
                         updateForeground(
-                                4,
-                                "Glosh · Paso 4 de 4",
+                                7,
+                                "Glosh · Paso 7 de " + TOTAL_STEPS,
                                 "Conectando de forma segura con soporte…");
                     }
                 }
@@ -377,9 +373,8 @@ public final class RemotePairingService extends Service {
                         sessionState = SessionState.CONNECTED;
                         pairingUiState = PairingUiState.INACTIVE;
                         pairingGuard.finish();
-                        LiveGuideRuntime.connected();
                         updateForeground(
-                                4,
+                                7,
                                 "Conectado con soporte",
                                 "La conexión temporal y segura ya está activa.");
                     }
@@ -416,7 +411,6 @@ public final class RemotePairingService extends Service {
         }
         pendingPairingCode = null;
         pairingGuard.finish();
-        LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
         String host = pairingHost;
         int port = pairingPort;
         if (host != null && port > 0) {
@@ -427,7 +421,7 @@ public final class RemotePairingService extends Service {
                     PairingUiState.CODE_FAILED);
         } else {
             pairingUiState = PairingUiState.CODE_FAILED;
-            updateForeground(4, "Necesitamos un código nuevo", message);
+            updateForeground(7, "Necesitamos un código nuevo", message);
         }
     }
 
@@ -442,7 +436,6 @@ public final class RemotePairingService extends Service {
         sessionState = SessionState.IDLE;
         pairingUiState = PairingUiState.INACTIVE;
         pairingGuard.finish();
-        LiveGuideRuntime.reset();
         cleanupRuntime();
         stopForeground(STOP_FOREGROUND_REMOVE);
 
@@ -528,7 +521,7 @@ public final class RemotePairingService extends Service {
                 .setContentTitle(title)
                 .setContentText(text)
                 .setStyle(new Notification.BigTextStyle().bigText(text))
-                .setSubText(step >= TOTAL_STEPS ? "Último paso" : "Guía de conexión")
+                .setSubText(step >= TOTAL_STEPS ? "Último paso" : "Guía Samsung")
                 .setProgress(TOTAL_STEPS, Math.max(0, Math.min(TOTAL_STEPS, step)), false)
                 .setOngoing(true)
                 .addAction(stopAction())
