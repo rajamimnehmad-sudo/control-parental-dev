@@ -3,6 +3,7 @@ package com.contentfilter.user.chromedataplane
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -100,6 +101,60 @@ class ChromeProxyAdmissionTest {
             assertTrue(discarded.await(1, TimeUnit.SECONDS))
             assertFalse(queuedRan.get())
             assertTrue(admission.isShutdown())
+        } finally {
+            releaseFirst.countDown()
+            admission.close()
+        }
+    }
+
+    @Test
+    fun `close unblocks a saturated submit and discards it exactly once`() {
+        val firstStarted = CountDownLatch(1)
+        val releaseFirst = CountDownLatch(1)
+        val queuedDiscarded = AtomicInteger()
+        val blockedDiscarded = AtomicInteger()
+        val blockedReturned = CountDownLatch(1)
+        val blockedResult = AtomicReference<ChromeProxyAdmissionResult>()
+        val admission = ChromeProxyAdmission(workerCount = 1, queueCapacity = 1, threadNamePrefix = "test-proxy")
+
+        try {
+            assertEquals(
+                ChromeProxyAdmissionResult.Accepted,
+                admission.dispatch(onDiscard = {}) {
+                    firstStarted.countDown()
+                    try {
+                        releaseFirst.await()
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                    }
+                },
+            )
+            assertTrue(firstStarted.await(1, TimeUnit.SECONDS))
+            assertEquals(
+                ChromeProxyAdmissionResult.Accepted,
+                admission.dispatch(onDiscard = { queuedDiscarded.incrementAndGet() }) {},
+            )
+
+            val submitter =
+                Thread {
+                    try {
+                        blockedResult.set(
+                            admission.dispatch(onDiscard = { blockedDiscarded.incrementAndGet() }) {},
+                        )
+                    } finally {
+                        blockedReturned.countDown()
+                    }
+                }.apply { start() }
+
+            assertFalse(blockedReturned.await(100, TimeUnit.MILLISECONDS))
+            admission.close()
+
+            assertTrue(blockedReturned.await(1, TimeUnit.SECONDS))
+            assertEquals(ChromeProxyAdmissionResult.Closed, blockedResult.get())
+            assertEquals(1, queuedDiscarded.get())
+            assertEquals(1, blockedDiscarded.get())
+            submitter.join(1_000)
+            assertFalse(submitter.isAlive)
         } finally {
             releaseFirst.countDown()
             admission.close()
