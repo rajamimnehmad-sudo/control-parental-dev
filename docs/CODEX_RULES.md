@@ -1,52 +1,72 @@
 # CODEX RULES
 
-Reglas permanentes para trabajar con Codex en este proyecto.
+Reglas locales/especiales para Codex. `AGENTS.md` y `START_HERE.md` definen el workflow transversal; este archivo no debe contradecirlos.
 
-- Antes de cualquier ticket, leer `START_HERE.md`.
-- La unica carpeta canonica del proyecto es
-  `/Users/yejielnehmad/Developer/content-filter`, fuera de iCloud. No crear
-  repositorios, worktrees, datasets, APKs ni builds del proyecto dentro de
-  `Documents`, `Desktop`, `Mobile Documents` o iCloud Drive.
-- Usar `docs/AREAS.md` para identificar el area exacta afectada.
-- Abrir solo los archivos necesarios de esa area.
-- No revisar todo el repo salvo que el ticket diga explicitamente: "revisar todo el repo".
-- No tocar areas no relacionadas.
-- Trabajar siempre en tickets chicos.
-- Diagnosticar antes de escribir codigo.
-- Encontrar causa raiz antes de cambiar archivos.
-- Recien despues escribir codigo.
-- Abrir solo archivos del area afectada.
-- No recorrer todo el repo salvo auditoria explicita.
-- No agregar features fuera del ticket.
-- Modificar la menor cantidad posible de archivos.
-- Prioridad permanente: ahorrar tokens, reducir contexto, evitar cambios innecesarios, hacer fixes faciles de revisar y mantener el repo limpio y escalable.
-- Antes de elegir una arquitectura, libreria, modelo, servicio o flujo operativo, buscar y contrastar las mejores practicas vigentes en documentacion oficial y fuentes primarias. No confiar solamente en memoria, ejemplos antiguos o una unica herramienta.
-- Comparar alternativas relevantes por seguridad, privacidad, mantenibilidad, compatibilidad, licencia, costo, consumo de tokens, CPU, RAM, disco, red y tiempo de ejecucion. Documentar la opcion elegida y por que es mejor para este proyecto.
-- Informar al usuario cuando exista una alternativa materialmente mas segura, rapida, economica o confiable, incluso si el ticket original propone otra solucion. No cambiar el alcance sin autorizacion, pero dejar la recomendacion concreta y sus tradeoffs.
-- No implementar ciegamente una practica conocida como inferior. Si una restriccion obliga a desviarse de la mejor practica, documentar el motivo, el riesgo residual, el rollback y el ticket de seguimiento.
-- Verificar licencia, procedencia, mantenimiento, seguridad y compatibilidad comercial de modelos, pesos, datasets y dependencias antes de incorporarlos. No asumir que un artefacto publicado en Hugging Face, GitHub u otro catalogo permite uso comercial.
-- Antes de una operacion costosa o larga, ejecutar una prueba pequena y medible. Escalar solamente si pasa criterios definidos. Fijar limites de costo, tokens, reintentos, tiempo, almacenamiento y concurrencia; nunca dejar procesos sin limite.
-- Reutilizar scripts, caches y artefactos verificables. Evitar repetir investigaciones, builds globales o recorridos completos cuando una prueba dirigida aporta evidencia suficiente.
-- `.codex-tmp` no se considera basura en bloque. Antes de limpiarlo, comprobar
-  las rutas referenciadas por splits e informes. El corpus vigente, las
-  revisiones humanas y los artefactos que reproducen el modelo Android oficial
-  deben preservarse fuera de Git pero dentro de la carpeta canonica.
-- La Mac de desarrollo M2 con 8 GB de RAM sirve para programacion, preparacion por lotes, metadatos, deduplicacion, pruebas pequenas, exportacion y validacion. No cargar datasets completos en RAM, no ejecutar varios procesos pesados simultaneos y no planificar entrenamiento visual grande localmente.
-- Codex local o cloud coordina, programa, ejecuta pruebas y analiza resultados, pero no se considera una GPU de entrenamiento ni se presupone hardware acelerado no documentado.
-- Supabase se usa para Postgres, Storage privado, auditoria, colas livianas, metadatos, registro y distribucion de artefactos. No ejecutar entrenamiento pesado dentro de Edge Functions ni asumir GPU incluida en la suscripcion.
-- GitHub Actions estandar se usa para CI, validaciones y orquestacion. No asumir GPU; cualquier runner GPU requiere disponibilidad, plan y presupuesto verificados por un ticket separado.
-- El entrenamiento pesado de modelos se ejecutara en una GPU externa efimera y alquilada por tiempo solamente cuando un ticket aprobado lo requiera. Codex debe preparar un pipeline reproducible, reanudable y con apagado automatico para evitar gasto accidental.
-- Si cambia Android: validar cada ticket con build/tests proporcionales e incrementar solo el `versionCode` de cada app afectada; Usuario, Admin y DAG versionan de forma independiente. Integrar y confirmar el lote en `main` local. Push, PR y publicacion DEV requieren un `OK` explicito separado.
-- Si solo cambian docs: no compilar, no incrementar `versionCode`, no publicar APK, no tocar Android y no tocar Supabase.
-- Si solo cambian docs/scripts/SQL: no APK.
-- Cada ticket autorizado debe terminar implementado, con validaciones automaticas proporcionales y commit en `main` local. La prueba fisica o de laboratorio bloquea cuando el usuario la exige o cuando el cambio afecta navegador, carga, medios, seguridad o compatibilidad fisica. No inventar una aprobacion ni ocultar un gate externo pendiente.
-- Varios tickets Android relacionados, aprobados y listos deben agruparse en un solo lote. Si luego se autoriza una publicacion, hacer una sola por app afectada y respaldar antes en GitHub el codigo exacto con otra autorizacion explicita.
-- Despues de publicar, verificar manifiestos, hashes, paquetes, version y firma; recien entonces actualizar `docs/HANDOFF_ACTUAL.md` y `docs/BACKLOG_PRODUCTO.md` de candidato a publicado.
-- Las pruebas fisicas, de laboratorio o cualquier requisito externo pendiente se documentan por separado con su bloqueo exacto. Nunca declararlos ejecutados por inferencia.
-- Todo candidato de DAG que cambie navegador, carga, GeckoView o imagenes debe ejecutar primero el fixture controlado y despues la matriz Mimo, Cheeky y una URL estable de Fravega en el mismo telefono objetivo. Usar perfil/cache declarados, `codexperf` unico, muestras frias y calientes y condiciones comparables; DAG usa GeckoView, no `LOAD_NO_CACHE` de WebView. Registrar `page_visible` (estructura protegida utilizable, aunque queden fotos pendientes), `viewport_images_ready` (trabajo visual de la ventana inicial acotada ya quieto) y `page_analysis_ready` (`GeckoSession.onPageStop` para pagina/texto, no inferencia visual), junto con memoria, temperatura, crash/ANR, dispositivo, Android, fecha y variante. Una prueba omitida, pagina rota o metrica ausente no cuenta como exito.
-- Cada cambio en `app-dag-browser/src/main/assets/dag-protection/` debe incrementar la version de la extension en `manifest.json`. DAG debe usar instalacion incorporada consciente de version para que una actualizacion in-place no conserve scripts anteriores.
-- Antes de iniciar otro lote, dejar `main` local integrada, documentacion coherente y el checkout sin artefactos generados por la tarea. Estar por delante de `origin/main` es valido mientras el usuario mantenga el flujo sin push.
+## Entrada y contexto
+
+- Leer `START_HERE.md` y usar lectura minima/condicional; no releer todo el corpus documental por rutina.
+- Antes de escribir, hacer un control Git liviano: status, rama, worktrees, commits recientes, base/owner/rutas de la tarea y Central cuando corresponda.
+- Usar `docs/AREAS.md` para ubicar el area afectada. Abrir solo rutas necesarias salvo auditoria explicita.
+- No tocar areas no relacionadas ni agregar features fuera del objetivo.
+- Diagnosticar causa raiz antes de cambiar codigo.
+- Modificar la menor cantidad razonable de archivos, sin sacrificar cohesion o mantenibilidad.
+- Preferir lotes coherentes que cierren un problema completo; no imponer microtickets cuando varias correcciones pertenecen al mismo subsistema/gate.
+
+## Entorno local y aislamiento
+
+- Repo base canonico: `/Users/yejielnehmad/Developer/content-filter`, fuera de iCloud.
+- Worktrees aislados pueden vivir como carpetas hermanas bajo `/Users/yejielnehmad/Developer/` cuando el ticket lo requiera.
+- No crear repos/worktrees/datasets/builds del proyecto dentro de `Documents`, `Desktop`, `Mobile Documents` o iCloud Drive.
+- Un unico owner escribe cada tarea; por defecto maximo 2 frentes escriben codigo en paralelo.
+- No usar reset, stash, rebase, force-push, limpieza masiva, reformateo global ni revertir cambios desconocidos para despejar el entorno.
+- Cambios ajenos no relacionados no bloquean. Ante colision real sobre rutas/semantica, detenerse y reportar.
+
+## Eficiencia
+
+- Reutilizar tests, fixtures, caches, scripts y evidencia verificable. No repetir builds globales, investigacion o gates fisicos cuando el diff no invalida evidencia previa.
+- Ejecutar pruebas proporcionales al riesgo y al alcance. Un gate global preexistente fuera del diff se reporta, pero no bloquea automaticamente un scope limpio.
+- Antes de una operacion costosa/larga, usar una prueba pequena y medible cuando aporte valor. Fijar limites de costo, reintentos, tiempo, almacenamiento y concurrencia.
+- No dejar procesos pesados sin limite ni ejecutar varios procesos pesados simultaneos en la Mac M2/8 GB.
+- Codex se usa principalmente cuando hace falta entorno local: codigo, compilaciones, tests, ADB, dispositivos, emuladores, scripts, entrenamiento o benchmarks. Analisis/arquitectura/revision que ChatGPT pueda resolver no debe duplicarse en Codex.
+
+## Cierre tecnico y handoff
+
+- Codex termina como PASS, BLOCKED o FAILED. PASS es tecnico; ChatGPT decide el cierre final.
+- Al PASS con codigo/evidencia revisable, el mismo ticket debe dejar commits cohesivos (preferentemente funcional + evidencia), publicar una rama `review/*-final`, verificar el SHA remoto y reportar base/functional/final SHA, archivos, gates y evidencia.
+- El push no destructivo de `review/*`/preservacion esta preautorizado. No pedir otra interaccion solo para publicar la rama review.
+- No integrar automaticamente a `main` local/remoto como requisito del PASS.
+- PR, merge, publicacion DEV de producto, Production, deploy, borrados destructivos y gastos son pasos separados y requieren autorizacion/control especifico.
+- Codex no modifica Glosh Central salvo autorizacion expresa del ticket. ChatGPT sincroniza Central al revisar el resultado.
+- No generar churn de Central `pending→in_progress→done` para ejecuciones Codex transitorias del mismo ciclo.
+
+## Android / APK
+
+- Si cambia codigo que entra a una APK: ejecutar build/tests proporcionales y, cuando haga falta una APK nueva para gate/distribucion, usar el `versionCode` DEV real maximo + 1 de la app afectada. Usuario/Admin/DAG versionan de forma independiente.
+- Build/test/APK de gate fisico pueden salir del worktree validado.
+- No publicar automaticamente APK a Supabase/usuarios ni hacer push a `main` por el solo hecho de que el build pase.
+- Si solo cambian docs/reglas: no compilar, no incrementar `versionCode`, no generar/publicar APK, no tocar Android/Supabase.
+- Pruebas fisicas/lab son obligatorias cuando el riesgo o el ticket lo requieren (navegador, medios, seguridad, compatibilidad fisica, lifecycle). Nunca declararlas por inferencia.
+- Despues de una publicacion realmente autorizada: verificar hashes, package, version, firma y manifests correspondientes.
+
+## Arquitectura, dependencias y seguridad
+
+- No reabrir decisiones arquitectonicas cerradas salvo nueva evidencia/requisito/regresion.
+- Antes de incorporar una arquitectura/libreria/modelo/servicio nuevo o cambiar uno materialmente, contrastar documentacion oficial/fuentes primarias y evaluar seguridad, privacidad, mantenimiento, compatibilidad, licencia, costo, CPU/RAM/disco/red y tiempo.
+- Verificar licencia/procedencia/mantenimiento/uso comercial de modelos, pesos, datasets y dependencias antes de incorporarlos.
+- No implementar ciegamente una practica inferior; si una restriccion obliga a un compromiso, documentar riesgo residual y rollback.
 - No usar Service Role Key en Android.
-- No borrar datos sin confirmacion.
-- Errores tecnicos solo en Logcat.
-- Usuario ve mensajes simples.
+- No borrar datos sin confirmacion/autorizacion especifica.
+- Errores tecnicos van a Logcat; mensajes al usuario deben ser simples.
+
+## Datos, entrenamiento y compute
+
+- `.codex-tmp` no es basura en bloque. Preservar corpus, revisiones humanas y artefactos reproducibles referenciados.
+- No cargar datasets completos en RAM local ni planificar entrenamiento visual grande en la Mac M2/8 GB.
+- Supabase sirve para DB/Storage/metadata/auditoria/colas livianas; no usar Edge Functions como compute pesado.
+- GitHub Actions estandar se usa para CI/orquestacion; no asumir GPU.
+- Entrenamiento pesado usa GPU externa efimera solo bajo ticket/autorizacion que contemple costo, pipeline reproducible y apagado automatico.
+
+## Reglas DAG especiales
+
+- Un candidato DAG que cambie navegador/carga/GeckoView/imagenes debe usar el gate fisico definido para DAG cuando siga vigente para ese ticket; no sustituirlo por evidencia inventada. Registrar dispositivo/Android/fecha/variante y las metricas exigidas por el gate.
+- Cada cambio en `app-dag-browser/src/main/assets/dag-protection/` debe incrementar la version de la extension en `manifest.json` y conservar actualizacion in-place consciente de version.
