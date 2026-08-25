@@ -2,7 +2,7 @@ package com.contentfilter.user.chromedataplane
 
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.RejectedExecutionException
-import java.util.concurrent.Semaphore
+import java.util.concurrent.RejectedExecutionHandler
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -16,10 +16,10 @@ internal enum class ChromeProxyAdmissionResult {
 }
 
 /**
- * Bounds accepted proxy work before it reaches the executor queue.
+ * Applies bounded backpressure when every proxy worker and queue slot is occupied.
  *
- * The accept loop blocks when every worker and queue slot is occupied, allowing the listening
- * socket backlog to provide TCP backpressure instead of accepting a connection only to drop it.
+ * The accept loop blocks on the existing bounded executor queue instead of accepting a connection
+ * only to drop it. The listening socket backlog therefore remains the outer TCP admission boundary.
  */
 internal class ChromeProxyAdmission(
     workerCount: Int,
@@ -27,7 +27,6 @@ internal class ChromeProxyAdmission(
     threadNamePrefix: String = "chrome-web-proxy-worker",
 ) : AutoCloseable {
     private val closed = AtomicBoolean(false)
-    private val permits: Semaphore
     private val executor: ThreadPoolExecutor
 
     init {
@@ -35,7 +34,6 @@ internal class ChromeProxyAdmission(
         require(queueCapacity > 0)
         require(threadNamePrefix.isNotBlank())
         val threadNumber = AtomicInteger()
-        permits = Semaphore(workerCount + queueCapacity, true)
         executor =
             ThreadPoolExecutor(
                 workerCount,
@@ -48,23 +46,20 @@ internal class ChromeProxyAdmission(
                         isDaemon = true
                     }
                 },
-                ThreadPoolExecutor.AbortPolicy(),
+                BackpressurePolicy(closed),
             )
     }
 
-    @Throws(InterruptedException::class)
     fun dispatch(
         onDiscard: () -> Unit,
         block: () -> Unit,
     ): ChromeProxyAdmissionResult {
-        permits.acquire()
         if (closed.get()) {
-            permits.release()
             runCatching(onDiscard)
             return ChromeProxyAdmissionResult.Closed
         }
 
-        val task = AdmittedTask(permits, onDiscard, block)
+        val task = AdmittedTask(onDiscard, block)
         return try {
             executor.execute(task)
             ChromeProxyAdmissionResult.Accepted
@@ -87,8 +82,30 @@ internal class ChromeProxyAdmission(
         }
     }
 
+    private class BackpressurePolicy(
+        private val closed: AtomicBoolean,
+    ) : RejectedExecutionHandler {
+        override fun rejectedExecution(
+            runnable: Runnable,
+            executor: ThreadPoolExecutor,
+        ) {
+            if (closed.get() || executor.isShutdown) {
+                throw RejectedExecutionException("Proxy admission is closed")
+            }
+            try {
+                executor.queue.put(runnable)
+            } catch (error: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw RejectedExecutionException("Proxy admission interrupted", error)
+            }
+            if ((closed.get() || executor.isShutdown) && executor.remove(runnable)) {
+                (runnable as? AdmittedTask)?.discard()
+                throw RejectedExecutionException("Proxy admission closed during enqueue")
+            }
+        }
+    }
+
     private class AdmittedTask(
-        private val permits: Semaphore,
         private val onDiscard: () -> Unit,
         private val block: () -> Unit,
     ) : Runnable {
@@ -98,21 +115,13 @@ internal class ChromeProxyAdmission(
             try {
                 block()
             } finally {
-                finish(discard = false)
+                finished.compareAndSet(false, true)
             }
         }
 
         fun discard() {
-            finish(discard = true)
-        }
-
-        private fun finish(discard: Boolean) {
             if (!finished.compareAndSet(false, true)) return
-            try {
-                if (discard) runCatching(onDiscard)
-            } finally {
-                permits.release()
-            }
+            runCatching(onDiscard)
         }
     }
 }
