@@ -36,7 +36,9 @@ public final class GuideNotification {
 
     /** Legacy compatibility for existing call sites while the guided flow is being migrated. */
     public void show(String progress, String copy) {
-        String title = progress == null || progress.isBlank() ? "Glosh Remote" : progress;
+        String title = progress == null || progress.trim().isEmpty()
+                ? "Glosh Remote"
+                : progress;
         show(new GuidePresentation(
                 1,
                 4,
