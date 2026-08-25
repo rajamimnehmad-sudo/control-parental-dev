@@ -74,6 +74,13 @@ public final class SamsungSettingsClassifier {
         return new ClassifiedScreen(screen, confidence, targets, wirelessEnabled, policyBlocked);
     }
 
+    boolean hasVisibleWirelessDebuggingLabel(SettingsSnapshot snapshot) {
+        return snapshot.nodes().stream()
+                .filter(NodeSnapshot::visible)
+                .anyMatch(node -> exact(WIRELESS_DEBUGGING, node.candidate().text())
+                        || exact(WIRELESS_DEBUGGING, node.candidate().contentDescription()));
+    }
+
     private Screen screen(SettingsSnapshot snapshot, String title) {
         if (contains(CREDENTIAL_TITLES, title)) {
             return Screen.CREDENTIAL_PROMPT;
@@ -118,27 +125,71 @@ public final class SamsungSettingsClassifier {
         if (!expectedScreen) {
             return null;
         }
+
         List<Scored> scored = new ArrayList<>();
-        for (NodeSnapshot node : snapshot.nodes()) {
-            TargetCandidate candidate = node.candidate();
-            boolean own = exact(labels, candidate.text())
-                    || exact(labels, candidate.contentDescription());
-            boolean descendant = node.descendantTexts().stream().anyMatch(value -> exact(labels, value));
-            if ((!own && !descendant)
-                    || !candidate.clickable()
-                    || !node.enabled()
-                    || node.checkable()
-                    || isSwitchControl(candidate)) {
+        Set<List<Integer>> addedPaths = new HashSet<>();
+
+        for (NodeSnapshot anchor : snapshot.nodes()) {
+            TargetCandidate anchorCandidate = anchor.candidate();
+            boolean exactAnchor = anchor.visible()
+                    && (exact(labels, anchorCandidate.text())
+                    || exact(labels, anchorCandidate.contentDescription()));
+            if (!exactAnchor) {
                 continue;
             }
-            int score = descendant ? 100 : 92;
-            if (candidate.className() != null
-                    && candidate.className().toLowerCase(Locale.ROOT).contains("layout")) {
-                score += 2;
+
+            if (isSafeNavigableRow(anchor) && addedPaths.add(anchor.path())) {
+                scored.add(new Scored(anchor, 120));
             }
-            scored.add(new Scored(node, score));
+
+            NodeSnapshot ancestor = nearestSafeClickableAncestor(snapshot.nodes(), anchor.path());
+            if (ancestor != null && addedPaths.add(ancestor.path())) {
+                int distance = Math.max(1, anchor.path().size() - ancestor.path().size());
+                scored.add(new Scored(ancestor, Math.max(100, 118 - distance)));
+            }
         }
+
+        // Retain the simple/direct representation used by some Settings builds and fixtures.
+        for (NodeSnapshot node : snapshot.nodes()) {
+            if (!isSafeNavigableRow(node) || addedPaths.contains(node.path())) {
+                continue;
+            }
+            boolean descendant = node.descendantTexts().stream()
+                    .anyMatch(value -> exact(labels, value));
+            if (descendant) {
+                addedPaths.add(node.path());
+                scored.add(new Scored(node, 104));
+            }
+        }
+
         return scoredTarget(key, scored);
+    }
+
+    private NodeSnapshot nearestSafeClickableAncestor(
+            List<NodeSnapshot> nodes,
+            List<Integer> anchorPath) {
+        if (anchorPath == null || anchorPath.size() < 2) {
+            return null;
+        }
+        for (int depth = anchorPath.size() - 1; depth >= 1; depth--) {
+            List<Integer> prefix = anchorPath.subList(0, depth);
+            for (NodeSnapshot node : nodes) {
+                if (node.path().equals(prefix) && isSafeNavigableRow(node)) {
+                    return node;
+                }
+            }
+        }
+        return null;
+    }
+
+    private boolean isSafeNavigableRow(NodeSnapshot node) {
+        TargetCandidate candidate = node.candidate();
+        return node.visible()
+                && candidate.clickable()
+                && node.enabled()
+                && !node.checkable()
+                && !isSwitchControl(candidate)
+                && !candidate.bounds().isEmpty();
     }
 
     private MatchedTarget match(
