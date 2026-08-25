@@ -42,11 +42,13 @@ public class GuidePresentationPhysicalUxTest {
     }
 
     @Test
-    public void restrictedSettingsPreflightExplainsTheSamsungMenuAction() {
-        GuidePresentation presentation = GuidePresentation.restrictedSettings();
+    public void restrictedSettingsRecoveryNeverPromisesOverflowAlreadyExists() {
+        GuidePresentation presentation = GuidePresentation.restrictedSettingsRecovery();
 
         assertEquals(1, presentation.step());
         assertEquals(GuidePresentation.Cue.ATTENTION, presentation.cue());
+        assertTrue(presentation.body().contains("Si aparece ⋮"));
+        assertTrue(presentation.body().contains("Si no aparece ⋮"));
         assertTrue(presentation.body().contains("Permitir configuración restringida"));
     }
 }
