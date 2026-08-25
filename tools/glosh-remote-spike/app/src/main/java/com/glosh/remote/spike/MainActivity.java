@@ -1,39 +1,28 @@
 package com.glosh.remote.spike;
 
 import android.Manifest;
-import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.app.PendingIntent;
-import android.app.PictureInPictureParams;
-import android.app.RemoteAction;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.content.res.Configuration;
-import android.graphics.drawable.Icon;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Rational;
+import android.provider.Settings;
 import android.view.WindowManager;
 
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.GuideNotification;
+import com.glosh.remote.spike.wizard.GuideOverlayController;
 import com.glosh.remote.spike.wizard.OemFamily;
 import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.SamsungGuideStep;
 import com.glosh.remote.spike.wizard.SamsungGuideStore;
-import com.glosh.remote.spike.wizard.SamsungPipCoachView;
 import com.glosh.remote.spike.wizard.SettingsNavigator;
 import com.glosh.remote.spike.wizard.WizardLayout;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /** Samsung-first guided entry point. Accessibility is intentionally not part of this flow. */
 public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
@@ -41,9 +30,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     public static final String ACTION_GUIDE_BACK = "com.glosh.remote.spike.GUIDE_BACK";
     public static final String ACTION_GUIDE_NEXT = "com.glosh.remote.spike.GUIDE_NEXT";
 
-    private static final String ACTION_PIP_BACK = "com.glosh.remote.spike.PIP_BACK";
-    private static final String ACTION_PIP_NEXT = "com.glosh.remote.spike.PIP_NEXT";
-    private static final String ACTION_PIP_OPEN = "com.glosh.remote.spike.PIP_OPEN";
     private static final int REQUEST_NOTIFICATIONS = 9001;
     private static final long STATE_REFRESH_MS = 500L;
 
@@ -53,49 +39,51 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         @Override
         public void run() {
             synchronizeRuntimeProgress();
-            render();
-            handler.postDelayed(this, STATE_REFRESH_MS);
-        }
-    };
-
-    private final BroadcastReceiver pipActions = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent == null ? null : intent.getAction();
-            if (ACTION_PIP_BACK.equals(action)) {
-                guideBack(true);
-            } else if (ACTION_PIP_NEXT.equals(action)) {
-                guideNext(true);
-            } else if (ACTION_PIP_OPEN.equals(action)) {
-                openGloshFromPip();
+            if (guideOverlay != null && guideOverlay.isVisible()) {
+                refreshOverlaySurface();
+            } else {
+                render();
             }
+            handler.postDelayed(this, STATE_REFRESH_MS);
         }
     };
 
     private SupportSessionCoordinator coordinator;
     private SamsungGuideStore guideStore;
     private GuideNotification guideNotification;
+    private GuideOverlayController guideOverlay;
     private WizardLayout ui;
-    private SamsungPipCoachView pipView;
     private String lastRenderKey;
     private boolean awaitingNotificationPermission;
-    private boolean launchingSettings;
-    private boolean pipReceiverRegistered;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        // Release builds protect sensitive support UI. DEV deliberately allows screenshots so
+        // physical UX can be reviewed without weakening the eventual production configuration.
+        if (!BuildConfig.DEBUG) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        }
+
         coordinator = SupportSessionCoordinator.get(this);
         guideStore = new SamsungGuideStore(this);
         guideNotification = new GuideNotification(this);
         ui = new WizardLayout(this);
-        pipView = new SamsungPipCoachView(this);
+        guideOverlay = new GuideOverlayController(this, new GuideOverlayController.Listener() {
+            @Override
+            public void onBack() {
+                guideBack(true);
+            }
+
+            @Override
+            public void onNext() {
+                guideNext(true);
+            }
+        });
         setContentView(ui.view());
-        registerPipActions();
         consumeIntent(getIntent());
 
-        // A previous Accessibility-based build may have left a stale wizard checkpoint.
+        // A previous Accessibility/PiP build may have left a stale wizard checkpoint.
         if (RemotePairingService.getSessionState() == SessionState.IDLE
                 && !guideStore.active()
                 && coordinator.step() != OnboardingState.Step.HOME
@@ -117,79 +105,52 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     @Override
     protected void onResume() {
         super.onResume();
+        guideOverlay.hide();
         coordinator.attach(this);
-        if (!isInPictureInPictureMode()) {
-            ui.onHostResume();
-        }
+        ui.onHostResume();
         handler.removeCallbacks(refreshState);
         handler.post(refreshState);
+
+        if (guideStore.active()
+                && coordinator.step() == OnboardingState.Step.HOME
+                && !needsNotificationPermission()) {
+            if (needsOverlayPermission()) {
+                lastRenderKey = null;
+                renderOverlayPermission();
+            } else {
+                beginSupportDiscovery();
+            }
+        }
     }
 
     @Override
     protected void onPause() {
-        handler.removeCallbacks(refreshState);
-        if (!isInPictureInPictureMode()) {
-            ui.onHostPause();
+        ui.onHostPause();
+        if (!guideOverlay.isVisible()) {
+            handler.removeCallbacks(refreshState);
+            coordinator.detach(this);
         }
-        coordinator.detach(this);
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
-        if (pipReceiverRegistered) {
-            try {
-                unregisterReceiver(pipActions);
-            } catch (Throwable ignored) {
-                // Activity is already being torn down.
-            }
-            pipReceiverRegistered = false;
-        }
-        pipView.stop();
+        handler.removeCallbacks(refreshState);
+        coordinator.detach(this);
+        guideOverlay.hide();
         super.onDestroy();
-    }
-
-    @Override
-    public void onPictureInPictureModeChanged(
-            boolean isInPictureInPictureMode,
-            Configuration newConfig) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
-        if (isInPictureInPictureMode) {
-            ui.onHostPause();
-            pipView.setStep(guideStore.step());
-            pipView.start();
-            setContentView(pipView);
-            updatePipParams(guideStore.step(), false);
-        } else {
-            pipView.stop();
-            setContentView(ui.view());
-            ui.onHostResume();
-            lastRenderKey = null;
-            render();
-        }
-    }
-
-    @Override
-    public void onUserLeaveHint() {
-        super.onUserLeaveHint();
-        if (!launchingSettings
-                || Build.VERSION.SDK_INT < Build.VERSION_CODES.O
-                || isInPictureInPictureMode()) {
-            return;
-        }
-        try {
-            enterPictureInPictureMode(buildPipParams(guideStore.step(), false));
-        } catch (Throwable ignored) {
-            // Android 12+ also has auto-enter enabled; notification remains the final fallback.
-        }
     }
 
     @Override
     public void onStateChanged() {
         handler.post(() -> {
             synchronizeRuntimeProgress();
-            lastRenderKey = null;
-            render();
+            if (guideOverlay.isVisible()) {
+                refreshOverlaySurface();
+            } else {
+                lastRenderKey = null;
+                render();
+            }
         });
     }
 
@@ -203,7 +164,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
         awaitingNotificationPermission = false;
-        beginSupportDiscovery();
+        continueGuideSetup();
     }
 
     private void render() {
@@ -211,17 +172,12 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         PairingUiState pairing = RemotePairingService.getPairingUiState();
         OnboardingState.Step onboarding = coordinator.step();
         SamsungGuideStep guide = guideStore.step();
-        String key = session + ":" + pairing + ":" + onboarding + ":" + guideStore.active() + ":" + guide;
+        String key = session + ":" + pairing + ":" + onboarding + ":" + guideStore.active()
+                + ":" + guide + ":overlay=" + !needsOverlayPermission();
         if (key.equals(lastRenderKey)) {
             return;
         }
         lastRenderKey = key;
-
-        if (isInPictureInPictureMode()) {
-            pipView.setStep(guide);
-            updatePipParams(guide, false);
-            return;
-        }
 
         if (coordinator.profile().family() != OemFamily.SAMSUNG) {
             guideNotification.clear();
@@ -231,6 +187,11 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
         if (session == SessionState.CONNECTED) {
             renderConnected();
+            return;
+        }
+
+        if (guideStore.active() && needsOverlayPermission()) {
+            renderOverlayPermission();
             return;
         }
 
@@ -260,8 +221,22 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderHome() {
+        guideOverlay.hide();
         guideNotification.clear();
         ui.showHome(view -> startSamsungGuide());
+    }
+
+    private void renderOverlayPermission() {
+        guideOverlay.hide();
+        guideNotification.clear();
+        ui.showScreen(
+                "Una sola vez",
+                "Permití la guía flotante",
+                "Glosh necesita “Mostrar sobre otras apps” para dejar una tarjeta pequeña encima de los Ajustes reales de Samsung.",
+                "Este permiso no toca Ajustes por vos ni lee la pantalla. Activá “Permitir” para Glosh Remote y, al volver, continuamos automáticamente.");
+        ui.clearVisual();
+        ui.showPrimary("PERMITIR GUÍA FLOTANTE", view -> requestOverlayPermission(), true);
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderCheckingSupport() {
@@ -285,7 +260,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         ui.showPrimary("REINTENTAR", view -> {
             coordinator.reset();
             guideStore.begin();
-            beginSupportDiscovery();
+            continueGuideSetup();
         }, false);
         ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
@@ -312,7 +287,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
 
-        String info = "Cuando abras Ajustes, Glosh queda flotando arriba. Tocá la mini ventana para usar Atrás o “Ya está / Siguiente”.";
+        String info = "Cuando abras Ajustes, Glosh deja una tarjeta pequeña arriba con la instrucción, Atrás y Ya está. Podés arrastrarla desde el encabezado.";
         if (step == SamsungGuideStep.WIRELESS_DEBUGGING
                 && onboarding == OnboardingState.Step.REQUESTING_SUPPORT) {
             info = "Podés ir dejando abierta Depuración inalámbrica. Glosh está preparando la sesión de soporte en segundo plano.";
@@ -345,6 +320,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderConnected() {
+        guideOverlay.hide();
         guideNotification.clear();
         guideStore.clear();
         ui.showScreen(
@@ -366,6 +342,15 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                     REQUEST_NOTIFICATIONS);
             return;
         }
+        continueGuideSetup();
+    }
+
+    private void continueGuideSetup() {
+        if (needsOverlayPermission()) {
+            lastRenderKey = null;
+            renderOverlayPermission();
+            return;
+        }
         beginSupportDiscovery();
     }
 
@@ -379,10 +364,10 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         }
     }
 
-    private void guideNext(boolean fromPip) {
+    private void guideNext(boolean fromOverlay) {
         SamsungGuideStep current = guideStore.step();
         if (current == SamsungGuideStep.ENTER_CODE) {
-            openGloshFromPip();
+            openGloshFromOverlay();
             return;
         }
 
@@ -394,87 +379,95 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 coordinator.confirmDeveloperOptions();
             }
             guideStore.setStep(SamsungGuideStep.DEVELOPER_OPTIONS);
-            syncGuideSurfaces(fromPip);
+            syncGuideSurfaces(fromOverlay);
             return;
         }
 
         if (current == SamsungGuideStep.WIRELESS_DEBUGGING) {
             if (RemotePairingService.getSessionState() == SessionState.IDLE) {
                 if (coordinator.step() == OnboardingState.Step.REQUESTING_SUPPORT) {
-                    guideNotification.showWaiting(
-                            current,
-                            "Esperá un momento: estamos preparando la sesión segura con soporte.");
-                    if (!fromPip) {
+                    String waiting = "Esperá un momento: estamos preparando la sesión segura con soporte.";
+                    guideNotification.showWaiting(current, waiting);
+                    if (fromOverlay) {
+                        guideOverlay.showWaiting(current, waiting);
+                    } else {
                         lastRenderKey = null;
                         render();
                     }
                     return;
                 }
                 if (!startSupportSession()) {
-                    guideNotification.showWaiting(
-                            current,
-                            "Todavía estamos preparando soporte. Probá nuevamente en unos segundos.");
+                    String waiting = "Todavía estamos preparando soporte. Probá nuevamente en unos segundos.";
+                    guideNotification.showWaiting(current, waiting);
+                    if (fromOverlay) {
+                        guideOverlay.showWaiting(current, waiting);
+                    }
                     return;
                 }
             }
             guideStore.setStep(SamsungGuideStep.PAIR_DEVICE);
-            syncGuideSurfaces(fromPip);
+            syncGuideSurfaces(fromOverlay);
             return;
         }
 
         if (current == SamsungGuideStep.PAIR_DEVICE) {
             guideStore.setStep(SamsungGuideStep.ENTER_CODE);
             guideNotification.clear();
-            syncGuideSurfaces(fromPip);
+            syncGuideSurfaces(fromOverlay);
             return;
         }
 
         guideStore.setStep(current.next());
-        syncGuideSurfaces(fromPip);
+        syncGuideSurfaces(fromOverlay);
     }
 
-    private void guideBack(boolean fromPip) {
+    private void guideBack(boolean fromOverlay) {
         SamsungGuideStep current = guideStore.step();
         if (!current.canGoBack()) {
-            if (fromPip) {
-                openGloshFromPip();
+            if (fromOverlay) {
+                openGloshFromOverlay();
             } else {
                 cancelConnection();
             }
             return;
         }
         guideStore.setStep(current.previous());
-        syncGuideSurfaces(fromPip);
+        syncGuideSurfaces(fromOverlay);
     }
 
-    private void syncGuideSurfaces(boolean fromPip) {
+    private void syncGuideSurfaces(boolean fromOverlay) {
         SamsungGuideStep step = guideStore.step();
         if (RemotePairingService.getSessionState() == SessionState.IDLE) {
             guideNotification.showStep(step);
         }
-        if (isInPictureInPictureMode() || fromPip) {
-            pipView.setStep(step);
-            updatePipParams(step, false);
+        if (guideOverlay.isVisible() || fromOverlay) {
+            guideOverlay.updateStep(step);
         }
         lastRenderKey = null;
-        render();
+        if (!guideOverlay.isVisible()) {
+            render();
+        }
     }
 
     private void openSettingsForGuide() {
         SamsungGuideStep step = guideStore.step();
+        if (!guideOverlay.show(step)) {
+            lastRenderKey = null;
+            renderOverlayPermission();
+            return;
+        }
         guideNotification.showStep(step);
-        updatePipParams(step, true);
-        launchingSettings = true;
         settingsNavigator.openForStep(this, step);
-        handler.postDelayed(() -> launchingSettings = false, 1_500L);
     }
 
     private void openWirelessSettings() {
+        if (!guideOverlay.show(guideStore.step())) {
+            lastRenderKey = null;
+            renderOverlayPermission();
+            return;
+        }
         guideNotification.clear();
-        updatePipParams(guideStore.step(), true);
-        launchingSettings = true;
         settingsNavigator.openWirelessDebugging(this);
-        handler.postDelayed(() -> launchingSettings = false, 1_500L);
     }
 
     private boolean startSupportSession() {
@@ -506,6 +499,10 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private void synchronizeRuntimeProgress() {
         SessionState session = RemotePairingService.getSessionState();
         PairingUiState pairing = RemotePairingService.getPairingUiState();
+        if (session == SessionState.CONNECTED) {
+            guideOverlay.hide();
+            return;
+        }
         if (!guideStore.active() || session != SessionState.PREPARING) {
             return;
         }
@@ -515,15 +512,30 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 && guideStore.step().ordinal() < SamsungGuideStep.ENTER_CODE.ordinal()) {
             guideStore.setStep(SamsungGuideStep.ENTER_CODE);
             guideNotification.clear();
-            if (isInPictureInPictureMode()) {
-                pipView.setStep(SamsungGuideStep.ENTER_CODE);
-                updatePipParams(SamsungGuideStep.ENTER_CODE, false);
+            if (guideOverlay.isVisible()) {
+                guideOverlay.updateStep(SamsungGuideStep.ENTER_CODE);
             }
             lastRenderKey = null;
         }
     }
 
+    private void refreshOverlaySurface() {
+        SessionState session = RemotePairingService.getSessionState();
+        PairingUiState pairing = RemotePairingService.getPairingUiState();
+        if (session == SessionState.CONNECTED || !guideStore.active()) {
+            guideOverlay.hide();
+            return;
+        }
+        SamsungGuideStep step = guideStore.step();
+        if (session == SessionState.PREPARING && pairing == PairingUiState.CONNECTING) {
+            guideOverlay.showWaiting(step, "Código recibido. Glosh está completando la conexión segura…");
+        } else {
+            guideOverlay.updateStep(step);
+        }
+    }
+
     private void cancelConnection() {
+        guideOverlay.hide();
         guideNotification.clear();
         guideStore.clear();
         coordinator.reset();
@@ -543,6 +555,25 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED;
+    }
+
+    private boolean needsOverlayPermission() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this);
+    }
+
+    private void requestOverlayPermission() {
+        Intent intent = new Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:" + getPackageName()));
+        try {
+            startActivity(intent);
+        } catch (Throwable firstFailure) {
+            try {
+                startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION));
+            } catch (Throwable ignored) {
+                // The permission screen is a platform surface; render() will remain on the safe gate.
+            }
+        }
     }
 
     private void consumeIntent(Intent intent) {
@@ -579,105 +610,13 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         }
     }
 
-    /**
-     * API 33+ supports the explicit NOT_EXPORTED receiver flag. Older releases only expose the
-     * legacy two-argument overload, so the lint warning is intentionally suppressed for that
-     * compatibility branch; the PendingIntents that target these actions are app-owned.
-     */
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    private void registerPipActions() {
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_PIP_BACK);
-        filter.addAction(ACTION_PIP_NEXT);
-        filter.addAction(ACTION_PIP_OPEN);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(pipActions, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(pipActions, filter);
-        }
-        pipReceiverRegistered = true;
-    }
-
-    private void openGloshFromPip() {
+    private void openGloshFromOverlay() {
         Intent intent = new Intent(this, MainActivity.class)
                 .setAction(ACTION_GUIDE_OPEN)
                 .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP
                         | Intent.FLAG_ACTIVITY_CLEAR_TOP
                         | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         startActivity(intent);
-    }
-
-    private void updatePipParams(SamsungGuideStep step, boolean autoEnter) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
-            return;
-        }
-        try {
-            setPictureInPictureParams(buildPipParams(step, autoEnter));
-        } catch (Throwable ignored) {
-            // Some devices or user settings may disable PiP. Notification remains available.
-        }
-    }
-
-    private PictureInPictureParams buildPipParams(SamsungGuideStep step, boolean autoEnter) {
-        PictureInPictureParams.Builder builder = new PictureInPictureParams.Builder()
-                .setAspectRatio(new Rational(16, 9))
-                .setActions(pipActionsFor(step));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            builder.setAutoEnterEnabled(autoEnter);
-        }
-        return builder.build();
-    }
-
-    private List<RemoteAction> pipActionsFor(SamsungGuideStep step) {
-        List<RemoteAction> actions = new ArrayList<>();
-        actions.add(remoteAction(
-                android.R.drawable.ic_media_previous,
-                "Atrás",
-                ACTION_PIP_BACK,
-                9201));
-        if (step == SamsungGuideStep.ENTER_CODE) {
-            actions.add(remoteAction(
-                    android.R.drawable.ic_menu_edit,
-                    "Abrir Glosh",
-                    ACTION_PIP_OPEN,
-                    9203));
-        } else {
-            actions.add(remoteAction(
-                    android.R.drawable.ic_media_next,
-                    pipNextLabel(step),
-                    ACTION_PIP_NEXT,
-                    9202));
-        }
-        return actions;
-    }
-
-    private RemoteAction remoteAction(
-            int iconResource,
-            String label,
-            String action,
-            int requestCode) {
-        Intent intent = new Intent(action).setPackage(getPackageName());
-        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags |= PendingIntent.FLAG_IMMUTABLE;
-        }
-        PendingIntent pending = PendingIntent.getBroadcast(this, requestCode, intent, flags);
-        return new RemoteAction(
-                Icon.createWithResource(this, iconResource),
-                label,
-                label,
-                pending);
-    }
-
-    private static String pipNextLabel(SamsungGuideStep step) {
-        return switch (step) {
-            case ABOUT_PHONE, SOFTWARE_INFO -> "Ya lo abrí";
-            case BUILD_NUMBER -> "Ya está activo";
-            case DEVELOPER_OPTIONS -> "Ya estoy ahí";
-            case WIRELESS_DEBUGGING -> "Ya la activé";
-            case PAIR_DEVICE -> "Ya veo el código";
-            case ENTER_CODE -> "Abrir Glosh";
-        };
     }
 
     private static String openSettingsLabel(SamsungGuideStep step) {
