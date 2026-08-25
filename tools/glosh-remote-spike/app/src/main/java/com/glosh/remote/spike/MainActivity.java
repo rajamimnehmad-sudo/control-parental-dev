@@ -21,6 +21,7 @@ import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.GuideNotification;
 import com.glosh.remote.spike.wizard.GuidePresentation;
 import com.glosh.remote.spike.wizard.OnboardingState;
+import com.glosh.remote.spike.wizard.RestrictedSettingsPreflight;
 import com.glosh.remote.spike.wizard.SettingsNavigator;
 import com.glosh.remote.spike.wizard.WizardLayout;
 
@@ -30,6 +31,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private static final int PERMISSION_OPEN_ACCESSIBILITY = 1;
     private static final int PERMISSION_OPEN_DEVELOPER = 2;
     private static final int PERMISSION_START_SESSION = 3;
+    private static final int PERMISSION_OPEN_RESTRICTED_SETTINGS = 4;
     private static final long STATE_REFRESH_MS = 500L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -125,6 +127,8 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             performOpenDeveloperSettings();
         } else if (action == PERMISSION_START_SESSION) {
             startSupportSession();
+        } else if (action == PERMISSION_OPEN_RESTRICTED_SETTINGS) {
+            performOpenRestrictedSettingsInfo();
         }
     }
 
@@ -136,8 +140,10 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             coordinator.reset();
             return;
         }
+        boolean restrictedPreflight = RestrictedSettingsPreflight.required(this);
         String key = session + ":" + pairing + ":" + step + ":"
-                + GuideServiceStatus.isEnabled(this) + ":" + LiveGuideRuntime.stage();
+                + GuideServiceStatus.isEnabled(this) + ":" + LiveGuideRuntime.stage()
+                + ":restricted=" + restrictedPreflight;
         if (key.equals(lastRenderKey)) {
             return;
         }
@@ -165,8 +171,8 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderCheckingSupport() {
-        GuidePresentation presentation = GuidePresentation.forStage(
-                GuideStage.SUPPORT_PREPARING,
+        GuidePresentation presentation = GuidePresentation.preparing(
+                "Buscando soporte",
                 "Estamos comprobando que haya una consola de soporte disponible.");
         showPresentation(presentation,
                 "Todavía no tenés que cambiar ninguna opción del teléfono.");
@@ -174,6 +180,22 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderGuidePermission() {
+        if (RestrictedSettingsPreflight.required(this)) {
+            GuidePresentation presentation = GuidePresentation.restrictedSettings();
+            showPresentation(presentation,
+                    "Esto aparece en Android 13 o superior cuando la app fue instalada manualmente. Se hace una sola vez.");
+            guideNotification.show(presentation);
+            ui.showPrimary(
+                    "1 · ABRIR INFORMACIÓN DE LA APP",
+                    view -> openRestrictedSettingsInfo(),
+                    true);
+            ui.showSecondary(
+                    "2 · YA LO PERMITÍ · CONTINUAR",
+                    view -> confirmRestrictedSettingsAndContinue());
+            ui.showTertiary("CANCELAR", view -> coordinator.reset());
+            return;
+        }
+
         GuidePresentation presentation = GuidePresentation.forStage(
                 GuideStage.GUIDE_PERMISSION,
                 "Activá el interruptor de Glosh Remote. Al hacerlo, seguimos automáticamente.");
@@ -213,7 +235,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 GuideStage.WIRELESS_DEBUGGING,
                 "Activá el interruptor. Cuando quede listo, Glosh mostrará el paso del código.");
         showPresentation(presentation,
-                "No hace falta buscar esta opción: Glosh abre la pantalla directa.");
+                "Glosh intenta la ruta directa una sola vez; si Samsung no la admite, te guía en la lista sin hacer scroll por vos.");
         guideNotification.show(presentation);
         ui.showPrimary(
                 "ABRIR DEPURACIÓN INALÁMBRICA",
@@ -317,23 +339,25 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void performOpenDeveloperSettings() {
-        GuidePresentation presentation = GuidePresentation.forStage(
+        GuidePresentation presentation = GuidePresentation.waiting(
                 GuideStage.AUTOPILOT_PROBE,
-                "Si están apagadas, activá las opciones de desarrollador.");
+                "Verificando el estado de las opciones de desarrollador…");
         guideNotification.show(presentation);
         if (GuideServiceStatus.isEnabled(this)) {
             LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
+            return;
         }
         settingsNavigator.openDeveloperOptions(this);
     }
 
     private void prepareAndOpenWirelessDebugging() {
-        GuidePresentation presentation = GuidePresentation.forStage(
+        GuidePresentation presentation = GuidePresentation.waiting(
                 GuideStage.WIRELESS_DEBUGGING,
-                "Activá Depuración inalámbrica. Glosh detectará el cambio.");
+                "Abriendo Depuración inalámbrica…");
         guideNotification.show(presentation);
         if (GuideServiceStatus.isEnabled(this)) {
             LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
+            return;
         }
         if (coordinator.descriptor() != null
                 && RemotePairingService.getSessionState() == SessionState.IDLE) {
@@ -412,7 +436,33 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 REQUEST_NOTIFICATIONS);
     }
 
+    private void openRestrictedSettingsInfo() {
+        if (needsNotificationPermission()) {
+            pendingPermissionAction = PERMISSION_OPEN_RESTRICTED_SETTINGS;
+            requestNotificationPermission();
+        } else {
+            performOpenRestrictedSettingsInfo();
+        }
+    }
+
+    private void performOpenRestrictedSettingsInfo() {
+        GuidePresentation presentation = GuidePresentation.restrictedSettings();
+        guideNotification.show(presentation);
+        settingsNavigator.openAppDetails(this);
+    }
+
+    private void confirmRestrictedSettingsAndContinue() {
+        RestrictedSettingsPreflight.confirm(this);
+        lastRenderKey = null;
+        activateGuide();
+    }
+
     private void activateGuide() {
+        if (RestrictedSettingsPreflight.required(this)) {
+            lastRenderKey = null;
+            render();
+            return;
+        }
         if (needsNotificationPermission()) {
             pendingPermissionAction = PERMISSION_OPEN_ACCESSIBILITY;
             requestNotificationPermission();
@@ -442,9 +492,9 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         LiveGuideRuntime.guideEnabled();
         coordinator.guideReady();
         LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
-        guideNotification.show(GuidePresentation.forStage(
+        guideNotification.show(GuidePresentation.waiting(
                 GuideStage.AUTOPILOT_PROBE,
-                "Si están apagadas, activá las opciones de desarrollador."));
+                "Verificando si el modo desarrollador ya está activado…"));
     }
 
     private void consumeDebugIntent(Intent intent) {
