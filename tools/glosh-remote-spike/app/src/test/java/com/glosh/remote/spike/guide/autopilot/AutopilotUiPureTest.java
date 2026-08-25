@@ -81,6 +81,20 @@ public class AutopilotUiPureTest {
     }
 
     @Test
+    public void developerWirelessNavigationPrefersRowOverInternalSwitch() {
+        SettingsSnapshot developer = snapshot("Opciones de desarrollador", List.of(
+                clickableRow("Depuración inalámbrica", "wireless"),
+                toggle(false),
+                toggleState(false)));
+
+        var target = classifier.classify(developer).target(TargetKey.WIRELESS_DEBUGGING);
+        assertEquals(Confidence.HIGH, target.confidence());
+        assertEquals("com.android.settings:id/wireless", target.node().candidate().viewId());
+        assertFalse(target.node().checkable());
+        assertFalse(target.node().candidate().className().contains("Switch"));
+    }
+
+    @Test
     public void snapshotCollectionsAreImmutableAndActionGateRejectsStaleToken() {
         ArrayList<Integer> path = new ArrayList<>(List.of(1));
         ArrayList<String> descendants = new ArrayList<>(List.of("Número de compilación"));
@@ -162,6 +176,23 @@ public class AutopilotUiPureTest {
                 guard.evaluate(Screen.ABOUT_PHONE, null, 4_000));
         assertEquals(AutopilotTransitionGuard.Result.REJECT,
                 guard.evaluate(Screen.ABOUT_PHONE, null, 5_501));
+    }
+
+    @Test
+    public void wirelessNavigationIsNotSuccessfulUntilScreenActuallyChanges() {
+        AutopilotTransitionGuard guard = new AutopilotTransitionGuard(2_500);
+        guard.expect(EnumSet.of(Screen.WIRELESS_DEBUGGING), null, 10_000);
+
+        assertEquals(AutopilotTransitionGuard.Result.WAIT,
+                guard.evaluate(Screen.DEVELOPER_OPTIONS, null, 10_500));
+        assertEquals(AutopilotTransitionGuard.Result.WAIT,
+                guard.evaluate(Screen.DEVELOPER_OPTIONS, null, 12_499));
+        assertEquals(AutopilotTransitionGuard.Result.REJECT,
+                guard.evaluate(Screen.DEVELOPER_OPTIONS, null, 12_500));
+
+        guard.expect(EnumSet.of(Screen.WIRELESS_DEBUGGING), null, 20_000);
+        assertEquals(AutopilotTransitionGuard.Result.ACCEPT,
+                guard.evaluate(Screen.WIRELESS_DEBUGGING, null, 20_400));
     }
 
     private SettingsSnapshot snapshot(String title, List<NodeSnapshot> nodes) {
