@@ -38,6 +38,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private final Runnable refreshState = new Runnable() {
         @Override
         public void run() {
+            synchronizeGuidePermission();
             render();
             handler.postDelayed(this, STATE_REFRESH_MS);
         }
@@ -186,6 +187,24 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void renderDeveloperOptions() {
+        GuideStage liveStage = LiveGuideRuntime.stage();
+        if (liveStage == GuideStage.AUTOPILOT_PROBE
+                || liveStage == GuideStage.SUPPORT_PREPARING
+                || liveStage == GuideStage.AUTOPILOT_CREDENTIAL) {
+            boolean credential = liveStage == GuideStage.AUTOPILOT_CREDENTIAL;
+            ui.showScreen(
+                    "Preparando teléfono…",
+                    credential ? "Confirmá tu bloqueo de pantalla" : "Glosh está preparando tu teléfono",
+                    credential
+                            ? "Android necesita que ingreses el PIN, patrón o contraseña del teléfono."
+                            : "Detectamos el estado real y elegimos el camino más corto y seguro.",
+                    credential
+                            ? "Glosh nunca lee ni guarda esa credencial."
+                            : "No toques otras opciones mientras Glosh continúa.");
+            ui.clearVisual();
+            ui.showSecondary("CANCELAR", view -> coordinator.reset());
+            return;
+        }
         OemGuideRecipe recipe = coordinator.recipe();
         DeveloperGuidePhase phase = coordinator.developerPhase();
         if (phase == DeveloperGuidePhase.HELP) {
@@ -447,6 +466,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                     settingsPackageResolver.resolve(this));
             LiveGuideRuntime.guideEnabled();
             coordinator.guideReady();
+            LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
         }
     }
 

@@ -38,21 +38,8 @@ public final class SettingsWindowSelector {
                 settings.add(candidate);
             }
         }
-        if (settings.size() == 1) {
-            return new Selection(settings.get(0), false);
-        }
-        if (settings.isEmpty()) {
-            return new Selection(null, false);
-        }
-        List<WindowCandidate> authoritative = new ArrayList<>();
-        for (WindowCandidate candidate : settings) {
-            if (candidate.active() || candidate.focused()) {
-                authoritative.add(candidate);
-            }
-        }
-        if (authoritative.size() == 1) {
-            return new Selection(authoritative.get(0), false);
-        }
-        return new Selection(null, true);
+        return settings.size() == 1
+                ? new Selection(settings.get(0), false)
+                : new Selection(null, settings.size() > 1);
     }
 }

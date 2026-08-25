@@ -19,6 +19,11 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import com.glosh.remote.spike.RemotePairingService;
 import com.glosh.remote.spike.BuildConfig;
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
+import com.glosh.remote.spike.guide.autopilot.AdaptiveInstallCoordinator;
+import com.glosh.remote.spike.guide.autopilot.AutopilotActionGate;
+import com.glosh.remote.spike.guide.autopilot.FreshNodeClickExecutor;
+import com.glosh.remote.spike.guide.autopilot.FreshSettingsScrollExecutor;
+import com.glosh.remote.spike.guide.autopilot.SamsungSettingsClassifier;
 import com.glosh.remote.spike.guide.overlay.CoachBarController;
 import com.glosh.remote.spike.guide.overlay.HighlightController;
 import com.glosh.remote.spike.guide.overlay.OverlayGeometry;
@@ -28,24 +33,29 @@ import com.glosh.remote.spike.guide.scroll.RevealScrollController;
 import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.wizard.OemDetector;
+import com.glosh.remote.spike.session.SessionState;
 
-import java.util.List;
 import java.util.Set;
 
 public final class LiveGuideAccessibilityService extends AccessibilityService
-        implements LiveGuideRuntime.Listener, GuideEventActor.Listener {
+        implements LiveGuideRuntime.Listener,
+        GuideEventActor.Listener,
+        AdaptiveInstallCoordinator.Host {
     private final Handler actorHandler = new Handler(Looper.getMainLooper());
     private final TargetMatcher matcher = new TargetMatcher();
+    private final GuideDebugSummary debugSummary = new GuideDebugSummary(matcher);
     private final AccessibilityEventTargetInspector eventTargetInspector =
             new AccessibilityEventTargetInspector(matcher);
     private final GuideTargetLocator locator = new GuideTargetLocator(matcher);
     private final PairingCodeDetector codeDetector = new PairingCodeDetector();
+    private final SamsungSettingsClassifier samsungClassifier = new SamsungSettingsClassifier();
     private final ScanGenerationGuard generationGuard = new ScanGenerationGuard();
     private final RevealScrollController reveal = new RevealScrollController();
 
     private GuideEventActor actor;
     private SettingsWindowAuthority windowAuthority;
     private RevealActionExecutor revealExecutor;
+    private AdaptiveInstallCoordinator autopilot;
     private HighlightController highlight;
     private CoachBarController coach;
     private ScanGenerationGuard.Token currentToken;
@@ -67,6 +77,19 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         LiveGuideRuntime.updateSettingsPackages(new SettingsPackageResolver().resolve(this));
         windowAuthority = new SettingsWindowAuthority(this);
         revealExecutor = new RevealActionExecutor(windowAuthority, reveal, generationGuard);
+        FreshNodeClickExecutor clickExecutor = new FreshNodeClickExecutor(
+                windowAuthority,
+                generationGuard,
+                samsungClassifier,
+                new AutopilotActionGate());
+        autopilot = new AdaptiveInstallCoordinator(
+                this,
+                actorHandler,
+                generationGuard,
+                clickExecutor,
+                new FreshSettingsScrollExecutor(
+                        windowAuthority, generationGuard, samsungClassifier),
+                this);
         highlight = new HighlightController(this, generationGuard);
         coach = new CoachBarController(
                 this,
@@ -102,7 +125,9 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
             reveal.onScrolled(SystemClock.elapsedRealtime());
         } else if (event.getEventType() == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            trackExpectedClick(event);
+            if (autopilot == null || !autopilot.handles(LiveGuideRuntime.stage())) {
+                trackExpectedClick(event);
+            }
         } else if (event.getEventType() == AccessibilityEvent.TYPE_ANNOUNCEMENT
                 || event.getEventType() == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) {
             detectDeveloperConfirmation(event);
@@ -141,6 +166,9 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
             }
             reveal.cancel();
             rescueRequested = false;
+            if (autopilot != null) {
+                autopilot.onStageChanged(stage, active);
+            }
             actor.relevantEvent();
         });
     }
@@ -166,10 +194,15 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         currentToken = token;
         currentSnapshot = snapshot;
 
+        if (autopilot != null && autopilot.handles(LiveGuideRuntime.stage())) {
+            autopilot.onStableSnapshot(token, snapshot);
+            return;
+        }
+
         if (LiveGuideRuntime.stage() == GuideStage.PAIR_CODE_TARGET) {
             String code = codeDetector.detect(snapshot.visibleText(), true);
             if (code != null) {
-                submitDetectedCode(code);
+                submitPairingCode(code);
                 return;
             }
         }
@@ -180,7 +213,10 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
                 + " expectedScreen=" + locator.isExpectedScreen(
                         LiveGuideRuntime.family(), LiveGuideRuntime.stage(), snapshot.screenTitle())
                 + " nodes=" + snapshot.nodes().size()
-                + " confidence=" + confidenceSummary(snapshot));
+                + " confidence=" + debugSummary.confidence(
+                        snapshot,
+                        GuideTargetCatalog.forStage(
+                                LiveGuideRuntime.family(), LiveGuideRuntime.stage())));
         if (rescueRequested) {
             rescueRequested = false;
             if (located == null) {
@@ -209,6 +245,9 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         if (rescueRequested) {
             rescueRequested = false;
             showRecovery("Abramos nuevamente los Ajustes correctos");
+        }
+        if (autopilot != null) {
+            autopilot.onNoTrustedWindow(generation);
         }
     }
 
@@ -240,6 +279,42 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
 
     private SettingsSnapshot captureSnapshot() {
         return windowAuthority.capture(LiveGuideRuntime.settingsPackages());
+    }
+
+    @Override
+    public void startSupportStackIfReady() {
+        if (RemotePairingService.getSessionState() != SessionState.IDLE) {
+            return;
+        }
+        String descriptor = SupportSessionCoordinator.get(this).markSessionStarted();
+        if (descriptor == null) {
+            return;
+        }
+        startForegroundService(new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_START)
+                .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
+    }
+
+    @Override
+    public void showManualPairingFallback() {
+        LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
+        Intent intent = new Intent(this, com.glosh.remote.spike.MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        startActivity(intent);
+    }
+
+    @Override
+    public void openSettings(String action) {
+        Intent intent = new Intent(action).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            intent = new Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
+        try {
+            startActivity(intent);
+        } catch (Throwable error) {
+            LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_FALLBACK);
+            showRecovery("No pude abrir los Ajustes correctos.");
+        }
     }
 
     private LocatedTarget locate(SettingsSnapshot snapshot, boolean rescue) {
@@ -374,7 +449,8 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         }
     }
 
-    private void submitDetectedCode(String code) {
+    @Override
+    public void submitPairingCode(String code) {
         if (LiveGuideRuntime.stage() != GuideStage.PAIR_CODE_TARGET) {
             return;
         }
@@ -385,7 +461,8 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         startService(intent);
     }
 
-    private void showRecovery(String message) {
+    @Override
+    public void showRecovery(String message) {
         if (highlight != null) {
             highlight.clear();
         }
@@ -400,7 +477,8 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         LiveGuideRuntime.reset();
     }
 
-    private void clearVisuals() {
+    @Override
+    public void clearVisuals() {
         if (highlight != null) {
             highlight.clear();
         }
@@ -414,6 +492,21 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         currentToken = null;
         currentSnapshot = null;
         clearVisuals();
+    }
+
+    @Override
+    public void invalidateAndRescan() {
+        generationGuard.invalidate();
+        if (actor != null) {
+            actor.relevantEvent();
+        }
+    }
+
+    @Override
+    public void rescanAfter(long delayMs) {
+        if (actor != null) {
+            actorHandler.postDelayed(actor::relevantEvent, delayMs);
+        }
     }
 
     private boolean hasScrollable(SettingsSnapshot snapshot) {
@@ -453,89 +546,6 @@ public final class LiveGuideAccessibilityService extends AccessibilityService
         if (BuildConfig.DEBUG) {
             Log.d("GloshGuideV2", message);
         }
-    }
-
-    private String confidenceSummary(SettingsSnapshot snapshot) {
-        TargetSpec spec = GuideTargetCatalog.forStage(
-                LiveGuideRuntime.family(), LiveGuideRuntime.stage());
-        if (spec == null) {
-            return "none";
-        }
-        int high = 0;
-        int textLabel = 0;
-        int descriptionLabel = 0;
-        int textPrefix = 0;
-        int descriptionPrefix = 0;
-        int textContains = 0;
-        int descriptionContains = 0;
-        for (NodeSnapshot node : snapshot.nodes()) {
-            TargetCandidate candidate = node.candidate();
-            if (matchesLabel(spec, candidate.text())) {
-                textLabel++;
-            }
-            if (matchesLabel(spec, candidate.contentDescription())) {
-                descriptionLabel++;
-            }
-            if (startsWithLabel(spec, candidate.text())) {
-                textPrefix++;
-            }
-            if (startsWithLabel(spec, candidate.contentDescription())) {
-                descriptionPrefix++;
-            }
-            if (containsLabel(spec, candidate.text())) {
-                textContains++;
-            }
-            if (containsLabel(spec, candidate.contentDescription())) {
-                descriptionContains++;
-            }
-            if (matcher.score(spec, candidate) == TargetMatcher.Confidence.HIGH) {
-                high++;
-            }
-        }
-        return "high:" + high + ",text:" + textLabel + ",desc:" + descriptionLabel
-                + ",textPrefix:" + textPrefix + ",descPrefix:" + descriptionPrefix
-                + ",textContains:" + textContains + ",descContains:" + descriptionContains;
-    }
-
-    private boolean matchesLabel(TargetSpec spec, String value) {
-        String normalized = TargetMatcher.normalize(value);
-        if (normalized.isEmpty()) {
-            return false;
-        }
-        return spec.exactLabels().stream()
-                .map(TargetMatcher::normalize)
-                .anyMatch(normalized::equals)
-                || spec.aliases().stream()
-                .map(TargetMatcher::normalize)
-                .anyMatch(normalized::equals);
-    }
-
-    private boolean startsWithLabel(TargetSpec spec, String value) {
-        String normalized = TargetMatcher.normalize(value);
-        if (normalized.isEmpty()) {
-            return false;
-        }
-        return spec.exactLabels().stream()
-                .map(TargetMatcher::normalize)
-                .anyMatch(label -> normalized.startsWith(label + " ")
-                        || normalized.startsWith(label + ","))
-                || spec.aliases().stream()
-                .map(TargetMatcher::normalize)
-                .anyMatch(label -> normalized.startsWith(label + " ")
-                        || normalized.startsWith(label + ","));
-    }
-
-    private boolean containsLabel(TargetSpec spec, String value) {
-        String normalized = TargetMatcher.normalize(value);
-        if (normalized.isEmpty()) {
-            return false;
-        }
-        return spec.exactLabels().stream()
-                .map(TargetMatcher::normalize)
-                .anyMatch(normalized::contains)
-                || spec.aliases().stream()
-                .map(TargetMatcher::normalize)
-                .anyMatch(normalized::contains);
     }
 
     private record LocatedTarget(GuideStage stage, NodeSnapshot node) {

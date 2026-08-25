@@ -116,7 +116,7 @@ public final class WizardLayout {
         information.setVisibility(View.GONE);
         clearVisual();
         homeDetails.setVisibility(View.VISIBLE);
-        showPrimary("CONECTAR CON SOPORTE", connect, true);
+        showPrimary("INICIAR", connect, true);
         hide(secondary);
         hide(tertiary);
     }

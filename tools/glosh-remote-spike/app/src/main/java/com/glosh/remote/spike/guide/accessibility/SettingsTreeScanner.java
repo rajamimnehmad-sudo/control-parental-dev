@@ -5,6 +5,8 @@ import android.view.accessibility.AccessibilityNodeInfo;
 
 import com.glosh.remote.spike.guide.pairing.PairingCodeDetector;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,7 +21,7 @@ public final class SettingsTreeScanner {
         String title = findTitle(root);
         List<NodeSnapshot> nodes = new ArrayList<>();
         List<PairingCodeDetector.VisibleText> visibleText = new ArrayList<>();
-        walk(root, title, List.of(), nodes, visibleText);
+        walk(root, title, List.of(), List.of(), nodes, visibleText);
         String fingerprint = fingerprint(title, nodes);
         return new SettingsSnapshot(
                 windowId, packageName, title, fingerprint, nodes, visibleText);
@@ -29,6 +31,7 @@ public final class SettingsTreeScanner {
             AccessibilityNodeInfo node,
             String title,
             List<Integer> path,
+            List<String> ancestors,
             List<NodeSnapshot> nodes,
             List<PairingCodeDetector.VisibleText> visibleText) {
         if (node == null || nodes.size() >= MAX_NODES) {
@@ -36,8 +39,9 @@ public final class SettingsTreeScanner {
         }
         Rect bounds = new Rect();
         node.getBoundsInScreen(bounds);
-        String parent = node.getParent() == null ? "" : textOf(node.getParent());
-        String children = childText(node);
+        String parent = ancestors.isEmpty() ? "" : ancestors.get(ancestors.size() - 1);
+        List<String> descendants = descendantTexts(node, 3, 24);
+        String children = String.join(" ", descendants);
         TargetCandidate candidate = new TargetCandidate(
                 string(node.getText()),
                 string(node.getContentDescription()),
@@ -48,7 +52,16 @@ public final class SettingsTreeScanner {
                 string(node.getClassName()),
                 node.isClickable(),
                 bounds);
-        nodes.add(new NodeSnapshot(path, candidate, node.isScrollable()));
+        nodes.add(new NodeSnapshot(
+                path,
+                candidate,
+                node.isScrollable(),
+                node.isCheckable(),
+                node.isCheckable() ? node.isChecked() : null,
+                node.isEnabled(),
+                node.isVisibleToUser(),
+                ancestors,
+                descendants));
         if (!candidate.text().isEmpty()) {
             visibleText.add(new PairingCodeDetector.VisibleText(candidate.text(), parent, title));
         }
@@ -59,7 +72,20 @@ public final class SettingsTreeScanner {
         for (int index = 0; index < node.getChildCount(); index++) {
             List<Integer> childPath = new ArrayList<>(path);
             childPath.add(index);
-            walk(node.getChild(index), title, childPath, nodes, visibleText);
+            List<String> childAncestors = new ArrayList<>(ancestors);
+            String own = textOf(node);
+            if (!own.isEmpty()) {
+                childAncestors.add(own);
+            }
+            AccessibilityNodeInfo child = node.getChild(index);
+            if (child == null) {
+                continue;
+            }
+            try {
+                walk(child, title, childPath, childAncestors, nodes, visibleText);
+            } finally {
+                child.recycle();
+            }
         }
     }
 
@@ -68,16 +94,31 @@ public final class SettingsTreeScanner {
         logical.append('|').append(nodes.size());
         for (NodeSnapshot node : nodes) {
             TargetCandidate candidate = node.candidate();
-            if (!candidate.text().isEmpty() || !candidate.contentDescription().isEmpty()) {
-                logical.append('|')
-                        .append(TargetMatcher.normalize(candidate.text()))
-                        .append(':')
-                        .append(TargetMatcher.normalize(candidate.contentDescription()))
-                        .append(':')
-                        .append(candidate.viewId() == null ? "" : candidate.viewId());
-            }
+            Rect bounds = candidate.bounds();
+            logical.append('|').append(node.path())
+                    .append(':').append(TargetMatcher.normalize(candidate.text()))
+                    .append(':').append(TargetMatcher.normalize(candidate.contentDescription()))
+                    .append(':').append(candidate.viewId() == null ? "" : candidate.viewId())
+                    .append(':').append(candidate.className())
+                    .append(':').append(candidate.clickable())
+                    .append(':').append(node.checkable())
+                    .append(':').append(node.checked())
+                    .append(':').append(node.enabled())
+                    .append(':').append(node.visible())
+                    .append(':').append(bounds.left).append(',').append(bounds.top)
+                    .append(',').append(bounds.right).append(',').append(bounds.bottom);
         }
-        return Integer.toHexString(logical.toString().hashCode()) + ":" + logical.length();
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(logical.toString().getBytes(StandardCharsets.UTF_8));
+            StringBuilder value = new StringBuilder();
+            for (byte item : digest) {
+                value.append(String.format("%02x", item));
+            }
+            return value.toString();
+        } catch (Exception impossible) {
+            throw new IllegalStateException("SHA-256 unavailable", impossible);
+        }
     }
 
     private String findTitle(AccessibilityNodeInfo root) {
@@ -97,9 +138,17 @@ public final class SettingsTreeScanner {
             return own;
         }
         for (int index = 0; index < node.getChildCount(); index++) {
-            String found = findTitleById(node.getChild(index), titleContext);
-            if (!found.isEmpty()) {
-                return found;
+            AccessibilityNodeInfo child = node.getChild(index);
+            if (child == null) {
+                continue;
+            }
+            try {
+                String found = findTitleById(child, titleContext);
+                if (!found.isEmpty()) {
+                    return found;
+                }
+            } finally {
+                child.recycle();
             }
         }
         return "";
@@ -111,30 +160,47 @@ public final class SettingsTreeScanner {
             if (child == null) {
                 continue;
             }
-            String text = textOf(child);
-            String viewId = child.getViewIdResourceName();
-            if (!text.isEmpty() && (viewId == null
-                    || viewId.contains("title")
-                    || viewId.contains("collapsing_toolbar"))) {
-                return text;
+            try {
+                String text = textOf(child);
+                String viewId = child.getViewIdResourceName();
+                if (!text.isEmpty() && (viewId == null
+                        || viewId.contains("title")
+                        || viewId.contains("collapsing_toolbar"))) {
+                    return text;
+                }
+            } finally {
+                child.recycle();
             }
         }
         return textOf(root);
     }
 
-    private String childText(AccessibilityNodeInfo node) {
-        StringBuilder value = new StringBuilder();
-        int limit = Math.min(node.getChildCount(), 4);
-        for (int index = 0; index < limit; index++) {
-            String text = textOf(node.getChild(index));
-            if (!text.isEmpty()) {
-                if (value.length() > 0) {
-                    value.append(' ');
+    private List<String> descendantTexts(AccessibilityNodeInfo node, int depth, int limit) {
+        List<String> values = new ArrayList<>();
+        collectDescendantTexts(node, depth, limit, values);
+        return List.copyOf(values);
+    }
+
+    private void collectDescendantTexts(
+            AccessibilityNodeInfo node, int depth, int limit, List<String> values) {
+        if (node == null || depth <= 0 || values.size() >= limit) {
+            return;
+        }
+        for (int index = 0; index < node.getChildCount() && values.size() < limit; index++) {
+            AccessibilityNodeInfo child = node.getChild(index);
+            if (child == null) {
+                continue;
+            }
+            try {
+                String text = textOf(child);
+                if (!text.isEmpty()) {
+                    values.add(text);
                 }
-                value.append(text);
+                collectDescendantTexts(child, depth - 1, limit, values);
+            } finally {
+                child.recycle();
             }
         }
-        return value.toString();
     }
 
     private String textOf(AccessibilityNodeInfo node) {

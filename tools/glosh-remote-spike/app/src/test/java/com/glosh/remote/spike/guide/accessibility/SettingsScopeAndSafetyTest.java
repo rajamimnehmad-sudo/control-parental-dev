@@ -18,11 +18,11 @@ public class SettingsScopeAndSafetyTest {
     }
 
     @Test
-    public void actionPolicyContainsOnlyShowAndScroll() {
+    public void actionPolicyAllowsOnlyTransactionalClickShowAndScroll() {
+        assertTrue(GuideActionPolicy.isAllowed(GuideActionPolicy.Operation.CLICK));
         assertTrue(GuideActionPolicy.isAllowed(GuideActionPolicy.Operation.SHOW_ON_SCREEN));
         assertTrue(GuideActionPolicy.isAllowed(GuideActionPolicy.Operation.SCROLL_DOWN));
         assertTrue(GuideActionPolicy.isAllowed(GuideActionPolicy.Operation.SCROLL_FORWARD));
-        assertFalse(GuideActionPolicy.allowsFrameworkActionName("ACTION_CLICK"));
         assertFalse(GuideActionPolicy.allowsFrameworkActionName("ACTION_SET_TEXT"));
         assertFalse(GuideActionPolicy.allowsFrameworkActionName("dispatchGesture"));
         assertFalse(GuideActionPolicy.allowsFrameworkActionName("GLOBAL_ACTION_BACK"));

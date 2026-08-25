@@ -47,12 +47,12 @@ public class SettingsWindowSelectorTest {
     }
 
     @Test
-    public void oneActiveSettingsWindowWinsOverInactivePeer() {
+    public void twoSettingsWindowsFailClosedEvenWhenOnlyOneIsActive() {
         SettingsWindowSelector.Selection selection = selector.select(List.of(
                 window(1, SettingsWindowSelector.WindowType.APPLICATION, SETTINGS, false),
                 window(2, SettingsWindowSelector.WindowType.APPLICATION, SETTINGS, true)), Set.of(SETTINGS));
-        assertTrue(selection.selected());
-        assertTrue(selection.window().id() == 2);
+        assertFalse(selection.selected());
+        assertTrue(selection.ambiguous());
     }
 
     private SettingsWindowSelector.WindowCandidate window(
