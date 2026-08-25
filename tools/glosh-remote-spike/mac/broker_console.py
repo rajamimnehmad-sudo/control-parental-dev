@@ -37,12 +37,62 @@ async def accept_request(
     return f"[broker] solicitud aceptada: {request.request_id}"
 
 
-async def announce_pending_requests(session, broker: BrokerOperatorClient) -> None:
+async def maintain_operator_presence(
+    session,
+    broker: BrokerOperatorClient,
+    interval_seconds: float = 60.0,
+) -> None:
+    """Renew the support-ready lease while the technician is explicitly waiting."""
+    while not session.stop_event.is_set():
+        try:
+            await asyncio.wait_for(session.stop_event.wait(), timeout=interval_seconds)
+            return
+        except asyncio.TimeoutError:
+            pass
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, broker.register, 0)
+        except Exception as exc:
+            if not session.stop_event.is_set():
+                print(f"[broker] heartbeat temporal falló: {exc}", file=sys.stderr)
+
+
+async def announce_pending_requests(
+    session,
+    broker: BrokerOperatorClient,
+    descriptor: str | None = None,
+) -> None:
     announced = set()
+    autoaccepted_request_id: str | None = None
     while not session.stop_event.is_set():
         try:
             requests = await asyncio.get_running_loop().run_in_executor(None, broker.pending)
             current = {request.request_id for request in requests}
+
+            if (
+                descriptor
+                and autoaccepted_request_id is None
+                and session.agent is None
+                and len(requests) == 1
+            ):
+                request = requests[0]
+                await asyncio.get_running_loop().run_in_executor(
+                    None, broker.accept, request, descriptor
+                )
+                autoaccepted_request_id = request.request_id
+                print(
+                    f"\n[broker] cliente único aceptado automáticamente: "
+                    f"{request.manufacturer} {request.model}",
+                    flush=True,
+                )
+                current.discard(request.request_id)
+                requests = []
+            elif len(requests) > 1 and autoaccepted_request_id is None:
+                print(
+                    "\n[broker] hay varias solicitudes pendientes; "
+                    "se requiere accept <request-id> manual.",
+                    flush=True,
+                )
+
             for request in requests:
                 if request.request_id not in announced:
                     print(
