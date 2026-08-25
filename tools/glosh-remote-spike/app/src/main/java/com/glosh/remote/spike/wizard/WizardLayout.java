@@ -13,6 +13,8 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.glosh.remote.spike.guide.overlay.GuideCueView;
+
 @SuppressLint("SetTextI18n")
 public final class WizardLayout {
     public static final int COLOR_LIME = Color.rgb(190, 242, 84);
@@ -35,6 +37,7 @@ public final class WizardLayout {
     private final LinearLayout homeDetails;
     private final ActiveCtaPulse pulse = new ActiveCtaPulse(COLOR_LIME);
     private GuideAnimation guideAnimation;
+    private GuideCueView guideCue;
     private PairingCodeInputView pairingInput;
     private boolean hostActive;
 
@@ -99,6 +102,9 @@ public final class WizardLayout {
         if (guideAnimation != null) {
             guideAnimation.onHostResume();
         }
+        if (guideCue != null) {
+            guideCue.onHostResume();
+        }
     }
 
     public void onHostPause() {
@@ -107,15 +113,17 @@ public final class WizardLayout {
         if (guideAnimation != null) {
             guideAnimation.onHostPause();
         }
+        if (guideCue != null) {
+            guideCue.onHostPause();
+        }
     }
 
     public void showHome(View.OnClickListener connect) {
         progress.setVisibility(View.GONE);
         title.setText("Soporte remoto Glosh");
         body.setText(
-                "Conectate con soporte en un toque.\n\n"
-                        + "Glosh prepara el teléfono automáticamente y sólo te pide intervenir "
-                        + "si Android necesita una confirmación protegida.");
+                "Te llevamos a cada pantalla correcta y te mostramos exactamente qué tocar.\n\n"
+                        + "Vos confirmás lo que Android pide; Glosh detecta el cambio y abre el paso siguiente.");
         information.setVisibility(View.GONE);
         clearVisual();
         homeDetails.setVisibility(View.VISIBLE);
@@ -139,6 +147,62 @@ public final class WizardLayout {
         pulse.clear();
     }
 
+    public void showPresentation(GuidePresentation presentation) {
+        clearVisual();
+        LinearLayout card = new LinearLayout(activity);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+        card.setBackground(rounded(COLOR_GRAPHITE, 20));
+
+        guideCue = new GuideCueView(activity);
+        guideCue.setCue(presentation.cue());
+        LinearLayout.LayoutParams cueParams = new LinearLayout.LayoutParams(dp(58), dp(58));
+        cueParams.setMargins(0, 0, dp(14), 0);
+        card.addView(guideCue, cueParams);
+
+        LinearLayout copy = new LinearLayout(activity);
+        copy.setOrientation(LinearLayout.VERTICAL);
+        TextView label = text(
+                presentation.progressLabel(),
+                12,
+                COLOR_LIME,
+                Typeface.BOLD);
+        TextView reassurance = text(
+                presentation.terminal()
+                        ? "Sesión segura activa"
+                        : "Vos tocás · Glosh continúa",
+                15,
+                Color.WHITE,
+                Typeface.BOLD);
+        TextView detail = text(
+                presentation.terminal()
+                        ? "La conexión sigue bajo tu control."
+                        : "La tarjeta flotante y la notificación muestran siempre el mismo paso.",
+                13,
+                Color.rgb(193, 200, 188),
+                Typeface.NORMAL);
+        detail.setLineSpacing(dp(2), 1f);
+        copy.addView(label, matchWrap());
+        LinearLayout.LayoutParams reassuranceParams = matchWrap();
+        reassuranceParams.setMargins(0, dp(3), 0, 0);
+        copy.addView(reassurance, reassuranceParams);
+        LinearLayout.LayoutParams detailParams = matchWrap();
+        detailParams.setMargins(0, dp(3), 0, 0);
+        copy.addView(detail, detailParams);
+        card.addView(copy, new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f));
+
+        visualSlot.addView(card, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        if (hostActive) {
+            guideCue.onHostResume();
+        }
+    }
+
     public void showGuide(OemGuideStep step) {
         clearVisual();
         guideAnimation = new GuideAnimation(activity);
@@ -152,11 +216,15 @@ public final class WizardLayout {
     }
 
     public void showPairingInput(PairingCodeController.Listener listener, boolean retry) {
-        clearVisual();
+        if (pairingInput != null) {
+            visualSlot.removeView(pairingInput);
+        }
         pairingInput = new PairingCodeInputView(activity, listener);
-        visualSlot.addView(pairingInput, new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(12), 0, 0);
+        visualSlot.addView(pairingInput, params);
         if (retry) {
             pairingInput.allowRetry();
         } else {
@@ -168,6 +236,10 @@ public final class WizardLayout {
         if (guideAnimation != null) {
             guideAnimation.onHostPause();
             guideAnimation = null;
+        }
+        if (guideCue != null) {
+            guideCue.onHostPause();
+            guideCue = null;
         }
         pairingInput = null;
         visualSlot.removeAllViews();
@@ -192,7 +264,7 @@ public final class WizardLayout {
         LinearLayout details = new LinearLayout(activity);
         details.setOrientation(LinearLayout.VERTICAL);
         TextView reassurance = text(
-                "Conexión temporal · Segura · Vos tenés el control",
+                "4 pasos claros · Conexión temporal · Sin acceso permanente",
                 14,
                 COLOR_GRAPHITE,
                 Typeface.BOLD);
@@ -200,11 +272,13 @@ public final class WizardLayout {
         reassurance.setGravity(Gravity.CENTER);
         reassurance.setPadding(dp(14), dp(11), dp(14), dp(11));
         add(details, reassurance, 0, 26);
-        add(details, text("Tu privacidad primero", 21, COLOR_GRAPHITE, Typeface.BOLD), 0, 12);
+        add(details, text("Qué vas a hacer", 21, COLOR_GRAPHITE, Typeface.BOLD), 0, 12);
         add(details, text(
-                "• La conexión empieza sólo cuando vos la pedís.\n"
-                        + "• Podés cancelarla cuando quieras.\n"
-                        + "• No dejamos acceso remoto permanente en tu teléfono.",
+                "1. Activar Glosh Remote.\n"
+                        + "2. Confirmar opciones de desarrollador.\n"
+                        + "3. Activar depuración inalámbrica.\n"
+                        + "4. Abrir el código de vinculación.\n\n"
+                        + "Glosh abre cada pantalla, sigue tu progreso y toma el código automáticamente cuando es seguro.",
                 16,
                 COLOR_MUTED,
                 Typeface.NORMAL), 0, 0);
@@ -220,7 +294,9 @@ public final class WizardLayout {
         button.setMinHeight(dp(primaryStyle ? 58 : 48));
         button.setPadding(dp(18), dp(8), dp(18), dp(8));
         button.setTextColor(COLOR_GRAPHITE);
-        button.setBackground(primaryStyle ? rounded(COLOR_LIME, 18) : rounded(Color.TRANSPARENT, 18));
+        button.setBackground(primaryStyle
+                ? rounded(COLOR_LIME, 18)
+                : rounded(Color.TRANSPARENT, 18));
         return button;
     }
 
@@ -244,11 +320,10 @@ public final class WizardLayout {
         return view;
     }
 
-    private View divider() {
-        View view = new View(activity);
-        view.setBackgroundColor(COLOR_LINE);
-        view.setMinimumHeight(dp(1));
-        return view;
+    private LinearLayout.LayoutParams matchWrap() {
+        return new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     private GradientDrawable rounded(int color, int radiusDp) {
