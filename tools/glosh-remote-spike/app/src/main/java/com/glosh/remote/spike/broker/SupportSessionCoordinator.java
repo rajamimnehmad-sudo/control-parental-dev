@@ -3,8 +3,9 @@ package com.glosh.remote.spike.broker;
 import android.content.Context;
 import android.os.Build;
 
-import com.glosh.remote.spike.protocol.JoinDescriptor;
+import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
+import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.wizard.DeveloperGuidePhase;
 import com.glosh.remote.spike.wizard.DeviceProfile;
 import com.glosh.remote.spike.wizard.OemDetector;
@@ -149,6 +150,7 @@ public final class SupportSessionCoordinator {
         });
     }
 
+    /** Starts broker rendezvous while the customer continues the Wireless Debugging step. */
     public void confirmDeveloperOptions() {
         synchronized (this) {
             if (onboarding.step() != OnboardingState.Step.DEVELOPER_OPTIONS) {
@@ -157,7 +159,7 @@ public final class SupportSessionCoordinator {
             onboarding.developerOptionsReady();
             developerConfirmed = true;
             developerPhase = DeveloperGuidePhase.CONFIRMATION;
-            LiveGuideRuntime.setStage(com.glosh.remote.spike.guide.state.GuideStage.SUPPORT_PREPARING);
+            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
             persist();
         }
         notifyChanged();
@@ -181,8 +183,7 @@ public final class SupportSessionCoordinator {
                             descriptor = value;
                             onboarding.sessionReady();
                             wirelessHelp = false;
-                            LiveGuideRuntime.setStage(
-                                    com.glosh.remote.spike.guide.state.GuideStage.WIRELESS_DEBUGGING);
+                            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
                             persist();
                         }
                         notifyChanged();
