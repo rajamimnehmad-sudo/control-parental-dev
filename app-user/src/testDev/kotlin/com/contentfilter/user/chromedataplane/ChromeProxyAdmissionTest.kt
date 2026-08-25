@@ -69,17 +69,18 @@ class ChromeProxyAdmissionTest {
     }
 
     @Test
-    fun `close discards queued work and runs discard hook`() {
+    fun `close cancels active work and discards queued work`() {
         val firstStarted = CountDownLatch(1)
         val releaseFirst = CountDownLatch(1)
-        val discarded = CountDownLatch(1)
+        val activeDiscarded = CountDownLatch(1)
+        val queuedDiscarded = CountDownLatch(1)
         val queuedRan = AtomicBoolean(false)
         val admission = ChromeProxyAdmission(workerCount = 1, queueCapacity = 1, threadNamePrefix = "test-proxy")
 
         try {
             assertEquals(
                 ChromeProxyAdmissionResult.Accepted,
-                admission.dispatch(onDiscard = {}) {
+                admission.dispatch(onDiscard = { activeDiscarded.countDown() }) {
                     firstStarted.countDown()
                     try {
                         releaseFirst.await()
@@ -91,14 +92,15 @@ class ChromeProxyAdmissionTest {
             assertTrue(firstStarted.await(1, TimeUnit.SECONDS))
             assertEquals(
                 ChromeProxyAdmissionResult.Accepted,
-                admission.dispatch(onDiscard = { discarded.countDown() }) {
+                admission.dispatch(onDiscard = { queuedDiscarded.countDown() }) {
                     queuedRan.set(true)
                 },
             )
 
             admission.close()
 
-            assertTrue(discarded.await(1, TimeUnit.SECONDS))
+            assertTrue(activeDiscarded.await(1, TimeUnit.SECONDS))
+            assertTrue(queuedDiscarded.await(1, TimeUnit.SECONDS))
             assertFalse(queuedRan.get())
             assertTrue(admission.isShutdown())
         } finally {
