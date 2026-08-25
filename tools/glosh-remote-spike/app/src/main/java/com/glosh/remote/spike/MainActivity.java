@@ -1,6 +1,7 @@
 package com.glosh.remote.spike;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
@@ -578,6 +579,12 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         }
     }
 
+    /**
+     * API 33+ supports the explicit NOT_EXPORTED receiver flag. Older releases only expose the
+     * legacy two-argument overload, so the lint warning is intentionally suppressed for that
+     * compatibility branch; the PendingIntents that target these actions are app-owned.
+     */
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     private void registerPipActions() {
         IntentFilter filter = new IntentFilter();
         filter.addAction(ACTION_PIP_BACK);
