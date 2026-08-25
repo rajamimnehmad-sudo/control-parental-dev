@@ -31,19 +31,27 @@ public final class GuideTargetCatalog {
                                     List.of("Acerca del teléfono", "About phone", "Sistema", "System"));
             case DEV_BUILD_NUMBER -> family == OemFamily.XIAOMI_FAMILY
                     ? spec(
-                            List.of("Versión de OS", "Versión de MIUI", "Versión de HyperOS", "OS version", "MIUI version", "HyperOS version"),
+                            List.of("Versión de OS", "Versión de MIUI", "Versión de HyperOS",
+                                    "OS version", "MIUI version", "HyperOS version"),
                             List.of(),
                             List.of("Información detallada y especificaciones", "Detailed info and specs"))
                     : spec(
                             List.of("Número de compilación", "Build number"),
                             List.of(),
-                            List.of("Información de software", "Software information", "Acerca del teléfono", "About phone"));
+                            List.of("Información de software", "Software information",
+                                    "Acerca del teléfono", "About phone"));
             case WIRELESS_DEBUGGING -> spec(
                     List.of("Depuración inalámbrica", "Wireless debugging"),
-                    List.of(),
-                    List.of("Opciones de desarrollador", "Developer options"));
+                    List.of("Usar depuración inalámbrica", "Use wireless debugging"),
+                    List.of("Depuración inalámbrica", "Wireless debugging",
+                            "Opciones de desarrollador", "Developer options"));
             case PAIR_CODE_TARGET -> spec(
-                    List.of("Emparejar dispositivo con código", "Pair device with pairing code"),
+                    List.of(
+                            "Vincular dispositivo con código de vinculación",
+                            "Vincular dispositivo con un código de vinculación",
+                            "Vincular dispositivo con código",
+                            "Emparejar dispositivo con código",
+                            "Pair device with pairing code"),
                     List.of("Emparejar con código", "Pair using pairing code"),
                     List.of("Depuración inalámbrica", "Wireless debugging"));
             default -> null;
@@ -52,12 +60,12 @@ public final class GuideTargetCatalog {
 
     public static String instruction(GuideStage stage) {
         return switch (stage) {
-            case DEV_ABOUT_PHONE -> "Tocá Acerca del teléfono";
-            case DEV_SOFTWARE_INFO -> "Tocá Información de software";
-            case DEV_BUILD_NUMBER -> "Tocá 7 veces Número de compilación";
-            case WIRELESS_DEBUGGING -> "Activá Depuración inalámbrica";
-            case PAIR_CODE_TARGET -> "Tocá Emparejar dispositivo con código";
-            default -> "Volvamos al punto correcto";
+            case DEV_ABOUT_PHONE -> "Tocá “Acerca del teléfono”.";
+            case DEV_SOFTWARE_INFO -> "Tocá “Información de software”.";
+            case DEV_BUILD_NUMBER -> "Tocá 7 veces “Número de compilación”.";
+            case WIRELESS_DEBUGGING -> "Activá “Depuración inalámbrica”.";
+            case PAIR_CODE_TARGET -> "Tocá “Vincular dispositivo con código”.";
+            default -> "Seguí la indicación de Glosh.";
         };
     }
 
@@ -68,8 +76,8 @@ public final class GuideTargetCatalog {
                 screens,
                 List.of(),
                 List.of(),
-                List.of("title", "summary", "switch_text"),
-                List.of("TextView", "Switch", "LinearLayout"),
+                List.of("title", "summary", "switch_text", "switch_widget", "switch_background"),
+                List.of("TextView", "Switch", "LinearLayout", "FrameLayout"),
                 false);
     }
 }
