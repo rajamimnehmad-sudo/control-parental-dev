@@ -1,5 +1,7 @@
 package com.glosh.remote.spike.guide.accessibility;
 
+import com.glosh.remote.spike.guide.autopilot.AutopilotContract;
+import com.glosh.remote.spike.guide.autopilot.SamsungSettingsClassifier;
 import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.wizard.OemFamily;
 
@@ -11,6 +13,7 @@ public final class GuideTargetLocator {
     }
 
     private final TargetMatcher matcher;
+    private final SamsungSettingsClassifier samsungClassifier = new SamsungSettingsClassifier();
 
     public GuideTargetLocator(TargetMatcher matcher) {
         this.matcher = matcher;
@@ -21,6 +24,13 @@ public final class GuideTargetLocator {
             OemFamily family,
             GuideStage currentStage,
             boolean rescue) {
+        GuideStage landed = landedSamsungStage(snapshot, family, currentStage);
+        if (landed != null && landed != currentStage) {
+            // The service only needs the stage transition here. No target is consumed until the
+            // next stable snapshot, so a null node is intentional and safe.
+            return new LocatedTarget(landed, null);
+        }
+
         List<GuideStage> stages = new ArrayList<>();
         stages.add(currentStage);
         if (isDeveloperLearningStage(currentStage)) {
@@ -68,6 +78,30 @@ public final class GuideTargetLocator {
         return spec.screenTitles().stream()
                 .map(TargetMatcher::normalize)
                 .anyMatch(normalized::equals);
+    }
+
+    private GuideStage landedSamsungStage(
+            SettingsSnapshot snapshot,
+            OemFamily family,
+            GuideStage currentStage) {
+        if (family != OemFamily.SAMSUNG) {
+            return null;
+        }
+        AutopilotContract.Screen screen = samsungClassifier.classify(snapshot).screen();
+        if (currentStage == GuideStage.DEV_ABOUT_PHONE
+                && screen == AutopilotContract.Screen.ABOUT_PHONE) {
+            return GuideStage.DEV_SOFTWARE_INFO;
+        }
+        if ((currentStage == GuideStage.DEV_ABOUT_PHONE
+                || currentStage == GuideStage.DEV_SOFTWARE_INFO)
+                && screen == AutopilotContract.Screen.SOFTWARE_INFO) {
+            return GuideStage.DEV_BUILD_NUMBER;
+        }
+        if (isDeveloperLearningStage(currentStage)
+                && screen == AutopilotContract.Screen.WIRELESS_DEBUGGING) {
+            return GuideStage.WIRELESS_DEBUGGING;
+        }
+        return null;
     }
 
     private boolean isDeveloperLearningStage(GuideStage stage) {
