@@ -6,10 +6,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
-FINAL_APK="$APK_DIR/GloshRemote-Samsung-Overlay-DEV.apk"
-REPORT="$APK_DIR/REMOTE-SAMSUNG-OVERLAY-GUIDE-11-report.txt"
+FINAL_APK="$APK_DIR/GloshRemote-Samsung-Bubble-DEV.apk"
+REPORT="$APK_DIR/REMOTE-SAMSUNG-BUBBLE-GUIDE-12-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
-VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-samsung-overlay-python.XXXXXX")"
+VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-samsung-bubble-python.XXXXXX")"
 
 cleanup() {
   rm -rf "$VENV_DIR"
@@ -34,7 +34,7 @@ file_size() {
   fi
 }
 
-printf '\n=== Glosh Remote Samsung custom overlay guide gate ===\n'
+printf '\n=== Glosh Remote Samsung system Bubble guide gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
@@ -43,7 +43,9 @@ MANIFEST="$SCRIPT_DIR/app/src/main/AndroidManifest.xml"
 MAIN="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/MainActivity.java"
 SERVICE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/RemotePairingService.java"
 SAMSUNG_STEP="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/SamsungGuideStep.java"
-OVERLAY="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/GuideOverlayController.java"
+BUBBLE_NOTIFICATION="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/GuideNotification.java"
+BUBBLE_ACTIVITY="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/GuideBubbleActivity.java"
+FLOATING_CONTROLLER="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/GuideOverlayController.java"
 
 if grep -Eq 'BIND_ACCESSIBILITY_SERVICE|LiveGuideAccessibilityService|ACCESSIBILITY_SETTINGS|ACCESSIBILITY_DETAILS_SETTINGS' "$MANIFEST"; then
   echo "ERROR: Accessibility volvió al manifiesto del instalador Samsung." >&2
@@ -57,20 +59,33 @@ if grep -Eq 'LiveGuideRuntime|GuideStage' "$SERVICE"; then
   echo "ERROR: pairing service volvió a depender del runtime de Accessibility." >&2
   exit 3
 fi
-if ! grep -q 'android.permission.SYSTEM_ALERT_WINDOW' "$MANIFEST"; then
-  echo "ERROR: falta el permiso explícito para la guía flotante propia." >&2
+if grep -q 'android.permission.SYSTEM_ALERT_WINDOW' "$MANIFEST"; then
+  echo "ERROR: SYSTEM_ALERT_WINDOW volvió al manifiesto; Samsung Settings ocultó físicamente esa ruta." >&2
   exit 3
 fi
 if grep -q 'supportsPictureInPicture' "$MANIFEST"; then
-  echo "ERROR: PiP volvió al manifiesto; la ruta vigente es overlay propio." >&2
+  echo "ERROR: PiP volvió al manifiesto; la ruta PiP ya falló UX física." >&2
   exit 3
 fi
-if ! grep -q 'TYPE_APPLICATION_OVERLAY' "$OVERLAY"; then
-  echo "ERROR: la guía no usa TYPE_APPLICATION_OVERLAY." >&2
+if ! grep -q 'GuideBubbleActivity' "$MANIFEST" \
+  || ! grep -q 'android:allowEmbedded="true"' "$MANIFEST" \
+  || ! grep -q 'android:resizeableActivity="true"' "$MANIFEST"; then
+  echo "ERROR: falta la Activity embebible/redimensionable requerida por Bubble." >&2
   exit 3
 fi
-if ! grep -q 'Settings.canDrawOverlays' "$OVERLAY"; then
-  echo "ERROR: falta comprobación real del permiso de overlay." >&2
+if ! grep -q 'Notification.BubbleMetadata.Builder' "$BUBBLE_NOTIFICATION" \
+  || ! grep -q 'setShortcutId' "$BUBBLE_NOTIFICATION" \
+  || ! grep -q 'setConversationId' "$BUBBLE_NOTIFICATION"; then
+  echo "ERROR: la notificación no cumple el contrato de Bubble/conversation Android 11+." >&2
+  exit 3
+fi
+if ! grep -q 'GuideOverlayView' "$BUBBLE_ACTIVITY" \
+  || ! grep -q 'ACTION_SUBMIT_CODE' "$BUBBLE_ACTIVITY"; then
+  echo "ERROR: la Bubble no contiene la guía interactiva o el ingreso local de 6 dígitos." >&2
+  exit 3
+fi
+if grep -q 'TYPE_APPLICATION_OVERLAY' "$FLOATING_CONTROLLER"; then
+  echo "ERROR: el controller volvió a usar TYPE_APPLICATION_OVERLAY." >&2
   exit 3
 fi
 if ! grep -q 'TOTAL_STEPS = 7' "$SAMSUNG_STEP"; then
@@ -82,7 +97,7 @@ if grep -R -Eq 'SamsungPipCoachView|PictureInPictureParams|RemoteAction' \
   echo "ERROR: quedan dependencias de la UX PiP superseded." >&2
   exit 3
 fi
-printf 'PASS: Samsung-only + custom overlay + user-confirmed Settings + no Accessibility/PiP\n'
+printf 'PASS: Samsung-only + system Bubble + user-confirmed Settings + no Accessibility/PiP/app-overlay\n'
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -117,7 +132,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" status --short)"
 
 {
-  echo "TASK=REMOTE-SAMSUNG-OVERLAY-GUIDE-11"
+  echo "TASK=REMOTE-SAMSUNG-BUBBLE-GUIDE-12"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
