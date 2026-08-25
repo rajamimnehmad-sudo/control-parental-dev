@@ -176,6 +176,7 @@ internal fun responseMayHaveBody(
     requestMethod != ChromePhotosProxyRequest.Head &&
         statusCode !in 100..199 &&
         statusCode != 204 &&
+        statusCode != 205 &&
         statusCode != 304
 
 internal fun List<ChromeHttpHeader>.firstValue(name: String): String? =

@@ -67,6 +67,7 @@ class ChromePhotosProxyRequestTest {
             "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 5\r\n\r\nabc",
             "POST / HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: gzip, chunked\r\n\r\n",
             "POST / HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked\r\nTrailer: Digest\r\n\r\n0\r\n\r\n",
+            "POST / HTTP/1.1\r\nHost: example.com\r\nTransfer-Encoding: chunked\r\n\r\n0\r\nDigest: hidden\r\n\r\n",
         ).forEach { raw -> assertFailsWith<Exception> { parse(raw) } }
         val tooLarge = "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 1025\r\n\r\n"
         assertEquals(413, assertFailsWith<ChromeHttpProtocolException> { parse(tooLarge) }.statusCode)

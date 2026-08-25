@@ -196,7 +196,7 @@ internal class ChromeHttp1RequestReader(
                     ?.takeIf { it >= 0 && it <= Int.MAX_VALUE }
                     ?: throw ChromeHttpProtocolException(400, "Malformed chunk size")
             if (length == 0L) {
-                readTrailers(input)
+                requireEmptyTrailers(input)
                 return output.toByteArray()
             }
             if (output.size().toLong() + length > maximumBodyBytes) {
@@ -209,18 +209,11 @@ internal class ChromeHttp1RequestReader(
         }
     }
 
-    private fun readTrailers(input: InputStream) {
-        repeat(maximumHeaderCount) {
-            val line =
-                input.readCrlfLine(maximumLineBytes)
-                    ?: throw ChromeHttpProtocolException(400, "Truncated trailers")
-            if (line.isEmpty()) return
-            val separator = line.indexOf(':')
-            if (separator <= 0 || !line.substring(0, separator).all(::isHeaderTokenCharacter)) {
-                throw ChromeHttpProtocolException(400, "Malformed trailer")
-            }
-        }
-        throw ChromeHttpProtocolException(431, "Too many trailers")
+    private fun requireEmptyTrailers(input: InputStream) {
+        val line =
+            input.readCrlfLine(maximumLineBytes)
+                ?: throw ChromeHttpProtocolException(400, "Truncated chunk terminator")
+        if (line.isNotEmpty()) throw ChromeHttpProtocolException(501, "Request trailers unsupported")
     }
 
     private fun InputStream.readExactly(length: Int): ByteArray {

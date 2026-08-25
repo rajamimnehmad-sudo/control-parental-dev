@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -7,6 +8,18 @@ internal data class ChromeStreamResult(
     val bytesWritten: Long,
     val chunked: Boolean,
 )
+
+internal class ChromeHttpResponseIntegrityException(
+    val declaredLength: Long,
+    val bytesWritten: Long,
+    val additionalBodyByteObserved: Boolean,
+) : IOException(
+        if (additionalBodyByteObserved) {
+            "Response body exceeded declared length $declaredLength"
+        } else {
+            "Response body ended after $bytesWritten of $declaredLength bytes"
+        },
+    )
 
 internal class ChromeHttp1ResponseWriter(
     private val streamBufferBytes: Int = DefaultStreamBufferBytes,
@@ -41,7 +54,7 @@ internal class ChromeHttp1ResponseWriter(
             request = request,
             statusCode = response.statusCode,
             statusText = response.statusText,
-            headers = ChromeHttpHeaderPolicy.downstreamResponseHeaders(response.headers),
+            headers = response.headers,
             body = response.body,
             bodyLength = response.bodyLength,
         )
@@ -60,7 +73,10 @@ internal class ChromeHttp1ResponseWriter(
         val safeHeaders = ChromeHttpHeaderPolicy.downstreamResponseHeaders(headers)
         val effectiveLength =
             when {
+                statusCode in 100..199 || statusCode == 204 -> null
+                statusCode == 205 -> 0L
                 request.method == ChromePhotosProxyRequest.Head -> originalContentLength
+                statusCode == 304 -> originalContentLength
                 !bodyAllowed -> null
                 bodyLength >= 0 -> bodyLength
                 else -> null
@@ -79,20 +95,65 @@ internal class ChromeHttp1ResponseWriter(
         output.flush()
         if (!bodyAllowed) return ChromeStreamResult(0, chunked = false)
 
+        val total =
+            if (chunked) {
+                writeChunkedBody(output, body)
+            } else {
+                writeFixedLengthBody(output, body, effectiveLength ?: error("Missing response length"))
+            }
+        output.flush()
+        return ChromeStreamResult(total, chunked)
+    }
+
+    private fun writeFixedLengthBody(
+        output: OutputStream,
+        body: InputStream,
+        declaredLength: Long,
+    ): Long {
+        val buffer = ByteArray(streamBufferBytes)
+        var total = 0L
+        while (total < declaredLength) {
+            val maximumRead = minOf(buffer.size.toLong(), declaredLength - total).toInt()
+            val read = body.read(buffer, 0, maximumRead)
+            if (read < 0) {
+                throw ChromeHttpResponseIntegrityException(
+                    declaredLength = declaredLength,
+                    bytesWritten = total,
+                    additionalBodyByteObserved = false,
+                )
+            }
+            if (read == 0) continue
+            output.write(buffer, 0, read)
+            total += read
+        }
+        if (body.read() >= 0) {
+            throw ChromeHttpResponseIntegrityException(
+                declaredLength = declaredLength,
+                bytesWritten = total,
+                additionalBodyByteObserved = true,
+            )
+        }
+        return total
+    }
+
+    private fun writeChunkedBody(
+        output: OutputStream,
+        body: InputStream,
+    ): Long {
         val buffer = ByteArray(streamBufferBytes)
         var total = 0L
         while (true) {
             val read = body.read(buffer)
-            if (read < 0) break
+            if (read < 0) {
+                ChromeHttp1Wire.writeAscii(output, "0\r\n\r\n")
+                return total
+            }
             if (read == 0) continue
-            if (chunked) ChromeHttp1Wire.writeAscii(output, read.toString(16) + "\r\n")
+            ChromeHttp1Wire.writeAscii(output, read.toString(16) + "\r\n")
             output.write(buffer, 0, read)
-            if (chunked) ChromeHttp1Wire.writeAscii(output, "\r\n")
+            ChromeHttp1Wire.writeAscii(output, "\r\n")
             total += read
         }
-        if (chunked) ChromeHttp1Wire.writeAscii(output, "0\r\n\r\n")
-        output.flush()
-        return ChromeStreamResult(total, chunked)
     }
 
     private fun String.sanitizeReason(): String =
