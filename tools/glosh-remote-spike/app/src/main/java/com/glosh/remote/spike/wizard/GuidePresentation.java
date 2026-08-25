@@ -153,6 +153,9 @@ public record GuidePresentation(
 
     public static GuidePresentation recovery(GuideStage stage, String message) {
         String cleanMessage = clean(message);
+        if (looksLikeWaiting(cleanMessage)) {
+            return waiting(stage, cleanMessage);
+        }
         if (!looksLikeWarning(cleanMessage)) {
             return forStage(stage, cleanMessage);
         }
@@ -175,7 +178,7 @@ public record GuidePresentation(
         if (normalized.contains("permitir")) {
             return "Confirmá “Permitir”";
         }
-        if (normalized.contains("busca") || normalized.contains("tocá “depuracion")) {
+        if (normalized.contains("busca") || normalized.contains("toca depuracion")) {
             return "Tocá “Depuración inalámbrica”";
         }
         if (normalized.contains("opciones de desarrollador")) {
@@ -191,7 +194,7 @@ public record GuidePresentation(
                     "Confirmá “Permitir”",
                     "Android necesita confirmar esta red Wi‑Fi una sola vez.");
         }
-        if (normalized.contains("busca") || normalized.contains("tocá “depuracion")) {
+        if (normalized.contains("busca") || normalized.contains("toca depuracion")) {
             return secondary(instruction,
                     "Tocá “Depuración inalámbrica”",
                     "Samsung no abrió esta pantalla directamente; tocala en la lista y Glosh continuará.");
@@ -273,13 +276,23 @@ public record GuidePresentation(
         return Cue.CODE;
     }
 
+    private static boolean looksLikeWaiting(String value) {
+        String normalized = normalize(value);
+        return normalized.startsWith("espera")
+                || normalized.startsWith("verificando")
+                || normalized.startsWith("abriendo")
+                || normalized.startsWith("preparando")
+                || normalized.startsWith("leyendo")
+                || normalized.contains("detecte un cambio");
+    }
+
     private static boolean looksLikeWarning(String value) {
         String normalized = normalize(value);
         return normalized.startsWith("no ")
                 || normalized.startsWith("esta no")
                 || normalized.contains("no pude")
                 || normalized.contains("no encuentro")
-                || normalized.contains("volvé a glosh")
+                || normalized.contains("volve a glosh")
                 || normalized.contains("fallo")
                 || normalized.contains("error");
     }
