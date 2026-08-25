@@ -165,8 +165,8 @@ internal class ChromePhotosHttpsProxy(
                 }
             }
         runCatching { resources.serverSocket?.close() }
-        resources.acceptThread?.interrupt()
         admission.close()
+        resources.acceptThread?.interrupt()
         val cleanupFailure =
             listOf(
                 runCatching { transformer.close() },
@@ -187,30 +187,25 @@ internal class ChromePhotosHttpsProxy(
                 val connectionId = connectionIds.incrementAndGet()
                 val correlationId = "c$connectionId"
                 connections.incrementAndGet()
-                val admissionResult =
-                    try {
-                        admission.dispatch(
-                            onDiscard = { runCatching { client.close() } },
-                            block = { handleClient(client, correlationId) },
-                        )
-                    } catch (error: InterruptedException) {
-                        runCatching { client.close() }
-                        Thread.currentThread().interrupt()
-                        if (running.get()) fatal(error)
-                        return
-                    }
-                when (admissionResult) {
+                when (
+                    admission.dispatch(
+                        onDiscard = { runCatching { client.close() } },
+                        block = { handleClient(client, correlationId) },
+                    )
+                ) {
                     ChromeProxyAdmissionResult.Accepted -> Unit
                     ChromeProxyAdmissionResult.Closed -> {
                         if (running.get()) fatal(IllegalStateException("Proxy admission closed while running"))
                         return
                     }
                     ChromeProxyAdmissionResult.Rejected -> {
+                        if (!running.get()) return
                         queueRejected.incrementAndGet()
-                        failures.incrementAndGet()
                         warningLog(
                             "phase=connection_rejected reason=admission_invariant correlationId=$correlationId",
                         )
+                        fatal(IllegalStateException("Proxy admission rejected while running"))
+                        return
                     }
                 }
             }
@@ -279,26 +274,29 @@ internal class ChromePhotosHttpsProxy(
     ) {
         val serverMaterial = tls.serverMaterialFor(connectTarget.host)
         val tlsSocket =
-            serverMaterial.sslContext.socketFactory.createSocket(
-                client,
-                connectTarget.host,
-                HttpsPort,
-                false,
-            ) as SSLSocket
-        tlsSocket.useClientMode = false
-        tlsSocket.sslParameters = tlsSocket.sslParameters.apply { applicationProtocols = arrayOf(Http11) }
-        try {
-            tlsSocket.startHandshake()
-        } catch (error: Throwable) {
-            throw ChromeProxyTlsStageException(TlsHandshakeStage, error)
-        }
-        val protocol = tlsSocket.applicationProtocol.ifBlank { Http11 }
-        infoLog(
-            "phase=tls_ready correlationId=$correlationId host=${connectTarget.host} clientProtocol=$protocol " +
-                "ca=${tls.caFingerprint.take(FingerprintLogLength)}",
-        )
-
+            try {
+                serverMaterial.sslContext.socketFactory.createSocket(
+                    client,
+                    connectTarget.host,
+                    HttpsPort,
+                    false,
+                ) as SSLSocket
+            } catch (error: Throwable) {
+                throw ChromeProxyTlsStageException(TlsServerSocketStage, error)
+            }
         tlsSocket.use { secureSocket ->
+            secureSocket.useClientMode = false
+            secureSocket.sslParameters = secureSocket.sslParameters.apply { applicationProtocols = arrayOf(Http11) }
+            try {
+                secureSocket.startHandshake()
+            } catch (error: Throwable) {
+                throw ChromeProxyTlsStageException(TlsHandshakeStage, error)
+            }
+            val protocol = secureSocket.applicationProtocol.ifBlank { Http11 }
+            infoLog(
+                "phase=tls_ready correlationId=$correlationId host=${connectTarget.host} clientProtocol=$protocol " +
+                    "ca=${tls.caFingerprint.take(FingerprintLogLength)}",
+            )
             handleHttp11Session(
                 input = secureSocket.inputStream,
                 output = BufferedOutputStream(secureSocket.outputStream),
@@ -469,7 +467,7 @@ internal class ChromePhotosHttpsProxy(
             if (tlsFailure != null) {
                 val stage =
                     when {
-                        tlsFailure.errorClass == "SSLHandshakeException" -> TlsHandshakeStage
+                        tlsFailure.isHandshake -> TlsHandshakeStage
                         upstreamExchangeReady -> TlsResponseStreamStage
                         else -> TlsConnectStage
                     }
@@ -613,6 +611,7 @@ internal class ChromePhotosHttpsProxy(
         const val LogTag = "ChromePhotosDataPlane"
         const val StandaloneConnectionId = "standalone"
         const val StandaloneRequestId = "standalone-r1"
+        const val TlsServerSocketStage = "server_socket"
         const val TlsHandshakeStage = "handshake"
         const val TlsSessionStage = "session"
         const val TlsConnectStage = "connect_tls"
