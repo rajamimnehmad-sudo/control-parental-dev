@@ -28,12 +28,18 @@ async def accept_request(
     broker: BrokerOperatorClient,
     request_id: str,
     descriptor: str,
+    session=None,
 ) -> str:
+    if session is not None and getattr(session, "support_slot_claimed", False):
+        return "Esta sesión ya aceptó un cliente."
     requests = await asyncio.get_running_loop().run_in_executor(None, broker.pending)
     request = next((item for item in requests if item.request_id == request_id), None)
     if request is None:
         return "Solicitud pendiente no encontrada o expirada."
     await asyncio.get_running_loop().run_in_executor(None, broker.accept, request, descriptor)
+    if session is not None:
+        session.support_slot_claimed = True
+        session.accepted_request_id = request.request_id
     return f"[broker] solicitud aceptada: {request.request_id}"
 
 
@@ -63,15 +69,15 @@ async def announce_pending_requests(
     poll_interval_seconds: float = 2.0,
 ) -> None:
     announced = set()
-    autoaccepted_request_id: str | None = None
     while not session.stop_event.is_set():
         try:
             requests = await asyncio.get_running_loop().run_in_executor(None, broker.pending)
             current = {request.request_id for request in requests}
+            slot_claimed = getattr(session, "support_slot_claimed", False)
 
             if (
                 descriptor
-                and autoaccepted_request_id is None
+                and not slot_claimed
                 and session.agent is None
                 and len(requests) == 1
             ):
@@ -79,7 +85,8 @@ async def announce_pending_requests(
                 await asyncio.get_running_loop().run_in_executor(
                     None, broker.accept, request, descriptor
                 )
-                autoaccepted_request_id = request.request_id
+                session.support_slot_claimed = True
+                session.accepted_request_id = request.request_id
                 print(
                     f"\n[broker] cliente único aceptado automáticamente: "
                     f"{request.manufacturer} {request.model}",
@@ -87,7 +94,7 @@ async def announce_pending_requests(
                 )
                 current.discard(request.request_id)
                 requests = []
-            elif len(requests) > 1 and autoaccepted_request_id is None:
+            elif len(requests) > 1 and not slot_claimed:
                 print(
                     "\n[broker] hay varias solicitudes pendientes; "
                     "se requiere accept <request-id> manual.",
