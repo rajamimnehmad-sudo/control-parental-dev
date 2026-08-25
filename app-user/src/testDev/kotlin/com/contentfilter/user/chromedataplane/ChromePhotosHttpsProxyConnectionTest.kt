@@ -69,6 +69,7 @@ class ChromePhotosHttpsProxyConnectionTest {
                         body = FailingAfterPrefixInputStream("abc".toByteArray()),
                         bodyLength = -1,
                         extraHeaders = listOf(ChromeHttpHeader("Content-Encoding", "gzip")),
+                        contentType = "application/json",
                     ),
                 ),
                 Reply(response(body = "second", bodyLength = 6)),
@@ -221,12 +222,13 @@ class ChromePhotosHttpsProxyConnectionTest {
         body: InputStream,
         bodyLength: Long,
         extraHeaders: List<ChromeHttpHeader> = emptyList(),
+        contentType: String = "text/plain",
     ) = ChromePhotosUpstreamResponse(
         host = "example.com",
         statusCode = 200,
         statusText = "OK",
         headers =
-            listOf(ChromeHttpHeader("Content-Type", "text/plain")) + extraHeaders +
+            listOf(ChromeHttpHeader("Content-Type", contentType)) + extraHeaders +
                 if (bodyLength >= 0) listOf(ChromeHttpHeader("Content-Length", bodyLength.toString())) else emptyList(),
         body = body,
         bodyLength = bodyLength,

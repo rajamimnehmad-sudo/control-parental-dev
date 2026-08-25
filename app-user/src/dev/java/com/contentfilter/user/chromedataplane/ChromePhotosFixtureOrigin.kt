@@ -137,7 +137,7 @@ internal class ChromePhotosFixtureOrigin(
             "/web11a/gzip" ->
                 ChromePhotosFixtureResponse(
                     resourceId = "web11a-gzip",
-                    contentType = "text/plain; charset=utf-8",
+                    contentType = "text/html; charset=utf-8",
                     originalBytes = gzip("gzip-pass".toByteArray()),
                     headers =
                         listOf(

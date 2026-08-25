@@ -1,6 +1,8 @@
 package com.contentfilter.user.chromedataplane
 
 import java.io.ByteArrayInputStream
+import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -64,6 +66,97 @@ class ChromeImageContentAuthorityTest {
         assertEquals(ChromeImageFormat.Heif, authority.sniffFormat(avif("heic")))
         assertEquals(ChromeImageFormat.Svg, authority.sniffFormat(" <svg></svg>".toByteArray()))
         assertNull(authority.sniffFormat("<html>not image</html>".toByteArray()))
+    }
+
+    @Test
+    fun `explicit non image MIME streams pass through without consuming a prefix`() {
+        listOf(
+            "text/event-stream" to "data: event\n\n",
+            "text/html" to "<html><img></html>",
+            "application/json" to "{\"value\":true}",
+            "text/css" to "body { color: black; }",
+            "application/javascript" to "window.fixture = true;",
+        ).forEach { (contentType, body) ->
+            val stream = ReadGuardInputStream(body.toByteArray(), maximumReads = 0)
+            val inspection = authority.inspect(request(), response(stream, body.length.toLong(), contentType))
+
+            assertIs<ChromeImageContentInspection.Passthrough>(inspection)
+            assertEquals(0, stream.readCalls, contentType)
+        }
+    }
+
+    @Test
+    fun `SVG authority requires svg to be the document root`() {
+        val xhtml = "<?xml version=\"1.0\"?><html><body><svg/></body></html>".toByteArray()
+        val feed = "<?xml version=\"1.0\"?><feed><svg/></feed>".toByteArray()
+        val svg =
+            ("\uFEFF <?xml version=\"1.0\"?>" +
+                "<!--fixture--><!DOCTYPE svg [<!ELEMENT svg ANY>]><svg viewBox=\"0 0 1 1\"/>").toByteArray()
+
+        assertNull(authority.sniffFormat(xhtml))
+        assertNull(authority.sniffFormat(feed))
+        assertEquals(ChromeImageFormat.Svg, authority.sniffFormat(svg))
+    }
+
+    @Test
+    fun `fragmented absent MIME JPEG is detected with only signature reads`() {
+        val bytes = jpeg("fragmented")
+        val stream = ReadGuardInputStream(bytes, maximumReads = 3)
+
+        val candidate =
+            assertIs<ChromeImageContentInspection.Candidate>(
+                authority.inspect(request(), response(stream, bytes.size.toLong(), null)),
+            )
+
+        assertEquals(ChromeImageFormat.Jpeg, candidate.prefixFormat)
+        assertEquals(3, stream.readCalls)
+        assertContentEquals(bytes, candidate.response.body.readBytes())
+    }
+
+    @Test
+    fun `ambiguous clear non image stops early instead of filling sniff limit`() {
+        val bytes = "plain incremental stream that remains open".toByteArray()
+        val stream = ReadGuardInputStream(bytes, maximumReads = 5)
+
+        val passthrough =
+            assertIs<ChromeImageContentInspection.Passthrough>(
+                authority.inspect(request(), response(stream, -1, null)),
+            )
+
+        assertEquals(5, stream.readCalls)
+        assertContentEquals(bytes, passthrough.response.body.readBytes())
+    }
+
+    @Test
+    fun `fragmented HTML root stops progressive sniff before later inline svg`() {
+        val bytes = "<html><body><svg/></body></html>".toByteArray()
+        val stream = ReadGuardInputStream(bytes, maximumReads = 6)
+
+        val passthrough =
+            assertIs<ChromeImageContentInspection.Passthrough>(
+                authority.inspect(request(), response(stream, -1, "application/octet-stream")),
+            )
+
+        assertEquals(6, stream.readCalls)
+        assertContentEquals(bytes, passthrough.response.body.readBytes())
+    }
+
+    @Test
+    fun `encoded ambiguous MIME fails closed while encoded HTML remains untouched`() {
+        val unknown = response(jpeg("encoded"), null, ChromeHttpHeader("Content-Encoding", "gzip"))
+        val htmlBytes = "<html>compressed transport</html>".toByteArray()
+        val htmlStream = ReadGuardInputStream(htmlBytes, maximumReads = 0)
+        val html =
+            response(
+                htmlStream,
+                htmlBytes.size.toLong(),
+                "text/html",
+                ChromeHttpHeader("Content-Encoding", "gzip"),
+            )
+
+        assertIs<ChromeImageContentInspection.Candidate>(authority.inspect(request(), unknown))
+        assertIs<ChromeImageContentInspection.Passthrough>(authority.inspect(request(), html))
+        assertEquals(0, htmlStream.readCalls)
     }
 
     @Test
@@ -199,13 +292,20 @@ class ChromeImageContentAuthorityTest {
         bytes: ByteArray,
         contentType: String?,
         vararg extraHeaders: ChromeHttpHeader,
+    ) = response(ByteArrayInputStream(bytes), bytes.size.toLong(), contentType, *extraHeaders)
+
+    private fun response(
+        body: InputStream,
+        bodyLength: Long,
+        contentType: String?,
+        vararg extraHeaders: ChromeHttpHeader,
     ) = ChromePhotosUpstreamResponse(
         host = "example.com",
         statusCode = 200,
         statusText = "OK",
         headers = listOfNotNull(contentType?.let { ChromeHttpHeader("Content-Type", it) }) + extraHeaders,
-        body = ByteArrayInputStream(bytes),
-        bodyLength = bytes.size.toLong(),
+        body = body,
+        bodyLength = bodyLength,
         protocol = "h2",
     )
 
@@ -230,5 +330,33 @@ class ChromeImageContentAuthorityTest {
         brand.toByteArray().copyInto(bytes, 8)
         brand.toByteArray().copyInto(bytes, 16)
         return bytes
+    }
+
+    private class ReadGuardInputStream(
+        private val bytes: ByteArray,
+        private val maximumReads: Int,
+    ) : InputStream() {
+        var readCalls: Int = 0
+            private set
+        private var offset = 0
+
+        override fun read(): Int {
+            readCalls++
+            if (readCalls > maximumReads) throw IOException("unexpected prefix read $readCalls")
+            if (offset >= bytes.size) return -1
+            return bytes[offset++].toInt() and 0xff
+        }
+
+        override fun read(
+            target: ByteArray,
+            targetOffset: Int,
+            length: Int,
+        ): Int {
+            if (offset >= bytes.size) return -1
+            val count = minOf(length, bytes.size - offset)
+            bytes.copyInto(target, targetOffset, offset, offset + count)
+            offset += count
+            return count
+        }
     }
 }

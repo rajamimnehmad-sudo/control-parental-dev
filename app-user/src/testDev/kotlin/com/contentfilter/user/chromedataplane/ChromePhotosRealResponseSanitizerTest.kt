@@ -64,13 +64,13 @@ class ChromePhotosRealResponseSanitizerTest {
         val tooLarge = sanitizer.sanitize("GET", upstream("image/avif", avif() + ByteArray(65)))
         val compressed = sanitizer.sanitize("GET", upstream("image/jpeg", safe, encoding = "gzip"))
         val brotli = sanitizer.sanitize("GET", upstream("image/jpeg", safe, encoding = "br"))
+        val unknownMime = sanitizer.sanitize("GET", upstream(null, safe, encoding = "gzip"))
 
-        assertEquals(ChromePhotosResourceDecision.Unknown, tooLarge.decision)
-        assertEquals(ChromePhotosResourceDecision.Unknown, compressed.decision)
-        assertEquals(ChromePhotosResourceDecision.Unknown, brotli.decision)
-        assertContentEquals(placeholder, tooLarge.bytes)
-        assertContentEquals(placeholder, compressed.bytes)
-        assertContentEquals(placeholder, brotli.bytes)
+        listOf(tooLarge, compressed, brotli, unknownMime).forEach { result ->
+            assertEquals(ChromePhotosResourceDecision.Unknown, result.decision)
+            assertContentEquals(placeholder, result.bytes)
+            assertFalse(result.bytes.contentEquals(safe))
+        }
     }
 
     @Test
@@ -175,7 +175,7 @@ class ChromePhotosRealResponseSanitizerTest {
     }
 
     private fun upstream(
-        contentType: String,
+        contentType: String?,
         bytes: ByteArray,
         encoding: String? = null,
         statusCode: Int = 200,
@@ -186,7 +186,7 @@ class ChromePhotosRealResponseSanitizerTest {
         statusText = if (statusCode == 304) "Not Modified" else "OK",
         headers =
             listOfNotNull(
-                ChromeHttpHeader("Content-Type", contentType),
+                contentType?.let { ChromeHttpHeader("Content-Type", it) },
                 encoding?.let { ChromeHttpHeader("Content-Encoding", it) },
             ) + extraHeaders,
         body = bytes.inputStream(),

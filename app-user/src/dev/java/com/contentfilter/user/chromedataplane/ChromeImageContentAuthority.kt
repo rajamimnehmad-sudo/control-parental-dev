@@ -58,6 +58,22 @@ internal sealed interface ChromeImageContentResolution {
     ) : ChromeImageContentResolution
 }
 
+private enum class DeclaredMimeDisposition {
+    DeclaredImage,
+    AmbiguousSniffable,
+    DefiniteNonImage,
+}
+
+private sealed interface ProgressiveSniffDecision {
+    data class Match(
+        val format: ChromeImageFormat,
+    ) : ProgressiveSniffDecision
+
+    data object NeedMore : ProgressiveSniffDecision
+
+    data object NoMatch : ProgressiveSniffDecision
+}
+
 /** Establishes image authority before any candidate body can be delivered to Chrome. */
 internal class ChromeImageContentAuthority(
     maximumConcurrentBodies: Int = DefaultMaximumConcurrentBodies,
@@ -91,7 +107,8 @@ internal class ChromeImageContentAuthority(
     ): ChromeImageContentInspection {
         val requestIntent = request.isImageIntent()
         val declaredMimeTypes = response.headers.declaredContentTypes()
-        if (requestIntent || declaredMimeTypes.any(String::isDeclaredImageMimeType)) {
+        val mimeDisposition = declaredMimeTypes.disposition()
+        if (requestIntent || mimeDisposition == DeclaredMimeDisposition.DeclaredImage) {
             candidates.incrementAndGet()
             return ChromeImageContentInspection.Candidate(
                 response = response,
@@ -100,17 +117,29 @@ internal class ChromeImageContentAuthority(
                 prefixFormat = null,
             )
         }
-        if (!response.headers.hasIdentityContentEncoding() || !responseMayHaveBody(request.method, response.statusCode)) {
+        if (!responseMayHaveBody(request.method, response.statusCode)) {
             return ChromeImageContentInspection.Passthrough(response)
         }
+        if (mimeDisposition == DeclaredMimeDisposition.DefiniteNonImage) {
+            return ChromeImageContentInspection.Passthrough(response)
+        }
+        if (!response.headers.hasIdentityContentEncoding()) {
+            candidates.incrementAndGet()
+            return ChromeImageContentInspection.Candidate(
+                response = response,
+                requestIntent = false,
+                declaredMimeTypes = declaredMimeTypes,
+                prefixFormat = null,
+            )
+        }
 
-        val peek = response.body.peekPrefix(maximumSniffBytes)
+        val peek = response.body.peekImagePrefix(maximumSniffBytes)
         prefixPeeks.incrementAndGet()
         val replayResponse =
             response.copy(
                 body = SequenceInputStream(ByteArrayInputStream(peek.bytes), response.body),
             )
-        val format = sniffFormat(peek.bytes)
+        val format = peek.format
         return if (format == null) {
             ChromeImageContentInspection.Passthrough(replayResponse)
         } else {
@@ -132,10 +161,14 @@ internal class ChromeImageContentAuthority(
     ): ChromeImageContentInspection {
         val requestIntent = request.isImageIntent()
         val declaredMimeTypes = response.headers.declaredContentTypes()
-        val format = sniffFormat(bytes)
-        return if (requestIntent || declaredMimeTypes.any(String::isDeclaredImageMimeType) || format != null) {
+        val mimeDisposition = declaredMimeTypes.disposition()
+        val encodedAmbiguous =
+            mimeDisposition == DeclaredMimeDisposition.AmbiguousSniffable &&
+                !response.headers.hasIdentityContentEncoding()
+        val format = if (encodedAmbiguous) null else sniffFormat(bytes)
+        return if (requestIntent || mimeDisposition == DeclaredMimeDisposition.DeclaredImage || encodedAmbiguous || format != null) {
             candidates.incrementAndGet()
-            if (!requestIntent && declaredMimeTypes.none(String::isDeclaredImageMimeType) && format != null) {
+            if (!requestIntent && mimeDisposition != DeclaredMimeDisposition.DeclaredImage && format != null) {
                 magicCandidates.incrementAndGet()
             }
             ChromeImageContentInspection.Candidate(
@@ -194,6 +227,12 @@ internal class ChromeImageContentAuthority(
         )
 
     internal fun sniffFormat(bytes: ByteArray): ChromeImageFormat? {
+        sniffBinaryFormat(bytes)?.let { return it }
+        if (looksLikeSvg(bytes)) return ChromeImageFormat.Svg
+        return null
+    }
+
+    private fun sniffBinaryFormat(bytes: ByteArray): ChromeImageFormat? {
         if (bytes.startsWith(JpegSignature)) return ChromeImageFormat.Jpeg
         if (bytes.startsWith(PngSignature)) return ChromeImageFormat.Png
         if (bytes.size >= WebpHeaderBytes && bytes.matchesAscii(0, "RIFF") && bytes.matchesAscii(8, "WEBP")) {
@@ -203,8 +242,89 @@ internal class ChromeImageContentAuthority(
         if (bytes.startsWith(BmpSignature)) return ChromeImageFormat.Bmp
         if (bytes.startsWith(IcoSignature)) return ChromeImageFormat.Ico
         sniffIsoBmff(bytes)?.let { return it }
-        if (looksLikeSvg(bytes)) return ChromeImageFormat.Svg
         return null
+    }
+
+    private fun InputStream.peekImagePrefix(maximumBytes: Int): PrefixPeek {
+        val output = ByteArrayOutputStream(minOf(maximumBytes, ProgressiveInitialCapacity))
+        while (output.size() < maximumBytes) {
+            when (val decision = progressiveSniff(output.toByteArray(), endOfInput = false, maximumBytes)) {
+                is ProgressiveSniffDecision.Match -> return PrefixPeek(output.toByteArray(), decision.format)
+                ProgressiveSniffDecision.NoMatch -> return PrefixPeek(output.toByteArray(), null)
+                ProgressiveSniffDecision.NeedMore -> Unit
+            }
+            val next = read()
+            if (next < 0) {
+                val bytes = output.toByteArray()
+                val final = progressiveSniff(bytes, endOfInput = true, maximumBytes)
+                return PrefixPeek(bytes, (final as? ProgressiveSniffDecision.Match)?.format)
+            }
+            output.write(next)
+        }
+        val bytes = output.toByteArray()
+        val final = progressiveSniff(bytes, endOfInput = true, maximumBytes)
+        return PrefixPeek(bytes, (final as? ProgressiveSniffDecision.Match)?.format)
+    }
+
+    private fun progressiveSniff(
+        bytes: ByteArray,
+        endOfInput: Boolean,
+        maximumBytes: Int,
+    ): ProgressiveSniffDecision {
+        sniffBinaryFormat(bytes)?.let { return ProgressiveSniffDecision.Match(it) }
+        val svgDecision = svgRootDecision(bytes, endOfInput)
+        if (svgDecision is ProgressiveSniffDecision.Match) return svgDecision
+        val binaryCouldMatch = binaryImageCouldMatch(bytes, maximumBytes)
+        return if (!endOfInput && (binaryCouldMatch || svgDecision == ProgressiveSniffDecision.NeedMore)) {
+            ProgressiveSniffDecision.NeedMore
+        } else {
+            ProgressiveSniffDecision.NoMatch
+        }
+    }
+
+    private fun binaryImageCouldMatch(
+        bytes: ByteArray,
+        maximumBytes: Int,
+    ): Boolean =
+        JpegSignature.couldStartWith(bytes) ||
+            PngSignature.couldStartWith(bytes) ||
+            Gif87aSignature.couldStartWith(bytes) ||
+            Gif89aSignature.couldStartWith(bytes) ||
+            BmpSignature.couldStartWith(bytes) ||
+            IcoSignature.couldStartWith(bytes) ||
+            webpCouldMatch(bytes) ||
+            isoBmffCouldMatch(bytes, maximumBytes)
+
+    private fun webpCouldMatch(bytes: ByteArray): Boolean {
+        if (bytes.size > WebpHeaderBytes) return false
+        for (index in bytes.indices) {
+            val expected =
+                when (index) {
+                    in 0..3 -> "RIFF"[index].code.toByte()
+                    in 8..11 -> "WEBP"[index - 8].code.toByte()
+                    else -> null
+                }
+            if (expected != null && bytes[index] != expected) return false
+        }
+        return true
+    }
+
+    private fun isoBmffCouldMatch(
+        bytes: ByteArray,
+        maximumBytes: Int,
+    ): Boolean {
+        for (index in 4 until minOf(bytes.size, 8)) {
+            if (bytes[index] != "ftyp"[index - 4].code.toByte()) return false
+        }
+        if (bytes.size < 8) return true
+        val declaredBoxSize = bytes.readUnsignedInt(0)
+        if (declaredBoxSize < IsoBmffMinimumBytes) return false
+        val scanEnd =
+            declaredBoxSize
+                .coerceAtMost(MaximumIsoBmffBrandBytes.toLong())
+                .coerceAtMost(maximumBytes.toLong())
+                .toInt()
+        return bytes.size < scanEnd
     }
 
     private fun sniffIsoBmff(bytes: ByteArray): ChromeImageFormat? {
@@ -255,19 +375,66 @@ internal class ChromeImageContentAuthority(
             .coerceAtMost(MaximumIsoBmffBrandBytes.toLong())
             .toInt()
 
-    private fun looksLikeSvg(bytes: ByteArray): Boolean {
-        val prefix =
-            bytes.copyOfRange(0, minOf(bytes.size, SvgSniffBytes))
-                .toString(StandardCharsets.UTF_8)
-                .trimStart('\uFEFF', ' ', '\t', '\r', '\n')
-                .lowercase(Locale.US)
-        return prefix.startsWith("<svg") || (prefix.startsWith("<?xml") && "<svg" in prefix)
+    private fun looksLikeSvg(bytes: ByteArray): Boolean =
+        svgRootDecision(bytes.copyOfRange(0, minOf(bytes.size, SvgSniffBytes)), endOfInput = true) is
+            ProgressiveSniffDecision.Match
+
+    private fun svgRootDecision(
+        bytes: ByteArray,
+        endOfInput: Boolean,
+    ): ProgressiveSniffDecision {
+        val bomOffset = utf8BomOffset(bytes) ?: return if (endOfInput) ProgressiveSniffDecision.NoMatch else ProgressiveSniffDecision.NeedMore
+        val text = bytes.copyOfRange(bomOffset, bytes.size).toString(StandardCharsets.UTF_8)
+        var offset = text.skipXmlWhitespace(0)
+        while (true) {
+            if (offset >= text.length) return text.moreOrNoMatch(endOfInput)
+            if (
+                !endOfInput &&
+                listOf(XmlDeclarationStart, XmlCommentStart, DoctypeStart).any { token ->
+                    token.regionMatches(0, text, offset, text.length - offset, ignoreCase = true)
+                }
+            ) {
+                return ProgressiveSniffDecision.NeedMore
+            }
+            when {
+                text.regionMatches(offset, XmlDeclarationStart, 0, XmlDeclarationStart.length, ignoreCase = true) -> {
+                    val end = text.indexOf("?>", offset + XmlDeclarationStart.length)
+                    if (end < 0) return text.moreOrNoMatch(endOfInput)
+                    offset = text.skipXmlWhitespace(end + 2)
+                }
+                text.startsWith(XmlCommentStart, offset) -> {
+                    val end = text.indexOf(XmlCommentEnd, offset + XmlCommentStart.length)
+                    if (end < 0) return text.moreOrNoMatch(endOfInput)
+                    offset = text.skipXmlWhitespace(end + XmlCommentEnd.length)
+                }
+                text.regionMatches(offset, DoctypeStart, 0, DoctypeStart.length, ignoreCase = true) -> {
+                    val end = text.findDoctypeEnd(offset + DoctypeStart.length)
+                    if (end < 0) return text.moreOrNoMatch(endOfInput)
+                    offset = text.skipXmlWhitespace(end + 1)
+                }
+                else -> break
+            }
+        }
+        if (text[offset] != '<') return ProgressiveSniffDecision.NoMatch
+        if (offset + 1 >= text.length) return text.moreOrNoMatch(endOfInput)
+        if (text[offset + 1] in setOf('/', '!', '?')) return ProgressiveSniffDecision.NoMatch
+        var nameEnd = offset + 1
+        while (nameEnd < text.length && text[nameEnd].isXmlNameCharacter()) nameEnd++
+        if (nameEnd == offset + 1) return ProgressiveSniffDecision.NoMatch
+        if (nameEnd == text.length && !endOfInput) return ProgressiveSniffDecision.NeedMore
+        val rootName = text.substring(offset + 1, nameEnd).substringAfterLast(':')
+        return if (rootName.equals("svg", ignoreCase = true)) {
+            ProgressiveSniffDecision.Match(ChromeImageFormat.Svg)
+        } else {
+            ProgressiveSniffDecision.NoMatch
+        }
     }
 
     private companion object {
         const val DefaultMaximumConcurrentBodies = 2
         const val DefaultMaximumSniffBytes = 512
         const val MinimumSniffBytes = 32
+        const val ProgressiveInitialCapacity = 16
         const val WebpHeaderBytes = 12
         const val WebpFlagsOffset = 20
         const val IsoBmffMinimumBytes = 16
@@ -275,6 +442,10 @@ internal class ChromeImageContentAuthority(
         const val IsoBmffBrandBytes = 4
         const val MaximumIsoBmffBrandBytes = 512
         const val SvgSniffBytes = 512
+        const val XmlDeclarationStart = "<?xml"
+        const val XmlCommentStart = "<!--"
+        const val XmlCommentEnd = "-->"
+        const val DoctypeStart = "<!doctype"
         const val UnknownFormatReason = "image_format_unknown"
         const val FormatChangedAfterPeekReason = "image_format_changed_after_peek"
         const val AnimatedImageReason = "animated_image"
@@ -284,6 +455,8 @@ internal class ChromeImageContentAuthority(
         val HeifBrands = setOf("heic", "heix", "hevc", "hevx", "heim", "heis", "mif1", "msf1")
         val JpegSignature = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte())
         val PngSignature = byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a)
+        val Gif87aSignature = "GIF87a".toByteArray(StandardCharsets.US_ASCII)
+        val Gif89aSignature = "GIF89a".toByteArray(StandardCharsets.US_ASCII)
         val BmpSignature = byteArrayOf('B'.code.toByte(), 'M'.code.toByte())
         val IcoSignature = byteArrayOf(0, 0, 1, 0)
     }
@@ -291,6 +464,7 @@ internal class ChromeImageContentAuthority(
 
 private data class PrefixPeek(
     val bytes: ByteArray,
+    val format: ChromeImageFormat?,
 )
 
 private fun ChromePhotosProxyRequest.isImageIntent(): Boolean =
@@ -301,6 +475,12 @@ private fun List<ChromeHttpHeader>.declaredContentTypes(): List<String> =
         .map { header -> header.value.normalizedImageMimeType() }
         .filter(String::isNotEmpty)
 
+private fun List<String>.disposition(): DeclaredMimeDisposition {
+    if (any(String::isDeclaredImageMimeType)) return DeclaredMimeDisposition.DeclaredImage
+    if (isEmpty() || any(String::isAmbiguousSniffableMimeType)) return DeclaredMimeDisposition.AmbiguousSniffable
+    return DeclaredMimeDisposition.DefiniteNonImage
+}
+
 internal fun List<ChromeHttpHeader>.hasIdentityContentEncoding(): Boolean {
     val values = filter { it.name.equals("Content-Encoding", ignoreCase = true) }.map(ChromeHttpHeader::value)
     if (values.isEmpty()) return true
@@ -310,23 +490,16 @@ internal fun List<ChromeHttpHeader>.hasIdentityContentEncoding(): Boolean {
 
 private fun String.isDeclaredImageMimeType(): Boolean = startsWith("image/")
 
-private fun InputStream.peekPrefix(maximumBytes: Int): PrefixPeek {
-    val output = ByteArrayOutputStream(maximumBytes)
-    val buffer = ByteArray(minOf(maximumBytes, 256))
-    var zeroReads = 0
-    while (output.size() < maximumBytes) {
-        val count = read(buffer, 0, minOf(buffer.size, maximumBytes - output.size()))
-        if (count < 0) break
-        if (count == 0) {
-            zeroReads++
-            if (zeroReads >= MaximumZeroReads) break
-            continue
-        }
-        zeroReads = 0
-        output.write(buffer, 0, count)
-    }
-    return PrefixPeek(output.toByteArray())
-}
+private fun String.isAmbiguousSniffableMimeType(): Boolean =
+    this == "text/plain" ||
+        this == "application/octet-stream" ||
+        this == "binary/octet-stream" ||
+        this == "application/unknown" ||
+        this == "application/x-unknown" ||
+        this == "unknown/unknown"
+
+private fun ByteArray.couldStartWith(prefix: ByteArray): Boolean =
+    prefix.size <= size && prefix.indices.all { index -> this[index] == prefix[index] }
 
 private fun ByteArray.startsWith(signature: ByteArray): Boolean =
     size >= signature.size && signature.indices.all { index -> this[index] == signature[index] }
@@ -351,4 +524,38 @@ private fun ByteArray.readUnsignedInt(offset: Int): Long =
         ((this[offset + 2].toLong() and 0xff) shl 8) or
         (this[offset + 3].toLong() and 0xff)
 
-private const val MaximumZeroReads = 3
+private fun utf8BomOffset(bytes: ByteArray): Int? {
+    if (bytes.isEmpty() || bytes[0] != 0xef.toByte()) return 0
+    if (bytes.size < 3) return null
+    return if (bytes[1] == 0xbb.toByte() && bytes[2] == 0xbf.toByte()) 3 else 0
+}
+
+private fun String.skipXmlWhitespace(start: Int): Int {
+    var offset = start
+    while (offset < length && this[offset] in setOf(' ', '\t', '\r', '\n')) offset++
+    return offset
+}
+
+private fun String.moreOrNoMatch(endOfInput: Boolean): ProgressiveSniffDecision =
+    if (endOfInput) ProgressiveSniffDecision.NoMatch else ProgressiveSniffDecision.NeedMore
+
+private fun Char.isXmlNameCharacter(): Boolean = isLetterOrDigit() || this in setOf('_', '-', '.', ':')
+
+private fun String.findDoctypeEnd(start: Int): Int {
+    var quote: Char? = null
+    var subsetDepth = 0
+    for (index in start until length) {
+        val character = this[index]
+        if (quote != null) {
+            if (character == quote) quote = null
+        } else {
+            when (character) {
+                '\'', '"' -> quote = character
+                '[' -> subsetDepth++
+                ']' -> if (subsetDepth > 0) subsetDepth--
+                '>' -> if (subsetDepth == 0) return index
+            }
+        }
+    }
+    return -1
+}
