@@ -8,9 +8,6 @@ import android.provider.Settings;
 import com.glosh.remote.spike.guide.accessibility.LiveGuideAccessibilityService;
 
 public final class SettingsNavigator {
-    private static final String ACCESSIBILITY_DETAILS =
-            "android.settings.ACCESSIBILITY_DETAILS_SETTINGS";
-
     public void openAboutPhone(Activity activity) {
         open(activity,
                 new Intent(Settings.ACTION_DEVICE_INFO_SETTINGS),
@@ -32,7 +29,7 @@ public final class SettingsNavigator {
 
     public void openAccessibility(Activity activity) {
         ComponentName service = new ComponentName(activity, LiveGuideAccessibilityService.class);
-        Intent details = new Intent(ACCESSIBILITY_DETAILS)
+        Intent details = new Intent(SettingsRoute.ACCESSIBILITY_DETAILS)
                 .putExtra(Intent.EXTRA_COMPONENT_NAME, service);
         open(activity,
                 details,
