@@ -7,23 +7,23 @@ Flujo operativo para validar cambios con el menor costo razonable. `AGENTS.md` y
 Separar siempre tres cosas:
 
 1. **Validacion tecnica**: codigo + tests/build + gate fisico cuando corresponda.
-2. **Review/preservacion**: commits cohesivos + rama `review/*-final` para auditoria ChatGPT.
+2. **Review/preservacion**: commit(s) cohesivos + rama `review/*-final` para auditoria ChatGPT.
 3. **Integracion/publicacion**: PR/merge/main/publicacion DEV/Production, solo como paso posterior cuando realmente se autoriza/necesita.
 
 Un PASS tecnico NO obliga a integrar ni publicar producto.
 
 ## Flujo normal de un lote
 
-1. Leer solo el contexto necesario (`START_HERE.md`, Central/AREAS si aplica y el ticket).
+1. Leer solo el contexto necesario (`START_HERE.md`, Central/AREAS si aplica y el ticket delta).
 2. Confirmar owner, base, rama/worktree y rutas cuando exista trabajo paralelo.
 3. Diagnosticar causa raiz.
 4. Implementar un lote cohesivo; no fragmentar artificialmente ni mezclar temas no relacionados.
 5. Ejecutar tests/checks proporcionales al diff y al riesgo.
 6. Si el cambio necesita APK fisica, asignar `versionCode` DEV vigente (maximo real + 1), compilar e instalar desde el worktree validado.
 7. Ejecutar gate fisico/lab solo cuando el riesgo o el ticket lo requiera; reutilizar evidencia anterior que el diff no invalida.
-8. Dejar commits locales claros (preferentemente funcional + evidencia).
+8. Dejar commit(s) claros. Crear evidencia documental separada solo cuando el riesgo/trazabilidad lo justifique.
 9. En PASS tecnico, publicar en el mismo ticket una rama `review/*-final` y verificar el SHA remoto.
-10. ChatGPT revisa diff/codigo/tests/evidencia y actualiza Central.
+10. Codex devuelve handoff compacto; ChatGPT deriva archivos/diff desde GitHub, revisa y actualiza Central.
 11. PR/merge/main/publicacion se hacen solo si forman parte del siguiente paso autorizado; no son requisito del PASS tecnico.
 
 ## Cuando NO ejecutar Android/Gradle
@@ -82,19 +82,39 @@ No repetir una matriz completa si un follow-up toca un area aislada y existe evi
 
 Al terminar, limpiar solo recursos creados por el gate y acreditar rollback cuando corresponda. No limpiar trabajo ajeno.
 
-## Review branch
+## Review branch y handoff
 
 Para un PASS tecnico que ChatGPT deba revisar:
 
 - commit funcional cohesivo;
-- commit de evidencia/docs separado cuando ayude;
+- evidencia/docs separada solo si aporta trazabilidad real;
 - push automatico/preautorizado de `review/<task>-final` al SHA exacto validado;
-- verificar origin;
-- reportar base SHA, functional SHA, final/evidence SHA, version/APK/hash (si existe), gates, fisico y residuales.
+- verificar origin.
 
 No pedir una segunda interaccion Codex solo para hacer este push.
 
+Handoff normal minimo:
+
+```text
+STATUS:
+BASE:
+FUNCTIONAL SHA:
+REMOTE REVIEW BRANCH:
+REMOTE HEAD:
+VALIDATION:
+PHYSICAL:   # solo si aplica
+RESIDUALS:  # solo si existen
+```
+
+ChatGPT obtiene lista de archivos, diff exacto y commits desde GitHub. No hace falta duplicarlos en el handoff salvo desviacion o dato que no exista remotamente.
+
 Una rama review es una superficie de auditoria/preservacion; **no autoriza merge ni publicacion**.
+
+## Evidencia proporcional
+
+Crear/actualizar evidencia detallada cuando el lote afecta seguridad, navegador/medios, dispositivo, performance, migraciones/datos, releases o un cierre material. Para fixes rutinarios, commits + tests + handoff pueden ser evidencia suficiente.
+
+No repetir en un documento nuevo pruebas historicas que el diff no invalida; referenciarlas/heredarlas cuando corresponda.
 
 ## Publicacion DEV de producto
 
@@ -126,19 +146,7 @@ Documentacion especifica de publicacion:
 
 ## Cierre eficiente
 
-Un lote se considera tecnicamente listo para revision cuando informa:
-
-- causa/objetivo;
-- base/rama/worktree cuando aplica;
-- archivos modificados;
-- tests/checks ejecutados;
-- APK/version/hash si hubo gate Android;
-- evidencia fisica/lab si corresponde;
-- rollback/estado final cuando corresponde;
-- residuales reales;
-- rama review y SHAs remotos.
-
-ChatGPT decide despues PASS FINAL, follow-up o cambio de ruta y sincroniza Central.
+ChatGPT debe poder decidir el cierre con cuatro cosas: **diff remoto exacto, validacion relevante, gate fisico si aplica y residuales reales**. Todo dato adicional se agrega solo cuando mejora esa decision.
 
 No actualizar por rutina `HANDOFF_ACTUAL.md` y `BACKLOG_PRODUCTO.md` en cada microcambio. Actualizarlos solo cuando el cambio de contexto/producto tenga valor persistente; Central es el tracker estructurado principal.
 
