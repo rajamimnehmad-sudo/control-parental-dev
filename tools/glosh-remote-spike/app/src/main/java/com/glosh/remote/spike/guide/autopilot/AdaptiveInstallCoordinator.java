@@ -70,6 +70,11 @@ public final class AdaptiveInstallCoordinator {
         if (!active) {
             return;
         }
+        if (stage == GuideStage.GUIDE_PERMISSION) {
+            SupportSessionCoordinator.get(context).guideReady();
+            LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
+            return;
+        }
         if (stage == GuideStage.AUTOPILOT_PROBE) {
             resetProbe();
             host.showInstruction("Si están apagadas, activá las opciones de desarrollador.");
