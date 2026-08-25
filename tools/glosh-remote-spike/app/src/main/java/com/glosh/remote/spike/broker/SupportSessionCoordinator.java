@@ -183,7 +183,12 @@ public final class SupportSessionCoordinator {
                             descriptor = value;
                             onboarding.sessionReady();
                             wirelessHelp = false;
-                            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
+                            GuideStage current = LiveGuideRuntime.stage();
+                            GuideStage resume = current == GuideStage.PAIR_CODE_TARGET
+                                    || current == GuideStage.PAIRING
+                                    ? current
+                                    : GuideStage.WIRELESS_DEBUGGING;
+                            LiveGuideRuntime.setStage(resume);
                             persist();
                         }
                         notifyChanged();
