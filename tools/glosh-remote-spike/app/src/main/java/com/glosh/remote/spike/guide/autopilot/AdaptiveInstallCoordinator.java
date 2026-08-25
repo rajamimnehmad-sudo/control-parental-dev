@@ -28,8 +28,10 @@ public final class AdaptiveInstallCoordinator {
         void startSupportStackIfReady();
         void submitPairingCode(String code);
         void showManualPairingFallback();
-        void showInstruction(String message);
         void showRecovery(String message);
+        default void showInstruction(String message) {
+            showRecovery(message);
+        }
         void clearVisuals();
         void invalidateAndRescan();
         void rescanAfter(long delayMs);
