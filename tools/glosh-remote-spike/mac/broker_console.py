@@ -60,6 +60,7 @@ async def announce_pending_requests(
     session,
     broker: BrokerOperatorClient,
     descriptor: str | None = None,
+    poll_interval_seconds: float = 2.0,
 ) -> None:
     announced = set()
     autoaccepted_request_id: str | None = None
@@ -106,4 +107,4 @@ async def announce_pending_requests(
         except Exception as exc:
             if not session.stop_event.is_set():
                 print(f"[broker] consulta temporal falló: {exc}", file=sys.stderr)
-        await asyncio.sleep(2)
+        await asyncio.sleep(poll_interval_seconds)
