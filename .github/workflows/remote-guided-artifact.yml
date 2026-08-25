@@ -1,9 +1,9 @@
-name: Remote Samsung Overlay Guide APK
+name: Remote Samsung Bubble Guide APK
 
 on:
   push:
     branches:
-      - work/remote-samsung-overlay-guide-11-chatgpt
+      - work/remote-samsung-bubble-guide-12-chatgpt
     paths:
       - "tools/glosh-remote-spike/**"
       - ".github/workflows/remote-guided-artifact.yml"
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  build-remote-samsung-overlay:
+  build-remote-samsung-bubble:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -38,7 +38,7 @@ jobs:
           chmod +x ./gradlew
           chmod +x tools/glosh-remote-spike/verify_guided_assistant.sh
 
-      - name: Run full Samsung overlay gate
+      - name: Run full Samsung Bubble gate
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
         run: bash tools/glosh-remote-spike/verify_guided_assistant.sh
@@ -46,9 +46,9 @@ jobs:
       - name: Preserve exact APK and report
         uses: actions/upload-artifact@v4
         with:
-          name: GloshRemote-Samsung-Overlay-${{ github.sha }}
+          name: GloshRemote-Samsung-Bubble-${{ github.sha }}
           path: |
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Samsung-Overlay-DEV.apk
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-SAMSUNG-OVERLAY-GUIDE-11-report.txt
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Samsung-Bubble-DEV.apk
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-SAMSUNG-BUBBLE-GUIDE-12-report.txt
           if-no-files-found: error
           retention-days: 14
