@@ -20,12 +20,24 @@ import java.util.Set;
 public final class SamsungSettingsClassifier {
     private static final Set<String> ABOUT_PHONE = aliases(
             "Acerca del teléfono", "About phone");
+    private static final Set<String> ABOUT_PHONE_MARKERS = aliases(
+            "Nombre del producto", "Product name",
+            "Nombre del modelo", "Model name",
+            "Número de serie", "Serial number");
     private static final Set<String> SOFTWARE_INFO = aliases(
             "Información de software", "Software information");
+    private static final Set<String> SOFTWARE_INFO_MARKERS = aliases(
+            "Versión de One UI", "One UI version",
+            "Versión de Android", "Android version",
+            "Número de compilación", "Build number");
     private static final Set<String> BUILD_NUMBER = aliases(
             "Número de compilación", "Build number");
     private static final Set<String> DEVELOPER_OPTIONS = aliases(
             "Opciones de desarrollador", "Developer options");
+    private static final Set<String> DEVELOPER_MARKERS = aliases(
+            "Depuración USB", "USB debugging",
+            "Depuración inalámbrica", "Wireless debugging",
+            "Permanecer activo", "Stay awake");
     private static final Set<String> WIRELESS_DEBUGGING = aliases(
             "Depuración inalámbrica", "Wireless debugging");
     private static final Set<String> PAIR_WITH_CODE = aliases(
@@ -75,17 +87,16 @@ public final class SamsungSettingsClassifier {
     }
 
     boolean hasVisibleWirelessDebuggingLabel(SettingsSnapshot snapshot) {
-        return snapshot.nodes().stream()
-                .filter(NodeSnapshot::visible)
-                .anyMatch(node -> exact(WIRELESS_DEBUGGING, node.candidate().text())
-                        || exact(WIRELESS_DEBUGGING, node.candidate().contentDescription()));
+        return hasVisibleExact(snapshot, WIRELESS_DEBUGGING);
     }
 
     private Screen screen(SettingsSnapshot snapshot, String title) {
-        if (contains(CREDENTIAL_TITLES, title)) {
+        if (contains(CREDENTIAL_TITLES, title)
+                || hasVisibleExact(snapshot, CREDENTIAL_TITLES)) {
             return Screen.CREDENTIAL_PROMPT;
         }
-        if (contains(NETWORK_CONFIRM_TITLES, title)
+        if ((contains(NETWORK_CONFIRM_TITLES, title)
+                || hasVisibleExact(snapshot, NETWORK_CONFIRM_TITLES))
                 && hasExact(snapshot, NETWORK_CONFIRM_POSITIVE)) {
             return Screen.NETWORK_CONFIRMATION;
         }
@@ -99,7 +110,8 @@ public final class SamsungSettingsClassifier {
         if (pairingContext && sixDigits) {
             return Screen.PAIRING_DIALOG;
         }
-        if (contains(WIRELESS_DEBUGGING, title)) {
+        if (contains(WIRELESS_DEBUGGING, title)
+                || hasVisibleExact(snapshot, PAIR_WITH_CODE)) {
             return Screen.WIRELESS_DEBUGGING;
         }
         if (contains(DEVELOPER_OPTIONS, title)) {
@@ -110,6 +122,18 @@ public final class SamsungSettingsClassifier {
         }
         if (contains(ABOUT_PHONE, title)) {
             return Screen.ABOUT_PHONE;
+        }
+
+        // One UI 8 sometimes exposes a custom toolbar where the title is not captured as the
+        // canonical screenTitle. Use multiple visible semantic markers as a conservative fallback.
+        if (visibleMarkerCount(snapshot, SOFTWARE_INFO_MARKERS) >= 2) {
+            return Screen.SOFTWARE_INFO;
+        }
+        if (visibleMarkerCount(snapshot, ABOUT_PHONE_MARKERS) >= 2) {
+            return Screen.ABOUT_PHONE;
+        }
+        if (visibleMarkerCount(snapshot, DEVELOPER_MARKERS) >= 2) {
+            return Screen.DEVELOPER_OPTIONS;
         }
         if (contains(SETTINGS_HOME, title)) {
             return Screen.SETTINGS_HOME;
@@ -182,10 +206,6 @@ public final class SamsungSettingsClassifier {
         return null;
     }
 
-    /**
-     * This classifier is shared by pure JVM tests and observation-only guided mode. Android Rect
-     * geometry belongs to the overlay/execution authority, not to semantic screen classification.
-     */
     private boolean isSafeNavigableRow(NodeSnapshot node) {
         TargetCandidate candidate = node.candidate();
         return node.visible()
@@ -284,6 +304,31 @@ public final class SamsungSettingsClassifier {
                 exact(labels, node.candidate().text())
                         || exact(labels, node.candidate().contentDescription())
                         || node.descendantTexts().stream().anyMatch(value -> exact(labels, value)));
+    }
+
+    private boolean hasVisibleExact(SettingsSnapshot snapshot, Set<String> labels) {
+        return snapshot.nodes().stream()
+                .filter(NodeSnapshot::visible)
+                .anyMatch(node -> exact(labels, node.candidate().text())
+                        || exact(labels, node.candidate().contentDescription()));
+    }
+
+    private int visibleMarkerCount(SettingsSnapshot snapshot, Set<String> markers) {
+        Set<String> found = new HashSet<>();
+        for (NodeSnapshot node : snapshot.nodes()) {
+            if (!node.visible()) {
+                continue;
+            }
+            String text = normalize(node.candidate().text());
+            String description = normalize(node.candidate().contentDescription());
+            if (markers.contains(text)) {
+                found.add(text);
+            }
+            if (markers.contains(description)) {
+                found.add(description);
+            }
+        }
+        return found.size();
     }
 
     private static boolean isSwitchControl(TargetCandidate candidate) {
