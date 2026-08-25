@@ -8,6 +8,15 @@ APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
 FINAL_APK="$APK_DIR/GloshRemote-OneTap-DEV.apk"
 REPORT="$APK_DIR/REMOTE-INSTALL-ONE-TAP-HARDENING-05-report.txt"
+PYTHON_BIN="${PYTHON_BIN:-python3}"
+PYTHON_VENV=""
+
+cleanup() {
+  if [[ -n "$PYTHON_VENV" && -d "$PYTHON_VENV" ]]; then
+    rm -rf "$PYTHON_VENV"
+  fi
+}
+trap cleanup EXIT
 
 sha256_file() {
   local path="$1"
@@ -27,14 +36,38 @@ file_size() {
   fi
 }
 
+prepare_python() {
+  if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
+    echo "ERROR: no se encontró $PYTHON_BIN" >&2
+    return 1
+  fi
+  if [[ ! -f "$MAC_DIR/requirements.txt" ]]; then
+    echo "ERROR: falta $MAC_DIR/requirements.txt" >&2
+    return 1
+  fi
+
+  PYTHON_VENV="$(mktemp -d "${TMPDIR:-/tmp}/glosh-one-tap-python.XXXXXX")"
+  "$PYTHON_BIN" -m venv "$PYTHON_VENV"
+  "$PYTHON_VENV/bin/python" -m pip install \
+    --disable-pip-version-check \
+    --no-input \
+    -r "$MAC_DIR/requirements.txt"
+}
+
 printf '\n=== Glosh Remote One-Tap gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
+printf '\n[0/4] Python isolated environment\n'
+prepare_python
+
 printf '\n[1/4] Python protocol/broker/standby tests\n'
 (
   cd "$MAC_DIR"
-  python3 -m unittest test_protocol.py test_broker.py test_one_tap_standby.py
+  "$PYTHON_VENV/bin/python" -m unittest \
+    test_protocol.py \
+    test_broker.py \
+    test_one_tap_standby.py
 )
 
 printf '\n[2/4] Android JVM unit tests\n'
@@ -61,6 +94,7 @@ STATUS="$(git -C "$REPO_ROOT" status --short)"
   echo "TASK=REMOTE-INSTALL-ONE-TAP-HARDENING-05"
   echo "RESULT=PASS"
   echo "HEAD=$HEAD_SHA"
+  echo "PYTHON_ENV=isolated-venv"
   echo "PYTHON_TESTS=PASS"
   echo "ANDROID_UNIT_TESTS=PASS"
   echo "LINT=PASS"
