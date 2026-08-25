@@ -156,8 +156,12 @@ if [[ ! -f "$DEV_KEYSTORE" ]]; then
   echo "ERROR: keystore DEV decodificado no encontrado." >&2
   exit 2
 fi
-APK_CERT_SHA256="$($APKSIGNER verify --print-certs "$SOURCE_APK" \
-  | awk -F': ' '/Signer #1 certificate SHA-256 digest:/{print $2; exit}' \
+
+# Some apksigner revisions send certificate details through stderr. Capture both streams and
+# parse the digest flexibly so the gate validates the certificate rather than its output channel.
+APKSIGNER_OUTPUT="$($APKSIGNER verify --verbose --print-certs "$SOURCE_APK" 2>&1)"
+APK_CERT_SHA256="$(printf '%s\n' "$APKSIGNER_OUTPUT" \
+  | awk 'BEGIN{IGNORECASE=1} /certificate SHA-256 digest:/{sub(/.*digest:[[:space:]]*/, ""); print; exit}' \
   | normalize_digest)"
 KEYSTORE_CERT_SHA256="$(keytool -list -v \
   -keystore "$DEV_KEYSTORE" \
@@ -170,6 +174,7 @@ if [[ -z "$APK_CERT_SHA256" || -z "$KEYSTORE_CERT_SHA256" \
   || "$APK_CERT_SHA256" != "$KEYSTORE_CERT_SHA256" ]]; then
   echo "ERROR: APK no quedó firmada por la identidad DEV estable." >&2
   echo "APK=$APK_CERT_SHA256 KEYSTORE=$KEYSTORE_CERT_SHA256" >&2
+  printf '%s\n' "$APKSIGNER_OUTPUT" >&2
   exit 3
 fi
 printf 'PASS: stable DEV signer %s\n' "$APK_CERT_SHA256"
