@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-24 22:55 ART
+Updated: 2026-08-24 23:10 ART
 
 ## Connection base
 
@@ -12,130 +12,81 @@ The proven no-link stack remains frozen: broker → relay/WSS → Glosh Remote �
 
 `REMOTE-INSTALL-LIVE-GUIDE-03`: **FAILED UX PHYSICAL / SUPERSEDED**.
 
-Historical implementation chain before Autopilot:
-`475bd35b... → 1a537f7a... → 99fcf2bb... → 122c45b9... → 93735b1c...`
+The old guide-first model with large/duplicated controls is not the product UX.
 
-The previous guide-first UX remains superseded. Its useful matcher/pairing pieces may be reused only where compatible with Adaptive Autopilot.
+## Current Android checkpoint
 
-## Active product route — Adaptive Autopilot
+Local-only Codex checkpoint:
+- HEAD `eaa44f1ba5da204d66a720ae6f5f805699ee22ee`;
+- commit `feat(remote): add adaptive Samsung install autopilot`;
+- Android tests 83/83 PASS;
+- Python/broker 6/6 PASS;
+- lint 0 errors / 11 pre-existing-external warnings;
+- assemble PASS;
+- APK `GloshRemote-LiveGuide-V2-DEV.apk`;
+- 19,287,534 bytes;
+- SHA-256 `ca222dbfabaa776a9e304c0e643923caf5ce394ad785a72481c8a58654b14920`;
+- clean worktree;
+- no push/PR/merge/deploy.
 
-`REMOTE-INSTALL-LIVE-GUIDE-V2-04`: **PASS AUTOMATED / PENDING S22 PHYSICAL GATE**.
+This checkpoint remains technically valuable, but **is not the final UX candidate** after real-user feedback exposed two product defects:
+1. Mac/operator availability expires too quickly and repeatedly produces `soporte no disponible`;
+2. customer UI still exposes laboratory/wizard controls and repeated states (`Volver`, `Me perdí`, guide/retry/state buttons) that contradict the one-tap product goal.
 
-Codex completed the environment-bound Android integration without using a phone for the final gate.
+## Frozen final UX — One Tap
 
-Exact local result:
-- HEAD final: `eaa44f1ba5da204d66a720ae6f5f805699ee22ee`;
-- local commit: `feat(remote): add adaptive Samsung install autopilot`;
-- Android tests: **83/83 PASS**;
-- Python/broker regression: **6/6 PASS**;
-- `lintDebug`: **0 errors**, 11 warnings reported as pre-existing/external;
-- `assembleDebug`: **PASS**;
-- APK: `GloshRemote-LiveGuide-V2-DEV.apk`;
-- APK size: `19,287,534` bytes;
-- APK SHA-256: `ca222dbfabaa776a9e304c0e643923caf5ce394ad785a72481c8a58654b14920`;
-- worktree: clean;
-- relay/Quick Tunnel: closed;
-- broker: `available=false`;
-- no push / PR / merge / deploy;
-- Taildrop to S22: not sent yet.
+Authoritative UX contract:
+`docs/REMOTE_INSTALL_ONE_TAP_AUTOPILOT_UX.md`.
 
-This is an **automated technical PASS**, not final product closure. The only remaining acceptance gate for this candidate is a single real-user physical trial on the S22 without USB, using this exact APK SHA.
+Normal compatible-Samsung flow after one-time Accessibility bootstrap:
 
-Product direction remains frozen as:
+`CONECTAR CON SOPORTE` once → operator/request discovery → shortest-path Autopilot → missing Developer Options only if needed → Wireless Debugging only if needed → pairing-code dialog → exactly one contextual six-digit code consumed locally → local ADB pairing → frozen secure support stack → `Conectado con soporte`.
 
-**Samsung-first implementation + universal state engine + shortest-path Autopilot + minimal guided fallback.**
+The customer does not manually advance internal technical states. Exceptions are only Android-owned protected prerequisites such as credential entry, first-time Accessibility/Restricted Settings, no Wi-Fi, or policy blocks; after resolving an exception, Autopilot resumes automatically from a fresh probe.
 
-Target UX after one-time Accessibility bootstrap:
+## Support availability contract
 
-`INICIAR → detect real state → shortest safe path → enable Wireless Debugging only if needed → open pairing dialog → auto-read one contextual 6-digit code when safe → existing local pairing/ADB → existing secure support connection`.
+`soporte no disponible` must not appear merely because a short fixed timer expired while the Mac technician is actively waiting.
 
-Mandatory shortcuts/preconditions remain:
-- support already connected → DONE;
-- valid local ADB → skip Settings/pairing;
-- previous pairing → try reconnect before opening Settings;
-- Restricted Settings blocks Accessibility → user clears prerequisite;
-- Accessibility disabled → user enables it once;
-- no usable Wi-Fi → request Wi-Fi;
-- Wireless Debugging blocked by policy → safe BLOCKED result;
-- Developer Options already available → skip Build Number;
-- Wireless Debugging already ON → skip its toggle;
-- pairing dialog already open → pair immediately;
-- credential prompt → wait for user credential, then resume from a fresh probe.
+Use renewable internal leases:
+- operator presence: short lease (target 120 s) renewed automatically about every 30 s while Mac is healthy and support-ready;
+- customer request: target 10-minute lease renewed automatically about every 60 s while connect flow is active;
+- accepted active install/support session: sliding/activity renewal rather than a fixed wall-clock expiry mid-flow;
+- explicit cancel/revoke remains immediate.
 
-## Authoritative GitHub reference
+Preferred current single-technician workflow: Mac explicitly enters `Esperar próximo cliente`; first valid request for that one-use slot is auto-accepted, removing a redundant approval click while preserving technician intent.
 
-Branch:
-`coordination/remote-install-live-guide-v2`
+## Customer UI contract
 
-Architecture/status:
-- `docs/REMOTE_INSTALL_ADAPTIVE_AUTOPILOT_ARCHITECTURE.md`
-- `docs/REMOTE_INSTALL_AUTOPILOT_DECISION.md`
-- `docs/REMOTE_INSTALL_LIVE_GUIDE_STATUS.md`
+Idle:
+- one primary CTA: `CONECTAR CON SOPORTE`.
 
-Reference implementation:
-- `docs/artifacts/remote-install-autopilot/reference/AUTOPILOT_STATE_MACHINE.json`
-- `docs/artifacts/remote-install-autopilot/reference/SAMSUNG_RECIPE_V1.json`
-- `docs/artifacts/remote-install-autopilot/reference/SCENARIO_MATRIX.md`
-- `docs/artifacts/remote-install-autopilot/reference/adaptive_engine.py`
-- `docs/artifacts/remote-install-autopilot/reference/test_adaptive_engine.py`
-- `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlanner.kt`
-- `docs/artifacts/remote-install-autopilot/reference/AdaptiveAutopilotPlannerTest.kt`
-- `docs/artifacts/remote-install-autopilot/reference/AutopilotUiModel.kt`
-- `docs/artifacts/remote-install-autopilot/reference/SettingsWindowSelector.kt`
-- `docs/artifacts/remote-install-autopilot/reference/SamsungSettingsClassifier.kt`
-- `docs/artifacts/remote-install-autopilot/reference/PairingCodeDetector.kt`
-- `docs/artifacts/remote-install-autopilot/reference/AutopilotActionGate.kt`
-- `docs/artifacts/remote-install-autopilot/reference/AutopilotUiPureTest.kt`
-- `docs/artifacts/remote-install-autopilot/reference/CODEX_MINIMAL_PORT.md`
-- `docs/artifacts/remote-install-autopilot/reference/REFERENCE_VALIDATION.md`
+Running:
+- one progress surface (`Conectando…`, `Preparando el teléfono…`, `Activando conexión segura…`);
+- only normal secondary action: `Cancelar`.
 
-Pre-port reference validation completed by ChatGPT:
-- Python planner/state: **38/38 PASS**;
-- Kotlin planner: **40/40 reference checks PASS**;
-- Kotlin pure UI/safety layer: **18/18 PASS**.
+Remove from normal path:
+- `Volver`;
+- `Me perdí`;
+- `Mostrame`;
+- duplicated status/retry/pairing buttons;
+- manual next/continue controls for internal states.
 
-## Safety/action contract
+Connected:
+- one terminal state: `Conectado con soporte`.
 
-Every automatic click remains a verified transaction:
+## Current source-access blocker
 
-`stable trusted Settings snapshot → HIGH/unique classification → fresh live-node reacquisition → one ACTION_CLICK → invalidate generation → observe an allowed next state`.
+The authoritative Android implementation `eaa44f1b…` is currently local-only on the Mac and is **not present in GitHub**. The remote `work/remote-install-connection-00` branch is older and does not contain the integrated Adaptive Autopilot checkpoint.
 
-One wrong automatic click = FAIL. PIN/password/pattern are never automated or captured. Ambiguity causes a safe stop/fallback.
+Therefore ChatGPT cannot safely finish the One-Tap hardening or build the final APK from the exact current source until that local checkpoint is exposed as an isolated GitHub handoff branch. This is a source-transfer blocker only, not a design blocker.
 
-## Device strategy
+Required handoff is minimal: publish exact local HEAD `eaa44f1b…` to an isolated remote branch, without merge/PR/rebase/reset and without additional development. After that, ChatGPT resumes implementation/review from the exact checkpoint.
 
-### A23
-Samsung SM-A235M / Android 14 / API 34 is not required for the remaining gate. Its current Device Owner policy blocks the Glosh Remote AccessibilityService, so it should not be modified merely to validate this candidate while serving another front.
+## Final closure
 
-### S22 — only remaining gate
-Use the S22 as the cable-free real-user Samsung gate.
+`REMOTE-INSTALL-LIVE-GUIDE-V2-04`: **AUTOMATED CHECKPOINT PASS / ONE-TAP HARDENING REQUIRED / SOURCE HANDOFF PENDING**.
 
-Requirements:
-1. use exactly `GloshRemote-LiveGuide-V2-DEV.apk` with SHA-256 `ca222dbfabaa776a9e304c0e643923caf5ce394ad785a72481c8a58654b14920`;
-2. no USB instrumentation;
-3. start from Glosh Remote and tap `INICIAR`;
-4. verify the Autopilot takes the shortest safe path for the S22's actual current state;
-5. no wrong automatic click is allowed;
-6. credential/security prompts may pause for the user and then resume;
-7. pairing may be automatic when exactly one contextual code is safe, otherwise manual six-box fallback is acceptable;
-8. once ADB is ready, reuse the already-proven secure support stack;
-9. UX confirmation must come from the user, not only logs.
+Do not run the final S22 physical gate against the old `ca222d…` APK. Final gate must use the post-One-Tap APK built from the handed-off current source.
 
-## Final closure rule
-
-Do not mark `REMOTE-INSTALL-LIVE-GUIDE-V2-04` PASS FINAL until:
-- the exact APK SHA above is installed on S22;
-- one cable-free physical run completes or yields a reproducible failure;
-- ChatGPT reviews the resulting physical evidence and the local diff/code evidence.
-
-No push/PR/merge/deploy/Production/Supabase.
-
-## Coordination
-
-- `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
-- `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
-- `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: PASS AUTOMATED; only S22 physical gate pending.
-- `REMOTE-INSTALL-MAC-OPERATOR-04`: preserved; waits for installer UX stability.
-- `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved.
-- `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: pending the exact-candidate S22 cable-free gate.
-- Do not touch Chrome, GloshIA, DAG, App Usuario/Admin, Supabase or production Device Owner logic.
+No Production/Supabase/merge/deploy.
