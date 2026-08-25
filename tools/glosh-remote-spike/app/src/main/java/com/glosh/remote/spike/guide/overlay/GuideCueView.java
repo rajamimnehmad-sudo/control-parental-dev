@@ -15,11 +15,11 @@ import com.glosh.remote.spike.wizard.GuidePresentation;
 /** Small line-art cue used by both the floating coach and the in-app step card. */
 public final class GuideCueView extends View {
     private static final int LIME = Color.rgb(190, 242, 84);
-    private static final int MUTED = Color.rgb(141, 150, 136);
     private static final long DURATION_MS = 1_250L;
 
     private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint softFill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Path path = new Path();
     private GuidePresentation.Cue cue = GuidePresentation.Cue.WAIT;
@@ -28,8 +28,8 @@ public final class GuideCueView extends View {
 
     public GuideCueView(Context context) {
         super(context);
-        setMinimumWidth(dp(48));
-        setMinimumHeight(dp(48));
+        setMinimumWidth(Math.round(dp(48)));
+        setMinimumHeight(Math.round(dp(48)));
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         stroke.setStyle(Paint.Style.STROKE);
         stroke.setStrokeCap(Paint.Cap.ROUND);
@@ -38,6 +38,8 @@ public final class GuideCueView extends View {
         stroke.setColor(LIME);
         fill.setStyle(Paint.Style.FILL);
         fill.setColor(LIME);
+        softFill.setStyle(Paint.Style.FILL);
+        softFill.setColor(Color.argb(72, 190, 242, 84));
         text.setColor(LIME);
         text.setTextAlign(Paint.Align.CENTER);
         text.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
@@ -73,10 +75,8 @@ public final class GuideCueView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        float width = getWidth();
-        float height = getHeight();
-        float cx = width / 2f;
-        float cy = height / 2f;
+        float cx = getWidth() / 2f;
+        float cy = getHeight() / 2f;
         switch (cue) {
             case TAP -> drawTap(canvas, cx, cy, false);
             case MULTI_TAP -> drawTap(canvas, cx, cy, true);
@@ -104,17 +104,15 @@ public final class GuideCueView extends View {
 
     private void drawToggle(Canvas canvas, float cx, float cy) {
         RectF track = new RectF(cx - dp(17), cy - dp(8), cx + dp(17), cy + dp(8));
-        Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        trackPaint.setStyle(Paint.Style.FILL);
-        trackPaint.setColor(Color.argb(72, 190, 242, 84));
-        canvas.drawRoundRect(track, dp(9), dp(9), trackPaint);
+        canvas.drawRoundRect(track, dp(9), dp(9), softFill);
         stroke.setAlpha(220);
         canvas.drawRoundRect(track, dp(9), dp(9), stroke);
         stroke.setAlpha(255);
-        float x = track.left + dp(8) + (track.width() - dp(16)) * easedPulse();
+        float pulse = easedPulse();
+        float x = track.left + dp(8) + (track.width() - dp(16)) * pulse;
         canvas.drawCircle(x, cy, dp(6), fill);
-        float ring = dp(9) + dp(4) * easedPulse();
-        stroke.setAlpha(Math.round((1f - easedPulse()) * 150));
+        float ring = dp(9) + dp(4) * pulse;
+        stroke.setAlpha(Math.round((1f - pulse) * 150));
         canvas.drawCircle(x, cy, ring, stroke);
         stroke.setAlpha(255);
     }
