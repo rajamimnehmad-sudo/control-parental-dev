@@ -1,36 +1,58 @@
 package com.glosh.remote.spike.wizard;
 
 import android.app.Activity;
-import android.graphics.PixelFormat;
-import android.graphics.Rect;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
-import android.provider.Settings;
-import android.view.Gravity;
-import android.view.WindowManager;
 
-/** Owns the TYPE_APPLICATION_OVERLAY window used as the Samsung setup instructor. */
+/**
+ * Compatibility controller for the floating Samsung instructor.
+ *
+ * The previous implementation owned a TYPE_APPLICATION_OVERLAY window, but Samsung Settings
+ * physically hides those windows. The controller now delegates the same lifecycle contract to a
+ * system-managed notification Bubble, whose expanded content is GuideBubbleActivity.
+ */
 public final class GuideOverlayController {
+    public static final String ACTION_BUBBLE_BACK =
+            "com.glosh.remote.spike.BUBBLE_GUIDE_BACK";
+    public static final String ACTION_BUBBLE_NEXT =
+            "com.glosh.remote.spike.BUBBLE_GUIDE_NEXT";
+
     public interface Listener {
         void onBack();
         void onNext();
     }
 
     private final Activity activity;
-    private final WindowManager windowManager;
     private final Listener listener;
-    private GuideOverlayView view;
-    private WindowManager.LayoutParams params;
+    private final GuideNotification notification;
     private boolean visible;
+    private boolean receiverRegistered;
+
+    private final BroadcastReceiver actions = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent == null || intent.getAction() == null) {
+                return;
+            }
+            if (ACTION_BUBBLE_BACK.equals(intent.getAction())) {
+                listener.onBack();
+            } else if (ACTION_BUBBLE_NEXT.equals(intent.getAction())) {
+                listener.onNext();
+            }
+        }
+    };
 
     public GuideOverlayController(Activity activity, Listener listener) {
         this.activity = activity;
         this.listener = listener;
-        this.windowManager = activity.getSystemService(WindowManager.class);
+        this.notification = new GuideNotification(activity);
     }
 
     public boolean canShow() {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                && Settings.canDrawOverlays(activity);
+        return notification.canBubble();
     }
 
     public boolean show(SamsungGuideStep step) {
@@ -41,50 +63,21 @@ public final class GuideOverlayController {
         if (!canShow()) {
             return false;
         }
-        if (view == null) {
-            view = new GuideOverlayView(activity, new GuideOverlayView.Listener() {
-                @Override
-                public void onBack() {
-                    listener.onBack();
-                }
-
-                @Override
-                public void onNext() {
-                    listener.onNext();
-                }
-
-                @Override
-                public void onDragBy(int deltaX, int deltaY) {
-                    moveBy(deltaX, deltaY);
-                }
-            });
-        }
-        view.setStep(step, overrideInstruction);
-        if (visible) {
-            return true;
-        }
-
-        params = buildParams();
-        try {
-            windowManager.addView(view, params);
-            visible = true;
-            return true;
-        } catch (Throwable ignored) {
-            visible = false;
-            params = null;
-            return false;
-        }
+        ensureReceiver();
+        notification.showBubbleStep(step, overrideInstruction, true);
+        visible = true;
+        return true;
     }
 
     public void updateStep(SamsungGuideStep step) {
-        if (visible && view != null) {
-            view.setStep(step);
+        if (visible) {
+            notification.showBubbleStep(step, false);
         }
     }
 
     public void showWaiting(SamsungGuideStep step, String message) {
-        if (visible && view != null) {
-            view.setStep(step, message);
+        if (visible) {
+            notification.showBubbleStep(step, message, false);
         }
     }
 
@@ -93,68 +86,41 @@ public final class GuideOverlayController {
     }
 
     public void hide() {
-        if (!visible || view == null) {
-            return;
+        if (visible) {
+            notification.clear();
         }
-        try {
-            windowManager.removeView(view);
-        } catch (Throwable ignored) {
-            // Window may already have been removed by the system.
-        }
-        view.stop();
         visible = false;
-        params = null;
+        unregisterReceiver();
     }
 
-    private WindowManager.LayoutParams buildParams() {
-        int width = dp(292);
-        WindowManager.LayoutParams value = new WindowManager.LayoutParams(
-                width,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                        | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-                        | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                PixelFormat.TRANSLUCENT);
-        value.gravity = Gravity.TOP | Gravity.START;
-        Rect bounds = currentBounds();
-        value.x = Math.max(dp(10), bounds.width() - width - dp(12));
-        value.y = dp(70);
-        value.windowAnimations = 0;
-        return value;
-    }
-
-    private void moveBy(int deltaX, int deltaY) {
-        if (!visible || params == null || view == null) {
+    private void ensureReceiver() {
+        if (receiverRegistered) {
             return;
         }
-        Rect bounds = currentBounds();
-        int maxX = Math.max(0, bounds.width() - params.width);
-        int measuredHeight = view.getHeight() > 0 ? view.getHeight() : dp(210);
-        int maxY = Math.max(0, bounds.height() - measuredHeight);
-        params.x = clamp(params.x + deltaX, 0, maxX);
-        params.y = clamp(params.y + deltaY, 0, maxY);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(ACTION_BUBBLE_BACK);
+        filter.addAction(ACTION_BUBBLE_NEXT);
         try {
-            windowManager.updateViewLayout(view, params);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                activity.registerReceiver(actions, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                activity.registerReceiver(actions, filter);
+            }
+            receiverRegistered = true;
         } catch (Throwable ignored) {
-            // Keep the previous safe position if the window is being torn down.
+            receiverRegistered = false;
         }
     }
 
-    private Rect currentBounds() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            return windowManager.getCurrentWindowMetrics().getBounds();
+    private void unregisterReceiver() {
+        if (!receiverRegistered) {
+            return;
         }
-        return new Rect(0, 0,
-                activity.getResources().getDisplayMetrics().widthPixels,
-                activity.getResources().getDisplayMetrics().heightPixels);
-    }
-
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
-    }
-
-    private int dp(int value) {
-        return Math.round(value * activity.getResources().getDisplayMetrics().density);
+        try {
+            activity.unregisterReceiver(actions);
+        } catch (Throwable ignored) {
+            // Activity teardown may race with the Bubble being dismissed.
+        }
+        receiverRegistered = false;
     }
 }
