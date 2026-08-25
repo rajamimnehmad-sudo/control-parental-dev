@@ -124,18 +124,42 @@ class ProtectorAccessibilityService : AccessibilityService() {
             snapshotProvider.start(scope)
             launch {
                 snapshotProvider.observe().collect {
-                    val packageName = rootInActiveWindow?.packageName?.toString()?.takeIf { it.isNotBlank() }
-                    if (packageName != null) {
-                        scheduleSearchEngineProtection(
-                            packageName = packageName,
-                            eventLabel = PolicyChangedEventLabel,
-                            invalidateContext = true,
-                        )
-                    }
+                    schedulePolicyChangedProtection()
                 }
             }
             systemStatusRepository.updateAccessibilityState(ComponentState.Enabled)
             telemetryReporter.recordServiceState("Accessibility service connected.")
+        }
+    }
+
+    private fun schedulePolicyChangedProtection() {
+        val root = rootInActiveWindow ?: return
+        val activePackage = root.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
+        val resolvedOwnUninstaller = activePackage in ownUninstallerPackages
+        when {
+            settingsProtectionPolicy.couldContainProtectedScreen(activePackage, resolvedOwnUninstaller) -> {
+                treeEventProcessor?.invalidateSearchContext()
+                treeEventProcessor?.submitSettings(
+                    packageName = activePackage,
+                    eventLabel = PolicyChangedEventLabel,
+                    eventType = 0,
+                    className = root.className?.toString(),
+                    eventSignals = SettingsEventSignals(),
+                    invalidateContext = true,
+                )
+            }
+            AccessibilityForegroundAllowlist.contains(activePackage) -> {
+                treeEventProcessor?.invalidateSearchContext()
+                treeEventProcessor?.invalidateSettingsContext()
+            }
+            else -> {
+                treeEventProcessor?.invalidateSettingsContext()
+                scheduleSearchEngineProtection(
+                    packageName = activePackage,
+                    eventLabel = PolicyChangedEventLabel,
+                    invalidateContext = true,
+                )
+            }
         }
     }
 
@@ -160,7 +184,9 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val resolvedOwnUninstaller = packageName in ownUninstallerPackages
         val couldContainProtectedSettings =
             settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)
-        if (!couldContainProtectedSettings) {
+        if (couldContainProtectedSettings) {
+            treeEventProcessor?.invalidateSearchContext()
+        } else {
             treeEventProcessor?.invalidateSettingsContext()
             clearSettingsEscape()
         }
@@ -183,6 +209,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         }
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) return
         if (AccessibilityForegroundAllowlist.contains(packageName)) {
+            treeEventProcessor?.invalidateSearchContext()
             handleAlwaysAllowedForeground(packageName, elapsed, now)
             return
         }
@@ -323,8 +350,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     ownAppIdentityVisible = eventSignals.ownAppIdentityVisible,
                     dangerousSettingsActionVisible = eventSignals.dangerousSettingsActionVisible,
                 )
+        val identityIndependent =
+            settingsProtectionPolicy.canBlockImmediatelyWithoutTreeIdentity(packageName, className)
         if (
             urgent &&
+            identityIndependent &&
             shouldLeaveSettingsScreen(
                 packageName = packageName,
                 className = className,
@@ -350,8 +380,9 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private fun settingsSignalsFromEvent(event: AccessibilityEvent): SettingsEventSignals {
         val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
+        val ownPackageName = applicationContext.packageName
         return SettingsEventSignals(
-            ownAppIdentityVisible = values.any { it.matchesOwnAppIdentity(packageName, ownAppLabel) },
+            ownAppIdentityVisible = values.any { it.matchesOwnAppIdentity(ownPackageName, ownAppLabel) },
             adminAppIdentityVisible = values.any { it.matchesAdminAppIdentity() },
             dangerousSettingsActionVisible =
                 event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED &&
@@ -400,33 +431,41 @@ class ProtectorAccessibilityService : AccessibilityService() {
         packageName: String,
         urgent: Boolean,
     ) {
-        if (settingsEscapeJob?.isActive == true) return
         val scope = serviceScope ?: return
-        settingsEscapeJob =
-            scope.launch {
-                for (attempt in 1..SettingsEscapeFallbackAttempt) {
-                    delay(SettingsEscapeRecheckDelayMillis)
-                    treeEventProcessor?.submitSettings(
-                        packageName = packageName,
-                        eventLabel = SettingsRecheckEventLabel,
-                        eventType = 0,
-                        className = null,
-                        eventSignals = SettingsEventSignals(),
-                        fallbackAttempt = attempt,
-                        urgent = urgent,
-                    )
+        scope.launch(Dispatchers.Main.immediate) {
+            if (settingsEscapeJob?.isActive == true) return@launch
+            settingsEscapeJob =
+                launch {
+                    for (attempt in 1..SettingsEscapeFallbackAttempt) {
+                        delay(SettingsEscapeRecheckDelayMillis)
+                        treeEventProcessor?.submitSettings(
+                            packageName = packageName,
+                            eventLabel = SettingsRecheckEventLabel,
+                            eventType = 0,
+                            className = null,
+                            eventSignals = SettingsEventSignals(),
+                            fallbackAttempt = attempt,
+                            urgent = urgent,
+                        )
+                    }
+                    settingsEscapeJob = null
                 }
-                settingsEscapeJob = null
-            }
+        }
     }
 
     private fun reportSettingsProtection(elapsedRealtimeMillis: Long) {
-        Toast.makeText(this, "Este ajuste está protegido", Toast.LENGTH_SHORT).show()
-        serviceScope?.launch {
-            telemetryReporter.recordSettingsProtection()
-            if (lastTamperAlertAt == 0L || elapsedRealtimeMillis - lastTamperAlertAt >= TamperAlertDebounceMillis) {
-                lastTamperAlertAt = elapsedRealtimeMillis
-                pushNotificationRepository.reportProtectionAlert(ProtectionAlertType.TamperAttempt)
+        val scope = serviceScope ?: return
+        scope.launch(Dispatchers.Main.immediate) {
+            Toast.makeText(this@ProtectorAccessibilityService, "Este ajuste está protegido", Toast.LENGTH_SHORT).show()
+            val shouldAlert =
+                lastTamperAlertAt == 0L ||
+                    elapsedRealtimeMillis - lastTamperAlertAt >= TamperAlertDebounceMillis
+            if (shouldAlert) lastTamperAlertAt = elapsedRealtimeMillis
+            scope.launch {
+                telemetryReporter.recordSettingsProtection()
+                if (shouldAlert) {
+                    pushNotificationRepository.reportProtectionAlert(ProtectionAlertType.TamperAttempt)
+                }
             }
         }
     }
@@ -486,6 +525,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 browserCandidate = isBrowserCandidate(trigger.packageName),
                 elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
             )
+        val processorMetrics = processor.metrics()
         Log.i(
             LogTag,
             "Search protection layer=accessibility event=${trigger.eventLabel} sequence=${trigger.sequence} " +
@@ -497,7 +537,9 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 "searchEngine=${diagnosis.searchEngineId ?: "none"} " +
                 "action=${diagnosis.action} reason=${diagnosis.reason} " +
                 "scanNodes=${scan.visitedNodes} nodeBudget=${scan.nodeBudgetExhausted} " +
-                "timeBudget=${scan.timeBudgetExhausted}",
+                "timeBudget=${scan.timeBudgetExhausted} " +
+                "submitted=${processorMetrics.submittedSearch} started=${processorMetrics.startedSearch} " +
+                "coalesced=${processorMetrics.coalescedSearch}",
         )
         serviceScope?.launch {
             telemetryReporter.recordSearchProtection(
@@ -566,7 +608,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val scan =
             settingsPageScanner.scan(
                 root = AndroidAccessibilityNodeReader(root),
-                ownPackageName = packageName,
+                ownPackageName = applicationContext.packageName,
                 ownAppLabel = ownAppLabel,
             )
         if (!processor.isSettingsContextCurrent(trigger)) return
@@ -632,11 +674,14 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (!actionApplied || trigger.fallbackAttempt != null) return
         scheduleSettingsEscapeFallback(trigger.packageName, urgent)
         reportSettingsProtection(elapsed)
+        val processorMetrics = processor.metrics()
         Log.i(
             LogTag,
             "Settings protection event=${trigger.eventLabel} sequence=${trigger.sequence} " +
                 "package=${trigger.packageName} scanNodes=${scan.visitedNodes} " +
-                "nodeBudget=${scan.nodeBudgetExhausted} timeBudget=${scan.timeBudgetExhausted}",
+                "nodeBudget=${scan.nodeBudgetExhausted} timeBudget=${scan.timeBudgetExhausted} " +
+                "submitted=${processorMetrics.submittedSettings} started=${processorMetrics.startedSettings} " +
+                "coalesced=${processorMetrics.coalescedSettings}",
         )
     }
 
