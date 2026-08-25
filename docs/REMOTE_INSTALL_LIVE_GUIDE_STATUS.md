@@ -1,10 +1,12 @@
 # Glosh Remote — Samsung System Bubble Guided Installer
 
-Updated: 2026-08-25 17:34 ART
+Updated: 2026-08-25 18:54 ART
 
 ## Executive status
 
 `REMOTE-SAMSUNG-SYSTEM-UI-GUIDE-12`: **PASS AUTOMATED / PENDING PHYSICAL S22**.
+
+`REMOTE-SAMSUNG-BUBBLE-STABLE-SIGNING-13`: **PASS AUTOMATED / PACKAGING FIX COMPLETE**.
 
 `REMOTE-SAMSUNG-OVERLAY-GUIDE-11`: **FAILED PHYSICAL S22 / SUPERSEDED FOR SETTINGS**.
 
@@ -14,7 +16,7 @@ Accessibility remains **SUPERSEDED BY PRODUCT DECISION**. PiP remains **FAILED P
 
 ## Current route
 
-The new candidate uses an Android **system-managed notification Bubble** instead of PiP or an application overlay. The expanded Bubble hosts a normal Glosh Activity, so Android/SystemUI owns the floating surface while Samsung Settings stays foreground.
+The current candidate uses an Android **system-managed notification Bubble** instead of PiP or an application overlay. The expanded Bubble hosts a normal Glosh Activity, so Android/SystemUI owns the floating surface while Samsung Settings stays foreground.
 
 Implemented behavior:
 
@@ -25,66 +27,90 @@ Implemented behavior:
 5. Expanded Bubble contains Glosh's own white/lime guide UI with real Back/Next confirmation buttons.
 6. Bubble positioning is owned by SystemUI; Glosh performs no overlay coordinates or Settings gestures.
 7. At the pairing-code step, the Bubble contains a six-digit numeric input and Connect button while the Samsung code can remain visible behind it.
-8. The existing pairing service already accepts a pending six-digit code before mDNS finishes discovering the pairing endpoint and continues automatically once the endpoint is ready.
+8. The existing pairing service accepts a pending six-digit code before mDNS finishes discovering the pairing endpoint and continues automatically once the endpoint is ready.
 9. Persistent notification remains the fallback if Samsung does not expose/keep the Bubble as expected.
 10. The proven pairing/ADB/relay/crypto path was not changed.
 
-Bubble behavior over the exact Samsung Settings pages is **not yet physical PASS**. That is the next customer-like S22 gate.
+Bubble behavior over the exact Samsung Settings pages is **not yet physical PASS**. That remains the next customer-like S22 gate.
 
-## Current frozen candidate
+## Packaging defect found and fixed
+
+Physical installation of a later Glosh Remote build failed with Android's `conflicto con un paquete`. The cause was the DEV packaging configuration: GitHub Actions was using runner-local default debug signing, so APKs from different runs could have different signing certificates even though the `applicationId` was identical.
+
+The current Bubble line now has a dedicated **DEV-only stable signing identity** and monotonically higher DEV `versionCode`:
+
+- package: `com.glosh.remote.spike`;
+- versionCode: `13`;
+- versionName: `0.1.0-dev13`;
+- stable DEV signer SHA-256: `8c8c1d52c15b55b2239a8ba06f40de3d866a4b80d8a8700e237993b0495459f1`;
+- the gate independently verifies the APK certificate against the configured DEV keystore after assemble;
+- this signer is DEV-only and is not configured for Production/release signing.
+
+Because the S22 currently has an older Glosh Remote signed by a transient debug key whose private key is not preserved, the migration to this stable line requires **one uninstall/reinstall only**. After the first stable-signed install, later DEV builds using this same signer plus increasing `versionCode` can update in place.
+
+## Current frozen candidate for physical S22
 
 Implementation branch:
 
-`work/remote-samsung-bubble-guide-12-chatgpt`
+`work/remote-samsung-bubble-stable-signing-13-chatgpt`
 
 Exact candidate HEAD:
 
-`7821b3a2eaf8b2be1ce878ba3abaf17f24640024`
+`8c9497b772bace102665724d18ce0935c1aa7edc`
 
 Immutable gate branch:
 
-`gate/remote-samsung-bubble-7821b3a`
+`gate/remote-samsung-bubble-stable-signing-13-8c9497b`
 
 GitHub Actions run:
 
-`32895712969`
+`32903285095`
 
 Automated result:
 
-- product architecture guard: **PASS** — Samsung-only + system Bubble + user-confirmed Settings + no Accessibility/PiP/app-overlay;
+- product architecture guard: **PASS** — Samsung-only + system Bubble + no Accessibility/PiP/app-overlay + stable DEV signing;
 - Python protocol/broker/standby: **14/14 PASS**;
-- Android JVM unit suite: **115 tests PASS**;
+- Android JVM unit suite: **PASS**;
 - Android lint: **PASS**;
 - Android assemble: **PASS**;
-- artifact upload: **PASS**;
-- git status evidence: **clean**.
+- stable DEV certificate verification: **PASS**;
+- artifact upload: **PASS**.
+
+The Bubble UX/connection base is inherited from the already-reviewed Bubble candidate `7821b3a2eaf8b2be1ce878ba3abaf17f24640024`; this follow-up changes only DEV packaging/signing/versioning and the corresponding gate/CI evidence.
 
 ## Frozen APK for physical S22 gate
 
-- delivered filename: `GloshRemote-Samsung-Bubble-S22.apk`;
-- HEAD: `7821b3a2eaf8b2be1ce878ba3abaf17f24640024`;
-- size: `19,321,056` bytes;
-- SHA-256: `6ddf32781c34311c25294aabc1dce6aa92c8ee75a42c27a07d5cf1b947191cbd`;
-- workflow run: `32895712969`;
-- artifact ID: `9581203489`;
-- artifact ZIP digest: `sha256:36cab50723266b374588ebd3a8ea3bf332c4274eb6d9f9b8af149bdffd9b8aab`.
+- delivered filename: `GloshRemote-Samsung-Bubble-Stable-S22.apk`;
+- HEAD: `8c9497b772bace102665724d18ce0935c1aa7edc`;
+- versionCode: `13`;
+- size: `19,321,064` bytes;
+- SHA-256: `333a1e126b888aa952910af14b6510dddb7d1c29790030d054cb72bb192639bd`;
+- DEV signer SHA-256: `8c8c1d52c15b55b2239a8ba06f40de3d866a4b80d8a8700e237993b0495459f1`;
+- workflow run: `32903285095`;
+- artifact ID: `9583931770`;
+- artifact ZIP digest: `sha256:c83503d8b2805a0cb82746048d32fc454cb51e40f93756c4967e221dba04fef2`.
+
+Do not use the prior transient-signed Bubble APK `6ddf3278…` as the physical gate candidate anymore.
 
 ## Next physical gate — S22
 
-Validate the exact APK above, without recompiling:
+Migration pre-step: uninstall the currently installed old-signature `Glosh Remote` once, then install the exact stable-signed APK above.
 
-1. notifications allowed;
-2. Samsung bubble permission/configuration can be enabled for Glosh Remote;
-3. tapping/opening Settings produces a visible Glosh Bubble while Settings is foreground;
-4. Bubble can expand and show Glosh custom content;
-5. Back/Next/confirmation advance the guide without bringing MainActivity to foreground;
-6. steps remain synchronized with the persistent notification;
-7. Wireless Debugging remains user-controlled and loop-free;
-8. mDNS advances the state to code entry;
-9. six digits can be entered inside the Bubble while Samsung's code remains visible;
-10. pairing → local ADB → secure Mac relay → connected completes;
-11. cancel/cleanup leaves no residual access;
-12. if Bubble is unavailable or dismissed, persistent notification fallback remains usable.
+Validate without recompiling:
+
+1. installation succeeds after the one-time old-signature uninstall;
+2. notifications allowed;
+3. Samsung bubble permission/configuration can be enabled for Glosh Remote;
+4. tapping/opening Settings produces a visible Glosh Bubble while Settings is foreground;
+5. Bubble can expand and show Glosh custom content;
+6. Back/Next/confirmation advance the guide without bringing MainActivity to foreground;
+7. steps remain synchronized with the persistent notification;
+8. Wireless Debugging remains user-controlled and loop-free;
+9. mDNS advances the state to code entry;
+10. six digits can be entered inside the Bubble while Samsung's code remains visible;
+11. pairing → local ADB → secure Mac relay → connected completes;
+12. cancel/cleanup leaves no residual access;
+13. if Bubble is unavailable or dismissed, persistent notification fallback remains usable.
 
 Do not call the Bubble route physical PASS until this exact S22 gate succeeds.
 
@@ -122,6 +148,6 @@ The card is alive and visible in Recents, but Samsung Settings hides the non-sys
 - PiP route: **FAILED PHYSICAL / SUPERSEDED**;
 - custom application overlay route: **FAILED PHYSICAL / SUPERSEDED FOR SETTINGS**;
 - system Bubble route: **PASS AUTOMATED / PENDING PHYSICAL S22**;
-- exact Bubble source and APK are frozen above;
-- no Remote writer remains active after this handoff;
+- stable DEV signing/versioning fix: **PASS AUTOMATED / COMPLETE**;
+- exact physical candidate is the stable-signed APK frozen above;
 - no merge, PR, Production, deploy or Supabase mutation performed.
