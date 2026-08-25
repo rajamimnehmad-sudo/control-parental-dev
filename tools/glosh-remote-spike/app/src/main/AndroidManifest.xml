@@ -11,6 +11,9 @@
 
     <queries>
         <intent>
+            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
+        </intent>
+        <intent>
             <action android:name="android.settings.DEVICE_INFO_SETTINGS" />
         </intent>
         <intent>
