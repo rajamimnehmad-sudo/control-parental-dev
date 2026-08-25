@@ -12,7 +12,7 @@ public enum SamsungGuideStep {
             "Abrí “Acerca del teléfono”",
             "En Ajustes, bajá hasta “Acerca del teléfono” y tocalo.",
             "YA LO ABRÍ",
-            SettingsTarget.ABOUT_PHONE,
+            SettingsTarget.NONE,
             visual("Ajustes", "Acerca del teléfono", false)),
     SOFTWARE_INFO(
             2,
