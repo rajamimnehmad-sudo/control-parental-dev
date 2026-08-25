@@ -166,72 +166,73 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private void renderCheckingSupport() {
         ui.showScreen(
-                "Preparando la guía",
-                "Estamos buscando soporte",
-                "Primero comprobamos que haya alguien disponible para ayudarte.",
-                "Todavía no comenzó ninguna sesión temporal.");
+                "",
+                "Conectando…",
+                "Estamos buscando soporte disponible.",
+                "No tenés que configurar nada todavía.");
         ui.clearVisual();
         ui.showSecondary("CANCELAR", view -> coordinator.reset());
     }
 
     private void renderGuidePermission() {
         ui.showScreen(
-                "1 de 3 · Preparar el teléfono",
-                "PERMITÍ QUE GLOSH TE GUÍE",
-                "Durante esta configuración Glosh te va a indicar exactamente dónde tocar dentro de Ajustes.",
-                "La guía mira sólo Ajustes y se desactiva automáticamente cuando terminamos.");
+                "",
+                "Activá la automatización",
+                "Android necesita que habilites Glosh una sola vez para preparar el teléfono automáticamente.",
+                "Glosh observa sólo Ajustes durante esta preparación y se desactiva al terminar.");
         ui.clearVisual();
-        ui.showPrimary("ACTIVAR GUÍA", view -> activateGuide(), true);
-        ui.showSecondary("CONTINUAR SIN GUÍA", view -> continueWithoutGuide());
+        ui.showPrimary("ACTIVAR AUTOMATIZACIÓN", view -> activateGuide(), true);
         ui.showTertiary("CANCELAR", view -> coordinator.reset());
     }
 
     private void renderDeveloperOptions() {
         GuideStage liveStage = LiveGuideRuntime.stage();
-        if (liveStage == GuideStage.AUTOPILOT_PROBE
-                || liveStage == GuideStage.SUPPORT_PREPARING
-                || liveStage == GuideStage.AUTOPILOT_CREDENTIAL) {
+        if (automatedFlowActive()) {
             boolean credential = liveStage == GuideStage.AUTOPILOT_CREDENTIAL;
             ui.showScreen(
-                    "Preparando teléfono…",
-                    credential ? "Confirmá tu bloqueo de pantalla" : "Glosh está preparando tu teléfono",
+                    "",
+                    credential ? "Confirmá tu bloqueo de pantalla" : "Preparando el teléfono…",
                     credential
                             ? "Android necesita que ingreses el PIN, patrón o contraseña del teléfono."
-                            : "Detectamos el estado real y elegimos el camino más corto y seguro.",
+                            : "Glosh detecta el estado real y continúa por el camino más corto.",
                     credential
-                            ? "Glosh nunca lee ni guarda esa credencial."
-                            : "No toques otras opciones mientras Glosh continúa.");
+                            ? "Glosh nunca lee ni guarda esa credencial. Al terminar, continúa solo."
+                            : "Podés dejar que Glosh continúe automáticamente.");
             ui.clearVisual();
-            ui.showSecondary("CANCELAR", view -> coordinator.reset());
+            ui.showSecondary("CANCELAR", view -> cancelConnection());
             return;
         }
+
+        // Fail-closed fallback: preserve the proven guided controls only when Autopilot explicitly
+        // relinquishes authority because the current Settings screen cannot be resolved safely.
         OemGuideRecipe recipe = coordinator.recipe();
         DeveloperGuidePhase phase = coordinator.developerPhase();
         if (phase == DeveloperGuidePhase.HELP) {
             ui.showScreen(
-                    "1 de 3 · Preparar el teléfono",
+                    "Ayuda manual",
                     "Vamos de nuevo",
                     recipe.developerOptions().help().copy(),
                     "Seguí sólo la fila resaltada en verde.");
             ui.showGuide(recipe.developerOptions());
             ui.showPrimary("MOSTRARME DE NUEVO", view -> coordinator.showDeveloperGuide(), true);
             ui.showSecondary("ABRIR AJUSTES", view -> openDeveloperSettings());
+            ui.showTertiary("CANCELAR", view -> cancelConnection());
             return;
         }
         if (phase == DeveloperGuidePhase.CONFIRMATION) {
             ui.showScreen(
-                    "1 de 3 · Preparar el teléfono",
+                    "Ayuda manual",
                     "¿Viste el mensaje “Ya sos desarrollador”?",
                     "Si apareció, ya podemos seguir.",
-                    "La solicitud de soporte recién se creará cuando confirmes.");
+                    "Este control sólo aparece porque la automatización pidió ayuda manual.");
             ui.showGuide(recipe.developerOptions());
             ui.showPrimary("SÍ, SEGUIR", view -> coordinator.confirmDeveloperOptions(), true);
             ui.showSecondary("NO ME APARECIÓ", view -> coordinator.showDeveloperGuide());
-            ui.showTertiary("ME PERDÍ", view -> coordinator.showDeveloperHelp());
+            ui.showTertiary("CANCELAR", view -> cancelConnection());
             return;
         }
         ui.showScreen(
-                "1 de 3 · Preparar el teléfono",
+                "Ayuda manual",
                 recipe.developerOptions().title(),
                 recipe.developerOptions().body(),
                 "Detectamos: " + recipe.familyLabel() + " · " + coordinator.profile().model()
@@ -239,48 +240,76 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         ui.showGuide(recipe.developerOptions());
         ui.showPrimary("ABRIR AJUSTES", view -> openDeveloperSettings(), true);
         ui.showSecondary("YA LO TENGO ACTIVADO", view -> coordinator.openedDeveloperSettings());
-        ui.showTertiary("ME PERDÍ", view -> coordinator.showDeveloperHelp());
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderRequestingSupport() {
         ui.showScreen(
-                "Preparando la conexión",
-                "Esperando a soporte",
-                "Un operador va a aceptar tu solicitud.",
-                "Podés quedarte en esta pantalla. Glosh seguirá intentando durante unos minutos.");
+                "",
+                "Preparando conexión segura…",
+                "Glosh está esperando la aceptación del soporte y mantiene la solicitud activa automáticamente.",
+                "No necesitás tocar ningún paso técnico.");
         ui.clearVisual();
-        ui.showSecondary("CANCELAR", view -> coordinator.reset());
+        ui.showSecondary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderWirelessDebugging() {
+        if (automatedFlowActive()) {
+            ui.showScreen(
+                    "",
+                    "Activando conexión segura…",
+                    "Glosh está preparando la depuración inalámbrica y el emparejamiento local.",
+                    "No avances opciones manualmente mientras continúa.");
+            ui.clearVisual();
+            ui.showSecondary("CANCELAR", view -> cancelConnection());
+            return;
+        }
+
         OemGuideRecipe recipe = coordinator.recipe();
         if (coordinator.wirelessHelp()) {
             ui.showScreen(
-                    "2 de 3 · Abrir conexión",
+                    "Ayuda manual",
                     "Te muestro dónde está",
                     recipe.wirelessDebugging().help().copy(),
                     "No cambies ninguna otra opción.");
             ui.showGuide(recipe.wirelessDebugging());
             ui.showPrimary("MOSTRARME DE NUEVO", view -> coordinator.showWirelessGuide(), true);
             ui.showSecondary("ABRIR AJUSTES", view -> prepareAndOpenWirelessDebugging());
-            ui.showTertiary("CANCELAR CONEXIÓN", view -> cancelConnection());
+            ui.showTertiary("CANCELAR", view -> cancelConnection());
             return;
         }
         ui.showScreen(
-                "2 de 3 · Abrir conexión",
+                "Ayuda manual",
                 recipe.wirelessDebugging().title(),
                 recipe.wirelessDebugging().body(),
                 "Activá Depuración inalámbrica y tocá Emparejar dispositivo con código.");
         ui.showGuide(recipe.wirelessDebugging());
         ui.showPrimary("ABRIR DEPURACIÓN INALÁMBRICA", view -> prepareAndOpenWirelessDebugging(), true);
         ui.showSecondary("ME PERDÍ", view -> coordinator.showWirelessHelp());
-        ui.showTertiary("CANCELAR CONEXIÓN", view -> cancelConnection());
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderPairing(PairingUiState pairing) {
+        boolean manualFallback = LiveGuideRuntime.stage() == GuideStage.AUTOPILOT_FALLBACK
+                || pairing == PairingUiState.CODE_FAILED;
+        if (!manualFallback) {
+            ui.showScreen(
+                    "",
+                    pairing == PairingUiState.CONNECTING
+                            ? "Activando conexión segura…"
+                            : "Completando conexión…",
+                    pairing == PairingUiState.CONNECTING
+                            ? "Glosh ya recibió el código y está terminando el emparejamiento."
+                            : "Glosh está buscando el código de emparejamiento de Android de forma local y segura.",
+                    "Si Android requiere una confirmación protegida, te la va a mostrar directamente.");
+            ui.clearVisual();
+            ui.showSecondary("CANCELAR", view -> cancelConnection());
+            return;
+        }
+
         if (pairingHelp) {
             ui.showScreen(
-                    "3 de 3 · Ingresar código",
+                    "Ayuda manual",
                     "Busquemos el código",
                     coordinator.recipe().wirelessDebugging().help().copy(),
                     "Tocá Emparejar dispositivo con código. Android va a mostrar 6 números.");
@@ -291,55 +320,68 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 lastRenderKey = null;
                 render();
             });
-            ui.showTertiary("CANCELAR CONEXIÓN", view -> cancelConnection());
+            ui.showTertiary("CANCELAR", view -> cancelConnection());
             return;
         }
         if (pairing == PairingUiState.WAITING_FOR_CODE || pairing == PairingUiState.CODE_FAILED) {
             boolean failed = pairing == PairingUiState.CODE_FAILED;
             ui.showScreen(
-                    "3 de 3 · Ingresar código",
-                    failed ? "Ese código ya no sirve" : "INGRESÁ LOS 6 NÚMEROS",
-                    failed ? "Generá uno nuevo en Android y escribilo acá." : "Escribí los números que muestra Android.",
+                    "Ayuda manual",
+                    failed ? "Necesitamos un código nuevo" : "Ingresá los 6 números",
+                    failed
+                            ? "Generá un código nuevo en Android y escribilo acá."
+                            : "La lectura automática no fue inequívoca. Escribí los 6 números que muestra Android.",
                     "Al ingresar el sexto número, Glosh continúa automáticamente.");
             ui.showPairingInput(this::submitPairingCode, failed);
             if (failed) {
                 ui.showPrimary("ABRIR DEPURACIÓN INALÁMBRICA", view -> openWirelessDuringSession(), true);
             }
             ui.showSecondary("NO VEO EL CÓDIGO", view -> showPairingHelp());
-            ui.showTertiary("CANCELAR CONEXIÓN", view -> cancelConnection());
+            ui.showTertiary("CANCELAR", view -> cancelConnection());
             return;
         }
         ui.showScreen(
-                "3 de 3 · Ingresar código",
-                pairing == PairingUiState.CONNECTING ? "Conectando…" : "Esperando el código",
-                pairing == PairingUiState.CONNECTING
-                        ? "No cierres Glosh. Esto tarda sólo unos segundos."
-                        : "En Android, tocá Emparejar dispositivo con código.",
-                "Podés ingresar los 6 números en Glosh o desde la notificación.");
+                "Ayuda manual",
+                "Esperando el código",
+                "En Android, tocá Emparejar dispositivo con código.",
+                "Cuando aparezca, Glosh intenta leerlo localmente antes de pedirte que lo escribas.");
         ui.clearVisual();
-        ui.showSecondary("ME PERDÍ", view -> showPairingHelp());
-        ui.showTertiary("CANCELAR CONEXIÓN", view -> cancelConnection());
+        ui.showSecondary("NO VEO EL CÓDIGO", view -> showPairingHelp());
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderConnected() {
         guideNotification.clear();
         ui.showScreen(
-                "3 de 3 · Completado",
-                "¡Listo, Glosher!",
-                "Soporte ya está conectado de forma segura.",
-                "Guía terminada ✓\n\nLa conexión es temporal y podés terminarla cuando quieras.");
+                "",
+                "Conectado con soporte",
+                "La conexión segura ya está activa.",
+                "Es temporal y podés finalizarla cuando quieras.");
         ui.clearVisual();
-        ui.showSecondary("CANCELAR CONEXIÓN", view -> cancelConnection());
+        ui.showSecondary("FINALIZAR CONEXIÓN", view -> cancelConnection());
     }
 
     private void renderUnavailable() {
         ui.showScreen(
-                "Conexión no disponible",
-                "Soporte remoto no está disponible en este momento.",
-                "Intentá nuevamente más tarde.",
-                "No necesitás ingresar ningún dato técnico.");
+                "",
+                "Soporte no disponible",
+                "No encontramos una consola de soporte activa en este momento.",
+                "Podés reintentar sin volver a configurar el teléfono.");
         ui.clearVisual();
-        ui.showPrimary("VOLVER", view -> coordinator.reset(), false);
+        ui.showPrimary("REINTENTAR", view -> {
+            coordinator.reset();
+            handler.post(coordinator::requestSupport);
+        }, false);
+        ui.showSecondary("CANCELAR", view -> coordinator.reset());
+    }
+
+    private boolean automatedFlowActive() {
+        GuideStage stage = LiveGuideRuntime.stage();
+        return GuideServiceStatus.isEnabled(this)
+                && LiveGuideRuntime.isActive()
+                && stage != GuideStage.OFF
+                && stage != GuideStage.CONNECTED
+                && stage != GuideStage.AUTOPILOT_FALLBACK;
     }
 
     private void openDeveloperSettings() {
@@ -354,7 +396,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private void performOpenDeveloperSettings(boolean notificationsAllowed) {
         if (notificationsAllowed) {
-            guideNotification.show("Paso 1 de 3", coordinator.recipe().developerOptions().help().notificationCopy());
+            guideNotification.show("Glosh Remote", coordinator.recipe().developerOptions().help().notificationCopy());
         }
         if (GuideServiceStatus.isEnabled(this)) {
             LiveGuideRuntime.setStage(GuideStage.DEV_SOFTWARE_INFO);
@@ -404,7 +446,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         if (GuideServiceStatus.isEnabled(this)) {
             LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
         }
-        guideNotification.show("Paso 2 de 3", coordinator.recipe().wirelessDebugging().help().notificationCopy());
+        guideNotification.show("Glosh Remote", coordinator.recipe().wirelessDebugging().help().notificationCopy());
         settingsNavigator.openWirelessDebugging(this);
     }
 
@@ -451,11 +493,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         settingsNavigator.openAccessibility(this);
     }
 
-    private void continueWithoutGuide() {
-        LiveGuideRuntime.reset();
-        coordinator.guideReady();
-    }
-
     private void synchronizeGuidePermission() {
         if (coordinator.step() != OnboardingState.Step.GUIDE_PERMISSION) {
             return;
@@ -472,7 +509,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private String guideFallbackCopy() {
         if (LiveGuideRuntime.isActive() && !GuideServiceStatus.isEnabled(this)) {
-            return "\n\nLa guía en pantalla se desactivó. Podés continuar igual.";
+            return "\n\nLa automatización se desactivó. Activala nuevamente para continuar.";
         }
         return "";
     }
