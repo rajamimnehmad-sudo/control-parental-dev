@@ -1,0 +1,261 @@
+package com.glosh.remote.spike;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.InputFilter;
+import android.text.InputType;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.WindowManager;
+import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import com.glosh.remote.spike.session.PairingUiState;
+import com.glosh.remote.spike.session.SessionState;
+import com.glosh.remote.spike.wizard.GuideNotification;
+import com.glosh.remote.spike.wizard.GuideOverlayController;
+import com.glosh.remote.spike.wizard.GuideOverlayView;
+import com.glosh.remote.spike.wizard.SamsungGuideStep;
+import com.glosh.remote.spike.wizard.SamsungGuideStore;
+
+/** Expanded content rendered by Android/SystemUI inside the Glosh notification Bubble. */
+public final class GuideBubbleActivity extends Activity {
+    private static final long REFRESH_MS = 300L;
+    private static final int GRAPHITE = Color.rgb(25, 27, 24);
+    private static final int MUTED = Color.rgb(92, 96, 88);
+    private static final int LIME = Color.rgb(190, 242, 84);
+    private static final int SOFT = Color.rgb(239, 241, 234);
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable refresh = new Runnable() {
+        @Override
+        public void run() {
+            renderIfChanged();
+            handler.postDelayed(this, REFRESH_MS);
+        }
+    };
+
+    private SamsungGuideStore guideStore;
+    private GuideNotification guideNotification;
+    private FrameLayout root;
+    private SamsungGuideStep renderedStep;
+    private PairingUiState renderedPairing;
+    private SessionState renderedSession;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        getWindow().setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        guideStore = new SamsungGuideStore(this);
+        guideNotification = new GuideNotification(this);
+        root = new FrameLayout(this);
+        root.setPadding(dp(8), dp(8), dp(8), dp(8));
+        setContentView(root);
+        render(true);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        handler.removeCallbacks(refresh);
+        handler.post(refresh);
+    }
+
+    @Override
+    protected void onPause() {
+        handler.removeCallbacks(refresh);
+        super.onPause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(refresh);
+        super.onDestroy();
+    }
+
+    private void renderIfChanged() {
+        SamsungGuideStep step = guideStore.step();
+        PairingUiState pairing = RemotePairingService.getPairingUiState();
+        SessionState session = RemotePairingService.getSessionState();
+        if (step != renderedStep || pairing != renderedPairing || session != renderedSession) {
+            render(false);
+        }
+    }
+
+    private void render(boolean force) {
+        SessionState session = RemotePairingService.getSessionState();
+        if (session == SessionState.CONNECTED) {
+            guideNotification.clear();
+            finishAndRemoveTask();
+            return;
+        }
+        if (!guideStore.active()) {
+            finishAndRemoveTask();
+            return;
+        }
+
+        SamsungGuideStep step = guideStore.step();
+        PairingUiState pairing = RemotePairingService.getPairingUiState();
+        if (!force && step == renderedStep && pairing == renderedPairing && session == renderedSession) {
+            return;
+        }
+        renderedStep = step;
+        renderedPairing = pairing;
+        renderedSession = session;
+
+        root.removeAllViews();
+        if (step == SamsungGuideStep.ENTER_CODE) {
+            root.addView(codeCard(pairing), match());
+            return;
+        }
+
+        GuideOverlayView guide = new GuideOverlayView(this, new GuideOverlayView.Listener() {
+            @Override
+            public void onBack() {
+                sendGuideAction(GuideOverlayController.ACTION_BUBBLE_BACK);
+            }
+
+            @Override
+            public void onNext() {
+                sendGuideAction(GuideOverlayController.ACTION_BUBBLE_NEXT);
+            }
+
+            @Override
+            public void onDragBy(int deltaX, int deltaY) {
+                // SystemUI owns Bubble positioning. No app-owned overlay coordinates are used.
+            }
+        });
+        guide.setStep(step);
+        root.addView(guide, match());
+    }
+
+    private View codeCard(PairingUiState pairing) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(16), dp(14), dp(16), dp(14));
+        card.setBackground(rounded(Color.WHITE, 20));
+        card.setElevation(dp(10));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView wordmark = text("glosh", 17, GRAPHITE, Typeface.BOLD);
+        header.addView(wordmark, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView progress = text("Paso 7/7", 12, GRAPHITE, Typeface.BOLD);
+        progress.setPadding(dp(9), dp(4), dp(9), dp(4));
+        progress.setBackground(rounded(Color.rgb(234, 250, 202), 12));
+        header.addView(progress);
+        card.addView(header, margins(0, 0, 0, 12));
+
+        card.addView(text("Ingresá los 6 números", 20, GRAPHITE, Typeface.BOLD), margins(0, 0, 0, 6));
+        String helper = pairing == PairingUiState.CONNECTING
+                ? "Código recibido. Glosh está completando la conexión segura…"
+                : "Dejá visible el código de Samsung detrás. Podés escribir los seis números acá; si el endpoint todavía no apareció, Glosh los guarda y continúa solo cuando esté listo.";
+        card.addView(text(helper, 13, MUTED, Typeface.NORMAL), margins(0, 0, 0, 12));
+
+        EditText code = new EditText(this);
+        code.setSingleLine(true);
+        code.setGravity(Gravity.CENTER);
+        code.setTextSize(25);
+        code.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        code.setTextColor(GRAPHITE);
+        code.setHint("000000");
+        code.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        code.setFilters(new InputFilter[] {new InputFilter.LengthFilter(6)});
+        code.setBackground(rounded(Color.rgb(247, 248, 243), 14));
+        code.setPadding(dp(12), dp(10), dp(12), dp(10));
+        code.setEnabled(pairing != PairingUiState.CONNECTING);
+        card.addView(code, margins(0, 0, 0, 10));
+
+        TextView connect = action(pairing == PairingUiState.CONNECTING ? "CONECTANDO…" : "CONECTAR", true);
+        connect.setEnabled(pairing != PairingUiState.CONNECTING);
+        connect.setOnClickListener(view -> submitPairingCode(code));
+        card.addView(connect, margins(0, 0, 0, 8));
+
+        TextView back = action("ATRÁS", false);
+        back.setOnClickListener(view -> sendGuideAction(GuideOverlayController.ACTION_BUBBLE_BACK));
+        card.addView(back, margins(0, 0, 0, 0));
+        return card;
+    }
+
+    private void submitPairingCode(EditText input) {
+        String code = input.getText() == null ? "" : input.getText().toString().trim();
+        if (!code.matches("\\d{6}")) {
+            input.setError("Ingresá exactamente 6 números");
+            return;
+        }
+        if (RemotePairingService.getSessionState() != SessionState.PREPARING) {
+            input.setError("La sesión todavía no está lista");
+            return;
+        }
+        startService(new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_SUBMIT_CODE)
+                .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, code));
+        input.setEnabled(false);
+    }
+
+    private void sendGuideAction(String action) {
+        Intent intent = new Intent(action)
+                .setPackage(getPackageName());
+        sendBroadcast(intent);
+        handler.postDelayed(() -> render(true), 80L);
+    }
+
+    private TextView action(String label, boolean primary) {
+        TextView view = text(label, 13, GRAPHITE, Typeface.BOLD);
+        view.setGravity(Gravity.CENTER);
+        view.setMinHeight(dp(44));
+        view.setPadding(dp(12), dp(9), dp(12), dp(9));
+        view.setBackground(rounded(primary ? LIME : SOFT, 14));
+        view.setClickable(true);
+        view.setFocusable(true);
+        return view;
+    }
+
+    private TextView text(String value, float size, int color, int style) {
+        TextView view = new TextView(this);
+        view.setText(value);
+        view.setTextSize(size);
+        view.setTextColor(color);
+        view.setTypeface(Typeface.DEFAULT, style);
+        return view;
+    }
+
+    private GradientDrawable rounded(int color, int radiusDp) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radiusDp));
+        drawable.setStroke(dp(1), Color.rgb(229, 231, 224));
+        return drawable;
+    }
+
+    private FrameLayout.LayoutParams match() {
+        return new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.TOP);
+    }
+
+    private LinearLayout.LayoutParams margins(int left, int top, int right, int bottom) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(dp(left), dp(top), dp(right), dp(bottom));
+        return params;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+}
