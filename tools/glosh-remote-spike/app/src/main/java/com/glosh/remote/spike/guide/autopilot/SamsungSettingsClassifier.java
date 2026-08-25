@@ -182,23 +182,17 @@ public final class SamsungSettingsClassifier {
         return null;
     }
 
+    /**
+     * This classifier is shared by pure JVM tests and observation-only guided mode. Android Rect
+     * geometry belongs to the overlay/execution authority, not to semantic screen classification.
+     */
     private boolean isSafeNavigableRow(NodeSnapshot node) {
         TargetCandidate candidate = node.candidate();
         return node.visible()
                 && candidate.clickable()
                 && node.enabled()
                 && !node.checkable()
-                && !isSwitchControl(candidate)
-                && hasPositiveBounds(candidate);
-    }
-
-    /**
-     * Keep pure JVM tests independent from Android's stubbed Rect methods. TargetCandidate already
-     * snapshots the Rect, so direct field comparison is equivalent to !Rect.isEmpty().
-     */
-    private static boolean hasPositiveBounds(TargetCandidate candidate) {
-        android.graphics.Rect bounds = candidate.bounds();
-        return bounds.right > bounds.left && bounds.bottom > bounds.top;
+                && !isSwitchControl(candidate);
     }
 
     private MatchedTarget match(
