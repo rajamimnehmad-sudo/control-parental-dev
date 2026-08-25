@@ -4,7 +4,7 @@ Updated: 2026-08-25 15:44 ART
 
 ## Executive status
 
-`REMOTE-SAMSUNG-PIP-GUIDE-10`: **FAILED PHYSICAL S22 — PiP DID NOT APPEAR / DIAGNOSIS ACTIVE**.
+`REMOTE-SAMSUNG-PIP-GUIDE-10`: **FAILED PHYSICAL S22 — PiP ENTRY + NATIVE-CONTROLS UX / DIAGNOSIS ACTIVE**.
 
 `REMOTE-INSTALL-CONNECTION-00`: **PASS FINAL DEV / CLOSED**.
 
@@ -12,26 +12,31 @@ The previous Accessibility-based Guided Assistant line, including `690dac8… / 
 
 ## Latest physical evidence
 
-The exact frozen Samsung/PiP candidate `d2a801a… / 0b97e3a7…` was installed on the S22 and the native Picture-in-Picture instructor did **not** appear when the guide opened Samsung Settings.
+The exact frozen Samsung/PiP candidate `d2a801a… / 0b97e3a7…` was installed on the S22.
 
-This invalidates physical PASS for the current PiP entry implementation. No conclusion is yet made about whether the cause is per-app/user PiP permission, Samsung policy, or the Glosh transition logic. Product code is not being changed until the failure is isolated with a short physical diagnostic.
+Physical findings:
+
+1. PiP does **not** appear when Glosh itself launches Samsung Settings from the guide.
+2. PiP **does** appear when the customer leaves Glosh with Home. Therefore Samsung PiP capability and the per-app permission are functional on this S22; the failure is isolated to the Glosh→Settings transition/entry path rather than generic PiP support.
+3. Tapping the PiP exposes the native actions, but Samsung renders them as old-style media controls. Only back/forward-like icons are visibly useful; this is not acceptable as the intended polished `Atrás / Ya está` UX.
+4. The current PiP is visually oversized for the desired coach role. Android/Samsung owns the final PiP sizing; Glosh can influence aspect ratio/content but not freely size it like a normal custom floating window.
+5. Screenshots are blocked by the current DEV build because `MainActivity` sets `FLAG_SECURE`. This is unrelated to PiP capability and should be reconsidered for diagnostic builds.
+
+This means PiP remains technically viable as a lightweight visual instructor, but native PiP actions should not be relied on as the primary polished control surface. Product code is not being changed yet.
 
 ## Product route under diagnosis
 
 Glosh Remote remains Samsung-only for this phase and does not require Accessibility for the connection workflow.
 
-Intended customer flow:
+Intended customer flow remains:
 
 1. Open Glosh Remote and tap `COMENZAR`.
-2. Follow a seven-step Samsung visual guide.
-3. When Glosh opens real Samsung Settings, Glosh should remain available as a native Picture-in-Picture instructor when device/user PiP policy permits it.
-4. The PiP should expose native `Atrás` and step-specific `Ya está / Siguiente` actions.
-5. A persistent synchronized notification remains the fallback/control surface.
-6. Build Number has an animated tap effect progressing to ×7.
-7. Safe Settings intents are used only as navigation accelerators; the customer performs every Android-protected tap.
-8. When Wireless Debugging pairing exposes the local mDNS endpoint, Glosh advances automatically to the code stage.
-9. The customer keeps Android's six-digit code visible and enters it through the Glosh notification `RemoteInput` without returning to the app. The in-app six-digit field remains as fallback.
-10. Pairing, local ADB and secure Mac relay then continue automatically.
+2. Follow the Samsung visual guide.
+3. Use a floating visual instructor while real Samsung Settings remains interactive.
+4. Keep navigation user-controlled; no automatic Settings clicks, scrolls or coordinates.
+5. When Wireless Debugging pairing exposes the local mDNS endpoint, Glosh advances automatically to the code stage.
+6. Keep Android's six-digit code visible and enter it through Glosh without requiring Accessibility/OCR.
+7. Pairing, local ADB and secure Mac relay continue automatically.
 
 No Accessibility service is declared in the current manifest.
 
@@ -60,7 +65,7 @@ Immutable gate branch:
 
 `gate/remote-samsung-pip-d2a801a`
 
-## Automated gate — PASS, physical PiP gate — FAIL
+## Automated gate — PASS, physical UX gate — FAIL
 
 GitHub Actions run:
 
@@ -75,9 +80,12 @@ Automated result:
 - Android assemble: **PASS**;
 - artifact upload: **PASS**.
 
-Physical result on S22:
+Physical S22 result:
 
-- PiP instructor when entering Settings: **FAIL — did not appear**.
+- PiP capability via Home: **PASS**;
+- automatic PiP when Glosh opens Settings: **FAIL**;
+- native PiP control UX: **FAIL PRODUCT UX**;
+- PiP coach sizing: **needs reduction/rework**.
 
 ## Frozen APK used for the failure
 
@@ -88,23 +96,38 @@ Physical result on S22:
 - workflow run: `32882544807`;
 - artifact ID: `9576402195`.
 
-Do not call this candidate physical PASS or reuse it as a final installer without resolving the PiP entry failure.
+Do not call this candidate physical PASS or reuse it as a final installer without resolving the floating-guide transition and control UX.
 
-## Immediate diagnostic gate
+## Candidate UX directions before code changes
 
-Before changing code, isolate:
+Two viable directions are now explicit:
 
-1. Whether Glosh Remote is allowed to use Picture-in-Picture in Samsung special app access.
-2. Whether manually leaving Glosh with Home/swipe causes Glosh to enter PiP.
-3. Whether the failure occurs specifically only when Glosh launches Samsung Settings.
-4. Whether the synchronized notification remains present when Settings opens.
+### A. PiP as visual-only coach
 
-If manual Home enters PiP but launching Settings does not, the likely defect is Glosh's PiP transition/entry timing rather than Samsung PiP capability.
+- keep PiP only for the animation/instruction;
+- remove reliance on Samsung's media-style PiP actions;
+- use the persistent notification for textual `Atrás`, `Siguiente/Ya está` and six-digit `RemoteInput`;
+- fix the Glosh→Settings PiP entry timing/transition;
+- reduce visual density/aspect ratio as far as Samsung allows.
+
+Advantages: no extra special overlay permission. Limitation: controls remain outside the PiP.
+
+### B. Custom application overlay coach
+
+- request Android/Samsung `Mostrar sobre otras apps` / `SYSTEM_ALERT_WINDOW` once;
+- render a small fully custom Glosh floating card over Settings with arbitrary size, typography, animation and real `Atrás / Ya está` buttons;
+- keep notification as fallback because Android may suppress overlays on selected sensitive system surfaces;
+- no Accessibility required.
+
+Advantages: professional fully controllable visual UX. Cost: one extra special-access permission and OEM-sensitive overlay behavior.
+
+No choice has been implemented yet.
 
 ## Coordination
 
 - connection base: PASS FINAL DEV / CLOSED;
 - Accessibility route: SUPERSEDED BY PRODUCT DECISION;
-- Samsung/PiP candidate `d2a801a… / 0b97e3a7…`: FAILED PHYSICAL S22 at PiP entry;
+- Samsung/PiP candidate `d2a801a… / 0b97e3a7…`: FAILED PHYSICAL S22 for Settings-entry and native-control UX;
+- PiP itself is confirmed functional via Home on S22;
 - diagnosis active, no product-code edit yet;
 - no merge, PR, Production, deploy or Supabase mutation performed.
