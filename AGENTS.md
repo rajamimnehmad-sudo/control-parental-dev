@@ -37,7 +37,10 @@ Para planificacion, captura de ideas o seleccion de tickets:
 - Nunca usar reset, stash, rebase, force-push, limpieza masiva, reformateo global ni revertir cambios desconocidos para despejar el entorno.
 - Codex termina tecnicamente una tarea como PASS, BLOCKED o FAILED. PASS no significa cierre definitivo hasta que ChatGPT revise diff/codigo, tests y evidencia.
 - Codex no modifica Glosh Central salvo autorizacion explicita del ticket. ChatGPT Central mantiene y sincroniza el estado final del proyecto.
-- Todo cambio material de ruta, prioridad, estado, tarea, bloqueo o cierre debe reflejarse en Glosh Central en el mismo ciclo.
+- Todo cambio material/persistente de ruta, prioridad, estado, tarea, bloqueo o cierre debe reflejarse en Glosh Central en el mismo ciclo.
+- No sincronizar `in_progress` por ejecuciones transitorias de Codex que empiezan y terminan dentro del mismo ciclo/handoff. En esos casos la tarea puede permanecer `pending` mientras corre y Central se actualiza una sola vez al recibir/revisar el resultado.
+- Usar `in_progress` solo cuando el estado activo tenga valor persistente de coordinacion: trabajo que cruza interacciones/ciclos, owner que seguira ocupando rutas, frente largo o necesidad real de advertir a otros agentes sobre rutas reservadas.
+- La ausencia de `in_progress` no elimina el owner unico ni la obligacion de Codex de verificar owner/rutas/worktrees antes de escribir.
 
 ## Workflow ChatGPT ↔ Codex y ramas review
 
