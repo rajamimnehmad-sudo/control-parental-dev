@@ -74,11 +74,9 @@ public record GuidePresentation(
                     "Tocá 7 veces “Número de compilación”",
                     preferred(safeInstruction, "Android avisará cuando las opciones de desarrollador estén listas."),
                     Cue.MULTI_TAP);
-            case SUPPORT_PREPARING -> presentation(
-                    3,
+            case SUPPORT_PREPARING -> preparing(
                     "Preparando la conexión",
-                    preferred(safeInstruction, "Glosh está coordinando la sesión segura con soporte."),
-                    Cue.WAIT);
+                    preferred(safeInstruction, "Glosh está coordinando la sesión segura con soporte."));
             case WIRELESS_DEBUGGING -> presentation(
                     3,
                     titleForWireless(safeInstruction),
