@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/remote-samsung-bubble-guide-12-chatgpt
+      - work/remote-samsung-bubble-stable-signing-13-chatgpt
     paths:
       - "tools/glosh-remote-spike/**"
       - ".github/workflows/remote-guided-artifact.yml"
