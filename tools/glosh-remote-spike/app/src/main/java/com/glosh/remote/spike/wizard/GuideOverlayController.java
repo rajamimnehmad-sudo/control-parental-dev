@@ -5,7 +5,6 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.os.Build;
 
 /**
  * Compatibility controller for the floating Samsung instructor.
@@ -101,11 +100,7 @@ public final class GuideOverlayController {
         filter.addAction(ACTION_BUBBLE_BACK);
         filter.addAction(ACTION_BUBBLE_NEXT);
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                activity.registerReceiver(actions, filter, Context.RECEIVER_NOT_EXPORTED);
-            } else {
-                activity.registerReceiver(actions, filter);
-            }
+            activity.registerReceiver(actions, filter, Context.RECEIVER_NOT_EXPORTED);
             receiverRegistered = true;
         } catch (Throwable ignored) {
             receiverRegistered = false;
