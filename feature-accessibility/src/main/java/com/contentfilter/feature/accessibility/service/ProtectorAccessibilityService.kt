@@ -83,9 +83,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private val webActionDebouncer = AccessibilityWebActionDebouncer()
     private val explicitSearchClassifier = ExplicitSearchClassifier()
     private val browserPageScanner = AccessibilityBrowserPageScanner()
+    private val settingsPageScanner = AccessibilitySettingsPageScanner()
     private val browserCandidateCache = mutableMapOf<String, Boolean>()
     private var serviceScope: CoroutineScope? = null
-    private var searchEventProcessor: AccessibilitySearchEventProcessor? = null
+    private var treeEventProcessor: AccessibilityTreeEventProcessor? = null
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
     private var extraTimeExpiryAtEpochMillis: Long? = null
@@ -96,12 +97,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var blockRetryJob: Job? = null
     private var blockRetryPackageName: String? = null
     private var settingsEscapeJob: Job? = null
-    private var observedWindowPackageName: String? = null
-    private var observedWindowClassName: String? = null
     private var lastExplicitSearchNoticeAt: Long = 0L
     private var lastTamperAlertAt: Long = 0L
     private val foregroundDecisionDiagnosticGate = ForegroundDecisionDiagnosticGate()
     private val ownUninstallerPackages by lazy { resolveOwnUninstallerPackages() }
+    private val ownAppLabel by lazy { applicationInfo.loadLabel(packageManager).toString() }
     private var chromeVisualProbeController: ChromeVisualProbeController? = null
     private var chromeVisualController: ChromeVisualController? = null
 
@@ -112,10 +112,12 @@ class ProtectorAccessibilityService : AccessibilityService() {
         serviceScope = scope
         chromeVisualProbeController = ChromeVisualProbeController(this, scope)
         chromeVisualController = ChromeVisualController(this, scope)
-        searchEventProcessor =
-            AccessibilitySearchEventProcessor(scope) { trigger ->
-                processSearchEngineProtection(trigger)
-            }
+        treeEventProcessor =
+            AccessibilityTreeEventProcessor(
+                scope = scope,
+                processSearch = ::processSearchEngineProtection,
+                processSettings = ::processSettingsProtection,
+            )
         scope.launch {
             syncScheduler.requestSync()
             snapshotProvider.refresh()
@@ -124,7 +126,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 snapshotProvider.observe().collect {
                     val packageName = rootInActiveWindow?.packageName?.toString()?.takeIf { it.isNotBlank() }
                     if (packageName != null) {
-                        scheduleSearchEngineProtection(packageName, PolicyChangedEventLabel)
+                        scheduleSearchEngineProtection(
+                            packageName = packageName,
+                            eventLabel = PolicyChangedEventLabel,
+                            invalidateContext = true,
+                        )
                     }
                 }
             }
@@ -151,25 +157,39 @@ class ProtectorAccessibilityService : AccessibilityService() {
         chromeVisualProbeController?.onAccessibilityEvent(event)
         chromeVisualController?.onAccessibilityEvent(event)
         val packageName = eventPackageName ?: return
-        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
-            val resolvedOwnUninstaller = packageName in ownUninstallerPackages
-            if (!settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)) return
+        val resolvedOwnUninstaller = packageName in ownUninstallerPackages
+        val couldContainProtectedSettings =
+            settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)
+        if (!couldContainProtectedSettings) {
+            treeEventProcessor?.invalidateSettingsContext()
+            clearSettingsEscape()
         }
-        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            observedWindowPackageName = packageName
-            observedWindowClassName = event.className?.toString()
-        }
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED && !couldContainProtectedSettings) return
         if (blockExplicitSearchIfNeeded(event, packageName)) return
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
-        if (handleSettingsProtection(event, packageName, event.className?.toString(), elapsed, now)) return
+        if (
+            couldContainProtectedSettings &&
+            handleSettingsProtection(
+                event = event,
+                packageName = packageName,
+                className = event.className?.toString(),
+                resolvedOwnUninstaller = resolvedOwnUninstaller,
+                elapsedRealtimeMillis = elapsed,
+                nowEpochMillis = now,
+            )
+        ) {
+            return
+        }
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) return
         if (AccessibilityForegroundAllowlist.contains(packageName)) {
             handleAlwaysAllowedForeground(packageName, elapsed, now)
             return
         }
         if (blockRetryPackageName != packageName) clearBlockRetry()
-        scheduleSearchEngineProtection(packageName, AccessibilityEventFilter.label(event.eventType))
+        if (!couldContainProtectedSettings) {
+            scheduleSearchEngineProtection(packageName, AccessibilityEventFilter.label(event.eventType))
+        }
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         serviceScope?.let { scope ->
@@ -215,15 +235,18 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) return false
         if (packageName !in ExplicitSearchPackages) return false
         val source = event.source ?: return false
-        if (!source.isEditable || !source.isRecognizedSearchField(packageName)) return false
-        val query = source.text?.takeIf { it.isNotBlank() } ?: return false
+        val recognized = runCatching { source.isEditable && source.isRecognizedSearchField(packageName) }.getOrDefault(false)
+        if (!recognized) return false
+        val query = runCatching { source.text?.takeIf { it.isNotBlank() } }.getOrNull() ?: return false
         if (explicitSearchClassifier.classify(query) != ExplicitSearchDecision.BlockExplicit) return false
-        source.performAction(
-            AccessibilityNodeInfo.ACTION_SET_TEXT,
-            Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
-            },
-        )
+        runCatching {
+            source.performAction(
+                AccessibilityNodeInfo.ACTION_SET_TEXT,
+                Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+                },
+            )
+        }
         val elapsed = clock.elapsedRealtimeMillis()
         if (lastExplicitSearchNoticeAt == 0L || elapsed - lastExplicitSearchNoticeAt >= ExplicitSearchNoticeDebounceMillis) {
             lastExplicitSearchNoticeAt = elapsed
@@ -252,8 +275,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         chromeVisualProbeController = null
         chromeVisualController?.close()
         chromeVisualController = null
-        searchEventProcessor?.close()
-        searchEventProcessor = null
+        treeEventProcessor?.close()
+        treeEventProcessor = null
         webActionDebouncer.clear()
         clearSettingsEscape()
         val elapsed = clock.elapsedRealtimeMillis()
@@ -287,54 +310,116 @@ class ProtectorAccessibilityService : AccessibilityService() {
         event: AccessibilityEvent,
         packageName: String,
         className: String?,
+        resolvedOwnUninstaller: Boolean,
         elapsedRealtimeMillis: Long,
         nowEpochMillis: Long,
     ): Boolean {
-        val resolvedOwnUninstaller = packageName in ownUninstallerPackages
-        if (!settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)) return false
-        val ownAppIdentityVisible =
-            rootInActiveWindow.containsOwnAppIdentity() || eventContainsOwnAppIdentity(event)
-        val adminAppIdentityVisible =
-            rootInActiveWindow.containsAdminAppIdentity() || eventContainsAdminAppIdentity(event)
-        val dangerousSettingsActionVisible = rootInActiveWindow.containsDangerousSettingsAction()
-        val installSourceSettingsVisible = rootInActiveWindow.containsInstallSourceSettingsIndicator()
+        val eventSignals = settingsSignalsFromEvent(event)
+        val urgent =
+            event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+                settingsProtectionPolicy.requiresImmediateEscape(
+                    packageName = packageName,
+                    className = className,
+                    ownAppIdentityVisible = eventSignals.ownAppIdentityVisible,
+                    dangerousSettingsActionVisible = eventSignals.dangerousSettingsActionVisible,
+                )
         if (
-            !settingsProtectionPolicy.shouldLeaveProtectedScreen(
+            shouldLeaveSettingsScreen(
                 packageName = packageName,
                 className = className,
-                ownAppIdentityVisible = ownAppIdentityVisible,
-                adminAppIdentityVisible = adminAppIdentityVisible,
+                signals = eventSignals,
                 resolvedOwnUninstaller = resolvedOwnUninstaller,
-                dangerousSettingsActionVisible = dangerousSettingsActionVisible,
-                installSourceSettingsVisible = installSourceSettingsVisible,
-                deviceAdminEnabled = DeviceAdminController.isEnabled(this),
-                armed = protectionStateStore.isArmed(),
-                settingsAuthorized =
-                    protectionStateStore.isAuthorized(
-                        ProtectionAuthorizationScope.Settings,
-                        nowEpochMillis,
-                    ),
-                removalAuthorized =
-                    protectionStateStore.isAuthorized(
-                        ProtectionAuthorizationScope.Removal,
-                        nowEpochMillis,
-                    ),
-                trustedInstallAuthorized = protectionStateStore.isTrustedInstallAuthorized(nowEpochMillis),
                 elapsedRealtimeMillis = elapsedRealtimeMillis,
+                nowEpochMillis = nowEpochMillis,
             )
         ) {
-            return false
+            performInitialSettingsProtection(packageName, urgent, elapsedRealtimeMillis)
+            return true
         }
-        leaveProtectedSettings(
-            urgent =
-                event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
-                    settingsProtectionPolicy.requiresImmediateEscape(
-                        packageName = packageName,
-                        className = className,
-                        ownAppIdentityVisible = ownAppIdentityVisible,
-                        dangerousSettingsActionVisible = dangerousSettingsActionVisible,
-                    ),
+
+        treeEventProcessor?.submitSettings(
+            packageName = packageName,
+            eventLabel = AccessibilityEventFilter.label(event.eventType),
+            eventType = event.eventType,
+            className = className,
+            eventSignals = eventSignals,
         )
+        return false
+    }
+
+    private fun settingsSignalsFromEvent(event: AccessibilityEvent): SettingsEventSignals {
+        val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
+        return SettingsEventSignals(
+            ownAppIdentityVisible = values.any { it.matchesOwnAppIdentity(packageName, ownAppLabel) },
+            adminAppIdentityVisible = values.any { it.matchesAdminAppIdentity() },
+            dangerousSettingsActionVisible =
+                event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED &&
+                    values.any { isDangerousSettingsAction(viewId = null, label = it, clickable = true) },
+            installSourceSettingsVisible = values.any { isInstallSourceSettingsIndicator(viewId = null, label = it) },
+        )
+    }
+
+    private fun shouldLeaveSettingsScreen(
+        packageName: String,
+        className: String?,
+        signals: SettingsEventSignals,
+        resolvedOwnUninstaller: Boolean,
+        elapsedRealtimeMillis: Long,
+        nowEpochMillis: Long,
+    ): Boolean =
+        settingsProtectionPolicy.shouldLeaveProtectedScreen(
+            packageName = packageName,
+            className = className,
+            ownAppIdentityVisible = signals.ownAppIdentityVisible,
+            adminAppIdentityVisible = signals.adminAppIdentityVisible,
+            resolvedOwnUninstaller = resolvedOwnUninstaller,
+            dangerousSettingsActionVisible = signals.dangerousSettingsActionVisible,
+            installSourceSettingsVisible = signals.installSourceSettingsVisible,
+            deviceAdminEnabled = DeviceAdminController.isEnabled(this),
+            armed = protectionStateStore.isArmed(),
+            settingsAuthorized = protectionStateStore.isAuthorized(ProtectionAuthorizationScope.Settings, nowEpochMillis),
+            removalAuthorized = protectionStateStore.isAuthorized(ProtectionAuthorizationScope.Removal, nowEpochMillis),
+            trustedInstallAuthorized = protectionStateStore.isTrustedInstallAuthorized(nowEpochMillis),
+            elapsedRealtimeMillis = elapsedRealtimeMillis,
+        )
+
+    private fun performInitialSettingsProtection(
+        packageName: String,
+        urgent: Boolean,
+        elapsedRealtimeMillis: Long,
+    ) {
+        val fallbackAlreadyActive = settingsEscapeJob?.isActive == true
+        if (!urgent && fallbackAlreadyActive) return
+        performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0, urgent = urgent))
+        if (!fallbackAlreadyActive) scheduleSettingsEscapeFallback(packageName, urgent)
+        reportSettingsProtection(elapsedRealtimeMillis)
+    }
+
+    private fun scheduleSettingsEscapeFallback(
+        packageName: String,
+        urgent: Boolean,
+    ) {
+        if (settingsEscapeJob?.isActive == true) return
+        val scope = serviceScope ?: return
+        settingsEscapeJob =
+            scope.launch {
+                for (attempt in 1..SettingsEscapeFallbackAttempt) {
+                    delay(SettingsEscapeRecheckDelayMillis)
+                    treeEventProcessor?.submitSettings(
+                        packageName = packageName,
+                        eventLabel = SettingsRecheckEventLabel,
+                        eventType = 0,
+                        className = null,
+                        eventSignals = SettingsEventSignals(),
+                        fallbackAttempt = attempt,
+                        urgent = urgent,
+                    )
+                }
+                settingsEscapeJob = null
+            }
+    }
+
+    private fun reportSettingsProtection(elapsedRealtimeMillis: Long) {
         Toast.makeText(this, "Este ajuste está protegido", Toast.LENGTH_SHORT).show()
         serviceScope?.launch {
             telemetryReporter.recordSettingsProtection()
@@ -343,59 +428,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 pushNotificationRepository.reportProtectionAlert(ProtectionAlertType.TamperAttempt)
             }
         }
-        return true
-    }
-
-    private fun leaveProtectedSettings(urgent: Boolean = false) {
-        if (urgent) {
-            performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0, urgent = true))
-        } else {
-            if (settingsEscapeJob?.isActive == true) return
-            performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0, urgent = false))
-        }
-        val scope = serviceScope ?: return
-        if (settingsEscapeJob?.isActive == true) return
-        settingsEscapeJob =
-            scope.launch {
-                for (attempt in 1..SettingsEscapeFallbackAttempt) {
-                    delay(SettingsEscapeRecheckDelayMillis)
-                    if (!isProtectedSettingsStillVisible()) break
-                    performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt, urgent = urgent))
-                }
-                settingsEscapeJob = null
-            }
-    }
-
-    private fun isProtectedSettingsStillVisible(): Boolean {
-        val root = rootInActiveWindow ?: return false
-        val packageName = root.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return false
-        val className =
-            observedWindowClassName.takeIf {
-                observedWindowPackageName == packageName
-            } ?: root.className?.toString()
-        return settingsProtectionPolicy.shouldLeaveProtectedScreen(
-            packageName = packageName,
-            className = className,
-            ownAppIdentityVisible = root.containsOwnAppIdentity(),
-            adminAppIdentityVisible = root.containsAdminAppIdentity(),
-            resolvedOwnUninstaller = packageName in ownUninstallerPackages,
-            dangerousSettingsActionVisible = root.containsDangerousSettingsAction(),
-            installSourceSettingsVisible = root.containsInstallSourceSettingsIndicator(),
-            deviceAdminEnabled = DeviceAdminController.isEnabled(this),
-            armed = protectionStateStore.isArmed(),
-            settingsAuthorized =
-                protectionStateStore.isAuthorized(
-                    ProtectionAuthorizationScope.Settings,
-                    clock.nowEpochMillis(),
-                ),
-            removalAuthorized =
-                protectionStateStore.isAuthorized(
-                    ProtectionAuthorizationScope.Removal,
-                    clock.nowEpochMillis(),
-                ),
-            trustedInstallAuthorized = protectionStateStore.isTrustedInstallAuthorized(clock.nowEpochMillis()),
-            elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
-        )
     }
 
     private fun performSettingsEscapeAction(action: SettingsEscapeAction) {
@@ -410,81 +442,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         settingsEscapeJob = null
     }
 
-    private fun AccessibilityNodeInfo?.containsOwnAppIdentity(): Boolean {
-        val root = this ?: return false
-        val appLabel = applicationInfo.loadLabel(packageManager).toString()
-        val ownPackage = applicationContext.packageName
-        val pending = ArrayDeque<AccessibilityNodeInfo>()
-        pending.add(root)
-        var visited = 0
-        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
-            val node = pending.removeFirst()
-            visited += 1
-            val values = listOf(node.text?.toString(), node.contentDescription?.toString(), node.viewIdResourceName)
-            if (
-                values.any { value ->
-                    value.matchesOwnAppIdentity(ownPackage, appLabel)
-                }
-            ) {
-                return true
-            }
-            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
-        }
-        return false
-    }
-
-    private fun AccessibilityNodeInfo?.containsDangerousSettingsAction(): Boolean {
-        val root = this ?: return false
-        val pending = ArrayDeque<AccessibilityNodeInfo>()
-        pending.add(root)
-        var visited = 0
-        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
-            val node = pending.removeFirst()
-            visited += 1
-            if (
-                isDangerousSettingsAction(
-                    viewId = node.viewIdResourceName,
-                    label = node.text?.toString() ?: node.contentDescription?.toString(),
-                    clickable = node.isClickable,
-                )
-            ) {
-                return true
-            }
-            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
-        }
-        return false
-    }
-
-    private fun AccessibilityNodeInfo?.containsInstallSourceSettingsIndicator(): Boolean {
-        val root = this ?: return false
-        val pending = ArrayDeque<AccessibilityNodeInfo>()
-        pending.add(root)
-        var visited = 0
-        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
-            val node = pending.removeFirst()
-            visited += 1
-            val labels = listOf(node.text?.toString(), node.contentDescription?.toString())
-            if (labels.any { isInstallSourceSettingsIndicator(node.viewIdResourceName, it) }) return true
-            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
-        }
-        return false
-    }
-
-    private fun AccessibilityNodeInfo?.containsAdminAppIdentity(): Boolean {
-        val root = this ?: return false
-        val pending = ArrayDeque<AccessibilityNodeInfo>()
-        pending.add(root)
-        var visited = 0
-        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
-            val node = pending.removeFirst()
-            visited += 1
-            val values = listOf(node.text?.toString(), node.contentDescription?.toString(), node.viewIdResourceName)
-            if (values.any { it.matchesAdminAppIdentity() }) return true
-            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
-        }
-        return false
-    }
-
     @Suppress("DEPRECATION")
     private fun resolveOwnUninstallerPackages(): Set<String> =
         listOf(Intent.ACTION_DELETE, Intent.ACTION_UNINSTALL_PACKAGE)
@@ -496,32 +453,21 @@ class ProtectorAccessibilityService : AccessibilityService() {
             }.mapNotNull { it.activityInfo?.packageName }
             .toSet()
 
-    private fun eventContainsOwnAppIdentity(event: AccessibilityEvent): Boolean {
-        val appLabel = applicationInfo.loadLabel(packageManager).toString()
-        val ownPackage = applicationContext.packageName
-        val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
-        return values.any { value -> value.matchesOwnAppIdentity(ownPackage, appLabel) }
-    }
-
-    private fun eventContainsAdminAppIdentity(event: AccessibilityEvent): Boolean {
-        val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
-        return values.any { it.matchesAdminAppIdentity() }
-    }
-
     private fun scheduleSearchEngineProtection(
         packageName: String,
         eventLabel: String,
+        invalidateContext: Boolean = false,
     ) {
-        searchEventProcessor?.submit(packageName, eventLabel)
+        treeEventProcessor?.submitSearch(packageName, eventLabel, invalidateContext)
     }
 
     private suspend fun processSearchEngineProtection(trigger: SearchProtectionTrigger) {
-        val processor = searchEventProcessor ?: return
-        if (!processor.isCurrent(trigger.generation)) return
+        val processor = treeEventProcessor ?: return
+        if (!processor.isSearchContextCurrent(trigger)) return
         val root = rootInActiveWindow ?: return
         if (root.packageName?.toString() != trigger.packageName) return
         val scan = browserPageScanner.scan(AndroidAccessibilityNodeReader(root))
-        if (!processor.isCurrent(trigger.generation)) return
+        if (!processor.isSearchContextCurrent(trigger)) return
 
         val page = scan.observation
         val snapshot = snapshotProvider.current().snapshot
@@ -541,7 +487,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             )
         Log.i(
             LogTag,
-            "Search protection layer=accessibility event=${trigger.eventLabel} " +
+            "Search protection layer=accessibility event=${trigger.eventLabel} sequence=${trigger.sequence} " +
                 "package=${trigger.packageName} policyVersion=${snapshot.version} " +
                 "webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
                 "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
@@ -552,31 +498,29 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 "scanNodes=${scan.visitedNodes} nodeBudget=${scan.nodeBudgetExhausted} " +
                 "timeBudget=${scan.timeBudgetExhausted}",
         )
-        telemetryReporter.recordSearchProtection(
-            eventLabel = trigger.eventLabel,
-            packageName = trigger.packageName,
-            packageCategory = diagnosis.packageCategory,
-            reason = diagnosis.reason,
-            searchEngineId = diagnosis.searchEngineId,
-            action = diagnosis.action.name,
-            policyRevision = diagnosis.policyRevision,
-        )
+        serviceScope?.launch {
+            telemetryReporter.recordSearchProtection(
+                eventLabel = trigger.eventLabel,
+                packageName = trigger.packageName,
+                packageCategory = diagnosis.packageCategory,
+                reason = diagnosis.reason,
+                searchEngineId = diagnosis.searchEngineId,
+                action = diagnosis.action.name,
+                policyRevision = diagnosis.policyRevision,
+            )
+        }
         if (diagnosis.action == SearchNavigationAction.Allow) return
-        if (!processor.isCurrent(trigger.generation)) return
+        if (!processor.isSearchContextCurrent(trigger)) return
 
         var actionApplied = false
         withContext(Dispatchers.Main.immediate) {
-            if (!processor.isCurrent(trigger.generation)) return@withContext
+            if (!processor.isSearchContextCurrent(trigger)) return@withContext
             val activePackageName = rootInActiveWindow?.packageName?.toString()
             val currentPolicyRevision = snapshotProvider.current().snapshot.version
-            if (
-                activePackageName != trigger.packageName ||
-                currentPolicyRevision != diagnosis.policyRevision
-            ) {
+            if (activePackageName != trigger.packageName || currentPolicyRevision != diagnosis.policyRevision) {
                 Log.i(
                     LogTag,
-                    "Search protection action stale package=${trigger.packageName} " +
-                        "policyVersion=${diagnosis.policyRevision}",
+                    "Search protection action stale package=${trigger.packageName} policyVersion=${diagnosis.policyRevision}",
                 )
                 return@withContext
             }
@@ -604,10 +548,95 @@ class ProtectorAccessibilityService : AccessibilityService() {
             actionApplied = true
         }
         if (actionApplied) {
-            telemetryReporter.recordServiceState(
-                "Search protection action=${diagnosis.action} reason=${diagnosis.reason}.",
-            )
+            serviceScope?.launch {
+                telemetryReporter.recordServiceState(
+                    "Search protection action=${diagnosis.action} reason=${diagnosis.reason}.",
+                )
+            }
         }
+    }
+
+    private suspend fun processSettingsProtection(trigger: SettingsProtectionTrigger) {
+        val processor = treeEventProcessor ?: return
+        if (!processor.isSettingsContextCurrent(trigger)) return
+        val root = rootInActiveWindow ?: return
+        if (root.packageName?.toString() != trigger.packageName) return
+        val observedClassName = root.className?.toString() ?: trigger.className
+        val scan =
+            settingsPageScanner.scan(
+                root = AndroidAccessibilityNodeReader(root),
+                ownPackageName = packageName,
+                ownAppLabel = ownAppLabel,
+            )
+        if (!processor.isSettingsContextCurrent(trigger)) return
+        val signals = trigger.eventSignals.merge(scan.signals)
+        val elapsed = clock.elapsedRealtimeMillis()
+        val now = clock.nowEpochMillis()
+        val resolvedOwnUninstaller = trigger.packageName in ownUninstallerPackages
+        if (
+            !shouldLeaveSettingsScreen(
+                packageName = trigger.packageName,
+                className = observedClassName,
+                signals = signals,
+                resolvedOwnUninstaller = resolvedOwnUninstaller,
+                elapsedRealtimeMillis = elapsed,
+                nowEpochMillis = now,
+            )
+        ) {
+            return
+        }
+        val urgent =
+            trigger.urgent ||
+                trigger.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+                settingsProtectionPolicy.requiresImmediateEscape(
+                    packageName = trigger.packageName,
+                    className = observedClassName,
+                    ownAppIdentityVisible = signals.ownAppIdentityVisible,
+                    dangerousSettingsActionVisible = signals.dangerousSettingsActionVisible,
+                )
+        var actionApplied = false
+        withContext(Dispatchers.Main.immediate) {
+            if (!processor.isSettingsContextCurrent(trigger)) return@withContext
+            val currentRoot = rootInActiveWindow ?: return@withContext
+            val currentPackageName = currentRoot.packageName?.toString()
+            val currentClassName = currentRoot.className?.toString()
+            if (
+                currentPackageName != trigger.packageName ||
+                (observedClassName != null && currentClassName != observedClassName)
+            ) {
+                return@withContext
+            }
+            val currentElapsed = clock.elapsedRealtimeMillis()
+            val currentNow = clock.nowEpochMillis()
+            if (
+                !shouldLeaveSettingsScreen(
+                    packageName = trigger.packageName,
+                    className = currentClassName ?: observedClassName,
+                    signals = signals,
+                    resolvedOwnUninstaller = resolvedOwnUninstaller,
+                    elapsedRealtimeMillis = currentElapsed,
+                    nowEpochMillis = currentNow,
+                )
+            ) {
+                return@withContext
+            }
+            performSettingsEscapeAction(
+                SettingsEscapeStrategy.actionForAttempt(
+                    attempt = trigger.fallbackAttempt ?: 0,
+                    urgent = urgent,
+                ),
+            )
+            actionApplied = true
+        }
+        if (!actionApplied || trigger.fallbackAttempt != null) return
+        scheduleSettingsEscapeFallback(trigger.packageName, urgent)
+        reportSettingsProtection(elapsed)
+        Log.i(
+            LogTag,
+            "Settings protection event=${trigger.eventLabel} sequence=${trigger.sequence} " +
+                "package=${trigger.packageName} scanNodes=${scan.visitedNodes} " +
+                "nodeBudget=${scan.nodeBudgetExhausted} timeBudget=${scan.timeBudgetExhausted}",
+        )
     }
 
     private fun isBrowserCandidate(packageName: String): Boolean {
@@ -927,10 +956,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val BlockHomeRetries = 2
         const val SettingsEscapeRecheckDelayMillis = 100L
         const val SettingsEscapeFallbackAttempt = 3
+        const val SettingsRecheckEventLabel = "SETTINGS_RECHECK"
         const val PolicyChangedEventLabel = "POLICY_CHANGED"
         const val ExplicitSearchNoticeDebounceMillis = 2_000L
         const val TamperAlertDebounceMillis = 5 * 60_000L
-        const val MaxIdentityNodes = 200
         const val GoogleSearchPackage = "com.google.android.googlequicksearchbox"
         const val LogTag = "ProtectorAccessibility"
         val ExplicitSearchPackages = setOf("com.android.chrome", GoogleSearchPackage)
