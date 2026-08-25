@@ -256,6 +256,8 @@ internal class ChromePhotosHttpsProxy(
                             ChromeHttp1Wire.writeAscii(output, "HTTP/1.1 100 Continue\r\n\r\n")
                             output.flush()
                         } ?: break
+                    } catch (_: ChromeHttpIdleTimeoutException) {
+                        break
                     } catch (error: ChromeHttpProtocolException) {
                         writePlainError(output, error.statusCode, error.message ?: "Invalid request")
                         break

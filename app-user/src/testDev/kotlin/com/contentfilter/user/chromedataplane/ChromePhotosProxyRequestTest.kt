@@ -2,6 +2,8 @@ package com.contentfilter.user.chromedataplane
 
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.net.SocketTimeoutException
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -68,6 +70,19 @@ class ChromePhotosProxyRequestTest {
         ).forEach { raw -> assertFailsWith<Exception> { parse(raw) } }
         val tooLarge = "POST / HTTP/1.1\r\nHost: example.com\r\nContent-Length: 1025\r\n\r\n"
         assertEquals(413, assertFailsWith<ChromeHttpProtocolException> { parse(tooLarge) }.statusCode)
+    }
+
+    @Test
+    fun `idle keep alive timeout is distinct from a partial request timeout`() {
+        assertFailsWith<ChromeHttpIdleTimeoutException> {
+            reader.read(TimeoutInputStream(ByteArray(0)))
+        }
+
+        val partial =
+            assertFailsWith<ChromeHttpProtocolException> {
+                reader.read(TimeoutInputStream("GET /partial".toByteArray()))
+            }
+        assertEquals(408, partial.statusCode)
     }
 
     @Test
@@ -167,4 +182,15 @@ class ChromePhotosProxyRequestTest {
     }
 
     private fun parse(raw: String): ChromePhotosProxyRequest = reader.read(ByteArrayInputStream(raw.toByteArray()))!!
+
+    private class TimeoutInputStream(
+        private val prefix: ByteArray,
+    ) : InputStream() {
+        private var offset = 0
+
+        override fun read(): Int {
+            if (offset >= prefix.size) throw SocketTimeoutException("fixture timeout")
+            return prefix[offset++].toInt() and 0xff
+        }
+    }
 }

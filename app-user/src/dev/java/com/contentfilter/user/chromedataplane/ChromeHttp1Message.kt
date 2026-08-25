@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.io.EOFException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.SocketTimeoutException
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
@@ -69,6 +70,8 @@ internal class ChromeHttpProtocolException(
     message: String,
 ) : Exception(message)
 
+internal class ChromeHttpIdleTimeoutException : SocketTimeoutException("Idle HTTP connection")
+
 internal class ChromeHttp1RequestReader(
     private val maximumLineBytes: Int = DefaultMaximumLineBytes,
     private val maximumHeaderBytes: Int = DefaultMaximumHeaderBytes,
@@ -86,8 +89,10 @@ internal class ChromeHttp1RequestReader(
         input: InputStream,
         onContinue: () -> Unit = {},
     ): ChromePhotosProxyRequest? {
-        var requestLine = input.readCrlfLine(maximumLineBytes) ?: return null
-        while (requestLine.isEmpty()) requestLine = input.readCrlfLine(maximumLineBytes) ?: return null
+        var requestLine = input.readCrlfLine(maximumLineBytes, idleEligible = true) ?: return null
+        while (requestLine.isEmpty()) {
+            requestLine = input.readCrlfLine(maximumLineBytes, idleEligible = true) ?: return null
+        }
         val parsed =
             ChromePhotosProxyRequest.parse(requestLine)
                 ?: throw ChromeHttpProtocolException(400, "Malformed request line")
@@ -229,11 +234,22 @@ internal class ChromeHttp1RequestReader(
         return bytes
     }
 
-    private fun InputStream.readCrlfLine(maximumBytes: Int): String? {
+    private fun InputStream.readCrlfLine(
+        maximumBytes: Int,
+        idleEligible: Boolean = false,
+    ): String? {
         val output = ByteArrayOutputStream(minOf(maximumBytes, 256))
         var sawCarriageReturn = false
         while (output.size() <= maximumBytes) {
-            val next = read()
+            val next =
+                try {
+                    read()
+                } catch (_: SocketTimeoutException) {
+                    if (idleEligible && output.size() == 0 && !sawCarriageReturn) {
+                        throw ChromeHttpIdleTimeoutException()
+                    }
+                    throw ChromeHttpProtocolException(408, "Timed out HTTP line")
+                }
             if (next < 0) {
                 if (output.size() == 0 && !sawCarriageReturn) return null
                 throw EOFException("Truncated HTTP line")
