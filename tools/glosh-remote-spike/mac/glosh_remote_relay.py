@@ -25,7 +25,12 @@ from typing import Dict, Optional, Tuple, Union
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from websockets.legacy.server import WebSocketServerProtocol, serve
 from broker_client import BrokerOperatorClient
-from broker_console import accept_request, announce_pending_requests, print_pending_requests
+from broker_console import (
+    accept_request,
+    announce_pending_requests,
+    maintain_operator_presence,
+    print_pending_requests,
+)
 PROTOCOL_VERSION = 1
 MAX_MESSAGE_BYTES = 256 * 1024
 DEFAULT_PORT = 8765
@@ -102,7 +107,8 @@ class RemoteSession:
     def __init__(self, minutes: int) -> None:
         self.sid = b64u(os.urandom(18))
         self.key = os.urandom(32)
-        self.expires_at = time.monotonic() + minutes * 60
+        self.duration_seconds = minutes * 60
+        self.expires_at: Optional[float] = None
         self.agent: Optional[WebSocketServerProtocol] = None
         self.agent_info: Optional[AgentInfo] = None
         self.agent_ready = asyncio.Event()
@@ -131,7 +137,7 @@ class RemoteSession:
         if parsed.path != "/agent" or query.get("sid", [None])[0] != self.sid:
             await websocket.close(4001, "unknown session")
             return
-        if time.monotonic() >= self.expires_at:
+        if self.expires_at is not None and time.monotonic() >= self.expires_at:
             await websocket.close(4002, "session expired")
             return
 
@@ -152,6 +158,11 @@ class RemoteSession:
         async with self.claim_lock:
             if self.agent is not None:
                 await websocket.close(4005, "agent already connected")
+                return
+            if self.expires_at is None:
+                self.expires_at = time.monotonic() + self.duration_seconds
+            elif time.monotonic() >= self.expires_at:
+                await websocket.close(4002, "session expired")
                 return
             self.agent = websocket
             self.agent_info = AgentInfo.from_dict(auth.get("device") or {})
@@ -206,7 +217,7 @@ class RemoteSession:
         websocket = self.agent
         if websocket is None:
             raise ConnectionError("no agent connected")
-        if time.monotonic() >= self.expires_at:
+        if self.expires_at is not None and time.monotonic() >= self.expires_at:
             raise TimeoutError("session expired")
 
         request_id = str(uuid.uuid4())
@@ -373,11 +384,23 @@ async def interactive_cli(
 
 
 async def expire_session(session: RemoteSession) -> None:
-    delay = max(0.0, session.expires_at - time.monotonic())
-    await asyncio.sleep(delay)
-    if not session.stop_event.is_set():
-        print("\n[session] expiró automáticamente.")
-        session.stop_event.set()
+    await session.agent_ready.wait()
+    while not session.stop_event.is_set():
+        expires_at = session.expires_at
+        if expires_at is None:
+            await asyncio.sleep(0.1)
+            continue
+        delay = max(0.0, expires_at - time.monotonic())
+        if delay:
+            try:
+                await asyncio.wait_for(session.stop_event.wait(), timeout=delay)
+                return
+            except asyncio.TimeoutError:
+                pass
+        if not session.stop_event.is_set():
+            print("\n[session] expiró automáticamente.")
+            session.stop_event.set()
+        return
 
 
 async def async_main(args: argparse.Namespace) -> int:
@@ -402,16 +425,15 @@ async def async_main(args: argparse.Namespace) -> int:
             descriptor = session.join_uri(public_url)
             if args.broker_url:
                 broker = BrokerOperatorClient(args.broker_url, args.operator_key)
-                await asyncio.get_running_loop().run_in_executor(
-                    None,
-                    broker.register,
-                    args.session_minutes * 60,
-                )
+                await asyncio.get_running_loop().run_in_executor(None, broker.register, 0)
 
             print("\n=== GLOSH REMOTE SPIKE ===")
             print(f"Relay local: ws://127.0.0.1:{args.port}")
             print(f"Relay público temporal: {public_url}")
-            print(f"Expira en: {args.session_minutes} min")
+            print(
+                f"Standby sin consumir sesión · al conectar: "
+                f"{args.session_minutes} min de sesión segura"
+            )
             if broker is None:
                 print("\nFallback DEV directo (contiene una clave temporal; no lo publiques):\n")
                 print(descriptor)
@@ -419,11 +441,17 @@ async def async_main(args: argparse.Namespace) -> int:
             else:
                 print(f"Broker de soporte activo: {args.broker_url}")
                 print("El descriptor no se muestra ni se entrega al broker en claro.")
+                print("Esperando próximo cliente; una solicitud única se acepta automáticamente.")
 
             expiry_task = asyncio.create_task(expire_session(session))
             cli_task = asyncio.create_task(interactive_cli(session, descriptor, broker))
             broker_task = (
-                asyncio.create_task(announce_pending_requests(session, broker))
+                asyncio.create_task(announce_pending_requests(session, broker, descriptor))
+                if broker is not None
+                else None
+            )
+            presence_task = (
+                asyncio.create_task(maintain_operator_presence(session, broker))
                 if broker is not None
                 else None
             )
@@ -432,8 +460,14 @@ async def async_main(args: argparse.Namespace) -> int:
             expiry_task.cancel()
             if broker_task is not None:
                 broker_task.cancel()
+            if presence_task is not None:
+                presence_task.cancel()
             await asyncio.gather(
-                *[task for task in (cli_task, expiry_task, broker_task) if task is not None],
+                *[
+                    task
+                    for task in (cli_task, expiry_task, broker_task, presence_task)
+                    if task is not None
+                ],
                 return_exceptions=True,
             )
             await session.close()
