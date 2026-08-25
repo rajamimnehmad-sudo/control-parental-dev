@@ -129,7 +129,9 @@ cp -f "$SOURCE_APK" "$FINAL_APK"
 APK_SHA="$(sha256_file "$FINAL_APK")"
 APK_SIZE="$(file_size "$FINAL_APK")"
 HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-STATUS="$(git -C "$REPO_ROOT" status --short)"
+# CI chmods the gate script before execution. Ignore only file-mode changes so the report still
+# fails visibly on any content/untracked modification.
+STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 {
   echo "TASK=REMOTE-SAMSUNG-BUBBLE-GUIDE-12"
