@@ -145,13 +145,14 @@ internal class AccessibilityBrowserPageScanner(
         pending.addLast(root)
         var observation = BrowserPageObservation()
         var visited = 0
+        var nodeBudgetExhausted = false
 
         while (pending.isNotEmpty()) {
             if (visited >= maximumNodes) {
                 return BrowserPageScanResult(observation, visited, nodeBudgetExhausted = true, timeBudgetExhausted = false)
             }
             if (nanoTime() - startedAt >= maximumScanNanos) {
-                return BrowserPageScanResult(observation, visited, nodeBudgetExhausted = false, timeBudgetExhausted = true)
+                return BrowserPageScanResult(observation, visited, nodeBudgetExhausted, timeBudgetExhausted = true)
             }
 
             val node = pending.removeFirst()
@@ -167,18 +168,24 @@ internal class AccessibilityBrowserPageScanner(
                             addressBarFocused = node.isFocused,
                         )
                     if (node.isFocused) {
-                        return BrowserPageScanResult(observation, visited, false, false)
+                        return BrowserPageScanResult(observation, visited, nodeBudgetExhausted, false)
                     }
                 }
             }
 
             val children = node.childCount
             for (index in 0 until children) {
-                if (visited + pending.size >= maximumNodes) break
+                if (nanoTime() - startedAt >= maximumScanNanos) {
+                    return BrowserPageScanResult(observation, visited, nodeBudgetExhausted, timeBudgetExhausted = true)
+                }
+                if (visited + pending.size >= maximumNodes) {
+                    nodeBudgetExhausted = true
+                    break
+                }
                 node.childAt(index)?.let(pending::addLast)
             }
         }
-        return BrowserPageScanResult(observation, visited, false, false)
+        return BrowserPageScanResult(observation, visited, nodeBudgetExhausted, false)
     }
 
     private companion object {
