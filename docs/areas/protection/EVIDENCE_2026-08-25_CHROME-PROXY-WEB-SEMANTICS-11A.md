@@ -300,3 +300,177 @@ STOP final acreditó:
   streamean. Uploads mayores requieren un ticket posterior de streaming request.
 - No se certificaron logins reales de terceros, cuentas personales, downloads
   enormes ni toda la web pública. 11A demuestra la base semántica, no Production.
+
+## Closeout batch 02 — response integrity (DEV348)
+
+### Coordinación y alcance
+
+- Task: `CHROME-PROXY-WEB-SEMANTICS-11A-CLOSEOUT-BATCH-02`.
+- Base verificada contra GitHub y Glosh Central:
+  `ecc5f306d625fc715627488e6a66378bb6e076da`.
+- Funcional anterior: `984b73f29ab371f152f2c4276053219cd6ccc22a`.
+- Commit funcional del closeout:
+  `9ce65e027ec46c4f763f42fe7dd0361d8880f13c`.
+- Branch: `work/chrome-proxy-web-semantics-11a-closeout-batch-02`.
+- Worktree:
+  `/Users/yejielnehmad/Developer/glosh-chrome-proxy-web-semantics-11a-closeout-batch-02`.
+- Owner: Protección Android / Codex. No hubo otro writer sobre las rutas 11A.
+- No se modificaron Glosh Central, VPN, HEV, SOCKS, DNS, UID attribution,
+  Chrome DROP, guard 10B, GloshIA, modelos, thresholds ni política de imágenes.
+
+### Defectos y correcciones
+
+ChatGPT detectó que una respuesta con longitud conocida podía finalizar corta o
+continuar larga sin que `ChromeHttp1ResponseWriter` exigiera igualdad exacta, y
+que `serveRealRequest` absorbía el error post-response-start y permitía volver al
+loop HTTP/1.1. El cierre implementa:
+
+- streaming fixed-length limitado a la longitud anunciada;
+- EOF anticipado -> `ChromeHttpResponseIntegrityException`;
+- un byte adicional observado -> misma excepción, sin entregar ese byte a Chrome;
+- chunk terminal `0\r\n\r\n` únicamente tras EOF limpio;
+- error de lectura/escritura chunked -> propagación, sin terminal chunk;
+- disposición explícita `Continue`/`Close` por request;
+- error pre-response -> como máximo un 502 con `Connection: close`;
+- error post-response-start -> no segundo 502, no segundo request, cierre de la
+  sesión TLS;
+- fallo de escritura en fixture -> cierre equivalente;
+- una sola contabilización de failure en el nivel que gobierna la respuesta.
+
+La auditoría ampliada encontró y cerró dos P1 adicionales dentro del mismo scope:
+
+1. un trailer chunked no declarado podía ser aceptado aunque 11A declaraba
+   trailers no soportados; ahora cualquier trailer falla cerrado con 501;
+2. `writeStreaming` filtraba headers dos veces y podía perder el Content-Length
+   representativo de HEAD/304; ahora HEAD y 304 lo conservan, mientras 1xx/204 no
+   lo emiten y 205 fuerza longitud cero.
+
+No quedó otro P0/P1 conocido dentro de response framing, keep-alive, hop-by-hop,
+request framing, status sin body, Range/206, validators, cookies/auth,
+compression passthrough, protect-before-connect o error lifecycle de 11A.
+
+### Tests y gates automáticos
+
+- `ChromeHttp1ResponseWriterTest`: 6/6 PASS.
+- `ChromePhotosHttpsProxyConnectionTest`: 8/8 PASS.
+- `ChromePhotosProxyRequestTest`: 8/8 PASS.
+- Cobertura dirigida: exact/short/long, chunked success/failure, HEAD,
+  1xx/204/205/304, fallo post-start, dos requests con primera respuesta truncada,
+  502 pre-response, keep-alive válido, Connection close, HTTP/1.0 close y fallo
+  parcial de fixture.
+- `:app-user:testDevDebugUnitTest`: PASS (32 suites, 0 failures).
+- `:app-user:compileDevDebugKotlin`: PASS.
+- `:app-user:lintDevDebug`: PASS, 0 errors y 29 warnings preexistentes.
+- `:app-user:assembleDevDebug`: PASS.
+- `git diff --check`: PASS.
+- `runKtlintCheckOverDevSourceSet`: PASS.
+- `runKtlintCheckOverTestDevSourceSet`: PASS.
+
+El agregador `:app-user:ktlintCheck` permanece FAIL por deuda preexistente y fuera
+de este diff en `UserAnnouncementsScreen.kt`, `PackageChangeReceiver.kt` y
+`UserFeedbackViewModel.kt`. El diff contra la base para esos archivos es vacío.
+No se corrigió ni ocultó esa deuda ajena.
+
+### APK DEV348
+
+- Package: `com.contentfilter.user.dev`.
+- Version: `348` / `1.0.1-dev` (máximo DEV previo verificado: 347).
+- Ruta:
+  `app-user/build/outputs/apk/dev/debug/app-user-dev-debug.apk`.
+- Tamaño: `158,860,613` bytes.
+- SHA-256:
+  `9a2f28f585ca0a470693311dc16976571fa32ce632e3ad852e1a7059537c66c2`.
+- Instalación `adb install -r`: PASS; sin uninstall, clear, reset ni pérdida de
+  datos. `ceDataInode=1239519` antes/después y `resetCount=1`.
+
+### Gate físico A23 focalizado
+
+- Device: Samsung `SM-A235M`, Android 14/API 34, serial `R58T34V31AE`.
+- Chrome: `151.0.7922.173`.
+- Device Owner, Accessibility enabled/bound y VPN productiva: preservados.
+- Guard 10B: proceso independiente activo; sesión 18 y heartbeats monotónicos.
+- Full-tunnel DEV, proxy, CA efímera, policy y GloshIA R3.1 acreditaron health
+  antes de la navegación.
+
+La primera entrega de intent no generó request de la fixture y fue descartada
+como evidencia. El intent explícito con nonce
+`11a_dev348_20260825_0926` produjo la matriz real:
+
+```text
+GET PASS             HEAD PASS
+POST PASS            PUT PASS
+PATCH PASS           DELETE PASS
+OPTIONS PASS         FORM PASS
+MULTIPART PASS       BINARY PASS
+COOKIE PASS          AUTH PASS
+REDIRECT301 PASS     REDIRECT302 PASS
+REDIRECT303 PASS     REDIRECT307 PASS
+REDIRECT308 PASS     GZIP PASS
+CHUNKED PASS         RANGE PASS
+ETAG PASS            DOWNLOAD PASS
+CSP_CORS PASS        LARGE PASS
+```
+
+- Fixture: download `262,144` bytes y large body `4,194,304` bytes conservados.
+- Matriz al completar: 108 requests, `failures=0`, connections peak 8,
+  queue rejects 0, proxy p50/p95/p99 `1.635/250.370/332.211 ms`.
+- HTTPS público fresco:
+  `https://example.com/?glosh11a_closeout=dev348_0930`, status 200, upstream h2,
+  318 bytes, downstream chunked coherente.
+- Multi-host dinámico observado sin allowlist nueva: `example.com`,
+  `www.gstatic.com`, `httpbingo.org`, `farm6.staticflickr.com`, hosts Google de
+  Chrome y beacon público.
+- Upstream final: 18 sockets creados/protegidos, protect success 18,
+  protect failure 0; no hubo recursion reportada.
+
+Canarios frescos:
+
+- SAFE real `t0.gstatic.com`: `1,029 -> 1,029`, cache miss, engine call,
+  `model_allow`, original preservado.
+- SAFE histórico `httpbingo.org/image/png`: `8,090 -> 8,090`, cache miss,
+  `model_allow`, original preservado.
+- BLOCK Flickr histórico con nonce `dev348_0929`:
+  `77,187 -> 6,303`, cache miss, `model_filter`, probabilidad `0.6040119`,
+  placeholder; bytes originales no entregados.
+- El recurso `www.gstatic.com/webp/gallery/1.webp` ya no es un canario BLOCK
+  confiable: el origin actual devolvió 30,320 bytes y R3.1 decidió SAFE. No se
+  modificó el modelo ni se falseó ese resultado.
+
+La matriz semántica terminó con failures 0. Las 21 fallas acumuladas posteriores
+fueron exclusivamente `SSLHandshakeException` de conexiones que Chrome abandonó
+durante transiciones rápidas de pestaña/lease; no existió `upstream_failed`,
+`fixture_failed` ni `ChromeHttpResponseIntegrityException` en tráfico válido.
+
+Protected Surface final observado: attachment simultáneo 1, epochs monotónicos,
+`rawPresented=false`, stale 0, `captureRequestsSincePresentationReady=0`,
+`errorCode3=0`, marker/grilla OFF. PSS durante gate: 240,908 KiB; RSS 315,904 KiB.
+No hubo crash, ANR u OOM atribuible a DEV348; ApplicationExitInfo nuevo sólo
+registró `PACKAGE UPDATED` de la instalación in-place.
+
+### Rollback DEV348
+
+STOP final acreditó `rollback=complete`, proxy/CA/cache retirados y
+`rollback=vpn_restored action=refresh_routes`. Estado final:
+
+- Chrome suspended=true;
+- `VpnTransport09A status=inactive`, runtime ready;
+- owned FD resources `0`, protected UDP sockets `0`;
+- rutas default DEV IPv4/IPv6 ausentes; sólo permanecen rutas DNS productivas;
+- VPN productiva activa y DNS protegido restaurado;
+- Device Owner, Accessibility enabled/bound, `ceDataInode=1239519` y
+  `resetCount=1` preservados.
+
+### Residuales del closeout
+
+- La deuda ktlint global ajena descrita arriba sigue abierta y evita afirmar que
+  el agregador completo esté verde, aunque los source sets tocados pasan.
+- 11B conserva exclusivamente autoridad robusta de imagen/MIME/magic/encoding,
+  SVG/animated/cache/provenance; este lote no la abrió.
+- WebSocket/Upgrade y trailers siguen explícitamente unsupported/fail-close;
+  HTTP/3 de Chrome sigue bloqueado por transporte.
+- Los 21 handshakes abandonados son diagnósticos de lifecycle de Chrome, no
+  response corruption; no se normalizaron ni ocultaron.
+
+Resultado Codex: framing, lifecycle HTTP y gate físico **PASS técnico**. El cierre
+`PASS FINAL DEV / CHATGPT REVIEWED` queda reservado a la revisión del diff y esta
+evidencia por ChatGPT.
