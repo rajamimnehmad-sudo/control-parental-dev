@@ -48,12 +48,17 @@ public record GuidePresentation(
                 false);
     }
 
+    /** Recovery shown only after an Accessibility attempt returned without enabling the service. */
     public static GuidePresentation restrictedSettings() {
+        return restrictedSettingsRecovery();
+    }
+
+    public static GuidePresentation restrictedSettingsRecovery() {
         return new GuidePresentation(
                 1,
                 4,
-                "Primero permití el acceso",
-                "En Información de la app tocá ⋮ y elegí “Permitir configuración restringida”. Después volvé a Glosh.",
+                "¿Android no te dejó activarlo?",
+                "Si viste “A la app se le negó el acceso”, abrí Información de la app. Si aparece ⋮, elegí “Permitir configuración restringida”. Si no aparece ⋮, volvé a Accesibilidad e intentá activarlo una vez más.",
                 Cue.ATTENTION,
                 false);
     }
