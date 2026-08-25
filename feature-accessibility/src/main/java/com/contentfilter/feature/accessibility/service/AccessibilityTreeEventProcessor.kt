@@ -332,7 +332,7 @@ internal class AccessibilityBrowserPageScanner(
     }
 }
 
-/** One bounded traversal gathers every Settings signal that previously required four separate scans. */
+/** One off-main traversal gathers every Settings signal that previously required four separate scans. */
 internal class AccessibilitySettingsPageScanner(
     private val maximumNodes: Int = DefaultMaximumNodes,
     private val maximumScanNanos: Long = DefaultMaximumScanNanos,
@@ -415,8 +415,9 @@ internal class AccessibilitySettingsPageScanner(
     }
 
     private companion object {
-        const val DefaultMaximumNodes = 96
-        const val DefaultMaximumScanNanos = 12_000_000L
+        // Preserve the historical single-scan coverage while moving it entirely off the main thread.
+        const val DefaultMaximumNodes = 200
+        const val DefaultMaximumScanNanos = 100_000_000L
     }
 }
 
