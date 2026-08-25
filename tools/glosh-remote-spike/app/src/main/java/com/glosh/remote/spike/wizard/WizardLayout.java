@@ -112,7 +112,7 @@ public final class WizardLayout {
         progress.setVisibility(View.GONE);
         title.setText("Conectá tu Samsung con soporte");
         body.setText(
-                "Glosh te acompaña dentro de los Ajustes reales de Samsung con una mini guía flotante. "
+                "Glosh te acompaña dentro de los Ajustes reales de Samsung con una guía flotante pequeña. "
                         + "Vos hacés los toques que Android exige y la conexión se completa automáticamente después del código.");
         information.setVisibility(View.GONE);
         clearVisual();
@@ -223,9 +223,9 @@ public final class WizardLayout {
         add(details, reassurance, 0, 26);
         add(details, text("Cómo funciona", 21, COLOR_GRAPHITE, Typeface.BOLD), 0, 12);
         add(details, text(
-                "1. Glosh abre Ajustes y queda flotando como instructor.\n"
-                        + "2. Cada pantalla muestra una animación de dónde tocar.\n"
-                        + "3. Siempre tenés Atrás y Ya está / Siguiente.\n"
+                "1. La primera vez permitís “Mostrar sobre otras apps”.\n"
+                        + "2. Glosh abre Ajustes y deja una tarjeta propia, pequeña y arrastrable.\n"
+                        + "3. La tarjeta muestra la animación y botones reales Atrás / Ya está.\n"
                         + "4. Al llegar al código, respondés los 6 números desde la notificación.\n"
                         + "5. Glosh empareja ADB local y conecta con la Mac de soporte.\n\n"
                         + "No usamos Accesibilidad, no tocamos Ajustes por vos y no queda ADB público.",
