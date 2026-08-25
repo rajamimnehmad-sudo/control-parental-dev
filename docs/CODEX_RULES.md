@@ -5,6 +5,7 @@ Reglas locales/especiales para Codex. `AGENTS.md` y `START_HERE.md` definen el w
 ## Entrada y contexto
 
 - Leer `START_HERE.md` y usar lectura minima/condicional; no releer todo el corpus documental por rutina.
+- Todo ticket hereda automaticamente las reglas globales. El prompt no debe repetirlas: debe describir solo el delta especifico de la tarea.
 - Antes de escribir, hacer un control Git liviano: status, rama, worktrees, commits recientes, base/owner/rutas de la tarea y Central cuando corresponda.
 - Usar `docs/AREAS.md` para ubicar el area afectada. Abrir solo rutas necesarias salvo auditoria explicita.
 - No tocar areas no relacionadas ni agregar features fuera del objetivo.
@@ -28,16 +29,31 @@ Reglas locales/especiales para Codex. `AGENTS.md` y `START_HERE.md` definen el w
 - Antes de una operacion costosa/larga, usar una prueba pequena y medible cuando aporte valor. Fijar limites de costo, reintentos, tiempo, almacenamiento y concurrencia.
 - No dejar procesos pesados sin limite ni ejecutar varios procesos pesados simultaneos en la Mac M2/8 GB.
 - Codex se usa principalmente cuando hace falta entorno local: codigo, compilaciones, tests, ADB, dispositivos, emuladores, scripts, entrenamiento o benchmarks. Analisis/arquitectura/revision que ChatGPT pueda resolver no debe duplicarse en Codex.
+- No producir documentos de evidencia extensos por rutina. Crearlos cuando el riesgo o la trazabilidad lo justifiquen: seguridad, navegador/medios, dispositivos, performance, migraciones, releases o cierres importantes.
 
 ## Cierre tecnico y handoff
 
 - Codex termina como PASS, BLOCKED o FAILED. PASS es tecnico; ChatGPT decide el cierre final.
-- Al PASS con codigo/evidencia revisable, el mismo ticket debe dejar commits cohesivos (preferentemente funcional + evidencia), publicar una rama `review/*-final`, verificar el SHA remoto y reportar base/functional/final SHA, archivos, gates y evidencia.
+- Al PASS con codigo revisable, el mismo ticket debe dejar commit(s) cohesivos, publicar `review/*-final`, verificar el SHA remoto y hacer handoff.
 - El push no destructivo de `review/*`/preservacion esta preautorizado. No pedir otra interaccion solo para publicar la rama review.
 - No integrar automaticamente a `main` local/remoto como requisito del PASS.
 - PR, merge, publicacion DEV de producto, Production, deploy, borrados destructivos y gastos son pasos separados y requieren autorizacion/control especifico.
 - Codex no modifica Glosh Central salvo autorizacion expresa del ticket. ChatGPT sincroniza Central al revisar el resultado.
 - No generar churn de Central `pending→in_progress→done` para ejecuciones Codex transitorias del mismo ciclo.
+
+### Handoff normal
+
+No recontar el ticket ni enumerar datos que ChatGPT puede derivar del diff. Por defecto devolver solo:
+
+- `STATUS`.
+- `BASE`.
+- `FUNCTIONAL SHA`.
+- `REMOTE REVIEW BRANCH` y `REMOTE HEAD`.
+- `VALIDATION`: resumen corto de tests/gates.
+- `PHYSICAL`: solo si hubo gate fisico/lab.
+- `RESIDUALS` o `BLOCKER`: solo si existen.
+
+Agregar APK/version/hash, evidencia, rollback, archivos o detalle tecnico solo cuando sea material para el cierre o haya una desviacion del scope.
 
 ## Android / APK
 
