@@ -1,221 +1,152 @@
 # DEV FLOW
 
-Flujo operativo para ahorrar tiempo y tokens. Este documento no cambia arquitectura; solo define como validar y publicar segun impacto.
+Flujo operativo para validar cambios con el menor costo razonable. `AGENTS.md` y `START_HERE.md` mandan si una regla historica contradice este archivo.
 
-## Regla permanente del proyecto
+## Principio central
 
-Si se modifica codigo Android que forma parte de APK:
+Separar siempre tres cosas:
 
-- Kotlin, Java, Compose.
-- AndroidManifest.
-- Recursos Android.
-- Gradle de modulos Android.
-- Modulos Android usados por App Usuario o App Admin.
+1. **Validacion tecnica**: codigo + tests/build + gate fisico cuando corresponda.
+2. **Review/preservacion**: commits cohesivos + rama `review/*-final` para auditoria ChatGPT.
+3. **Integracion/publicacion**: PR/merge/main/publicacion DEV/Production, solo como paso posterior cuando realmente se autoriza/necesita.
 
-Entonces:
+Un PASS tecnico NO obliga a integrar ni publicar producto.
 
-1. Ejecutar build.
-2. Ejecutar tests adecuados.
-3. Si pasan, incrementar `versionCode` DEV solo de cada app afectada.
-4. Mantener `versionName` salvo pedido explicito.
-5. Commit.
-6. Push.
-7. Dejar que GitHub Actions publique solo las APK DEV afectadas; usar ambas si el cambio es compartido.
-8. Verificar cada manifiesto publico actualizado con su nuevo `versionCode`.
-9. Informar commit, versionCode y que ya se puede actualizar desde las apps.
+## Flujo normal de un lote
 
-Si solo cambian docs, SQL, scripts, GitHub Actions o archivos que no entran en APK:
+1. Leer solo el contexto necesario (`START_HERE.md`, Central/AREAS si aplica y el ticket).
+2. Confirmar owner, base, rama/worktree y rutas cuando exista trabajo paralelo.
+3. Diagnosticar causa raiz.
+4. Implementar un lote cohesivo; no fragmentar artificialmente ni mezclar temas no relacionados.
+5. Ejecutar tests/checks proporcionales al diff y al riesgo.
+6. Si el cambio necesita APK fisica, asignar `versionCode` DEV vigente (maximo real + 1), compilar e instalar desde el worktree validado.
+7. Ejecutar gate fisico/lab solo cuando el riesgo o el ticket lo requiera; reutilizar evidencia anterior que el diff no invalida.
+8. Dejar commits locales claros (preferentemente funcional + evidencia).
+9. En PASS tecnico, publicar en el mismo ticket una rama `review/*-final` y verificar el SHA remoto.
+10. ChatGPT revisa diff/codigo/tests/evidencia y actualiza Central.
+11. PR/merge/main/publicacion se hacen solo si forman parte del siguiente paso autorizado; no son requisito del PASS tecnico.
 
-- No compilar.
-- No subir versionCode.
-- No publicar APK.
+## Cuando NO ejecutar Android/Gradle
 
-## Build minimo segun tipo de cambio
+Si solo cambian docs, reglas, prompts, mapas o notas:
 
-| Cambio | Build local minimo | Tests locales minimos | Checks recomendados |
-| --- | --- | --- | --- |
-| Solo docs | Ninguno | Ninguno | `git diff --check` opcional |
-| Solo Admin UI/ViewModel | `./gradlew --no-daemon :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | `./gradlew --no-daemon :app-admin:testDevDebugUnitTest -x uploadDevUpdatesToStorage` | `./gradlew --no-daemon :app-admin:ktlintCheck -x uploadDevUpdatesToStorage` |
-| Solo Usuario UI/ViewModel | `./gradlew --no-daemon :app-user:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | `./gradlew --no-daemon :app-user:testDevDebugUnitTest -x uploadDevUpdatesToStorage` | `./gradlew --no-daemon :app-user:ktlintCheck -x uploadDevUpdatesToStorage` |
-| `feature-vpn` | `./gradlew --no-daemon :feature-vpn:test :app-user:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | `./gradlew --no-daemon :feature-vpn:test -x uploadDevUpdatesToStorage` | `:feature-vpn:ktlintCheck` si existe |
-| `feature-accessibility` | `./gradlew --no-daemon :feature-accessibility:test :app-user:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | `./gradlew --no-daemon :feature-accessibility:test -x uploadDevUpdatesToStorage` | `:feature-accessibility:ktlintCheck` si existe |
-| `core-policy` | `./gradlew --no-daemon :core-policy:test :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | `./gradlew --no-daemon :core-policy:test -x uploadDevUpdatesToStorage` | Revisar tests de VPN/Accessibility si cambia decision |
-| `core-data` / `core-database` | `./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | tests de modulo afectado, si existen | Revisar migrations/schemas si cambia DB |
-| `core-sync` / `core-network` | `./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | tests del modulo o app afectada | Validar outbox/realtime en CI |
-| Updates/publicacion Android | build de cada app afectada; ambas si cambia infraestructura compartida | unitarios de cada app afectada | Verificar manifests locales y publicos actualizados |
+- no compilar;
+- no tests Android por costumbre;
+- no incrementar `versionCode`;
+- no generar/publicar APK;
+- `git diff --check` es suficiente salvo necesidad especial.
 
-## Modulos a compilar por area
+Scripts/SQL/workflows se validan con checks propios cuando corresponda, no con un APK irrelevante.
 
-- Area Admin Rules: `app-admin`; si afecta aplicacion real, sumar `feature-vpn` o `feature-accessibility`.
-- Area Apps: `app-user` + `app-admin`; si cambia bloqueo real, sumar `feature-accessibility`.
-- Area Internet/VPN: `feature-vpn` + `app-user` + `app-admin`.
-- Area Requests: `feature-requests` + `app-user` + `app-admin` + `core-sync` si toca sync.
-- Area Timers Apps: `feature-accessibility` + `core-policy` + `app-user`.
-- Area Timers Dominios: `feature-vpn` + `core-policy` si cambia decision comun.
-- Area Sync: `core-sync` + ambas apps.
-- Area Updates: `core-update` + ambas apps.
-- Area Activation/Login: `feature-activation` + `core-security` + `core-network` + app afectada.
+## Build/test proporcional
 
-## Cuando publicar APK
+Usar el comando mas estrecho que pruebe el cambio y sumar gates solo cuando el impacto lo exige.
 
-Publicar DEV cuando cambia cualquier archivo Android que entra al APK:
+| Cambio | Validacion minima orientativa |
+| --- | --- |
+| Solo docs | `git diff --check` opcional |
+| App Admin UI/ViewModel | `:app-admin:testDevDebugUnitTest`, `:app-admin:compileDevDebugKotlin`; assemble/lint si el lote cierra o genera APK |
+| App Usuario UI/ViewModel | `:app-user:testDevDebugUnitTest`, `:app-user:compileDevDebugKotlin`; assemble/lint si el lote cierra o genera APK |
+| `feature-vpn` | tests/compile del modulo + app-user cuando el cambio entra al APK; gate fisico si afecta transporte/fail-close |
+| `feature-accessibility` | tests/compile del modulo + app-user; gate fisico si afecta servicio/lifecycle/proteccion |
+| `core-policy` | tests del core + consumidores afectados; no compilar ambas apps si una no consume el cambio relevante |
+| `core-data`/`core-database` | tests/modulo + apps realmente afectadas; revisar migrations/schema si aplica |
+| `core-sync`/`core-network` | tests del modulo/consumidor; validar realtime/outbox solo si el diff los toca |
+| Chrome/navegador/medios | tests dirigidos + app-user build + fixture/gate fisico proporcional |
+| Cambios compartidos | validar cada consumidor real; no asumir `both` si uno no entra en el camino modificado |
 
-- `app-user/**` excepto docs no Android.
-- `app-admin/**` excepto docs no Android.
-- `core-*` Android/Kotlin usado por las apps.
-- `feature-*` Android/Kotlin usado por las apps.
-- `AndroidManifest.xml`.
-- `res/**`.
-- `build.gradle.kts` de modulos Android.
+`ktlint`, lint y suites globales se usan cuando aportan valor de cierre. Una deuda preexistente fuera del diff se reporta y se aisla; no convierte automaticamente un cambio limpio en BLOCKED.
 
-Publicacion DEV significa:
+## APK y versionCode
 
-1. Determinar si cambia Usuario, Admin o ambas.
-2. Subir `versionCode` DEV solo en cada app afectada.
-3. Commit y push a `main`.
-4. GitHub Actions `Publicar APKs DEV` se ejecuta con `target=user`, `target=admin` o `target=both` y sube solo ese alcance a Supabase Storage.
-5. Verificar solo los manifests publicos modificados; el de la otra app debe permanecer intacto.
+Usuario y Admin tienen secuencias DEV independientes. DAG tambien mantiene su propia version cuando corresponda.
 
-## Cuando NO publicar APK
+- Incrementar `versionCode` solo de la app cuyo APK cambia y cuando se vaya a generar una nueva APK identificable para gate/distribucion.
+- Determinar el maximo DEV real vigente antes de elegir el numero; no asumir que `N+1` sigue libre por memoria.
+- No reutilizar un `versionCode` ya usado/publicado para esa app.
+- Mantener `versionName` salvo necesidad explicita.
+- Una instalacion de gate fisico puede hacerse desde el worktree validado (`adb install -r`) sin fusionar primero a `main`.
+- Preservar datos/Device Owner/Accessibility y otras precondiciones cuando el ticket lo requiera; no usar uninstall/clear/reset salvo autorizacion especifica.
 
-No publicar si solo cambia:
+## Gate fisico
 
-- `docs/**`.
-- `README` o markdown.
-- SQL o migraciones externas no integradas al APK.
-- Scripts no ejecutados por la app.
-- GitHub Actions.
-- Prompts, handoffs, mapas o notas.
+Es obligatorio/proporcional cuando el cambio depende de comportamiento que JVM/build no puede acreditar razonablemente, por ejemplo:
 
-En esos casos, informar explicitamente: "No se publico APK porque solo cambio documentacion/no APK".
+- navegador/render/captura/medios;
+- VPN/HEV/DNS/UID/fail-close;
+- Accessibility/Device Owner/lifecycle/process death;
+- compatibilidad OEM/dispositivo;
+- rendimiento o memoria que dependa de hardware.
 
-## VersionCode
+No repetir una matriz completa si un follow-up toca un area aislada y existe evidencia previa valida. Ejecutar el smoke minimo que demuestre la correccion y ausencia de regresion relevante.
 
-Archivos:
+Al terminar, limpiar solo recursos creados por el gate y acreditar rollback cuando corresponda. No limpiar trabajo ajeno.
 
-- Usuario: `app-user/build.gradle.kts`
-- Admin: `app-admin/build.gradle.kts`
+## Review branch
 
-Flavor DEV:
+Para un PASS tecnico que ChatGPT deba revisar:
 
-```kotlin
-create("dev") {
-    dimension = "distribution"
-    applicationIdSuffix = ".dev"
-    versionCode = N
-    versionNameSuffix = "-dev"
-}
-```
+- commit funcional cohesivo;
+- commit de evidencia/docs separado cuando ayude;
+- push automatico/preautorizado de `review/<task>-final` al SHA exacto validado;
+- verificar origin;
+- reportar base SHA, functional SHA, final/evidence SHA, version/APK/hash (si existe), gates, fisico y residuales.
 
-Regla:
+No pedir una segunda interaccion Codex solo para hacer este push.
 
-- Usuario y Admin tienen secuencias independientes; no necesitan coincidir.
-- Incrementar solo la app cuyo APK cambia. Si el cambio entra en ambas, incrementar ambas, aunque sus numeros previos sean distintos.
-- No reutilizar un `versionCode` ya publicado para esa app.
-- No cambiar `versionName` salvo pedido explicito.
-- Si el publish detecta el mismo `versionCode` de la app elegida, detener y corregir antes de continuar.
+Una rama review es una superficie de auditoria/preservacion; **no autoriza merge ni publicacion**.
 
-## GitHub Actions
+## Publicacion DEV de producto
 
-Workflows relevantes:
+Publicar una APK a usuarios/Supabase es distinto de construirla o instalarla en laboratorio.
 
-- `Android CI`: detecta el alcance. Para cambios exclusivos de `app-user` o `app-admin`, compila y valida solo esa app; ante codigo compartido o cambios en ambas, ejecuta la suite completa.
-- `Publicar APKs DEV`: permite elegir `user`, `admin` o `both`; ejecuta publicacion DEV y sube solo las APK/manifests elegidas.
+Solo publicar cuando el ticket/paso de entrega lo autorice. Entonces:
 
-Verificacion:
+1. determinar app(s) afectadas;
+2. confirmar codigo exacto revisado/integrado que se va a distribuir;
+3. confirmar `versionCode`, firma y notas;
+4. ejecutar el workflow/script de publicacion correspondiente;
+5. verificar manifests publicos, package, version, hash y firma;
+6. actualizar Central/entrega con la evidencia real.
 
-```bash
-gh run list --branch main --limit 5 --json databaseId,name,headSha,status,conclusion,url
-gh run watch <run_id> --exit-status
-```
+No publicar automaticamente por el solo hecho de que cambie un archivo Android o que un build pase.
 
-Notas:
-
-- CI completo puede tardar mas que los checks locales minimos.
-- Si la publicacion DEV ya paso pero CI sigue corriendo, esperar CI antes de cerrar cuando sea posible.
-- Warning de Node deprecated en Actions no bloquea si conclusion es success.
-
-## Runner / publicacion DEV
-
-Scripts:
-
-- Ambas apps: `scripts/publicar_dev.sh`.
-- Una app: `scripts/publicar_dev_app.sh usuario|admin`.
-
-Ambos publicadores exigen incremento por app, notas de version y firma DEV historica. La reparacion excepcional de la misma version requiere confirmacion explicita.
-
-Docs existentes:
+Documentacion especifica de publicacion:
 
 - `docs/DEV_APK_UPDATES.md`
 - `docs/PUBLICAR_DEV_REMOTO.md`
+- scripts `scripts/publicar_dev.sh` / `scripts/publicar_dev_app.sh` cuando el paso este autorizado.
 
-El script debe proteger contra publicar un `versionCode` menor o igual al publico actual.
+## CI / GitHub Actions
 
-Manifiestos publicos:
+- CI es evidencia complementaria; usar el workflow que corresponda al alcance.
+- No disparar/esperar suites globales por costumbre si el ticket no las necesita.
+- Si una publicacion/integracion depende de CI, verificar el run antes de cerrar ese paso.
+- Un warning heredado no bloquea si el check relevante pasa y no es causado por el diff.
 
-```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-manifest.json
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-manifest.json
-```
+## Cierre eficiente
 
-Verificacion rapida:
+Un lote se considera tecnicamente listo para revision cuando informa:
 
-```bash
-curl -fsSL https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-manifest.json
-curl -fsSL https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-manifest.json
-```
+- causa/objetivo;
+- base/rama/worktree cuando aplica;
+- archivos modificados;
+- tests/checks ejecutados;
+- APK/version/hash si hubo gate Android;
+- evidencia fisica/lab si corresponde;
+- rollback/estado final cuando corresponde;
+- residuales reales;
+- rama review y SHAs remotos.
 
-## Flujo recomendado por ticket
+ChatGPT decide despues PASS FINAL, follow-up o cambio de ruta y sincroniza Central.
 
-1. Trabajar en tickets chicos.
-2. Leer `docs/HANDOFF_ACTUAL.md`.
-3. Usar `docs/CODEX_MAP.md` solo para ubicarse.
-4. Leer solo el area necesaria en `docs/AREAS.md`.
-5. Revisar matriz de impacto.
-6. Abrir solo los archivos necesarios del area afectada.
-7. No revisar todo el repo salvo auditoria explicita.
-8. Cambiar lo minimo.
-9. Validar con build/test minimo del area.
-10. Si cambio Android, incrementar solo la app afectada, commit, push, verificar Actions y el manifest actualizado.
-11. Si no cambio Android, commit opcional segun pedido y no publicar APK.
+No actualizar por rutina `HANDOFF_ACTUAL.md` y `BACKLOG_PRODUCTO.md` en cada microcambio. Actualizarlos solo cuando el cambio de contexto/producto tenga valor persistente; Central es el tracker estructurado principal.
 
-## Cierre eficiente y completo
+## NO TOCAR sin necesidad del ticket
 
-- Cada ticket pequeno termina con pruebas proporcionales, PR y fusion a `main`; la documentacion no debe conservar `pendiente PR` despues de fusionarlo.
-- Varios tickets Android ya aprobados y listos deben agruparse en una sola publicacion por app afectada: un aumento de `versionCode` por app, una sola ronda de CI/publicacion y una verificacion de sus manifiestos, hashes y firma.
-- La agrupacion ocurre antes de publicar: nunca sacar varias APK y actualizar GitHub despues. El commit de `main` debe identificar exactamente el codigo de toda APK publica.
-- La agrupacion no mezcla la evidencia: cada cambio conserva causa, pruebas y trazabilidad dentro del lote, aunque use un unico PR cuando forman una entrega coherente.
-- Al publicar, actualizar `docs/HANDOFF_ACTUAL.md` y `docs/BACKLOG_PRODUCTO.md` de candidato a publicado. Las pruebas fisicas o de laboratorio pendientes se registran aparte y nunca se dan por realizadas.
-- No iniciar el siguiente lote dejando ramas, builds o estados documentales inconsistentes del lote anterior.
-
-## NO TOCAR
-
-No revisar ni modificar estos componentes salvo que el ticket lo pida o la matriz de impacto los marque como necesarios:
-
-- `core-policy/src/main/kotlin/com/contentfilter/core/policy/DefaultPolicyEngine.kt`
-- `feature-vpn/src/main/java/com/contentfilter/feature/vpn/service/FilterVpnService.kt`
-- `feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/ProtectorAccessibilityService.kt`
-- `core-sync/src/main/java/com/contentfilter/core/sync/engine/DefaultSyncEngine.kt`
-- `core-sync/src/main/java/com/contentfilter/core/sync/outbox/DefaultOutboxProcessor.kt`
-- `core-update/src/main/java/com/contentfilter/core/update/repository/DevApkUpdateRepository.kt`
-- `scripts/publicar_dev.sh`
-- `.github/workflows/*`
-- Supabase Auth/config/secrets.
-- Room migrations/schemas.
-
-## Cierre esperado
-
-Para cambios Android:
-
-- Causa.
-- Archivos modificados.
-- Build/tests ejecutados.
-- Commit.
-- versionCode de cada app publicada.
-- Confirmacion de los manifests publicos actualizados y de que los no seleccionados permanecieron intactos.
-- "Ya podes actualizar desde las apps."
-
-Para cambios no Android:
-
-- Archivos modificados.
-- Confirmacion: no build, no versionCode, no APK porque no cambio codigo Android.
+- Production/deploy/secrets.
+- Supabase Auth/config sensible.
+- Room migrations/schemas ajenos.
+- scripts/workflows de publicacion si el ticket no es de entrega.
+- areas/hotspots no relacionados.
+- trabajo de otro owner.
