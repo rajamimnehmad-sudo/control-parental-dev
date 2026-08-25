@@ -1,6 +1,6 @@
 # Glosh Remote — Adaptive Remote Installer
 
-Updated: 2026-08-25 00:22 ART
+Updated: 2026-08-25 00:25 ART
 
 ## Connection base
 
@@ -42,11 +42,11 @@ Isolated implementation branch:
 `work/remote-install-one-tap-05-chatgpt`
 
 Current implementation HEAD:
-`90fd8dddaf1a66db93313c0cadb7806629c9e2eb`
+`7258b131d6e9079b9bb8cfb552024d1d82526438`
 
-Base is exactly `eaa44f1ba5da204d66a720ae6f5f805699ee22ee`; compare is **ahead 15 / behind 0** and does not touch `main`.
+Base is exactly `eaa44f1ba5da204d66a720ae6f5f805699ee22ee`; branch is ahead-only and does not touch `main`.
 
-Changed runtime/test scope is limited to `tools/glosh-remote-spike/**`:
+Changed runtime/test scope remains limited to `tools/glosh-remote-spike/**`:
 - customer One-Tap UI;
 - Mac standby/heartbeat;
 - one-client safe autoaccept;
@@ -54,10 +54,14 @@ Changed runtime/test scope is limited to `tools/glosh-remote-spike/**`:
 - 30-minute phone request-renewal window;
 - bounded request/poll retry;
 - explicit manual pairing fallback state;
-- narrow Java/Python tests.
+- narrow Java/Python tests;
+- one-command verification/build script.
 
 Implementation handoff/evidence:
 `tools/glosh-remote-spike/ONE_TAP_HARDENING_05.md`.
+
+Automated local-environment gate:
+`tools/glosh-remote-spike/verify_one_tap.sh`.
 
 ## Frozen customer UX now implemented
 
@@ -118,26 +122,26 @@ Independent smoke validation outside the Android build environment:
 - manual acceptance and autoaccept share the one-customer slot in dedicated tests;
 - standby/session TTL logic did not consume lifetime before client authentication.
 
-Repository compare from `eaa44f1b…` confirms all runtime/test/document changes remain under `tools/glosh-remote-spike/**`.
+Repository compare from `eaa44f1b…` confirms all runtime/test/document/build-script changes remain under `tools/glosh-remote-spike/**`.
 
 These smokes are useful evidence but **do not replace the real Gradle gate**.
 
 ## Remaining technical gate
 
-Required before technical PASS:
+Single command on the Mac/local Android build environment:
 
 ```bash
-./gradlew -p tools/glosh-remote-spike :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+bash tools/glosh-remote-spike/verify_one_tap.sh
 ```
 
-and:
-
-```bash
-cd tools/glosh-remote-spike/mac
-python -m unittest test_protocol.py test_broker.py test_one_tap_standby.py
-```
-
-Then report exact APK path, byte size and SHA-256.
+The script runs:
+- `python3 -m unittest test_protocol.py test_broker.py test_one_tap_standby.py`;
+- `:app:testDebugUnitTest`;
+- `:app:lintDebug`;
+- `:app:assembleDebug`;
+- copies the result as `GloshRemote-OneTap-DEV.apk`;
+- calculates byte size + SHA-256;
+- writes `REMOTE-INSTALL-ONE-TAP-HARDENING-05-report.txt`.
 
 No A23/S22 is required for this build gate.
 
@@ -150,7 +154,7 @@ After Gradle/Python PASS and ChatGPT review, only the new post-hardening APK goe
 - `REMOTE-INSTALL-CONNECTION-00`: PASS FINAL DEV / CLOSED.
 - `REMOTE-INSTALL-LIVE-GUIDE-03`: FAILED UX / SUPERSEDED.
 - `REMOTE-INSTALL-LIVE-GUIDE-V2-04`: automated checkpoint preserved at `eaa44f1b…`; superseded as final candidate by One-Tap hardening.
-- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE at `90fd8ddd…` on isolated ChatGPT branch; pending real Gradle/Python gate, therefore not PASS yet.
+- `REMOTE-INSTALL-ONE-TAP-HARDENING-05`: CODE COMPLETE at `7258b131…` on isolated ChatGPT branch; pending real Gradle/Python gate, therefore not PASS yet.
 - `REMOTE-INSTALL-MAC-OPERATOR-04`: standby/heartbeat portion absorbed into One-Tap hardening; richer operator product remains later.
 - `REMOTE-INSTALL-PRECHECK-05`, `REMOTE-INSTALL-PIPELINE-06`, `REMOTE-INSTALL-DEVICE-OWNER-COMMIT-07`: preserved for later install pipeline.
 - `REMOTE-ADAPTIVE-INSTALL-PILOT-01`: waits post-hardening technical PASS + S22 cable-free UX gate.
