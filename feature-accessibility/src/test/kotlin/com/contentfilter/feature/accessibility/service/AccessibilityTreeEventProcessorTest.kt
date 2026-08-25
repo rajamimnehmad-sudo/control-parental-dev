@@ -159,14 +159,16 @@ class AccessibilityTreeEventProcessorTest {
     }
 
     @Test
-    fun `settings burst remains bounded and does not starve pending search`() {
+    fun `settings burst is bounded and switching to search discards obsolete pending settings`() {
         val harness = ProcessorHarness()
         val firstSettingsStarted = CountDownLatch(1)
         val releaseFirst = CountDownLatch(1)
         val searchFinished = CountDownLatch(1)
+        val firstSettingsCurrent = AtomicBoolean(true)
         val settingsSequences = CopyOnWriteArrayList<Long>()
         val searchSequences = CopyOnWriteArrayList<Long>()
-        val processor =
+        lateinit var processor: AccessibilityTreeEventProcessor
+        processor =
             harness.processor(
                 processSearch = { trigger ->
                     searchSequences += trigger.sequence
@@ -177,6 +179,7 @@ class AccessibilityTreeEventProcessorTest {
                     if (settingsSequences.size == 1) {
                         firstSettingsStarted.countDown()
                         releaseFirst.await(1, TimeUnit.SECONDS)
+                        firstSettingsCurrent.set(processor.isSettingsContextCurrent(trigger))
                     }
                 },
             )
@@ -184,23 +187,21 @@ class AccessibilityTreeEventProcessorTest {
         try {
             processor.submitSettings(Settings, "FIRST", 1, null, SettingsEventSignals())
             assertTrue(firstSettingsStarted.await(1, TimeUnit.SECONDS))
-            var latestSettings = 0L
             repeat(100) { index ->
-                latestSettings =
-                    processor.submitSettings(
-                        Settings,
-                        "BURST_$index",
-                        1,
-                        null,
-                        SettingsEventSignals(),
-                    )
+                processor.submitSettings(
+                    Settings,
+                    "BURST_$index",
+                    1,
+                    null,
+                    SettingsEventSignals(),
+                )
             }
             val search = processor.submitSearch(Chrome, "SEARCH")
             releaseFirst.countDown()
             assertTrue(searchFinished.await(1, TimeUnit.SECONDS))
 
-            assertEquals(2, settingsSequences.size)
-            assertEquals(latestSettings, settingsSequences.last())
+            assertEquals(1, settingsSequences.size)
+            assertFalse(firstSettingsCurrent.get())
             assertEquals(listOf(search), searchSequences.toList())
             assertEquals(101L, processor.metrics().submittedSettings)
             assertTrue(processor.metrics().coalescedSettings >= 99L)
