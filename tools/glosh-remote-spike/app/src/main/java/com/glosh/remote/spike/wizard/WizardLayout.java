@@ -13,8 +13,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.glosh.remote.spike.guide.overlay.GuideCueView;
-
 @SuppressLint("SetTextI18n")
 public final class WizardLayout {
     public static final int COLOR_LIME = Color.rgb(190, 242, 84);
@@ -22,7 +20,6 @@ public final class WizardLayout {
     private static final int COLOR_GRAPHITE = Color.rgb(25, 27, 24);
     private static final int COLOR_MUTED = Color.rgb(92, 96, 88);
     private static final int COLOR_LIME_SOFT = Color.rgb(234, 250, 202);
-    private static final int COLOR_LINE = Color.rgb(218, 221, 211);
 
     private final Activity activity;
     private final ScrollView root;
@@ -37,7 +34,6 @@ public final class WizardLayout {
     private final LinearLayout homeDetails;
     private final ActiveCtaPulse pulse = new ActiveCtaPulse(COLOR_LIME);
     private GuideAnimation guideAnimation;
-    private GuideCueView guideCue;
     private PairingCodeInputView pairingInput;
     private boolean hostActive;
 
@@ -102,9 +98,6 @@ public final class WizardLayout {
         if (guideAnimation != null) {
             guideAnimation.onHostResume();
         }
-        if (guideCue != null) {
-            guideCue.onHostResume();
-        }
     }
 
     public void onHostPause() {
@@ -113,94 +106,56 @@ public final class WizardLayout {
         if (guideAnimation != null) {
             guideAnimation.onHostPause();
         }
-        if (guideCue != null) {
-            guideCue.onHostPause();
-        }
     }
 
     public void showHome(View.OnClickListener connect) {
         progress.setVisibility(View.GONE);
-        title.setText("Soporte remoto Glosh");
+        title.setText("Conectá tu Samsung con soporte");
         body.setText(
-                "Te llevamos a cada pantalla correcta y te mostramos exactamente qué tocar.\n\n"
-                        + "Vos confirmás lo que Android pide; Glosh detecta el cambio y abre el paso siguiente.");
+                "Glosh te acompaña dentro de los Ajustes reales de Samsung con una mini guía flotante. "
+                        + "Vos hacés los toques que Android exige y la conexión se completa automáticamente después del código.");
         information.setVisibility(View.GONE);
         clearVisual();
         homeDetails.setVisibility(View.VISIBLE);
-        showPrimary("CONECTAR CON SOPORTE", connect, true);
+        showPrimary("COMENZAR", connect, true);
         hide(secondary);
         hide(tertiary);
+    }
+
+    public void showUnsupported(String manufacturer) {
+        showScreen(
+                "Samsung únicamente",
+                "Esta versión está preparada para Samsung",
+                "Detectamos " + manufacturer + ". Para esta prueba no vamos a adivinar rutas de otros fabricantes.",
+                "La conexión segura no cambia; sólo limitamos la guía visual para que sea confiable.");
+        clearVisual();
+        hide(primary);
+        hide(secondary);
+        hide(tertiary);
+    }
+
+    public void showSamsungStep(SamsungGuideStep step, String infoCopy) {
+        showScreen(
+                "Paso " + step.number() + " de " + SamsungGuideStep.TOTAL_STEPS,
+                step.title(),
+                step.instruction(),
+                infoCopy);
+        showGuide(step.visual());
     }
 
     public void showScreen(String progressCopy, String titleCopy, String bodyCopy, String infoCopy) {
         progress.setText(progressCopy == null ? "" : progressCopy);
         progress.setVisibility(
                 progressCopy == null || progressCopy.isEmpty() ? View.GONE : View.VISIBLE);
-        title.setText(titleCopy);
-        body.setText(bodyCopy);
-        information.setText(infoCopy);
+        title.setText(titleCopy == null ? "" : titleCopy);
+        body.setText(bodyCopy == null ? "" : bodyCopy);
+        information.setText(infoCopy == null ? "" : infoCopy);
         information.setVisibility(infoCopy == null || infoCopy.isEmpty() ? View.GONE : View.VISIBLE);
         homeDetails.setVisibility(View.GONE);
         hide(primary);
         hide(secondary);
         hide(tertiary);
         pulse.clear();
-    }
-
-    public void showPresentation(GuidePresentation presentation) {
-        clearVisual();
-        LinearLayout card = new LinearLayout(activity);
-        card.setOrientation(LinearLayout.HORIZONTAL);
-        card.setGravity(Gravity.CENTER_VERTICAL);
-        card.setPadding(dp(16), dp(14), dp(16), dp(14));
-        card.setBackground(rounded(COLOR_GRAPHITE, 20));
-
-        guideCue = new GuideCueView(activity);
-        guideCue.setCue(presentation.cue());
-        LinearLayout.LayoutParams cueParams = new LinearLayout.LayoutParams(dp(58), dp(58));
-        cueParams.setMargins(0, 0, dp(14), 0);
-        card.addView(guideCue, cueParams);
-
-        LinearLayout copy = new LinearLayout(activity);
-        copy.setOrientation(LinearLayout.VERTICAL);
-        TextView label = text(
-                presentation.progressLabel(),
-                12,
-                COLOR_LIME,
-                Typeface.BOLD);
-        TextView reassurance = text(
-                presentation.terminal()
-                        ? "Sesión segura activa"
-                        : "Vos tocás · Glosh continúa",
-                15,
-                Color.WHITE,
-                Typeface.BOLD);
-        TextView detail = text(
-                presentation.terminal()
-                        ? "La conexión sigue bajo tu control."
-                        : "La tarjeta flotante y la notificación muestran siempre el mismo paso.",
-                13,
-                Color.rgb(193, 200, 188),
-                Typeface.NORMAL);
-        detail.setLineSpacing(dp(2), 1f);
-        copy.addView(label, matchWrap());
-        LinearLayout.LayoutParams reassuranceParams = matchWrap();
-        reassuranceParams.setMargins(0, dp(3), 0, 0);
-        copy.addView(reassurance, reassuranceParams);
-        LinearLayout.LayoutParams detailParams = matchWrap();
-        detailParams.setMargins(0, dp(3), 0, 0);
-        copy.addView(detail, detailParams);
-        card.addView(copy, new LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f));
-
-        visualSlot.addView(card, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        if (hostActive) {
-            guideCue.onHostResume();
-        }
     }
 
     public void showGuide(OemGuideStep step) {
@@ -227,8 +182,6 @@ public final class WizardLayout {
         visualSlot.addView(pairingInput, params);
         if (retry) {
             pairingInput.allowRetry();
-        } else {
-            pairingInput.focusKeyboard();
         }
     }
 
@@ -236,10 +189,6 @@ public final class WizardLayout {
         if (guideAnimation != null) {
             guideAnimation.onHostPause();
             guideAnimation = null;
-        }
-        if (guideCue != null) {
-            guideCue.onHostPause();
-            guideCue = null;
         }
         pairingInput = null;
         visualSlot.removeAllViews();
@@ -264,7 +213,7 @@ public final class WizardLayout {
         LinearLayout details = new LinearLayout(activity);
         details.setOrientation(LinearLayout.VERTICAL);
         TextView reassurance = text(
-                "4 pasos claros · Conexión temporal · Sin acceso permanente",
+                "Samsung · Sin Accesibilidad · Conexión temporal",
                 14,
                 COLOR_GRAPHITE,
                 Typeface.BOLD);
@@ -272,13 +221,14 @@ public final class WizardLayout {
         reassurance.setGravity(Gravity.CENTER);
         reassurance.setPadding(dp(14), dp(11), dp(14), dp(11));
         add(details, reassurance, 0, 26);
-        add(details, text("Qué vas a hacer", 21, COLOR_GRAPHITE, Typeface.BOLD), 0, 12);
+        add(details, text("Cómo funciona", 21, COLOR_GRAPHITE, Typeface.BOLD), 0, 12);
         add(details, text(
-                "1. Activar Glosh Remote.\n"
-                        + "2. Confirmar opciones de desarrollador.\n"
-                        + "3. Activar depuración inalámbrica.\n"
-                        + "4. Abrir el código de vinculación.\n\n"
-                        + "Glosh abre cada pantalla, sigue tu progreso y toma el código automáticamente cuando es seguro.",
+                "1. Glosh abre Ajustes y queda flotando como instructor.\n"
+                        + "2. Cada pantalla muestra una animación de dónde tocar.\n"
+                        + "3. Siempre tenés Atrás y Ya está / Siguiente.\n"
+                        + "4. Al llegar al código, respondés los 6 números desde la notificación.\n"
+                        + "5. Glosh empareja ADB local y conecta con la Mac de soporte.\n\n"
+                        + "No usamos Accesibilidad, no tocamos Ajustes por vos y no queda ADB público.",
                 16,
                 COLOR_MUTED,
                 Typeface.NORMAL), 0, 0);
@@ -318,12 +268,6 @@ public final class WizardLayout {
         view.setTextColor(color);
         view.setTypeface(Typeface.DEFAULT, style);
         return view;
-    }
-
-    private LinearLayout.LayoutParams matchWrap() {
-        return new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     private GradientDrawable rounded(int color, int radiusDp) {
