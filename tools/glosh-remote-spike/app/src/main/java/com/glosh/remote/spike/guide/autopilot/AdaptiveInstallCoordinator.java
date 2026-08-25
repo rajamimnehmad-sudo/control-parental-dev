@@ -75,6 +75,10 @@ public final class AdaptiveInstallCoordinator {
             LiveGuideRuntime.setStage(GuideStage.AUTOPILOT_PROBE);
             return;
         }
+        if (stage == GuideStage.PAIR_CODE_TARGET || stage == GuideStage.PAIRING) {
+            host.startSupportStackIfReady();
+            return;
+        }
         if (stage == GuideStage.AUTOPILOT_PROBE) {
             resetProbe();
             host.showInstruction("Si están apagadas, activá las opciones de desarrollador.");
