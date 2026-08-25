@@ -262,7 +262,12 @@ class AccessibilityTreeEventProcessorTest {
 
     @Test
     fun `browser scanner enforces node and time budgets`() {
-        val nodeBounded = AccessibilityBrowserPageScanner(maximumNodes = 4, maximumScanNanos = 1_000L, nanoTime = { 0L })
+        val nodeBounded =
+            AccessibilityBrowserPageScanner(
+                maximumNodes = 4,
+                maximumScanNanos = 1_000L,
+                nanoTime = { 0L },
+            )
         val byNodes = nodeBounded.scan(deepTree(20))
         assertEquals(4, byNodes.visitedNodes)
         assertTrue(byNodes.nodeBudgetExhausted)

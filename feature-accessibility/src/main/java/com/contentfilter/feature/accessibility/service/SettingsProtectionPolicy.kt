@@ -120,9 +120,12 @@ class SettingsProtectionPolicy {
     private fun isPackageInstallScreen(
         packageName: String,
         className: String?,
-    ): Boolean =
-        packageName in PackageInstallerPackages &&
-            InstallClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
+    ): Boolean {
+        if (packageName !in PackageInstallerPackages) return false
+        val simpleClassName = className.orEmpty().substringAfterLast('.')
+        if (UninstallClassHints.any { simpleClassName.contains(it, ignoreCase = true) }) return false
+        return InstallClassHints.any { simpleClassName.contains(it, ignoreCase = true) }
+    }
 
     private fun isUnknownSourcesScreen(
         packageName: String,
@@ -149,10 +152,7 @@ class SettingsProtectionPolicy {
         ) {
             return ProtectionAuthorizationScope.Removal
         }
-        if (
-            packageName in PackageInstallerPackages &&
-            InstallClassHints.any { normalizedClass.contains(it, true) }
-        ) {
+        if (isPackageInstallScreen(packageName, className)) {
             return ProtectionAuthorizationScope.Settings
         }
         if (

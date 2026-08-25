@@ -262,7 +262,9 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) return false
         if (packageName !in ExplicitSearchPackages) return false
         val source = event.source ?: return false
-        val recognized = runCatching { source.isEditable && source.isRecognizedSearchField(packageName) }.getOrDefault(false)
+        val recognized =
+            runCatching { source.isEditable && source.isRecognizedSearchField(packageName) }
+                .getOrDefault(false)
         if (!recognized) return false
         val query = runCatching { source.text?.takeIf { it.isNotBlank() } }.getOrNull() ?: return false
         if (explicitSearchClassifier.classify(query) != ExplicitSearchDecision.BlockExplicit) return false
@@ -409,7 +411,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
             installSourceSettingsVisible = signals.installSourceSettingsVisible,
             deviceAdminEnabled = DeviceAdminController.isEnabled(this),
             armed = protectionStateStore.isArmed(),
-            settingsAuthorized = protectionStateStore.isAuthorized(ProtectionAuthorizationScope.Settings, nowEpochMillis),
+            settingsAuthorized =
+                protectionStateStore.isAuthorized(
+                    ProtectionAuthorizationScope.Settings,
+                    nowEpochMillis,
+                ),
             removalAuthorized = protectionStateStore.isAuthorized(ProtectionAuthorizationScope.Removal, nowEpochMillis),
             trustedInstallAuthorized = protectionStateStore.isTrustedInstallAuthorized(nowEpochMillis),
             elapsedRealtimeMillis = elapsedRealtimeMillis,

@@ -331,7 +331,12 @@ internal class AccessibilityBrowserPageScanner(
 
         while (pending.isNotEmpty()) {
             if (visited >= maximumNodes) {
-                return BrowserPageScanResult(observation, visited, nodeBudgetExhausted = true, timeBudgetExhausted = false)
+                return BrowserPageScanResult(
+                    observation,
+                    visited,
+                    nodeBudgetExhausted = true,
+                    timeBudgetExhausted = false,
+                )
             }
             if (nanoTime() - startedAt >= maximumScanNanos) {
                 return BrowserPageScanResult(observation, visited, nodeBudgetExhausted, timeBudgetExhausted = true)
@@ -428,14 +433,14 @@ internal class AccessibilitySettingsPageScanner(
             adminVisible = adminVisible || identityValues.any { it.matchesAdminAppIdentity() }
             dangerousVisible =
                 dangerousVisible ||
-                    isDangerousSettingsAction(
-                        viewId = viewId,
-                        label = text ?: description,
-                        clickable = node.isClickable,
-                    )
+                isDangerousSettingsAction(
+                    viewId = viewId,
+                    label = text ?: description,
+                    clickable = node.isClickable,
+                )
             installSourceVisible =
                 installSourceVisible ||
-                    listOf(text, description).any { label -> isInstallSourceSettingsIndicator(viewId, label) }
+                listOf(text, description).any { label -> isInstallSourceSettingsIndicator(viewId, label) }
 
             if (ownVisible && adminVisible && dangerousVisible && installSourceVisible) return result()
 
