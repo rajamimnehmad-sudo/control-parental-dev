@@ -119,8 +119,19 @@ internal class ChromePhotosBoundedDecisionSession(
         val started = nanoTime()
         requests.incrementAndGet()
         if (closed.get()) return record(unknown(ClosedReason), started)
-        val key = DecisionKey(engine.identity.cacheKey, contentHash)
+        val decisionGeneration = generation.get()
+        val canonicalMimeType = mimeType.normalizedImageMimeType()
+        val key =
+            DecisionKey(
+                identity = engine.identity.cacheKey,
+                generation = decisionGeneration,
+                canonicalMimeType = canonicalMimeType,
+                contentHash = contentHash,
+            )
         synchronized(cacheLock) { cache[key] }?.let { cached ->
+            if (generation.get() != decisionGeneration) {
+                return record(unknown(StaleGenerationReason, ChromePhotoDecisionSource.Unavailable), started)
+            }
             cacheHits.incrementAndGet()
             val result =
                 cached.copy(
@@ -132,7 +143,7 @@ internal class ChromePhotosBoundedDecisionSession(
         }
         cacheMisses.incrementAndGet()
 
-        val candidate = DecisionTask(key, imageBytes, mimeType, generation.get())
+        val candidate = DecisionTask(key, imageBytes, canonicalMimeType, decisionGeneration)
         val existing = inFlight.putIfAbsent(key, candidate)
         val task = existing ?: candidate
         if (existing == null) {
@@ -174,7 +185,11 @@ internal class ChromePhotosBoundedDecisionSession(
                 Thread.currentThread().interrupt()
                 unknown(InterruptedReason, ChromePhotoDecisionSource.Unavailable)
             }
-        return record(result, started)
+        return if (generation.get() == decisionGeneration) {
+            record(result, started)
+        } else {
+            record(unknown(StaleGenerationReason, ChromePhotoDecisionSource.Unavailable), started)
+        }
     }
 
     override fun cacheSize(): Int = synchronized(cacheLock) { cache.size }
@@ -334,6 +349,8 @@ internal class ChromePhotosBoundedDecisionSession(
 
     private data class DecisionKey(
         val identity: String,
+        val generation: Long,
+        val canonicalMimeType: String,
         val contentHash: String,
     )
 
@@ -349,6 +366,7 @@ internal class ChromePhotosBoundedDecisionSession(
         const val CancelledReason = "decision_cancelled"
         const val EngineExceptionReason = "decision_engine_exception"
         const val InterruptedReason = "decision_interrupted"
+        const val StaleGenerationReason = "decision_generation_stale"
     }
 }
 

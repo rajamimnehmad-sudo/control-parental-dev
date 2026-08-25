@@ -432,6 +432,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         val preferences = labPreferences()
         val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics()
         val decisions = metrics.decisionSession
+        val images = metrics.imageAuthority
         val bootstrap = bootstrapController.state()
         Log.i(
             LogTag,
@@ -451,7 +452,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "proxyP99Ms=${"%.3f".format(Locale.US, metrics.latencyP99Millis)} " +
                 "upstreamSockets=${metrics.upstream.protectedSocketsCreated} " +
                 "protectSuccess=${metrics.upstream.protectSuccess} protectFailure=${metrics.upstream.protectFailure} " +
-                "web11a=${metrics.webSemanticsReport} " +
+                "web11a=${metrics.webSemanticsReport} web11b=${metrics.imageAuthorityReport} " +
                 "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
                 "engineCalls=${decisions.engineCalls} dedupeHits=${decisions.dedupeHits} " +
                 "inferencePeak=${decisions.inferencePeak} inFlightPeak=${decisions.inFlightPeak} " +
@@ -461,6 +462,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "decisionP50Ms=${decisions.decisionP50Ms} decisionP95Ms=${decisions.decisionP95Ms} " +
                 "decisionP99Ms=${decisions.decisionP99Ms} cacheHitP50Ms=${decisions.cacheHitP50Ms} " +
                 "cacheHitP95Ms=${decisions.cacheHitP95Ms} " +
+                "imageCandidates=${images.candidates} imagePrefixPeeks=${images.prefixPeeks} " +
+                "imageMagicCandidates=${images.magicCandidates} imageBodyAdmissionPeak=${images.bodyAdmissionPeak} " +
+                "imageBodyAdmissionRejects=${images.bodyAdmissionRejects} " +
                 "quicAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyQuicAttempts, 0L)} " +
                 "directTcpAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts, 0L)} " +
                 "bootstrapResetGeneration=${bootstrap.resetGeneration} " +

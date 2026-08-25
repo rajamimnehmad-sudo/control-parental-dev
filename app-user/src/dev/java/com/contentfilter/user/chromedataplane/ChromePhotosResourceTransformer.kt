@@ -107,8 +107,10 @@ private class HashRegistryDecisionSession(
     private val safeHashes = safeBytes.mapTo(mutableSetOf(), ::sha256).apply { addAll(safeContentHashes) }
     private val blockedHashes = blockedBytes.mapTo(mutableSetOf(), ::sha256).apply { addAll(blockedContentHashes) }
     private val cache =
-        object : LinkedHashMap<String, ChromePhotoDecision>(maximumEntries, LoadFactor, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, ChromePhotoDecision>?): Boolean =
+        object : LinkedHashMap<HashRegistryKey, ChromePhotoDecision>(maximumEntries, LoadFactor, true) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<HashRegistryKey, ChromePhotoDecision>?,
+            ): Boolean =
                 size > maximumEntries
         }
 
@@ -124,13 +126,14 @@ private class HashRegistryDecisionSession(
         imageBytes: ByteArray,
         mimeType: String,
     ): ChromePhotoDecisionResult {
-        val cached = cache[contentHash]
+        val key = HashRegistryKey(contentHash, mimeType.normalizedImageMimeType())
+        val cached = cache[key]
         val decision =
             cached ?: when (contentHash) {
                 in safeHashes -> ChromePhotoDecision.Safe
                 in blockedHashes -> ChromePhotoDecision.Block
                 else -> ChromePhotoDecision.Unknown
-            }.also { cache[contentHash] = it }
+            }.also { cache[key] = it }
         return ChromePhotoDecisionResult(
             decision = decision,
             reason = "deterministic_hash_${decision.name.lowercase()}",
@@ -150,6 +153,11 @@ private class HashRegistryDecisionSession(
         const val LoadFactor = 0.75f
         val Sha256Pattern = Regex("[0-9a-f]{64}")
     }
+
+    private data class HashRegistryKey(
+        val contentHash: String,
+        val canonicalMimeType: String,
+    )
 }
 
 internal fun chromePhotosDeterministicTransformer(origin: ChromePhotosFixtureSource): ChromePhotosResourceTransformer =

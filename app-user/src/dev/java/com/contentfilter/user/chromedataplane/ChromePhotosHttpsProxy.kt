@@ -39,7 +39,9 @@ internal data class ChromePhotosProxyMetrics(
     val latencyP99Millis: Double = 0.0,
     val upstream: ChromePhotosUpstreamMetrics = ChromePhotosUpstreamMetrics(0, 0, 0),
     val webSemanticsReport: String = "not_run",
+    val imageAuthorityReport: String = "not_run",
     val decisionSession: ChromePhotoDecisionSessionMetrics = ChromePhotoDecisionSessionMetrics(),
+    val imageAuthority: ChromeImageAuthorityMetrics = ChromeImageAuthorityMetrics(),
 )
 
 internal enum class ChromeHttpConnectionDisposition {
@@ -55,6 +57,7 @@ internal class ChromePhotosHttpsProxy(
     private val destinationAuthority: ChromePublicDestinationAuthority = ChromePublicDestinationAuthority(),
     private val upstream: ChromePhotosUpstream = ChromePhotosRealUpstream(destinationAuthority = destinationAuthority),
     private val transformer: ChromePhotosResourceTransformer = chromePhotosDeterministicTransformer(origin),
+    private val imageAuthority: ChromeImageContentAuthority = ChromeImageContentAuthority(),
     private val lifecycleLog: (String, Throwable?) -> Unit = ::logProxyLifecycle,
     private val infoLog: (String) -> Unit = { message -> Log.i(LogTag, message) },
     private val warningLog: (String) -> Unit = { message -> Log.w(LogTag, message) },
@@ -64,6 +67,7 @@ internal class ChromePhotosHttpsProxy(
             transformer = transformer,
             destinationAuthority = destinationAuthority,
             placeholderBytes = origin.placeholderImageBytes,
+            imageAuthority = imageAuthority,
         )
     private val requestReader = ChromeHttp1RequestReader()
     private val responseWriter = ChromeHttp1ResponseWriter()
@@ -148,7 +152,9 @@ internal class ChromePhotosHttpsProxy(
             latencyP99Millis = latency.p99,
             upstream = upstream.metrics(),
             webSemanticsReport = origin.webSemanticsReport(),
+            imageAuthorityReport = origin.imageAuthorityReport(),
             decisionSession = transformer.decisionMetrics(),
+            imageAuthority = imageAuthority.metrics(),
         )
     }
 
@@ -310,36 +316,15 @@ internal class ChromePhotosHttpsProxy(
         var responseStarted = false
         return try {
             val started = System.nanoTime()
-            val response = origin.responseFor(request)
-            val transformed = transformer.transform(response.contentType, response.originalBytes)
-            val contentType =
-                if (
-                    transformed.decision in
-                    setOf(ChromePhotosResourceDecision.Block, ChromePhotosResourceDecision.Unknown)
-                ) {
-                    "image/png"
-                } else {
-                    response.contentType
-                }
-            val headers =
-                if (response.contentType.startsWith("image/", ignoreCase = true)) {
-                    ChromeHttpHeaderPolicy.transformedImageHeaders(response.headers, contentType)
-                } else {
-                    ChromeHttpHeaderPolicy.downstreamResponseHeaders(response.headers) +
-                        ChromeHttpHeader("Content-Type", contentType)
-                }
+            val response = origin.responseFor(imageAuthority.normalizeUpstreamRequest(request))
+            val fixtureUpstream = response.asUpstreamResponse()
             val sanitized =
-                ChromePhotosSanitizedResponse(
-                    statusCode = response.statusCode,
-                    statusText = response.statusText,
-                    headers = headers,
-                    bytes = transformed.bytes,
-                    decision = transformed.decision,
-                    cacheHit = transformed.cacheHit,
-                    contentHash = transformed.contentHash,
-                    inputBytes = response.originalBytes.size,
-                    decisionResult = transformed.decisionResult,
-                )
+                when (val inspection = imageAuthority.inspectBuffered(request, fixtureUpstream, response.originalBytes)) {
+                    is ChromeImageContentInspection.Candidate ->
+                        responseSanitizer.sanitizeCandidate(request.method, inspection)
+                    is ChromeImageContentInspection.Passthrough ->
+                        response.asPassthroughSanitizedResponse()
+                }
             requests.incrementAndGet()
             originalBytes.addAndGet(response.originalBytes.size.toLong())
             responseStarted = true
@@ -375,14 +360,29 @@ internal class ChromePhotosHttpsProxy(
         val started = System.nanoTime()
         var responseStarted = false
         return try {
-            upstream.execute(host, request).use { exchange ->
+            val upstreamRequest = imageAuthority.normalizeUpstreamRequest(request)
+            upstream.execute(host, upstreamRequest).use { exchange ->
                 val response = exchange.response
                 requests.incrementAndGet()
                 val redirectBlocked =
                     response.statusCode in RedirectCodes &&
                         response.headers.firstValue("Location")?.let(responseSanitizer::isAllowedRedirect) != true
-                if (redirectBlocked || responseSanitizer.isImage(response)) {
-                    val sanitized = responseSanitizer.sanitize(request.method, response)
+                val inspection =
+                    if (response.statusCode in RedirectCodes) {
+                        null
+                    } else {
+                        imageAuthority.inspect(request, response)
+                    }
+                if (redirectBlocked || inspection is ChromeImageContentInspection.Candidate) {
+                    val sanitized =
+                        if (redirectBlocked) {
+                            responseSanitizer.sanitizeRedirect(response)
+                        } else {
+                            responseSanitizer.sanitizeCandidate(
+                                request.method,
+                                inspection as ChromeImageContentInspection.Candidate,
+                            )
+                        }
                     responseStarted = true
                     val result = responseWriter.writeBuffered(output, request, sanitized)
                     originalBytes.addAndGet(sanitized.inputBytes.toLong())
@@ -390,16 +390,18 @@ internal class ChromePhotosHttpsProxy(
                     recordDecision(sanitized)
                     logRealResponse(host, request, clientProtocol, response, sanitized, result, started)
                 } else {
+                    val streamingResponse =
+                        (inspection as? ChromeImageContentInspection.Passthrough)?.response ?: response
                     responseStarted = true
-                    val result = responseWriter.writeStreaming(output, request, response)
+                    val result = responseWriter.writeStreaming(output, request, streamingResponse)
                     streamedResponses.incrementAndGet()
                     originalBytes.addAndGet(result.bytesWritten)
                     deliveredBytes.addAndGet(result.bytesWritten)
                     passthroughResponses.incrementAndGet()
                     infoLog(
                         "origin=real host=$host method=${request.method} clientProtocol=$clientProtocol " +
-                            "upstreamProtocol=${response.protocol} status=${response.statusCode} " +
-                            "contentType=${response.headers.firstValue("Content-Type").safeLogContentType()} " +
+                            "upstreamProtocol=${streamingResponse.protocol} status=${streamingResponse.statusCode} " +
+                            "contentType=${streamingResponse.headers.firstValue("Content-Type").safeLogContentType()} " +
                             "bytesOut=${result.bytesWritten} transfer=${if (result.chunked) "chunked" else "fixed"}",
                     )
                 }
@@ -553,6 +555,31 @@ private fun logProxyLifecycle(
 
 private fun ChromePhotosProxyRequest.successDisposition(): ChromeHttpConnectionDisposition =
     if (closeAfterResponse) ChromeHttpConnectionDisposition.Close else ChromeHttpConnectionDisposition.Continue
+
+private fun ChromePhotosFixtureResponse.asUpstreamResponse(): ChromePhotosUpstreamResponse =
+    ChromePhotosUpstreamResponse(
+        host = ChromePhotosDataPlaneLabContract.FixtureHost,
+        statusCode = statusCode,
+        statusText = statusText,
+        headers = headers + ChromeHttpHeader("Content-Type", contentType),
+        body = originalBytes.inputStream(),
+        bodyLength = originalBytes.size.toLong(),
+        protocol = "fixture",
+    )
+
+private fun ChromePhotosFixtureResponse.asPassthroughSanitizedResponse(): ChromePhotosSanitizedResponse =
+    ChromePhotosSanitizedResponse(
+        statusCode = statusCode,
+        statusText = statusText,
+        headers =
+            ChromeHttpHeaderPolicy.downstreamResponseHeaders(headers) +
+                ChromeHttpHeader("Content-Type", contentType),
+        bytes = originalBytes,
+        decision = ChromePhotosResourceDecision.Passthrough,
+        cacheHit = false,
+        contentHash = null,
+        inputBytes = originalBytes.size,
+    )
 
 private data class ChromeProxyLatencySnapshot(
     val p50: Double,

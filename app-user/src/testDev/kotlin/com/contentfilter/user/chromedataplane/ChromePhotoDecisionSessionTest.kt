@@ -32,6 +32,24 @@ class ChromePhotoDecisionSessionTest {
     }
 
     @Test
+    fun `same content hash with different canonical MIME never shares cache`() {
+        val engine = FakeEngine { safeResult() }
+        val session = session(engine)
+        val bytes = "same-image".toByteArray()
+
+        val png = session.decide(sha256(bytes), bytes, "image/png")
+        val jpeg = session.decide(sha256(bytes), bytes, "image/jpeg")
+        val pngAgain = session.decide(sha256(bytes), bytes, "image/png; charset=binary")
+
+        assertEquals(ChromePhotoDecisionSource.Engine, png.source)
+        assertEquals(ChromePhotoDecisionSource.Engine, jpeg.source)
+        assertEquals(ChromePhotoDecisionSource.Cache, pngAgain.source)
+        assertEquals(2, engine.calls.get())
+        assertEquals(2, session.cacheSize())
+        session.close()
+    }
+
+    @Test
     fun `simultaneous same hash requests deduplicate in flight inference`() {
         val inferenceEntered = CountDownLatch(1)
         val releaseInference = CountDownLatch(1)
@@ -176,6 +194,33 @@ class ChromePhotoDecisionSessionTest {
         session.clear()
         assertEquals(0, session.cacheSize())
         assertEquals(0, session.metrics().inFlightEntries)
+        session.close()
+    }
+
+    @Test
+    fun `clear invalidates in flight generation and late SAFE cannot escape or repopulate cache`() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val engine =
+            FakeEngine {
+                entered.countDown()
+                runCatching { release.await() }
+                safeResult()
+            }
+        val session = session(engine, timeoutMillis = 2_000)
+        val caller = Executors.newSingleThreadExecutor()
+        val bytes = "generation".toByteArray()
+        val pending = caller.submit(Callable { session.decide(sha256(bytes), bytes, "image/png") })
+        assertTrue(entered.await(1, TimeUnit.SECONDS))
+
+        session.clear()
+        release.countDown()
+        val result = pending.get(1, TimeUnit.SECONDS)
+
+        assertEquals(ChromePhotoDecision.Unknown, result.decision)
+        assertEquals(0, session.cacheSize())
+        assertEquals(0, session.metrics().inFlightEntries)
+        caller.shutdownNow()
         session.close()
     }
 

@@ -64,7 +64,13 @@ class ChromePhotosHttpsProxyConnectionTest {
     fun `chunked body failure omits terminator and closes before second request`() {
         val upstream =
             ScriptedUpstream(
-                Reply(response(body = FailingAfterPrefixInputStream("abc".toByteArray()), bodyLength = -1)),
+                Reply(
+                    response(
+                        body = FailingAfterPrefixInputStream("abc".toByteArray()),
+                        bodyLength = -1,
+                        extraHeaders = listOf(ChromeHttpHeader("Content-Encoding", "gzip")),
+                    ),
+                ),
                 Reply(response(body = "second", bodyLength = 6)),
             )
         val result = runSession(upstream, twoRequests())
@@ -209,17 +215,18 @@ class ChromePhotosHttpsProxyConnectionTest {
     private fun response(
         body: String,
         bodyLength: Long,
-    ) = response(body.byteInputStream(), bodyLength)
+    ) = response(body.byteInputStream(), bodyLength, emptyList())
 
     private fun response(
         body: InputStream,
         bodyLength: Long,
+        extraHeaders: List<ChromeHttpHeader> = emptyList(),
     ) = ChromePhotosUpstreamResponse(
         host = "example.com",
         statusCode = 200,
         statusText = "OK",
         headers =
-            listOf(ChromeHttpHeader("Content-Type", "text/plain")) +
+            listOf(ChromeHttpHeader("Content-Type", "text/plain")) + extraHeaders +
                 if (bodyLength >= 0) listOf(ChromeHttpHeader("Content-Length", bodyLength.toString())) else emptyList(),
         body = body,
         bodyLength = bodyLength,

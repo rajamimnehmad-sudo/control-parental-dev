@@ -92,4 +92,29 @@ class ChromePhotosFixtureOriginTest {
         )
         assertEquals("GET:PASS,POST:PASS", origin.webSemanticsReport())
     }
+
+    @Test
+    fun `image authority fixture records normalized image request and bounded report`() {
+        val origin = ChromePhotosFixtureOrigin("safe".toByteArray(), "block".toByteArray(), "placeholder".toByteArray())
+        val normalized =
+            ChromePhotosProxyRequest(
+                method = "GET",
+                target = "/web11b/normalized.png",
+                headers = listOf(ChromeHttpHeader("Accept-Encoding", "identity")),
+            )
+
+        assertEquals("web11b-normalization-pass", origin.responseFor(normalized).resourceId)
+        assertContentEquals(
+            "NORMALIZATION_PASS".toByteArray(),
+            origin.responseFor(ChromePhotosProxyRequest("GET", "/web11b/state")).originalBytes,
+        )
+        origin.responseFor(
+            ChromePhotosProxyRequest(
+                method = "POST",
+                target = "/web11b/report",
+                body = "SAFE:PASS,MISLABELED:PASS".toByteArray(),
+            ),
+        )
+        assertEquals("SAFE:PASS,MISLABELED:PASS", origin.imageAuthorityReport())
+    }
 }

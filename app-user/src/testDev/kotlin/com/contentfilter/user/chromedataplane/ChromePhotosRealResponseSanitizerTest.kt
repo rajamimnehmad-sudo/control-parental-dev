@@ -9,8 +9,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ChromePhotosRealResponseSanitizerTest {
-    private val safe = "safe-public-image".toByteArray()
-    private val blocked = "block-public-image".toByteArray()
+    private val safe = png("safe-public-image")
+    private val blocked = webp("block-public-image")
     private val placeholder = "neutral-png-placeholder".toByteArray()
     private val authority =
         ChromePublicDestinationAuthority(
@@ -47,7 +47,7 @@ class ChromePhotosRealResponseSanitizerTest {
     @Test
     fun `BLOCK and UNKNOWN images become placeholder without original bytes`() {
         val blockedResult = sanitizer.sanitize("GET", upstream("image/webp", blocked))
-        val unknownResult = sanitizer.sanitize("GET", upstream("image/jpeg", "unknown".toByteArray()))
+        val unknownResult = sanitizer.sanitize("GET", upstream("image/jpeg", jpeg("unknown")))
 
         listOf(blockedResult, unknownResult).forEach { result ->
             assertEquals("image/png", result.contentType)
@@ -61,17 +61,20 @@ class ChromePhotosRealResponseSanitizerTest {
 
     @Test
     fun `oversized or encoded image fails closed before original delivery`() {
-        val tooLarge = sanitizer.sanitize("GET", upstream("image/avif", ByteArray(65)))
+        val tooLarge = sanitizer.sanitize("GET", upstream("image/avif", avif() + ByteArray(65)))
         val compressed = sanitizer.sanitize("GET", upstream("image/jpeg", safe, encoding = "gzip"))
+        val brotli = sanitizer.sanitize("GET", upstream("image/jpeg", safe, encoding = "br"))
 
         assertEquals(ChromePhotosResourceDecision.Unknown, tooLarge.decision)
         assertEquals(ChromePhotosResourceDecision.Unknown, compressed.decision)
+        assertEquals(ChromePhotosResourceDecision.Unknown, brotli.decision)
         assertContentEquals(placeholder, tooLarge.bytes)
         assertContentEquals(placeholder, compressed.bytes)
+        assertContentEquals(placeholder, brotli.bytes)
     }
 
     @Test
-    fun `HEAD and 304 never fabricate a body and retain validators`() {
+    fun `HEAD has no body while image 304 becomes current generation placeholder`() {
         val head =
             sanitizer.sanitize(
                 "HEAD",
@@ -90,8 +93,52 @@ class ChromePhotosRealResponseSanitizerTest {
 
         assertEquals(0, head.bytes.size)
         assertEquals("\"fixture\"", head.headers.firstValue("ETag"))
-        assertEquals(0, notModified.bytes.size)
-        assertEquals(304, notModified.statusCode)
+        assertContentEquals(placeholder, notModified.bytes)
+        assertEquals(200, notModified.statusCode)
+        assertEquals(ChromePhotosResourceDecision.Unknown, notModified.decision)
+    }
+
+    @Test
+    fun `mislabeled identity image is inspected and SAFE uses canonical MIME`() {
+        val result = sanitizer.sanitize("GET", upstream("application/octet-stream", safe))
+
+        assertEquals(ChromePhotosResourceDecision.Safe, result.decision)
+        assertEquals("image/png", result.contentType)
+        assertContentEquals(safe, result.bytes)
+        assertEquals("no-store", result.headers.firstValue("Cache-Control"))
+        assertEquals("nosniff", result.headers.firstValue("X-Content-Type-Options"))
+    }
+
+    @Test
+    fun `declared image HTML and partial image never reach Chrome raw`() {
+        val html = "<html>not-image</html>".toByteArray()
+        val declared = sanitizer.sanitize("GET", upstream("image/png", html))
+        val partial = sanitizer.sanitize("GET", upstream("image/png", safe, statusCode = 206))
+
+        listOf(declared, partial).forEach { result ->
+            assertEquals(ChromePhotosResourceDecision.Unknown, result.decision)
+            assertContentEquals(placeholder, result.bytes)
+            assertEquals(200, result.statusCode)
+        }
+    }
+
+    @Test
+    fun `SVG animated and malformed candidates never deliver source bytes`() {
+        val sources =
+            listOf(
+                "<svg><script>alert(1)</script></svg>".toByteArray(),
+                "GIF89a-animated".toByteArray(),
+                png("acTL-animation"),
+                "not-an-image".toByteArray(),
+            )
+
+        sources.forEach { source ->
+            val result = sanitizer.sanitize("GET", upstream("image/png", source))
+            assertEquals(ChromePhotosResourceDecision.Unknown, result.decision)
+            assertContentEquals(placeholder, result.bytes)
+            assertFalse(result.bytes.contentEquals(source))
+            assertEquals("nosniff", result.headers.firstValue("X-Content-Type-Options"))
+        }
     }
 
     @Test
@@ -170,4 +217,24 @@ class ChromePhotosRealResponseSanitizerTest {
             ChromeHttpHeader("ETag", "\"fixture\""),
             ChromeHttpHeader("Last-Modified", "Sun, 24 Aug 2026 12:00:00 GMT"),
         )
+
+    private fun png(value: String) =
+        byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a) + value.toByteArray()
+
+    private fun jpeg(value: String) = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte()) + value.toByteArray()
+
+    private fun webp(value: String): ByteArray {
+        val header = ByteArray(12)
+        "RIFF".toByteArray().copyInto(header, 0)
+        "WEBP".toByteArray().copyInto(header, 8)
+        return header + value.toByteArray()
+    }
+
+    private fun avif(): ByteArray {
+        val bytes = ByteArray(16)
+        bytes[3] = bytes.size.toByte()
+        "ftyp".toByteArray().copyInto(bytes, 4)
+        "avif".toByteArray().copyInto(bytes, 8)
+        return bytes
+    }
 }
