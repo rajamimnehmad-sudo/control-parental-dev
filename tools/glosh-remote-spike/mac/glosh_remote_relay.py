@@ -116,6 +116,8 @@ class RemoteSession:
         self.claim_lock = asyncio.Lock()
         self.send_lock = asyncio.Lock()
         self.pending: Dict[str, asyncio.Future] = {}
+        self.support_slot_claimed = False
+        self.accepted_request_id: Optional[str] = None
         self.server_seq = 0
         self.agent_seq = 0
 
@@ -367,7 +369,7 @@ async def interactive_cli(
                 continue
             request_id = raw.split(maxsplit=1)[1].strip()
             try:
-                print(await accept_request(broker, request_id, descriptor))
+                print(await accept_request(broker, request_id, descriptor, session))
             except Exception as exc:
                 print(f"[broker] no se pudo aceptar la solicitud: {exc}")
             continue
