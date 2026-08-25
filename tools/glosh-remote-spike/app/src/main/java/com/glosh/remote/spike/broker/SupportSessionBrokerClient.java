@@ -176,21 +176,24 @@ public final class SupportSessionBrokerClient {
         enqueue(current, request, new ResponseHandler() {
             @Override
             public void handle(Response response) {
-                if (response.code() == 503) {
-                    unavailable(current, listener);
-                    return;
-                }
                 if (!response.isSuccessful()) {
-                    fail(current, listener);
+                    if (response.code() == 503 || isTransient(response.code())) {
+                        retryFreshRequest(current, device, listener);
+                    } else {
+                        fail(current, listener);
+                    }
                     return;
                 }
+                recordSuccess(current);
                 post(current, () -> listener.onPending(currentRequestId(current)));
                 schedulePoll(current, device, listener);
             }
 
             @Override
             public void failed() {
-                fail(current, listener);
+                // The request may have reached the broker. Poll the same id/nonce first so a
+                // transport error cannot create a duplicate pending request.
+                retryPoll(current, device, listener);
             }
         });
     }
@@ -208,9 +211,16 @@ public final class SupportSessionBrokerClient {
             @Override
             public void handle(Response response) throws Exception {
                 if (!response.isSuccessful()) {
-                    fail(current, listener);
+                    if (response.code() == 404 || response.code() == 410) {
+                        retryFreshRequest(current, device, listener);
+                    } else if (isTransient(response.code())) {
+                        retryPoll(current, device, listener);
+                    } else {
+                        fail(current, listener);
+                    }
                     return;
                 }
+                recordSuccess(current);
                 JSONObject value = responseJson(response);
                 String state = value.optString("state", value.optString("status", ""));
                 if ("pending".equals(state)) {
@@ -226,9 +236,27 @@ public final class SupportSessionBrokerClient {
 
             @Override
             public void failed() {
-                fail(current, listener);
+                retryPoll(current, device, listener);
             }
         });
+    }
+
+    private void retryPoll(int current, DeviceMetadata device, Listener listener) {
+        long delay = nextRetryDelay(current);
+        if (delay < 0L) {
+            fail(current, listener);
+            return;
+        }
+        main.postDelayed(() -> poll(current, device, listener), delay);
+    }
+
+    private void retryFreshRequest(int current, DeviceMetadata device, Listener listener) {
+        long delay = nextRetryDelay(current);
+        if (delay < 0L) {
+            unavailable(current, listener);
+            return;
+        }
+        main.postDelayed(() -> renewExpiredRequest(current, device, listener), delay);
     }
 
     private void renewExpiredRequest(int current, DeviceMetadata device, Listener listener) {
@@ -248,6 +276,16 @@ public final class SupportSessionBrokerClient {
         return current == generation && waitPolicy.shouldRenew(state);
     }
 
+    private synchronized long nextRetryDelay(int current) {
+        return current == generation ? waitPolicy.nextRetryDelayMillis() : -1L;
+    }
+
+    private synchronized void recordSuccess(int current) {
+        if (current == generation) {
+            waitPolicy.recordSuccess();
+        }
+    }
+
     private void claim(int current, Listener listener) {
         JSONObject body = boundAction(current, "claim");
         if (body == null) {
@@ -265,6 +303,8 @@ public final class SupportSessionBrokerClient {
 
             @Override
             public void failed() {
+                // Claim is intentionally not retried: the broker consumes ciphertext on claim,
+                // so ambiguous transport failure must fail closed rather than risk state reuse.
                 fail(current, listener);
             }
         });
@@ -368,6 +408,10 @@ public final class SupportSessionBrokerClient {
             throw new IOException("Broker response too large");
         }
         return new JSONObject(raw);
+    }
+
+    private static boolean isTransient(int code) {
+        return code == 408 || code == 425 || code == 429 || code >= 500;
     }
 
     private void unavailable(int current, Listener listener) {
