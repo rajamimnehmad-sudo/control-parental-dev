@@ -3,8 +3,6 @@ package com.glosh.remote.spike.broker;
 import android.content.Context;
 import android.os.Build;
 
-import com.glosh.remote.spike.guide.state.GuideStage;
-import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.wizard.DeveloperGuidePhase;
 import com.glosh.remote.spike.wizard.DeviceProfile;
@@ -14,6 +12,7 @@ import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.WizardPersistence;
 import com.glosh.remote.spike.wizard.WizardSnapshot;
 
+/** Broker/session state only. The Samsung visual guide owns its own UI progress. */
 public final class SupportSessionCoordinator {
     public interface Listener {
         void onStateChanged();
@@ -51,7 +50,6 @@ public final class SupportSessionCoordinator {
                 detected.oemVersion(),
                 restored.family());
         recipe = OemGuideRecipe.forProfile(profile);
-        LiveGuideRuntime.initialize(context, profile.family());
         onboarding.restore(restored.step());
         developerPhase = restored.developerPhase();
         developerConfirmed = restored.developerConfirmed();
@@ -121,7 +119,6 @@ public final class SupportSessionCoordinator {
             developerPhase = DeveloperGuidePhase.GUIDE;
             developerConfirmed = false;
             wirelessHelp = false;
-            LiveGuideRuntime.reset();
             persist();
         }
         notifyChanged();
@@ -150,7 +147,7 @@ public final class SupportSessionCoordinator {
         });
     }
 
-    /** Starts broker rendezvous while the customer continues the Wireless Debugging step. */
+    /** Starts broker rendezvous once the customer confirms Developer mode is active. */
     public void confirmDeveloperOptions() {
         synchronized (this) {
             if (onboarding.step() != OnboardingState.Step.DEVELOPER_OPTIONS) {
@@ -159,7 +156,6 @@ public final class SupportSessionCoordinator {
             onboarding.developerOptionsReady();
             developerConfirmed = true;
             developerPhase = DeveloperGuidePhase.CONFIRMATION;
-            LiveGuideRuntime.setStage(GuideStage.WIRELESS_DEBUGGING);
             persist();
         }
         notifyChanged();
@@ -183,12 +179,6 @@ public final class SupportSessionCoordinator {
                             descriptor = value;
                             onboarding.sessionReady();
                             wirelessHelp = false;
-                            GuideStage current = LiveGuideRuntime.stage();
-                            GuideStage resume = current == GuideStage.PAIR_CODE_TARGET
-                                    || current == GuideStage.PAIRING
-                                    ? current
-                                    : GuideStage.WIRELESS_DEBUGGING;
-                            LiveGuideRuntime.setStage(resume);
                             persist();
                         }
                         notifyChanged();
@@ -277,7 +267,6 @@ public final class SupportSessionCoordinator {
         developerPhase = DeveloperGuidePhase.GUIDE;
         developerConfirmed = false;
         wirelessHelp = false;
-        LiveGuideRuntime.reset();
         persistence.clear();
         notifyChanged();
     }
