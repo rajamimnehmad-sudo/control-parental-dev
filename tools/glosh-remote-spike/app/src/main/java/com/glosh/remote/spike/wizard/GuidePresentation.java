@@ -200,9 +200,12 @@ public record GuidePresentation(
         if (normalized.contains("detectado") || normalized.contains("esperando")) {
             return Cue.WAIT;
         }
-        return normalized.contains("vincular") || normalized.contains("emparejar")
-                ? Cue.TAP
-                : Cue.CODE;
+        if (normalized.isEmpty()
+                || normalized.contains("vincular")
+                || normalized.contains("emparejar")) {
+            return Cue.TAP;
+        }
+        return Cue.CODE;
     }
 
     private static boolean looksLikeWarning(String value) {
