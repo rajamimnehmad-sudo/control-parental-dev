@@ -1,13 +1,10 @@
 package com.glosh.remote.spike.wizard;
 
 import android.app.Activity;
-import android.content.ComponentName;
 import android.content.Intent;
-import android.net.Uri;
 import android.provider.Settings;
 
-import com.glosh.remote.spike.guide.accessibility.LiveGuideAccessibilityService;
-
+/** Safe Settings destinations used only as accelerators for the manual Samsung guide. */
 public final class SettingsNavigator {
     public void openAboutPhone(Activity activity) {
         open(activity,
@@ -28,21 +25,20 @@ public final class SettingsNavigator {
                 new Intent(Settings.ACTION_SETTINGS));
     }
 
-    public void openAccessibility(Activity activity) {
-        ComponentName service = new ComponentName(activity, LiveGuideAccessibilityService.class);
-        Intent details = new Intent(SettingsRoute.ACCESSIBILITY_DETAILS)
-                .putExtra(Intent.EXTRA_COMPONENT_NAME, service);
-        open(activity,
-                details,
-                new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
-                new Intent(Settings.ACTION_SETTINGS));
+    public void openGeneralSettings(Activity activity) {
+        open(activity, new Intent(Settings.ACTION_SETTINGS));
     }
 
-    public void openAppDetails(Activity activity) {
-        Intent details = new Intent(
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.parse("package:" + activity.getPackageName()));
-        open(activity, details, new Intent(Settings.ACTION_SETTINGS));
+    public void openForStep(Activity activity, SamsungGuideStep step) {
+        SamsungGuideStep.SettingsTarget target = step == null
+                ? SamsungGuideStep.SettingsTarget.NONE
+                : step.settingsTarget();
+        switch (target) {
+            case ABOUT_PHONE -> openAboutPhone(activity);
+            case DEVELOPER_OPTIONS -> openDeveloperOptions(activity);
+            case WIRELESS_DEBUGGING -> openWirelessDebugging(activity);
+            case NONE -> openGeneralSettings(activity);
+        }
     }
 
     private void open(Activity activity, Intent... intents) {
@@ -54,7 +50,7 @@ public final class SettingsNavigator {
                 activity.startActivity(intent);
                 return;
             } catch (Throwable ignored) {
-                // Continue with the next safe Settings destination.
+                // Continue with the next safe Samsung Settings destination.
             }
         }
         activity.startActivity(new Intent(Settings.ACTION_SETTINGS));
