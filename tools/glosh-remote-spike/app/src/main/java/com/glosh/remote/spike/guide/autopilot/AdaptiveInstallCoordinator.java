@@ -27,7 +27,7 @@ import java.util.List;
  *
  * <p>The accessibility service owns Android lifecycle and stable snapshots. This class owns only
  * the pure planner binding and the one-click transaction sequence. It never chains clicks: every
- * successful action invalidates the scan authority and waits for a new stable snapshot.</p>
+ * dispatched action invalidates the scan authority and waits for a new stable snapshot.</p>
  */
 public final class AdaptiveInstallCoordinator {
     public interface Host {
@@ -321,7 +321,7 @@ public final class AdaptiveInstallCoordinator {
         FreshNodeClickExecutor.Result result = clickExecutor.click(
                 token, snapshot, target, LiveGuideRuntime.settingsPackages());
         debug("click target=" + target + " result=" + result);
-        if (result != FreshNodeClickExecutor.Result.CLICKED) {
+        if (result != FreshNodeClickExecutor.Result.ACTION_DISPATCHED) {
             stop("La pantalla cambió antes de poder continuar.");
             return;
         }
@@ -351,6 +351,11 @@ public final class AdaptiveInstallCoordinator {
                 && screen != AutopilotContract.Screen.SOFTWARE_INFO
                 && screen != AutopilotContract.Screen.DEVELOPER_OPTIONS
                 && screen != AutopilotContract.Screen.WIRELESS_DEBUGGING)) {
+            return false;
+        }
+        if (screen == AutopilotContract.Screen.DEVELOPER_OPTIONS
+                && classifier.hasVisibleWirelessDebuggingLabel(snapshot)) {
+            debug("wireless label visible but no safe navigable row; refusing scroll");
             return false;
         }
         if (scrollScreen != screen) {
