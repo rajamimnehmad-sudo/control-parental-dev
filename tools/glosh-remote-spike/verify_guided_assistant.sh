@@ -10,6 +10,7 @@ FINAL_APK="$APK_DIR/GloshRemote-Samsung-Bubble-DEV.apk"
 REPORT="$APK_DIR/REMOTE-SAMSUNG-BUBBLE-GUIDE-12-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-samsung-bubble-python.XXXXXX")"
+MIN_DEV_VERSION_CODE=14
 
 cleanup() {
   rm -rf "$VENV_DIR"
@@ -107,13 +108,15 @@ if [[ ! -s "$DEV_SIGNER_SOURCE" ]]; then
   echo "ERROR: falta la identidad DEV estable." >&2
   exit 3
 fi
+VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$BUILD_GRADLE" | head -n 1)"
 if ! grep -q 'create("stableDev")' "$BUILD_GRADLE" \
-  || ! grep -q 'versionCode = 13' "$BUILD_GRADLE" \
-  || ! grep -q 'signingConfig = signingConfigs.getByName("stableDev")' "$BUILD_GRADLE"; then
-  echo "ERROR: Bubble debug no está fijada a stableDev/versionCode 13." >&2
+  || ! grep -q 'signingConfig = signingConfigs.getByName("stableDev")' "$BUILD_GRADLE" \
+  || [[ ! "$VERSION_CODE" =~ ^[0-9]+$ ]] \
+  || (( VERSION_CODE < MIN_DEV_VERSION_CODE )); then
+  echo "ERROR: Bubble debug debe usar stableDev y versionCode >= $MIN_DEV_VERSION_CODE (actual=${VERSION_CODE:-missing})." >&2
   exit 3
 fi
-printf 'PASS: Samsung-only + system Bubble + no Accessibility/PiP/app-overlay + stable DEV signing\n'
+printf 'PASS: Samsung-only + system Bubble + no Accessibility/PiP/app-overlay + stable DEV signing (versionCode %s)\n' "$VERSION_CODE"
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -188,7 +191,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 {
-  echo "TASK=REMOTE-SAMSUNG-BUBBLE-STABLE-SIGNING-13"
+  echo "TASK=REMOTE-SAMSUNG-BUBBLE-CONVERSATION-GATE-14"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
@@ -196,7 +199,7 @@ STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
   echo "ANDROID_UNIT_TESTS=PASS"
   echo "LINT=PASS"
   echo "ASSEMBLE=PASS"
-  echo "VERSION_CODE=13"
+  echo "VERSION_CODE=$VERSION_CODE"
   echo "DEV_SIGNER_SHA256=$APK_CERT_SHA256"
   echo "APK=$FINAL_APK"
   echo "APK_SIZE_BYTES=$APK_SIZE"
@@ -212,6 +215,7 @@ STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 printf '\nPASS_AUTOMATED\n'
 printf 'HEAD: %s\n' "$HEAD_SHA"
+printf 'VERSION_CODE: %s\n' "$VERSION_CODE"
 printf 'DEV_SIGNER_SHA256: %s\n' "$APK_CERT_SHA256"
 printf 'APK: %s\n' "$FINAL_APK"
 printf 'APK_SIZE_BYTES: %s\n' "$APK_SIZE"
