@@ -621,7 +621,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
 
     private static String openSettingsLabel(SamsungGuideStep step) {
         return switch (step) {
-            case ABOUT_PHONE -> "ABRIR ACERCA DEL TELÉFONO";
+            case ABOUT_PHONE -> "ABRIR AJUSTES";
             case SOFTWARE_INFO, BUILD_NUMBER -> "VOLVER A ACERCA DEL TELÉFONO";
             case DEVELOPER_OPTIONS -> "ABRIR OPCIONES DE DESARROLLADOR";
             case WIRELESS_DEBUGGING -> "ABRIR DEPURACIÓN INALÁMBRICA";
