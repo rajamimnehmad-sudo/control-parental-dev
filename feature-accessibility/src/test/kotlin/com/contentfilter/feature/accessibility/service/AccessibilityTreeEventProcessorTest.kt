@@ -17,13 +17,13 @@ import kotlin.test.assertTrue
 
 class AccessibilityTreeEventProcessorTest {
     @Test
-    fun `same package burst is conflated without starving running search`() {
+    fun `same package burst supersedes old result and converges on latest search`() {
         val harness = ProcessorHarness()
         val firstStarted = CountDownLatch(1)
         val releaseFirst = CountDownLatch(1)
         val latestFinished = CountDownLatch(1)
         val processed = CopyOnWriteArrayList<Long>()
-        val firstRemainedCurrent = AtomicBoolean(false)
+        val firstStillLatest = AtomicBoolean(true)
         lateinit var processor: AccessibilityTreeEventProcessor
         processor =
             harness.processor(
@@ -32,8 +32,9 @@ class AccessibilityTreeEventProcessorTest {
                     if (processed.size == 1) {
                         firstStarted.countDown()
                         releaseFirst.await(1, TimeUnit.SECONDS)
-                        firstRemainedCurrent.set(processor.isSearchContextCurrent(trigger))
+                        firstStillLatest.set(processor.isSearchContextCurrent(trigger))
                     } else {
+                        assertTrue(processor.isSearchContextCurrent(trigger))
                         latestFinished.countDown()
                     }
                 },
@@ -48,8 +49,9 @@ class AccessibilityTreeEventProcessorTest {
             assertTrue(latestFinished.await(1, TimeUnit.SECONDS))
 
             assertEquals(listOf(first, latest), processed.toList())
-            assertTrue(firstRemainedCurrent.get())
+            assertFalse(firstStillLatest.get())
             assertEquals(101L, processor.metrics().submittedSearch)
+            assertTrue(processor.metrics().coalescedSearch >= 99L)
             assertTrue(processor.metrics().startedSearch <= 2L)
         } finally {
             processor.close()
@@ -85,6 +87,37 @@ class AccessibilityTreeEventProcessorTest {
             assertTrue(finished.await(1, TimeUnit.SECONDS))
 
             assertEquals(listOf(false, true), currency.toList())
+        } finally {
+            processor.close()
+            harness.close()
+        }
+    }
+
+    @Test
+    fun `settings submission invalidates search from prior package surface`() {
+        val harness = ProcessorHarness()
+        val searchStarted = CountDownLatch(1)
+        val releaseSearch = CountDownLatch(1)
+        val searchCurrent = AtomicBoolean(true)
+        val settingsFinished = CountDownLatch(1)
+        lateinit var processor: AccessibilityTreeEventProcessor
+        processor =
+            harness.processor(
+                processSearch = { trigger ->
+                    searchStarted.countDown()
+                    releaseSearch.await(1, TimeUnit.SECONDS)
+                    searchCurrent.set(processor.isSearchContextCurrent(trigger))
+                },
+                processSettings = { settingsFinished.countDown() },
+            )
+
+        try {
+            processor.submitSearch(Chrome, "SEARCH")
+            assertTrue(searchStarted.await(1, TimeUnit.SECONDS))
+            processor.submitSettings(Settings, "SETTINGS", 1, null, SettingsEventSignals())
+            releaseSearch.countDown()
+            assertTrue(settingsFinished.await(1, TimeUnit.SECONDS))
+            assertFalse(searchCurrent.get())
         } finally {
             processor.close()
             harness.close()
@@ -170,6 +203,36 @@ class AccessibilityTreeEventProcessorTest {
             assertEquals(latestSettings, settingsSequences.last())
             assertEquals(listOf(search), searchSequences.toList())
             assertEquals(101L, processor.metrics().submittedSettings)
+            assertTrue(processor.metrics().coalescedSettings >= 99L)
+        } finally {
+            processor.close()
+            harness.close()
+        }
+    }
+
+    @Test
+    fun `explicit context invalidation clears pending settings work`() {
+        val harness = ProcessorHarness()
+        val searchStarted = CountDownLatch(1)
+        val releaseSearch = CountDownLatch(1)
+        val settingsCalls = CopyOnWriteArrayList<Long>()
+        val processor =
+            harness.processor(
+                processSearch = {
+                    searchStarted.countDown()
+                    releaseSearch.await(1, TimeUnit.SECONDS)
+                },
+                processSettings = { trigger -> settingsCalls += trigger.sequence },
+            )
+
+        try {
+            processor.submitSearch(Chrome, "HOLD")
+            assertTrue(searchStarted.await(1, TimeUnit.SECONDS))
+            processor.submitSettings(Settings, "PENDING", 1, null, SettingsEventSignals())
+            processor.invalidateSettingsContext()
+            releaseSearch.countDown()
+            Thread.sleep(50)
+            assertTrue(settingsCalls.isEmpty())
         } finally {
             processor.close()
             harness.close()
@@ -240,7 +303,7 @@ class AccessibilityTreeEventProcessorTest {
     }
 
     @Test
-    fun `settings scanner enforces the same node budget instead of four independent walks`() {
+    fun `settings scanner enforces one bounded walk instead of four independent walks`() {
         val scanner = AccessibilitySettingsPageScanner(maximumNodes = 4, maximumScanNanos = 1_000L, nanoTime = { 0L })
 
         val result = scanner.scan(deepTree(30), "com.contentfilter.user.dev", "Content Filter")
