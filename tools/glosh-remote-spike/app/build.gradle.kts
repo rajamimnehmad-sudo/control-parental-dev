@@ -11,6 +11,20 @@ val escapedBrokerBaseUrl = brokerBaseUrl
     .replace("\r", "")
     .replace("\n", "")
 
+// DEV-ONLY signing identity. It is intentionally repository-stable so GitHub Actions builds
+// can update one another on physical devices. Never reuse this signer for a production package.
+val stableDevStoreSource = rootProject.file("dev-signing/glosh-remote-dev.p12.b64")
+val stableDevStoreFile = layout.buildDirectory
+    .file("stable-dev-signing/glosh-remote-dev.p12")
+    .get()
+    .asFile
+if (!stableDevStoreFile.exists()) {
+    stableDevStoreFile.parentFile.mkdirs()
+    stableDevStoreFile.writeBytes(
+        java.util.Base64.getMimeDecoder().decode(stableDevStoreSource.readText()),
+    )
+}
+
 android {
     namespace = "com.glosh.remote.spike"
     compileSdk = 35
@@ -19,21 +33,34 @@ android {
         applicationId = "com.glosh.remote.spike"
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-spike"
+        versionCode = 12
+        versionName = "0.1.0-dev12"
 
         buildConfigField("String", "BROKER_BASE_URL", "\"$escapedBrokerBaseUrl\"")
 
         testInstrumentationRunner = "android.test.InstrumentationTestRunner"
     }
 
+    signingConfigs {
+        create("stableDev") {
+            storeFile = stableDevStoreFile
+            storePassword = "GloshRemoteDev2026!"
+            keyAlias = "glosh-remote-dev"
+            keyPassword = "GloshRemoteDev2026!"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("stableDev")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // Deliberately unsigned here. Production signing must remain a separate decision.
         }
     }
 
