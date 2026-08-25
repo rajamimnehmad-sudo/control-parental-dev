@@ -105,10 +105,12 @@ class MainActivity : ComponentActivity() {
 private fun ControlCenterApp() {
     var tracker by remember { mutableStateOf(parseTracker(DEFAULT_TRACKER_JSON)) }
     var currentView by rememberSaveable { mutableStateOf(AppView.Priority) }
+    var selectedStateWire by rememberSaveable { mutableStateOf<String?>(null) }
     var expandedTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var expandedSectionId by rememberSaveable { mutableStateOf<String?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     var lastSyncLabel by remember { mutableStateOf("datos incluidos") }
+    val selectedState = TaskState.entries.firstOrNull { it.wire == selectedStateWire }
     val scope = rememberCoroutineScope()
 
     fun refresh() {
@@ -151,23 +153,41 @@ private fun ControlCenterApp() {
                     Header(tracker, lastSyncLabel, refreshing, ::refresh)
                     ViewSelector(currentView) { selected ->
                         currentView = selected
+                        selectedStateWire = null
                         expandedTaskId = null
                         expandedSectionId = null
                     }
-                    StatusSummary(tracker.sections.flatMap { it.tasks })
-                    when (currentView) {
-                        AppView.Priority -> PriorityScreen(
+                    StatusSummary(
+                        tasks = tracker.sections.flatMap { it.tasks },
+                        selectedState = selectedState,
+                        onState = { state ->
+                            selectedStateWire = if (selectedState == state) null else state.wire
+                            expandedTaskId = null
+                            expandedSectionId = null
+                        },
+                    )
+                    if (selectedState != null) {
+                        StatusScreen(
                             tracker = tracker,
+                            state = selectedState,
                             expandedTaskId = expandedTaskId,
                             onTask = { id -> expandedTaskId = if (expandedTaskId == id) null else id },
                         )
-                        AppView.Sections -> SectionsScreen(
-                            tracker = tracker,
-                            expandedSectionId = expandedSectionId,
-                            expandedTaskId = expandedTaskId,
-                            onSection = { id -> expandedSectionId = if (expandedSectionId == id) null else id },
-                            onTask = { id -> expandedTaskId = if (expandedTaskId == id) null else id },
-                        )
+                    } else {
+                        when (currentView) {
+                            AppView.Priority -> PriorityScreen(
+                                tracker = tracker,
+                                expandedTaskId = expandedTaskId,
+                                onTask = { id -> expandedTaskId = if (expandedTaskId == id) null else id },
+                            )
+                            AppView.Sections -> SectionsScreen(
+                                tracker = tracker,
+                                expandedSectionId = expandedSectionId,
+                                expandedTaskId = expandedTaskId,
+                                onSection = { id -> expandedSectionId = if (expandedSectionId == id) null else id },
+                                onTask = { id -> expandedTaskId = if (expandedTaskId == id) null else id },
+                            )
+                        }
                     }
                 }
             }
@@ -280,6 +300,40 @@ private fun PriorityScreen(
             item { EmptyLine("No quedan tareas pendientes") }
         } else {
             items(next, key = { it.task.id }) { routedTask ->
+                TaskRow(
+                    task = routedTask.task,
+                    sectionTitle = routedTask.section.title,
+                    expanded = expandedTaskId == routedTask.task.id,
+                    onClick = { onTask(routedTask.task.id) },
+                )
+            }
+        }
+        item { Spacer(Modifier.height(28.dp)) }
+    }
+}
+
+@Composable
+private fun StatusScreen(
+    tracker: Tracker,
+    state: TaskState,
+    expandedTaskId: String?,
+    onTask: (String) -> Unit,
+) {
+    val routed = tracker.sections
+        .flatMap { section -> section.tasks.map { RoutedTask(section, it) } }
+        .filter { it.task.state == state }
+        .sortedWith(
+            compareBy<RoutedTask> { priorityRank(it.task.priority) }
+                .thenBy { it.section.title }
+                .thenBy { it.task.title },
+        )
+
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item { ListHeading(summaryLabel(state), "Todas las tareas con este estado") }
+        if (routed.isEmpty()) {
+            item { EmptyLine("No hay tareas en este estado") }
+        } else {
+            items(routed, key = { it.task.id }) { routedTask ->
                 TaskRow(
                     task = routedTask.task,
                     sectionTitle = routedTask.section.title,
@@ -464,28 +518,64 @@ private fun PriorityIndicator(priority: String) {
 }
 
 @Composable
-private fun StatusSummary(tasks: List<TaskItem>) {
+private fun StatusSummary(
+    tasks: List<TaskItem>,
+    selectedState: TaskState?,
+    onState: (TaskState) -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 14.dp, vertical = 13.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SummaryItem(TaskState.Pending, "Pendientes", tasks.count { it.state == TaskState.Pending }, Modifier.weight(1f))
+        SummaryItem(
+            TaskState.Pending,
+            "Pendientes",
+            tasks.count { it.state == TaskState.Pending },
+            selectedState == TaskState.Pending,
+            Modifier.weight(1f),
+        ) { onState(TaskState.Pending) }
         SummaryItem(
             TaskState.InProgress,
             "En proceso",
             tasks.count { it.state == TaskState.InProgress },
+            selectedState == TaskState.InProgress,
             Modifier.weight(1f),
-        )
-        SummaryItem(TaskState.Done, "Hechas", tasks.count { it.state == TaskState.Done }, Modifier.weight(1f))
-        SummaryItem(TaskState.Blocked, "Bloqueadas", tasks.count { it.state == TaskState.Blocked }, Modifier.weight(1f))
+        ) { onState(TaskState.InProgress) }
+        SummaryItem(
+            TaskState.Done,
+            "Hechas",
+            tasks.count { it.state == TaskState.Done },
+            selectedState == TaskState.Done,
+            Modifier.weight(1f),
+        ) { onState(TaskState.Done) }
+        SummaryItem(
+            TaskState.Blocked,
+            "Bloqueadas",
+            tasks.count { it.state == TaskState.Blocked },
+            selectedState == TaskState.Blocked,
+            Modifier.weight(1f),
+        ) { onState(TaskState.Blocked) }
     }
     HorizontalDivider(color = Divider)
 }
 
 @Composable
-private fun SummaryItem(state: TaskState, label: String, count: Int, modifier: Modifier) {
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+private fun SummaryItem(
+    state: TaskState,
+    label: String,
+    count: Int,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .background(if (selected) Page else Color.Transparent, RoundedCornerShape(9.dp))
+            .padding(vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             TaskStateIcon(state, 14.dp)
             Text(count.toString(), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Ink)
@@ -540,6 +630,13 @@ private fun TaskStateIcon(state: TaskState, iconSize: Dp) {
             }
         }
     }
+}
+
+private fun summaryLabel(state: TaskState): String = when (state) {
+    TaskState.Pending -> "Pendientes"
+    TaskState.InProgress -> "En proceso"
+    TaskState.Done -> "Hechas"
+    TaskState.Blocked -> "Bloqueadas"
 }
 
 private fun stateRank(state: TaskState): Int = when (state) {
