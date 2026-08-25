@@ -1,3 +1,5 @@
+import java.util.Base64
+
 plugins {
     id("com.android.application")
 }
@@ -21,7 +23,7 @@ val stableDevStoreFile = layout.buildDirectory
 if (!stableDevStoreFile.exists()) {
     stableDevStoreFile.parentFile.mkdirs()
     stableDevStoreFile.writeBytes(
-        java.util.Base64.getMimeDecoder().decode(stableDevStoreSource.readText()),
+        Base64.getMimeDecoder().decode(stableDevStoreSource.readText()),
     )
 }
 
