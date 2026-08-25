@@ -10,6 +10,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
+import android.view.WindowMetrics;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -196,7 +197,7 @@ public final class CoachBarController {
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 android.graphics.PixelFormat.TRANSLUCENT);
-        WindowManager.WindowMetrics metrics = windowManager.getCurrentWindowMetrics();
+        WindowMetrics metrics = windowManager.getCurrentWindowMetrics();
         Rect display = metrics.getBounds();
         WindowInsets windowInsets = metrics.getWindowInsets();
         Insets insets = windowInsets.getInsetsIgnoringVisibility(
