@@ -1,130 +1,133 @@
-# Glosh Remote Spike
+# Glosh Remote
 
-`REMOTE-INSTALL-CONNECTION-00`
+Glosh Remote proves secure support access to an **already-used Android phone without a PC on the client side**.
 
-Laboratory project to prove remote technical access to an **already-used Android phone, without a PC on the client side**.
+It is deliberately isolated under `tools/glosh-remote-spike/`. It does not modify App Usuario, App Admin, Chrome/GloshIA, DAG, the root Android product or Production backend code.
 
-It is deliberately isolated under `tools/`: it does not modify App Usuario, App Admin, Chrome/GloshIA, the root Gradle project or Production backend code.
+## Current product direction
 
-## Client UX target
+The connection stack already passed the no-link/cross-network DEV gate. The current work is the customer experience that prepares Wireless ADB safely.
 
-The normal flow no longer transports session material through the UI:
+The normal product is a **professional guided assistant**, not a bot that blindly presses Android controls.
 
-1. The client opens Glosh Remote and taps **CONECTAR CON SOPORTE**.
-2. The app creates an in-memory RSA rendezvous identity and requests support from the configured broker.
-3. The Mac operator sees the manufacturer/model and explicitly accepts the random request ID.
-4. The operator encrypts the internal join descriptor for that one Android public key.
-5. Android decrypts it locally and guides the user through Developer options and Wireless debugging.
-6. The client types only Android's six-digit pairing code in the Glosh notification.
-7. Pairing, local ADB TLS and the existing remote relay continue automatically.
+### Customer flow
 
-The client never sees or enters a link, IP, TCP port, relay, key, shell command or terminal. A direct
-`gloshremote://join?...` intent remains available only in debug builds as a hidden laboratory fallback;
-there is no paste field or descriptor UI.
+1. Open Glosh Remote and tap **CONECTAR CON SOPORTE**.
+2. **Paso 1 de 4:** activate Glosh Remote Accessibility.
+3. **Paso 2 de 4:** confirm Developer options; Samsung enable-development screens are highlighted only if needed.
+4. **Paso 3 de 4:** Glosh opens Wireless Debugging directly; the customer activates it and confirms the Wi‑Fi network if Android asks.
+5. **Paso 4 de 4:** the customer taps **Pair device with pairing code**. Glosh reads a unique contextual six-digit code locally and submits it automatically when safe.
+6. Local ADB pairing, TLS connection and the encrypted Mac relay continue automatically.
 
-## PASS for this spike
+The app, persistent notification and compact floating coach show the same instruction and the same four-step progress. The floating card includes a small native animation for tap, switch, seven taps, code, waiting and success.
 
-PASS requires all of the following on Android 11+:
+If automatic code reading is not safe, the existing six-box input and notification `RemoteInput` remain available.
 
-- no PC on the client side;
-- no root;
-- no public ADB / no `adb tcpip 5555`;
-- local Wireless Debugging pairing succeeds on the same phone;
-- Mac and phone may be on different networks;
-- Android opens an outbound WSS connection to the temporary Mac relay;
-- mutual one-time-key authentication succeeds;
-- Mac runs only allowlisted actions: `ping`, `whoami`, `device`, `owners`, `users`, `battery`;
-- command/results are additionally AES-256-GCM encrypted end-to-end;
-- closing, losing or revoking the session closes local ADB too;
-- a new process/session requires a new ADB pairing identity.
+The customer never sees or enters a link, IP address, TCP port, relay descriptor, session key, shell command or terminal.
 
-No Device Owner mutation is performed in this ticket. The next pilot may use the proven channel to install/prepare Glosh adaptively.
+Detailed design and gate:
 
-## Ephemeral ADB identity
+`GUIDED_ASSISTANT_08.md`
 
-The ADB RSA private key and certificate are generated **in memory only** when the foreground service starts. They are not written to SharedPreferences, files, database or Android backup.
+## Interaction authority
 
-Consequences are intentional:
+Normal guided mode uses Accessibility for:
 
-- closing the session drops the identity;
-- killing the process drops the identity;
-- reboot drops the identity;
-- another support session requires pairing again.
+- selecting one trusted Settings application window;
+- stable immutable snapshots;
+- observing real state changes;
+- highlighting known labels;
+- reading the contextual pairing code;
+- a Samsung enable-development fallback.
 
-For a temporary installation bridge this is preferable to leaving a reusable ADB credential on a customer's phone.
+Normal guided mode does **not**:
 
-## Support Session Broker
+- automatically click Settings rows, buttons or switches;
+- automatically scroll Settings;
+- use screen coordinates;
+- read device PIN, pattern or password.
 
-`BROKER_BASE_URL` defaults in this DEV candidate to the deployed Supabase Edge Function and can be
-overridden at build time with:
+Glosh opens the narrowest resolvable Settings destination first. The customer performs Android-protected actions; Glosh observes the result and opens the next destination.
 
-```bash
-./gradlew -p tools/glosh-remote-spike \
-  -PbrokerBaseUrl=https://broker.example.invalid \
-  :app:assembleDebug
-```
+## Connection architecture
 
-With no stable HTTPS broker configured, the normal button fails cleanly with
-“Soporte remoto no está disponible en este momento.” It never falls back to asking the client for a link.
+The stable rendezvous endpoint is a Supabase Edge Function. The broker stores only short-lived request metadata, an ephemeral Android RSA public key and RSA-OAEP ciphertext after operator acceptance. It never receives the plaintext join descriptor or 256-bit session key.
 
-The broker contract is TTL-bound, single-use and rate-limited. It stores request metadata, the
-ephemeral Android public key and an RSA-OAEP ciphertext after explicit operator acceptance. The join
-descriptor and its 256-bit session key never reach the broker in plaintext. Cancellation destroys the
-Android private-key reference and revokes the pending request best-effort.
+The Mac relay binds to `127.0.0.1`. `cloudflared` creates an outbound temporary HTTPS/WSS endpoint, so neither the Mac nor Android requires an inbound router port.
 
-## Relay and rendezvous separation
+The client-side ADB RSA identity is generated in memory and discarded when the process/session ends. A new process requires a new Wireless Debugging pairing.
 
-The stable rendezvous endpoint is a Supabase Edge Function. The relay remains a separate, temporary
-Mac process; the broker only transfers metadata and ciphertext and never sees the descriptor plaintext.
+## Security properties
 
-The Mac relay binds only to `127.0.0.1`; `cloudflared` creates an outbound Quick Tunnel with a random HTTPS/WSS endpoint. Neither Mac nor Android needs an inbound router port.
+- Android 11+ standard Wireless Debugging path.
+- No root.
+- No public ADB and no `adb tcpip 5555`.
+- ADB remains local to the phone/network and is never forwarded publicly.
+- RSA-3072/OAEP-SHA256 rendezvous sealing.
+- Mutual HMAC authentication.
+- AES-256-GCM command/result payload protection.
+- Directional sequence numbers reject replay/out-of-order frames.
+- Fixed read-only command allowlist; no arbitrary remote shell.
+- Output capped per action.
+- Closing/revoking the session discards relay and local ADB identity.
+- `FLAG_SECURE` remains enabled.
+- Device credentials and pairing code are not logged.
 
-Quick Tunnel is **lab-only**. If the spike passes, it can later be replaced by Glosh-owned infrastructure without changing the local ADB bootstrap or encrypted command contract.
+## Standby behavior
 
-## Build
+While the Mac operator console is intentionally open:
+
+- broker presence is renewed by heartbeat;
+- standby does not consume authenticated-session TTL;
+- exactly one pending customer may be autoaccepted once;
+- multiple simultaneous customers fail closed to explicit technician selection;
+- phone broker requests renew within a bounded overall attempt window.
+
+## Build and automated gate
 
 Standalone Gradle project:
 
 ```bash
-./gradlew -p tools/glosh-remote-spike :app:testDebugUnitTest :app:assembleDebug
+./gradlew -p tools/glosh-remote-spike :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-Expected APK:
+Canonical guided verification:
+
+```bash
+ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk \
+  bash tools/glosh-remote-spike/verify_guided_assistant.sh
+```
+
+The gate runs:
+
+- source architecture guard: no click/scroll ownership in the guided coordinator;
+- Python protocol, broker and standby tests;
+- Android JVM tests;
+- Android lint;
+- Android assemble;
+- exact APK size/SHA report.
+
+Expected artifact:
 
 ```text
-tools/glosh-remote-spike/app/build/outputs/apk/debug/app-debug.apk
+tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Guided-DEV.apk
 ```
 
-The actual Android SDK/JitPack build is the point where this ticket hands off to Codex on the Mac.
+## Mac relay
 
-## Mac relay and broker
-
-Requires Python 3.9+ and `cloudflared` for the physical internet gate.
+Requires Python 3.9+, dependencies from `mac/requirements.txt`, and `cloudflared` for the temporary DEV tunnel.
 
 ```bash
 cd tools/glosh-remote-spike/mac
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python -m unittest test_protocol.py
-python -m unittest test_broker.py
-python glosh_remote_relay.py
-```
-
-For a local contract gate, start the in-memory reference broker:
-
-```bash
-export GLOSH_REMOTE_OPERATOR_KEY='<random-base64url-token>'
-python support_session_broker.py --operator-key "$GLOSH_REMOTE_OPERATOR_KEY"
-
+python -m unittest test_protocol.py test_broker.py test_one_tap_standby.py
 python glosh_remote_relay.py \
-  --broker-url http://127.0.0.1:8766
+  --broker-url "$BROKER_BASE_URL"
 ```
 
-In broker mode the relay does not print the descriptor. It prints pending requests and requires
-`accept <request-id>`. Without broker flags it retains the direct descriptor as a DEV-only gate tool.
-
-On the Mac the V0 actions are:
+The operator console exposes only:
 
 ```text
 ping
@@ -140,48 +143,20 @@ help
 quit
 ```
 
-There is intentionally **no arbitrary remote shell**.
+There is intentionally no arbitrary remote shell.
 
-## Gate 0 — relay without Android
+## Physical validation order
 
-Run `glosh_remote_relay.py` in one terminal and `mock_agent.py '<descriptor>'` in another. Verify mutual authentication, `ping`, `device`, revocation and reconnect behavior before involving a phone.
+1. Build and automated gate on the exact guided HEAD.
+2. A23 Samsung laboratory run:
+   - zero automatic clicks;
+   - zero programmatic scrolls;
+   - exact direct routes;
+   - visual fallback only when needed;
+   - automatic or notification pairing code;
+   - local ADB + Mac support;
+   - complete cleanup/restoration.
+3. Same exact APK on S22 cable-free as a real customer UX run.
+4. Add Motorola/Xiaomi adapters only from real evidence; keep the common guided engine.
 
-## Gate 1 — real Android DEV fallback
-
-1. Install the APK.
-2. Start the Mac relay and broker lab.
-3. Tap **CONECTAR CON SOPORTE** and explicitly accept the pending request on the Mac.
-4. Follow the three-step Android guide.
-5. Enable **Wireless debugging**.
-6. Tap **Pair device with pairing code**.
-7. Pull down the Glosh Remote notification and enter the six digits.
-8. Wait for **Conectado con soporte**.
-9. From the Mac run the allowlisted actions.
-10. Use `quit` / **Cancelar conexión** and prove commands no longer execute.
-11. Turn Wireless debugging off after the lab gate.
-
-## Security properties
-
-- ADB remains on the phone/local network; it is never forwarded to the Internet.
-- Session secret is random 256-bit material and is not persisted by the APK or visible to the broker.
-- Rendezvous uses an in-memory Android RSA-3072 key and standard RSA-OAEP SHA-256 sealing.
-- Broker requests are random, short-lived, single-use, explicitly accepted and replay-protected.
-- Mutual HMAC challenge/response authenticates both ends before command traffic.
-- Command/result bodies use AES-256-GCM with directional sequence-bound AAD.
-- Monotonic sequence numbers reject replayed encrypted frames.
-- Android receives action names, never raw shell text; a fixed local allowlist maps those actions to read-only diagnostic commands.
-- Output is capped to 64 KiB per action.
-- Relay loss is fail-closed and the temporary ADB identity is discarded.
-- `FLAG_SECURE` remains enabled throughout the guided flow.
-- Notification permission is required on Android 13+ because the six-digit pairing input lives in the notification.
-
-## Known limitations / next gates
-
-- Android 11+ only for V0.
-- The stable DEV broker is configured, but the no-link physical Internet and cross-network gates remain pending.
-- Wireless debugging remains enabled during V0. After this path passes, the next architecture experiment can start a short-lived shell-side bridge and ask the user to turn Wireless debugging off earlier.
-- Some OEMs may change Developer options or mDNS behavior; real pilots will build manufacturer/model recipes before automation.
-- Android 17 local-network permission changes are deferred until the target SDK is raised to API 37.
-- The `libadb-android` dependency explicitly says it has not undergone a security audit; V0 confines it to same-device bootstrap and does not expose its API over the remote protocol.
-
-See [`PROTOCOL.md`](PROTOCOL.md) and [`THIRD_PARTY.md`](THIRD_PARTY.md).
+No Device Owner mutation is performed by this guided bootstrap task.
