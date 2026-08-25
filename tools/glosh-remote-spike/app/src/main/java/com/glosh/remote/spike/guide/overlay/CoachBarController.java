@@ -14,6 +14,7 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.glosh.remote.spike.guide.state.GuideStage;
 import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.wizard.GuidePresentation;
 
@@ -38,11 +39,6 @@ public final class CoachBarController {
     private String presentationKey = "";
     private Rect targetBounds;
 
-    /**
-     * The legacy callbacks remain in the constructor for binary/source compatibility. Guided mode
-     * deliberately exposes no MOSTRARME/ME PERDÍ actions; the notification is the persistent
-     * fallback and the × only hides this card.
-     */
     public CoachBarController(
             Context context,
             Runnable ignoredShowMe,
@@ -131,12 +127,16 @@ public final class CoachBarController {
         render(GuidePresentation.forStage(LiveGuideRuntime.stage(), instruction));
     }
 
+    public void showWaiting(String message) {
+        targetBounds = null;
+        render(GuidePresentation.waiting(LiveGuideRuntime.stage(), message));
+    }
+
     public void showRecovery(String message) {
         targetBounds = null;
         render(GuidePresentation.recovery(LiveGuideRuntime.stage(), message));
     }
 
-    /** Clears visual state programmatically; a later presentation may appear normally. */
     public void clear() {
         userHidden = false;
         presentationKey = "";
@@ -196,12 +196,23 @@ public final class CoachBarController {
                         | WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
                         | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
                 android.graphics.PixelFormat.TRANSLUCENT);
-        Rect display = windowManager.getCurrentWindowMetrics().getBounds();
-        Insets insets = windowManager.getCurrentWindowMetrics()
-                .getWindowInsets()
-                .getInsetsIgnoringVisibility(
-                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-        boolean atTop = OverlayGeometry.coachAtTop(
+        WindowManager.WindowMetrics metrics = windowManager.getCurrentWindowMetrics();
+        Rect display = metrics.getBounds();
+        WindowInsets windowInsets = metrics.getWindowInsets();
+        Insets insets = windowInsets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+        boolean credential = LiveGuideRuntime.stage() == GuideStage.AUTOPILOT_CREDENTIAL;
+        boolean imeVisible = windowInsets.isVisible(WindowInsets.Type.ime());
+        boolean keyboardSafe = credential || imeVisible;
+
+        body.setMaxLines(keyboardSafe ? 1 : 3);
+        card.setPadding(
+                dp(14),
+                dp(keyboardSafe ? 8 : 12),
+                dp(12),
+                dp(keyboardSafe ? 8 : 12));
+
+        boolean atTop = keyboardSafe || OverlayGeometry.coachAtTop(
                 targetBounds == null ? null : new OverlayGeometry.Box(
                         targetBounds.left,
                         targetBounds.top,
@@ -213,7 +224,7 @@ public final class CoachBarController {
                 dp(112),
                 dp(10));
         params.gravity = atTop ? Gravity.TOP : Gravity.BOTTOM;
-        params.y = dp(8);
+        params.y = dp(keyboardSafe ? 2 : 8);
         if (attached) {
             windowManager.updateViewLayout(root, params);
         } else {
