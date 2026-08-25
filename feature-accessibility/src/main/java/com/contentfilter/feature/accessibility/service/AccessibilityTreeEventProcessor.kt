@@ -50,12 +50,11 @@ internal data class AccessibilityTreeEventMetrics(
  * Bounded single-consumer lane for expensive Accessibility tree work.
  *
  * At most one pending Search and one pending Settings request are retained. Repeated events replace
- * the pending request of the same kind instead of growing a queue. Context generations change only
- * when the logical package context changes (or explicitly on policy/session invalidation). Each
- * result is also checked against the latest submitted sequence before it may diagnose or act, so a
- * same-package navigation supersedes an older tree snapshot without permitting an old action on a
- * new screen. AccessibilityEvent/AccessibilityNodeInfo instances are never stored across the callback
- * boundary.
+ * the pending request of the same kind instead of growing a queue. Context generations change when
+ * the logical surface/package changes or when policy explicitly invalidates a result. Each result is
+ * also checked against the latest submitted sequence before it may diagnose or act, so a same-package
+ * navigation supersedes an older tree snapshot without permitting an old action on a new screen.
+ * AccessibilityEvent/AccessibilityNodeInfo instances are never stored across the callback boundary.
  */
 internal class AccessibilityTreeEventProcessor(
     scope: CoroutineScope,
@@ -91,7 +90,7 @@ internal class AccessibilityTreeEventProcessor(
 
                     pendingSettings.getAndSet(null)?.let { trigger ->
                         didWork = true
-                        if (isSettingsCurrentAndLatest(trigger)) {
+                        if (isSettingsContextCurrent(trigger)) {
                             startedSettings.incrementAndGet()
                             processSettings(trigger)
                         } else {
@@ -101,7 +100,7 @@ internal class AccessibilityTreeEventProcessor(
 
                     pendingSearch.getAndSet(null)?.let { trigger ->
                         didWork = true
-                        if (isSearchCurrentAndLatest(trigger)) {
+                        if (isSearchContextCurrent(trigger)) {
                             startedSearch.incrementAndGet()
                             processSearch(trigger)
                         } else {
@@ -121,6 +120,9 @@ internal class AccessibilityTreeEventProcessor(
     ): Long =
         synchronized(lock) {
             if (closed) return@synchronized 0L
+            if (lastSettingsPackageName != null && lastSettingsPackageName != packageName) {
+                invalidateSettingsContextLocked()
+            }
             if (invalidateContext || lastSearchPackageName != packageName) {
                 searchContextGeneration.incrementAndGet()
             }
@@ -154,6 +156,9 @@ internal class AccessibilityTreeEventProcessor(
     ): Long =
         synchronized(lock) {
             if (closed) return@synchronized 0L
+            if (lastSearchPackageName != null && lastSearchPackageName != packageName) {
+                invalidateSearchContextLocked()
+            }
             if (invalidateContext || lastSettingsPackageName != packageName) {
                 settingsContextGeneration.incrementAndGet()
             }
@@ -183,20 +188,14 @@ internal class AccessibilityTreeEventProcessor(
     fun invalidateSearchContext() {
         synchronized(lock) {
             if (closed || (lastSearchPackageName == null && pendingSearch.get() == null)) return
-            searchContextGeneration.incrementAndGet()
-            lastSearchPackageName = null
-            latestSearchSequence.set(0L)
-            pendingSearch.set(null)
+            invalidateSearchContextLocked()
         }
     }
 
     fun invalidateSettingsContext() {
         synchronized(lock) {
             if (closed || (lastSettingsPackageName == null && pendingSettings.get() == null)) return
-            settingsContextGeneration.incrementAndGet()
-            lastSettingsPackageName = null
-            latestSettingsSequence.set(0L)
-            pendingSettings.set(null)
+            invalidateSettingsContextLocked()
         }
     }
 
@@ -204,21 +203,17 @@ internal class AccessibilityTreeEventProcessor(
         synchronized(lock) {
             !closed &&
                 trigger.contextGeneration == searchContextGeneration.get() &&
-                trigger.packageName == lastSearchPackageName
+                trigger.packageName == lastSearchPackageName &&
+                trigger.sequence == latestSearchSequence.get()
         }
 
     fun isSettingsContextCurrent(trigger: SettingsProtectionTrigger): Boolean =
         synchronized(lock) {
             !closed &&
                 trigger.contextGeneration == settingsContextGeneration.get() &&
-                trigger.packageName == lastSettingsPackageName
+                trigger.packageName == lastSettingsPackageName &&
+                trigger.sequence == latestSettingsSequence.get()
         }
-
-    fun isSearchCurrentAndLatest(trigger: SearchProtectionTrigger): Boolean =
-        isSearchContextCurrent(trigger) && latestSearchSequence.get() == trigger.sequence
-
-    fun isSettingsCurrentAndLatest(trigger: SettingsProtectionTrigger): Boolean =
-        isSettingsContextCurrent(trigger) && latestSettingsSequence.get() == trigger.sequence
 
     fun metrics(): AccessibilityTreeEventMetrics =
         AccessibilityTreeEventMetrics(
@@ -235,17 +230,25 @@ internal class AccessibilityTreeEventProcessor(
         synchronized(lock) {
             if (closed) return
             closed = true
-            searchContextGeneration.incrementAndGet()
-            settingsContextGeneration.incrementAndGet()
-            lastSearchPackageName = null
-            lastSettingsPackageName = null
-            latestSearchSequence.set(0L)
-            latestSettingsSequence.set(0L)
-            pendingSearch.set(null)
-            pendingSettings.set(null)
+            invalidateSearchContextLocked()
+            invalidateSettingsContextLocked()
             wakeups.close()
         }
         worker.cancel()
+    }
+
+    private fun invalidateSearchContextLocked() {
+        searchContextGeneration.incrementAndGet()
+        lastSearchPackageName = null
+        latestSearchSequence.set(0L)
+        pendingSearch.set(null)
+    }
+
+    private fun invalidateSettingsContextLocked() {
+        settingsContextGeneration.incrementAndGet()
+        lastSettingsPackageName = null
+        latestSettingsSequence.set(0L)
+        pendingSettings.set(null)
     }
 }
 
