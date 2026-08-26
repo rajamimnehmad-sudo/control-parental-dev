@@ -45,4 +45,22 @@ public class OnboardingStateTest {
         assertEquals(OnboardingState.BrokerAction.DISCOVER, state.requestSupport());
         assertEquals(OnboardingState.Step.CHECKING_SUPPORT, state.step());
     }
+
+    @Test
+    public void directFlowSkipsAccessibilityAndStartsOneSession() {
+        OnboardingState state = new OnboardingState();
+        state.requestSupport();
+        state.directSupportAvailable();
+        assertEquals(OnboardingState.Step.REQUESTING_SUPPORT, state.step());
+        state.sessionReady();
+        assertEquals(OnboardingState.Step.WIRELESS_DEBUGGING, state.step());
+        state.sessionStarted();
+        assertEquals(OnboardingState.Step.SESSION_ACTIVE, state.step());
+        try {
+            state.sessionStarted();
+            fail("Expected duplicate service dispatch to fail closed");
+        } catch (IllegalStateException expected) {
+            assertEquals(OnboardingState.Step.SESSION_ACTIVE, state.step());
+        }
+    }
 }

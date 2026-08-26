@@ -29,6 +29,11 @@ public final class OnboardingState {
         step = Step.GUIDE_PERMISSION;
     }
 
+    public synchronized void directSupportAvailable() {
+        require(Step.CHECKING_SUPPORT);
+        step = Step.REQUESTING_SUPPORT;
+    }
+
     public synchronized void guideReady() {
         require(Step.GUIDE_PERMISSION);
         step = Step.DEVELOPER_OPTIONS;

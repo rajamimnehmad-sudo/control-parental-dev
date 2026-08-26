@@ -7,22 +7,8 @@ import android.provider.Settings;
 import java.util.List;
 
 public final class SettingsNavigator {
-    public void openAboutPhone(Activity activity) {
-        open(activity, SettingsRoute.aboutPhoneActions());
-    }
-
     public void openWirelessDebugging(Activity activity) {
         open(activity, SettingsRoute.wirelessDebuggingActions());
-    }
-
-    public void openDeveloperOptions(Activity activity) {
-        open(activity, List.of(
-                Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS,
-                Settings.ACTION_SETTINGS));
-    }
-
-    public void openAccessibility(Activity activity) {
-        open(activity, List.of(Settings.ACTION_ACCESSIBILITY_SETTINGS, Settings.ACTION_SETTINGS));
     }
 
     private void open(Activity activity, List<String> actions) {
