@@ -72,7 +72,7 @@ internal class ChromePixelProvenanceFixture {
                 bytesResponse(
                     id = "web13a-wasm",
                     contentType = WasmContentType,
-                    bytes = EmptyWasmModule,
+                    bytes = RedValueWasmModule,
                 )
             }
             ServiceWorkerPath -> {
@@ -177,8 +177,8 @@ internal class ChromePixelProvenanceFixture {
           <pre id="result">RUNNING</pre>
           <script>
           (()=>{
-            const results=[];
-            const mark=(key,value)=>{results.push(key+':'+value);};
+            const results=new Map();
+            const mark=(key,value)=>results.set(key,value);
             const decode=(value)=>Uint8Array.from(atob(value),character=>character.charCodeAt(0));
             const sleep=(millis)=>new Promise(resolve=>setTimeout(resolve,millis));
             const bounded=(promise,millis)=>Promise.race([promise,sleep(millis).then(()=>{throw new Error('timeout')})]);
@@ -208,6 +208,17 @@ internal class ChromePixelProvenanceFixture {
               await bounded(new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true})),5000);
               return navigator.serviceWorker.controller!==null;
             };
+            const cleanupStorage=async()=>{
+              let clean=true;
+              try{
+                const registrations=await navigator.serviceWorker.getRegistrations();
+                for(const registration of registrations){
+                  if(new URL(registration.scope).pathname==='$RunnerPath')clean=(await registration.unregister())&&clean;
+                }
+                clean=(await caches.delete('$StorageCacheName'))&&clean;
+              }catch(error){clean=false;}
+              return clean?'PASS':'FAIL';
+            };
             const run=async()=>{
               if(document.readyState!=='complete')await new Promise(resolve=>window.addEventListener('load',resolve,{once:true}));
               mark('DATA_URL',await bounded(imageResult(document.getElementById('data-url')),5000));
@@ -224,8 +235,10 @@ internal class ChromePixelProvenanceFixture {
                 mark('JSON',paint(document.getElementById('json'),config.background,config.stripe)?'RENDERED':'ERROR');
               }catch(error){mark('JSON','ERROR');}
               try{
-                await WebAssembly.instantiateStreaming(fetch('$WasmPath',{cache:'no-store'}));
-                mark('WASM',paint(document.getElementById('wasm'),'#dc1430','#000')?'RENDERED':'ERROR');
+                const wasm=await WebAssembly.instantiateStreaming(fetch('$WasmPath',{cache:'no-store'}));
+                const red=wasm.instance.exports.red();
+                const background='rgb('+red+',20,48)';
+                mark('WASM',red===220&&paint(document.getElementById('wasm'),background,'#000')?'RENDERED':'ERROR');
               }catch(error){mark('WASM','BLOCKED');}
               if(!('serviceWorker' in navigator)){
                 mark('SERVICE_WORKER','UNAVAILABLE');mark('CACHE_STORAGE','UNAVAILABLE');
@@ -233,16 +246,22 @@ internal class ChromePixelProvenanceFixture {
                 try{
                   await navigator.serviceWorker.register('$ServiceWorkerPath?run='+Date.now(),{scope:'$RunnerPath',updateViaCache:'none'});
                   await navigator.serviceWorker.ready;
-                  await waitForController();
+                  if(!(await waitForController()))throw new Error('controller_missing');
                   const swImage=document.getElementById('service-worker');swImage.src='$ServiceWorkerSyntheticPath?nonce='+Date.now();
                   mark('SERVICE_WORKER',await bounded(imageResult(swImage),5000));
                   const cacheImage=document.getElementById('cache-storage');cacheImage.src='$CacheStoragePath?nonce='+Date.now();
                   mark('CACHE_STORAGE',await bounded(imageResult(cacheImage),5000));
+                  const state=await (await fetch('$StatePath',{cache:'no-store'})).text();
+                  if(!state.includes('SW_ORIGIN_FALLBACK=0'))mark('SERVICE_WORKER','ORIGIN_FALLBACK');
+                  if(!state.includes('CACHE_ORIGIN_FALLBACK=0'))mark('CACHE_STORAGE','ORIGIN_FALLBACK');
                 }catch(error){mark('SERVICE_WORKER','ERROR');mark('CACHE_STORAGE','ERROR');}
+                mark('STORAGE_CLEANUP',await cleanupStorage());
               }
-              const report=results.join(',');
+              URL.revokeObjectURL(blobImage.src);
+              const report=Array.from(results,entry=>entry[0]+':'+entry[1]).join(',');
               await fetch('$ReportPath',{method:'POST',headers:{'Content-Type':'text/plain'},body:report});
-              document.getElementById('result').textContent=report.split(',').join('\n');
+              const state=await (await fetch('$StatePath',{cache:'no-store'})).text();
+              document.getElementById('result').textContent=report.split(',').join('\n')+'\n\n'+state;
               document.title='GLOSH13A_COMPLETE';
             };
             run().catch(error=>{document.getElementById('result').textContent='RUNNER:ERROR';document.title='GLOSH13A_ERROR';});
@@ -267,7 +286,7 @@ internal class ChromePixelProvenanceFixture {
 
     private fun serviceWorkerScript(): String =
         """
-        const CACHE_NAME='glosh-13a-v1';
+        const CACHE_NAME='$StorageCacheName';
         const CACHE_PATH='$CacheStoragePath';
         const SYNTHETIC_PATH='$ServiceWorkerSyntheticPath';
         const IMAGE_BASE64='$SentinelPngBase64';
@@ -327,6 +346,7 @@ internal class ChromePixelProvenanceFixture {
         const val CacheStoragePath = "/web13a/cache-only.png"
         const val ReportPath = "/web13a/report"
         const val StatePath = "/web13a/state"
+        const val StorageCacheName = "glosh-13a-v1"
         const val HtmlContentType = "text/html; charset=utf-8"
         const val TextContentType = "text/plain; charset=utf-8"
         const val JavaScriptContentType = "application/javascript; charset=utf-8"
@@ -338,12 +358,62 @@ internal class ChromePixelProvenanceFixture {
         const val InvalidReport = "invalid"
         const val JsonBody = "{\"background\":\"#dc1430\",\"stripe\":\"#000000\"}"
         const val SentinelPngBase64 =
-            "iVBORw0KGgoAAAANSUhEUgAAAUAAAAC0CAIAAABqhmJGAAACOklEQVR4nO3TQQ2EABAEweM0IAEB+FeBACQgAhOETYcqA5N59PIbcq77yO52HSO7/r7ja3//I6vAIwQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoawG9j7C4i/UFSBAAAAAElFTkSuQmCC"
+            "iVBORw0KGgoAAAANSUhEUgAAAUAAAAC0CAIAAABqhmJGAAACOklEQVR4nO3TQQ2EABAEweM0IAEB+FeBACQgAhOETYcqA5N5" +
+                "9PIbcq77yO52HSO7/r7ja3//I6vAIwQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEC" +
+                "hjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjAB" +
+                "Q5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iA" +
+                "IUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzA" +
+                "ECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZg" +
+                "CBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMw" +
+                "hAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkY" +
+                "wgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQM" +
+                "YQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKG" +
+                "MAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFD" +
+                "mIAhTMAQJmAIEzCECRjCBAxhAoawG9j7C4i/UFSBAAAAAElFTkSuQmCC"
         val NoStoreHeaders =
             listOf(
                 ChromeHttpHeader("Cache-Control", "no-store, max-age=0"),
                 ChromeHttpHeader("Pragma", "no-cache"),
             )
-        val EmptyWasmModule = byteArrayOf(0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00)
+        val RedValueWasmModule =
+            byteArrayOf(
+                0x00,
+                0x61,
+                0x73,
+                0x6d,
+                0x01,
+                0x00,
+                0x00,
+                0x00,
+                0x01,
+                0x05,
+                0x01,
+                0x60,
+                0x00,
+                0x01,
+                0x7f,
+                0x03,
+                0x02,
+                0x01,
+                0x00,
+                0x07,
+                0x07,
+                0x01,
+                0x03,
+                0x72,
+                0x65,
+                0x64,
+                0x00,
+                0x00,
+                0x0a,
+                0x07,
+                0x01,
+                0x05,
+                0x00,
+                0x41,
+                0xdc.toByte(),
+                0x01,
+                0x0b,
+            )
     }
 }
