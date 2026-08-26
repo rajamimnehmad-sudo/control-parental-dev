@@ -140,6 +140,18 @@ internal class ChromeVisualShieldController(
 
     override fun currentRenderIdentityToken(): String? = identityGate.snapshot().context?.renderIdentityToken()
 
+    override fun beginFixtureRender(): String? =
+        valueOnMain {
+            val current = identityGate.snapshot().context ?: return@valueOnMain null
+            invalidateProtectCapture(
+                windowId = current.windowId,
+                viewport = current.viewport,
+                reason = ChromeVisualShieldInvalidation.Navigation,
+                requireRenderAttestation = true,
+            )
+            identityGate.snapshot().context?.renderIdentityToken()
+        }
+
     override fun renderAttested(renderIdentityToken: String): String {
         val context = identityGate.snapshot().context ?: return "result=render_identity_unavailable"
         if (!viewportRenderGate.recordAttestation(renderIdentityToken, context)) {
@@ -238,6 +250,7 @@ internal class ChromeVisualShieldController(
         windowId: Int,
         viewport: ChromeVisualViewport,
         reason: ChromeVisualShieldInvalidation,
+        requireRenderAttestation: Boolean = false,
     ) {
         if (!labActive) return
         r1Metrics.onContentInvalidation()
@@ -250,9 +263,10 @@ internal class ChromeVisualShieldController(
         val protected = identityGate.invalidate(windowId, viewport, regionContract, reason) ?: return
         workCoordinator.invalidateAuthority()
         val context = protected.context ?: return
-        if (hardViewportBoundary) viewportRenderGate.requireCurrentRender(context)
+        val waitForCurrentRender = hardViewportBoundary || requireRenderAttestation
+        if (waitForCurrentRender) viewportRenderGate.requireCurrentRender(context)
         protectThenCapture(protected, reason.name.lowercase())
-        if (hardViewportBoundary) cancelWorkAndJoin()
+        if (waitForCurrentRender) cancelWorkAndJoin()
     }
 
     private fun invalidateWithoutNewWindow(reason: ChromeVisualShieldInvalidation) {
@@ -501,6 +515,14 @@ internal class ChromeVisualShieldController(
             "result=wrong_thread"
         }
 
+    private fun <T> valueOnMain(block: () -> T): T? {
+        if (Looper.myLooper() == Looper.getMainLooper()) return block()
+        val task = java.util.concurrent.FutureTask(block)
+        service.mainExecutor.execute(task)
+        return runCatching { task.get(MainCommandTimeoutSeconds, java.util.concurrent.TimeUnit.SECONDS) }
+            .getOrNull()
+    }
+
     private fun runOnMain(block: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) block() else service.mainExecutor.execute(block)
     }
@@ -529,5 +551,6 @@ internal class ChromeVisualShieldController(
     private companion object {
         const val AnyWindowId = -1
         const val LogTag = "GloshVisualShield"
+        const val MainCommandTimeoutSeconds = 5L
     }
 }

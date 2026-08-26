@@ -32,6 +32,8 @@ object ChromeVisualShieldLabControl {
 
     fun currentRenderIdentityToken(): String? = endpoint?.currentRenderIdentityToken()
 
+    fun beginFixtureRender(): String? = endpoint?.beginFixtureRender()
+
     fun renderAttested(renderIdentityToken: String): String =
         endpoint?.renderAttested(renderIdentityToken) ?: Unavailable
 
@@ -65,6 +67,8 @@ object ChromeVisualShieldLabControl {
         ): String
 
         fun currentRenderIdentityToken(): String?
+
+        fun beginFixtureRender(): String?
 
         fun renderAttested(renderIdentityToken: String): String
 

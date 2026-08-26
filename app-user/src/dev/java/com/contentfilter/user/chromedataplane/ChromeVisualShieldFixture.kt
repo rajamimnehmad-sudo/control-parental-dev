@@ -101,7 +101,7 @@ internal object ChromeVisualShieldFixture {
     }
 
     private fun renderIdentityResponse(path: String): ChromePhotosFixtureResponse {
-        val token = ChromeVisualShieldLabControl.currentRenderIdentityToken()
+        val token = ChromeVisualShieldLabControl.beginFixtureRender()
         val body = token?.let { "result=render_identity token=$it" } ?: "result=render_identity_unavailable"
         return ChromePhotosFixtureResponse(
             resourceId = "chrome-visual-shield-${path.substringAfterLast('/')}",
