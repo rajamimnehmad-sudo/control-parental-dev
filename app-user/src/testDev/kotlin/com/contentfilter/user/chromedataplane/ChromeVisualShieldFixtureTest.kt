@@ -1,6 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabControl
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -43,6 +44,42 @@ class ChromeVisualShieldFixtureTest {
     fun `fixture ignores paths outside its namespace`() {
         val request = request("/web11b")
         assertEquals(null, ChromeVisualShieldFixture.responseFor(request))
+    }
+
+    @Test
+    fun `real sample carrier is JSON base64 reconstructed into verified canvas`() {
+        val html = body(ChromeVisualShieldFixture.SafeCanvasPath)
+        val payload =
+            assertNotNull(
+                ChromeVisualShieldFixture.responseFor(
+                    request(ChromeVisualShieldFixture.SafePayloadPath),
+                ),
+            )
+
+        assertContains(html, ChromeVisualShieldFixtureSample.Safe.expectedSha256)
+        assertContains(html, "crypto.subtle.digest('SHA-256', bytes)")
+        assertContains(html, "createImageBitmap(new Blob([bytes], { type: 'application/octet-stream' }))")
+        assertContains(html, "<canvas id=\"fixture-canvas\"")
+        assertContains(html, "carrierVisible=canvas")
+        assertEquals("application/json; charset=utf-8", payload.contentType)
+        assertFalse(payload.contentType.startsWith("image/"))
+        assertContains(payload.originalBytes.toString(Charsets.UTF_8), "\"ready\":false")
+    }
+
+    @Test
+    fun `fixture loader rejects bytes that do not match historical sample sha`() {
+        val sample = ChromeVisualShieldFixtureSample.Block
+        ChromeVisualShieldFixtureSampleStore.reset(sample)
+        ChromeVisualShieldFixtureSampleStore.append(
+            sample,
+            Base64.getEncoder().encodeToString("not-the-historical-sample".toByteArray()),
+        )
+
+        val result = ChromeVisualShieldFixtureSampleStore.commit(sample)
+
+        assertContains(result, "result=fixture_sha_mismatch")
+        assertContains(result, "sample=block")
+        ChromeVisualShieldFixtureSampleStore.clear()
     }
 
     private fun body(path: String): String {

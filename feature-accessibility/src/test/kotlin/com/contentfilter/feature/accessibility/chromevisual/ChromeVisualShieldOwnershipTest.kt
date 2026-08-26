@@ -1,5 +1,6 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -105,6 +106,36 @@ class ChromeVisualShieldOwnershipTest {
     }
 
     @Test
+    fun `stale processing result still closes crop`() =
+        runBlocking {
+            val trace = mutableListOf<String>()
+            val resources = ChromeVisualShieldCaptureResources<Resource, Resource>()
+            resources.attachFullFrame(Resource("full", trace))
+            resources.deriveCrop { Resource("crop", trace) }
+
+            val result = resources.processCrop { "stale" }
+            resources.close()
+
+            assertEquals("stale", result)
+            assertEquals(listOf("full:closed", "crop:closed"), trace)
+        }
+
+    @Test
+    fun `processing error still closes crop`() =
+        runBlocking {
+            val trace = mutableListOf<String>()
+            val resources = ChromeVisualShieldCaptureResources<Resource, Resource>()
+            resources.attachFullFrame(Resource("full", trace))
+            resources.deriveCrop { Resource("crop", trace) }
+
+            assertFailsWith<IllegalStateException> {
+                resources.processCrop<Unit> { error("analyzer failed") }
+            }
+
+            assertEquals(listOf("full:closed", "crop:closed"), trace)
+        }
+
+    @Test
     fun `secure window error is counted without creating a frame`() {
         val metrics = ChromeVisualShieldMetrics()
         val observer = ChromeVisualShieldCaptureObserver(metrics)
@@ -134,6 +165,14 @@ class ChromeVisualShieldOwnershipTest {
         assertEquals(8_192, snapshot.fullFramePeakBytes)
         assertEquals(50, snapshot.fullFrameClosed)
         assertEquals(50, snapshot.cropClosed)
+    }
+
+    @Test
+    fun `resource completion without acquisition is test visible`() {
+        val metrics = ChromeVisualShieldMetrics()
+
+        assertFailsWith<IllegalStateException> { metrics.onFullFrameClosed(1) }
+        assertFailsWith<IllegalStateException> { metrics.onCropClosed() }
     }
 
     private class Resource(

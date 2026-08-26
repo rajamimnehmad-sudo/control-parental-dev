@@ -10,8 +10,6 @@ import com.glosh.visual.GloshiaVisualAnalyzer
 import com.glosh.visual.GloshiaVisualDecision
 import com.glosh.visual.GloshiaVisualPolicyContract
 import com.glosh.visual.LifecycleGloshiaVisualAnalyzer
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 internal sealed interface ChromeVisualShieldGloshiaDecision {
     val identity: ChromeVisualShieldIdentity
@@ -72,58 +70,52 @@ internal object ChromeVisualShieldGloshiaDecisionPolicy {
  */
 internal class ChromeVisualShieldGloshiaAnalyzer(
     private val service: AccessibilityService,
+    private val fault: ChromeVisualShieldAnalyzerFault,
 ) : AutoCloseable {
     private val lock = Any()
-    private val inferenceMutex = Mutex()
     private var analyzer: LifecycleGloshiaVisualAnalyzer? = null
 
     suspend fun analyze(
         bitmap: Bitmap,
         identity: ChromeVisualShieldIdentity,
         canContinue: () -> Boolean,
-    ): ChromeVisualShieldGloshiaDecision =
-        inferenceMutex.withLock {
-            if (!canContinue()) {
-                return@withLock ChromeVisualShieldGloshiaDecision.FailClosed(
-                    identity,
-                    GloshiaVisualPolicyContract.AnalysisExpiredReason,
-                )
-            }
-            val prepared =
-                runCatching {
-                    AndroidGloshiaImagePreprocessor.prepareVideoCapturedRaster(
-                        bitmap = bitmap,
-                        maxLongEdge = maxOf(bitmap.width, bitmap.height),
-                    )
-                }.getOrNull()
-                    ?: return@withLock ChromeVisualShieldGloshiaDecision.FailClosed(
-                        identity,
-                        GloshiaVisualPolicyContract.DecodeFailedReason,
-                    )
-            try {
-                val currentAnalyzer =
-                    engine()
-                        ?: return@withLock ChromeVisualShieldGloshiaDecision.FailClosed(
-                            identity,
-                            GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
-                        )
-                val decision =
-                    GloshiaPreparedRasterPolicy.decide(
-                        candidateId = identity.regionId,
-                        preparedImages = listOf(prepared),
-                        analyzer = currentAnalyzer,
-                        canContinue = canContinue,
-                    )
-                ChromeVisualShieldGloshiaDecisionPolicy.map(identity, decision)
-            } catch (_: Exception) {
-                ChromeVisualShieldGloshiaDecision.FailClosed(
-                    identity,
-                    GloshiaVisualPolicyContract.ModelExecutionFailedReason,
-                )
-            } finally {
-                prepared.rgb888.fill(0)
-            }
+    ): ChromeVisualShieldGloshiaDecision {
+        if (!canContinue()) {
+            return ChromeVisualShieldGloshiaDecision.FailClosed(
+                identity,
+                GloshiaVisualPolicyContract.AnalysisExpiredReason,
+            )
         }
+        val prepared =
+            runCatching {
+                AndroidGloshiaImagePreprocessor.prepareVideoCapturedRaster(
+                    bitmap = bitmap,
+                    maxLongEdge = maxOf(bitmap.width, bitmap.height),
+                )
+            }.getOrNull()
+                ?: return ChromeVisualShieldGloshiaDecision.FailClosed(
+                    identity,
+                    GloshiaVisualPolicyContract.DecodeFailedReason,
+                )
+        try {
+            val currentAnalyzer =
+                engine()
+                    ?: return ChromeVisualShieldGloshiaDecision.FailClosed(
+                        identity,
+                        GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
+                    )
+            return ChromeVisualShieldAnalyzerExecution.decide(identity, fault) {
+                GloshiaPreparedRasterPolicy.decide(
+                    candidateId = identity.regionId,
+                    preparedImages = listOf(prepared),
+                    analyzer = currentAnalyzer,
+                    canContinue = canContinue,
+                )
+            }
+        } finally {
+            prepared.rgb888.fill(0)
+        }
+    }
 
     override fun close() {
         synchronized(lock) {

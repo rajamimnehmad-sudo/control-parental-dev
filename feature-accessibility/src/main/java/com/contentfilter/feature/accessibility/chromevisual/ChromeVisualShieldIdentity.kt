@@ -199,6 +199,10 @@ internal class ChromeVisualShieldIdentityGate(
     }
 
     @Synchronized
+    fun isCurrentProcessing(identity: ChromeVisualShieldIdentity): Boolean =
+        phase == ChromeVisualShieldPhase.Processing && isCurrent(identity)
+
+    @Synchronized
     fun failClosed(identity: ChromeVisualShieldIdentity?) {
         if (identity == null || isCurrent(identity)) protect()
     }

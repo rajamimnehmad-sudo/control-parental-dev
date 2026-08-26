@@ -1,6 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabControl
+import java.util.Base64
 
 /** Controlled DEV origin for transport/identity/cleanup validation. It grants no production authority. */
 internal object ChromeVisualShieldFixture {
@@ -8,22 +9,130 @@ internal object ChromeVisualShieldFixture {
     const val SentinelPath = "/web13br/sentinel"
     const val SecondPath = "/web13br/second"
     const val DelayedPath = "/web13br/delayed"
+    const val SafeCanvasPath = "/web13br/canvas/safe"
+    const val BlockCanvasPath = "/web13br/canvas/block"
+    const val SafePayloadPath = "/web13br/payload/safe"
+    const val BlockPayloadPath = "/web13br/payload/block"
 
     fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse? {
         val path = request.target.substringBefore('?').substringBefore('#')
-        val body =
+        val response =
             when (path) {
-                ControlPath -> page("control", sentinel = false, delayed = false)
-                SentinelPath -> page("sentinel", sentinel = true, delayed = false)
-                SecondPath -> page("second-document", sentinel = true, delayed = false)
-                DelayedPath -> page("delayed", sentinel = false, delayed = true)
+                ControlPath -> pageResponse(path, page("control", sentinel = false, delayed = false))
+                SentinelPath -> pageResponse(path, page("sentinel", sentinel = true, delayed = false))
+                SecondPath -> pageResponse(path, page("second-document", sentinel = true, delayed = false))
+                DelayedPath -> pageResponse(path, page("delayed", sentinel = false, delayed = true))
+                SafeCanvasPath -> canvasResponse(path, ChromeVisualShieldFixtureSample.Safe)
+                BlockCanvasPath -> canvasResponse(path, ChromeVisualShieldFixtureSample.Block)
+                SafePayloadPath -> payloadResponse(path, ChromeVisualShieldFixtureSample.Safe)
+                BlockPayloadPath -> payloadResponse(path, ChromeVisualShieldFixtureSample.Block)
                 else -> return null
+            }
+        return response
+    }
+
+    private fun pageResponse(
+        path: String,
+        body: String,
+    ) = ChromePhotosFixtureResponse(
+        resourceId = "chrome-visual-shield-${path.substringAfterLast('/')}",
+        contentType = "text/html; charset=utf-8",
+        originalBytes = body.toByteArray(Charsets.UTF_8),
+    )
+
+    private fun canvasResponse(
+        path: String,
+        sample: ChromeVisualShieldFixtureSample,
+    ): ChromePhotosFixtureResponse = pageResponse(path, canvasPage(sample))
+
+    private fun payloadResponse(
+        path: String,
+        sample: ChromeVisualShieldFixtureSample,
+    ): ChromePhotosFixtureResponse {
+        val bytes = ChromeVisualShieldFixtureSampleStore.payload(sample)
+        val body =
+            if (bytes == null) {
+                """{"ready":false,"sample":"${sample.wireName}"}"""
+            } else {
+                try {
+                    val encoded = Base64.getEncoder().encodeToString(bytes)
+                    """{"ready":true,"sample":"${sample.wireName}","sha256":"${sample.expectedSha256}","base64":"$encoded"}"""
+                } finally {
+                    bytes.fill(0)
+                }
             }
         return ChromePhotosFixtureResponse(
             resourceId = "chrome-visual-shield-${path.substringAfterLast('/')}",
-            contentType = "text/html; charset=utf-8",
+            contentType = "application/json; charset=utf-8",
             originalBytes = body.toByteArray(Charsets.UTF_8),
         )
+    }
+
+    private fun canvasPage(sample: ChromeVisualShieldFixtureSample): String {
+        val payloadPath = if (sample == ChromeVisualShieldFixtureSample.Safe) SafePayloadPath else BlockPayloadPath
+        val left = ChromeVisualShieldLabControl.RegionLeftBasisPoints / 100.0
+        val top = ChromeVisualShieldLabControl.RegionTopBasisPoints / 100.0
+        val width =
+            (
+                ChromeVisualShieldLabControl.RegionRightBasisPoints -
+                    ChromeVisualShieldLabControl.RegionLeftBasisPoints
+            ) / 100.0
+        val height =
+            (
+                ChromeVisualShieldLabControl.RegionBottomBasisPoints -
+                    ChromeVisualShieldLabControl.RegionTopBasisPoints
+            ) / 100.0
+        return """
+            <!doctype html>
+            <html data-fixture-signature="${ChromeVisualShieldLabControl.FixtureSignature}"
+                  data-expected-sha="${sample.expectedSha256}">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+              <title>Visual Shield canvas ${sample.wireName}</title>
+              <style>
+                html, body { margin: 0; min-height: 100vh; background: #111; }
+                #fixture-canvas {
+                  position: fixed;
+                  left: ${left}vw;
+                  top: ${top}vh;
+                  width: ${width}vw;
+                  height: ${height}vh;
+                  object-fit: fill;
+                }
+              </style>
+            </head>
+            <body data-carrier="canvas" data-sample="${sample.wireName}">
+              <canvas id="fixture-canvas" data-carrier-visible="canvas"></canvas>
+              <script>
+                (async () => {
+                  const expectedSha = '${sample.expectedSha256}';
+                  const response = await fetch('$payloadPath', { cache: 'no-store' });
+                  const payload = await response.json();
+                  if (!payload.ready || payload.sha256 !== expectedSha) throw new Error('fixture payload unavailable');
+                  const binary = atob(payload.base64);
+                  const bytes = Uint8Array.from(binary, value => value.charCodeAt(0));
+                  const digest = await crypto.subtle.digest('SHA-256', bytes);
+                  const observedSha = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
+                  if (observedSha !== expectedSha) throw new Error('fixture sha mismatch');
+                  const bitmap = await createImageBitmap(new Blob([bytes], { type: 'application/octet-stream' }));
+                  const canvas = document.getElementById('fixture-canvas');
+                  canvas.width = bitmap.width;
+                  canvas.height = bitmap.height;
+                  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, 0, 0);
+                  bitmap.close();
+                  bytes.fill(0);
+                  document.documentElement.dataset.carrierVisible = 'canvas';
+                  document.documentElement.dataset.observedSha = observedSha;
+                  console.info('carrierVisible=canvas sample=${sample.wireName} sha=' + observedSha);
+                })().catch(error => {
+                  document.documentElement.dataset.fixtureError = error.message;
+                  console.error('carrierVisible=canvas fixtureError=' + error.message);
+                });
+              </script>
+            </body>
+            </html>
+            """.trimIndent()
     }
 
     private fun page(

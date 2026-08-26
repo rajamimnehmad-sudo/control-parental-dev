@@ -22,6 +22,8 @@ object ChromeVisualShieldLabControl {
 
     fun cancelStress(): String = endpoint?.cancelStress() ?: Unavailable
 
+    fun armAnalyzerFailure(): String = endpoint?.armAnalyzerFailure() ?: Unavailable
+
     fun status(): String = endpoint?.status() ?: Unavailable
 
     internal fun bind(value: Endpoint) {
@@ -42,6 +44,8 @@ object ChromeVisualShieldLabControl {
         fun injectStale(): String
 
         fun cancelStress(): String
+
+        fun armAnalyzerFailure(): String
 
         fun status(): String
     }

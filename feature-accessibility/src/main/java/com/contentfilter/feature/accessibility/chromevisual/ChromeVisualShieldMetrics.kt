@@ -36,9 +36,11 @@ internal class ChromeVisualShieldMetrics {
 
     @Synchronized
     fun onFullFrameClosed(bytes: Long) {
+        check(fullFrameOutstanding > 0) { "Visual Shield full frame closed without acquisition" }
+        check(fullFrameBytesOutstanding >= bytes) { "Visual Shield full frame bytes underflow" }
         fullFrameClosed += 1
-        fullFrameOutstanding = (fullFrameOutstanding - 1).coerceAtLeast(0)
-        fullFrameBytesOutstanding = (fullFrameBytesOutstanding - bytes).coerceAtLeast(0)
+        fullFrameOutstanding -= 1
+        fullFrameBytesOutstanding -= bytes
     }
 
     @Synchronized
@@ -49,8 +51,9 @@ internal class ChromeVisualShieldMetrics {
 
     @Synchronized
     fun onCropClosed() {
+        check(cropOutstanding > 0) { "Visual Shield crop closed without creation" }
         cropClosed += 1
-        cropOutstanding = (cropOutstanding - 1).coerceAtLeast(0)
+        cropOutstanding -= 1
     }
 
     @Synchronized
