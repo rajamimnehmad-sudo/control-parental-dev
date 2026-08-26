@@ -136,6 +136,9 @@ public final class GuideBubbleActivity extends Activity {
             return;
         }
 
+        LinearLayout stack = new LinearLayout(this);
+        stack.setOrientation(LinearLayout.VERTICAL);
+
         GuideOverlayView guide = new GuideOverlayView(this, new GuideOverlayView.Listener() {
             @Override
             public void onBack() {
@@ -153,7 +156,55 @@ public final class GuideBubbleActivity extends Activity {
             }
         });
         guide.setStep(step, transientInstruction);
-        root.addView(guide, match());
+        stack.addView(guide, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
+        stack.addView(compactCodeTray(pairing), margins(0, 8, 0, 0));
+        root.addView(stack, match());
+    }
+
+    /** Always-present compact ADB code entry inside the expanded Bubble. */
+    private View compactCodeTray(PairingUiState pairing) {
+        LinearLayout tray = new LinearLayout(this);
+        tray.setOrientation(LinearLayout.VERTICAL);
+        tray.setPadding(dp(12), dp(10), dp(12), dp(10));
+        tray.setBackground(rounded(Color.WHITE, 16));
+        tray.setElevation(dp(6));
+
+        tray.addView(
+                text("Código ADB · 6 dígitos", 11, GRAPHITE, Typeface.BOLD),
+                margins(0, 0, 0, 6));
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+
+        EditText code = pairingInput(18);
+        code.setEnabled(pairing != PairingUiState.CONNECTING);
+        row.addView(code, new LinearLayout.LayoutParams(0, dp(42), 1f));
+
+        TextView send = action(pairing == PairingUiState.CONNECTING ? "LISTO" : "ENVIAR", true);
+        send.setEnabled(pairing != PairingUiState.CONNECTING);
+        send.setOnClickListener(view -> submitPairingCode(code));
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(94), dp(42));
+        sendParams.setMargins(dp(8), 0, 0, 0);
+        row.addView(send, sendParams);
+        tray.addView(row, margins(0, 0, 0, 0));
+
+        tray.addView(
+                text(codeTrayHint(pairing), 10, MUTED, Typeface.NORMAL),
+                margins(0, 6, 0, 0));
+        return tray;
+    }
+
+    private String codeTrayHint(PairingUiState pairing) {
+        if (pairing == PairingUiState.CONNECTING) {
+            return "Código recibido. Glosh está completando la conexión.";
+        }
+        if (RemotePairingService.getSessionState() == SessionState.PREPARING) {
+            return "Cuando Samsung muestre el código, podés escribirlo acá desde cualquier paso.";
+        }
+        return "Este campo queda disponible durante toda la guía.";
     }
 
     private View codeCard(PairingUiState pairing) {
@@ -180,17 +231,7 @@ public final class GuideBubbleActivity extends Activity {
                 : "Dejá visible el código de Samsung detrás. Podés escribir los seis números acá; si el endpoint todavía no apareció, Glosh los guarda y continúa solo cuando esté listo.";
         card.addView(text(helper, 13, MUTED, Typeface.NORMAL), margins(0, 0, 0, 12));
 
-        EditText code = new EditText(this);
-        code.setSingleLine(true);
-        code.setGravity(Gravity.CENTER);
-        code.setTextSize(25);
-        code.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        code.setTextColor(GRAPHITE);
-        code.setHint("000000");
-        code.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        code.setFilters(new InputFilter[] {new InputFilter.LengthFilter(6)});
-        code.setBackground(rounded(Color.rgb(247, 248, 243), 14));
-        code.setPadding(dp(12), dp(10), dp(12), dp(10));
+        EditText code = pairingInput(25);
         code.setEnabled(pairing != PairingUiState.CONNECTING);
         card.addView(code, margins(0, 0, 0, 10));
 
@@ -203,6 +244,21 @@ public final class GuideBubbleActivity extends Activity {
         back.setOnClickListener(view -> handleBubbleBack());
         card.addView(back, margins(0, 0, 0, 0));
         return card;
+    }
+
+    private EditText pairingInput(float size) {
+        EditText code = new EditText(this);
+        code.setSingleLine(true);
+        code.setGravity(Gravity.CENTER);
+        code.setTextSize(size);
+        code.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        code.setTextColor(GRAPHITE);
+        code.setHint("000000");
+        code.setInputType(InputType.TYPE_CLASS_NUMBER);
+        code.setFilters(new InputFilter[] {new InputFilter.LengthFilter(6)});
+        code.setBackground(rounded(Color.rgb(247, 248, 243), 14));
+        code.setPadding(dp(12), dp(8), dp(12), dp(8));
+        return code;
     }
 
     /**
@@ -306,7 +362,7 @@ public final class GuideBubbleActivity extends Activity {
             return;
         }
         if (RemotePairingService.getSessionState() != SessionState.PREPARING) {
-            input.setError("La sesión todavía no está lista");
+            input.setError("Cuando Samsung muestre el código, Glosh lo acepta desde este mismo campo");
             return;
         }
         startService(new Intent(this, RemotePairingService.class)
