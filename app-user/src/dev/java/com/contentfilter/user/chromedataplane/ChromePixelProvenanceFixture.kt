@@ -1,6 +1,5 @@
 package com.contentfilter.user.chromedataplane
 
-import java.util.Base64
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
@@ -30,10 +29,7 @@ internal enum class ChromePixelProvenanceVector(
  * Deterministic 13A origin used to observe pixel provenance that is not represented by a direct
  * image response. It records behavior only; it does not label any renderer-local vector as safe.
  */
-internal class ChromePixelProvenanceFixture(
-    sentinelImageBytes: ByteArray,
-) {
-    private val sentinelBase64 = Base64.getEncoder().encodeToString(sentinelImageBytes)
+internal class ChromePixelProvenanceFixture {
     private val pageReport = AtomicReference(NotRun)
     private val externalJavaScriptRequests = AtomicLong()
     private val jsonRequests = AtomicLong()
@@ -167,7 +163,7 @@ internal class ChromePixelProvenanceFixture(
           <h1>CHROME-PROVENANCE-GAP-13A</h1>
           <p>Observation fixture. RENDERED means the browser produced pixels; it is not a safety decision.</p>
           <div class="grid">
-            <article class="card"><h2>data:</h2><img id="data-url" src="data:image/png;base64,$sentinelBase64"></article>
+            <article class="card"><h2>data:</h2><img id="data-url" src="data:image/png;base64,$SentinelPngBase64"></article>
             <article class="card"><h2>blob:</h2><img id="blob-url"></article>
             <article class="card"><h2>Canvas 2D</h2><canvas id="canvas-2d" width="320" height="180"></canvas></article>
             <article class="card"><h2>WebGL</h2><canvas id="webgl" width="320" height="180"></canvas></article>
@@ -216,7 +212,7 @@ internal class ChromePixelProvenanceFixture(
               if(document.readyState!=='complete')await new Promise(resolve=>window.addEventListener('load',resolve,{once:true}));
               mark('DATA_URL',await bounded(imageResult(document.getElementById('data-url')),5000));
               const blobImage=document.getElementById('blob-url');
-              blobImage.src=URL.createObjectURL(new Blob([decode('$sentinelBase64')],{type:'image/png'}));
+              blobImage.src=URL.createObjectURL(new Blob([decode('$SentinelPngBase64')],{type:'image/png'}));
               mark('BLOB_URL',await bounded(imageResult(blobImage),5000));
               mark('CANVAS_2D',paint(document.getElementById('canvas-2d'),'#dc1430','#000')?'RENDERED':'ERROR');
               mark('WEBGL',paintWebGl(document.getElementById('webgl')));
@@ -274,7 +270,7 @@ internal class ChromePixelProvenanceFixture(
         const CACHE_NAME='glosh-13a-v1';
         const CACHE_PATH='$CacheStoragePath';
         const SYNTHETIC_PATH='$ServiceWorkerSyntheticPath';
-        const IMAGE_BASE64='$sentinelBase64';
+        const IMAGE_BASE64='$SentinelPngBase64';
         const bytes=()=>Uint8Array.from(atob(IMAGE_BASE64),character=>character.charCodeAt(0));
         const imageResponse=()=>new Response(bytes(),{status:200,headers:{'Content-Type':'image/png','Cache-Control':'no-store'}});
         self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.put(CACHE_PATH,imageResponse())).then(()=>self.skipWaiting())));
@@ -341,6 +337,8 @@ internal class ChromePixelProvenanceFixture(
         const val NotRun = "not_run"
         const val InvalidReport = "invalid"
         const val JsonBody = "{\"background\":\"#dc1430\",\"stripe\":\"#000000\"}"
+        const val SentinelPngBase64 =
+            "iVBORw0KGgoAAAANSUhEUgAAAUAAAAC0CAIAAABqhmJGAAACOklEQVR4nO3TQQ2EABAEweM0IAEB+FeBACQgAhOETYcqA5N59PIbcq77yO52HSO7/r7ja3//I6vAIwQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoYwAUOYgCFMwBAmYAgTMIQJGMIEDGEChjABQ5iAIUzAECZgCBMwhAkYwgQMYQKGMAFDmIAhTMAQJmAIEzCECRjCBAxhAoawG9j7C4i/UFSBAAAAAElFTkSuQmCC"
         val NoStoreHeaders =
             listOf(
                 ChromeHttpHeader("Cache-Control", "no-store, max-age=0"),
@@ -348,16 +346,4 @@ internal class ChromePixelProvenanceFixture(
             )
         val EmptyWasmModule = byteArrayOf(0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00)
     }
-}
-
-/** Adds 13A endpoints without changing the established 11A/11B fixture behavior. */
-internal class ChromePhotosProvenanceFixtureSource(
-    private val delegate: ChromePhotosFixtureSource,
-) : ChromePhotosFixtureSource by delegate {
-    private val provenance = ChromePixelProvenanceFixture(delegate.sentinelImageBytes)
-
-    override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse =
-        provenance.responseFor(request) ?: delegate.responseFor(request)
-
-    fun provenanceReport(): String = provenance.report()
 }
