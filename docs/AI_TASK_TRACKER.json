@@ -1,14 +1,15 @@
 {
-  "updatedAt": "25 de ago de 2026 · 21:20",
+  "updatedAt": "25 de ago de 2026 · 21:39",
   "sections": [
     {
       "id": "coordination",
       "title": "Coordinación",
       "context": "Workflow paralelo eficiente: Glosh Central coordina estados persistentes, GitHub demuestra codigo/evidencia y los worktrees aislan escritura; default maximo 2 frentes de codigo",
       "tasks": [
-        {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario histórico terminado sin modificar el proyecto; se programa una nueva auditoría local↔GitHub porque el repo/worktrees siguieron evolucionando.","status":"done","priority":"critical"},
-        {"id":"mac-local-github-audit-02","title":"Auditar Mac local contra GitHub","detail":"PENDIENTE / READ-ONLY. Inventariar repo canónico, worktrees, ramas, commits no publicados, cambios tracked/untracked/ignored, datos/evidencia local y candidatos stale. No limpiar, mover, borrar, stash, reset, rebase ni publicar nada; devolver clasificación y plan para revisión ChatGPT.","status":"pending","priority":"important"},
-        {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"Estado local relevante preservado en ramas remotas preserve/*.","status":"done","priority":"critical"},
+        {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario histórico terminado sin modificar el proyecto; la auditoría local↔GitHub 02 actualiza este estado.","status":"done","priority":"critical"},
+        {"id":"mac-local-github-audit-02","title":"Auditar Mac local contra GitHub","detail":"PASS READ-ONLY. Canonical work/chrome-visual@6a045f13 quedó sin cambios por la auditoría. Hallazgos: 21 commits no publicados, de los cuales 16 tienen contenido realmente local; 25 commits unreachable ambiguos; único worktree dirty es el canónico; .codex-tmp mezcla ~5.5 GiB de corpus/evidencia con entornos regenerables; archivo local no Git de ~201 MiB; ~14.1 GiB de builds/cachés regenerables. No se limpió ni publicó nada.","status":"done","priority":"important"},
+        {"id":"mac-local-preservation-03","title":"Preservar trabajo local antes de limpiar","detail":"PENDIENTE / PRIORIDAD ANTES DE CLEANUP. Proteger de forma recuperable los 16 commits con contenido único y los 25 unreachable ambiguos; preservar dirty/untracked, archivo local y evidencia; clasificar .codex-tmp sin borrado en bloque. No publicar objetos ambiguos/sensibles al repo público. Sólo después preparar limpieza de worktrees/refs/builds superseded.","status":"pending","priority":"critical"},
+        {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"La preservación histórica cubre estados anteriores, pero la auditoría 02 detectó material local adicional; MAC-LOCAL-PRESERVATION-03 debe cerrarse antes de cualquier cleanup.","status":"done","priority":"critical"},
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
         {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. Scope token cross-device PASS; quedan gate end-to-end de pairing y deuda Auth del pairing Admin. Sin owner activo.","status":"pending","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96.","status":"done","priority":"important"},
