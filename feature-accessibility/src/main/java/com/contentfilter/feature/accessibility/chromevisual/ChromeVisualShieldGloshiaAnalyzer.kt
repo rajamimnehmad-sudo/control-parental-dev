@@ -3,11 +3,13 @@ package com.contentfilter.feature.accessibility.chromevisual
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Bitmap
 import com.contentfilter.feature.accessibility.ChromeVisualGloshiaEngineProvider
-import com.glosh.visual.AndroidGloshiaImagePreprocessor
+import com.glosh.visual.GloshiaImageCropPlan
 import com.glosh.visual.GloshiaPreparedRasterPolicy
 import com.glosh.visual.GloshiaVisualAction
+import com.glosh.visual.GloshiaVisualAnalysisResult
 import com.glosh.visual.GloshiaVisualAnalyzer
 import com.glosh.visual.GloshiaVisualDecision
+import com.glosh.visual.GloshiaVisualDecisionBasis
 import com.glosh.visual.GloshiaVisualPolicyContract
 import com.glosh.visual.LifecycleGloshiaVisualAnalyzer
 
@@ -64,6 +66,20 @@ internal object ChromeVisualShieldGloshiaDecisionPolicy {
         }
 }
 
+internal data class ChromeVisualShieldRegionalAnalysisEvidence(
+    val cropPlans: List<GloshiaImageCropPlan>,
+    val preparedImageCount: Int,
+    val regionalImageCount: Int,
+    val probabilities: List<Float>,
+    val basis: GloshiaVisualDecisionBasis,
+    val fullImageProbability: Float?,
+)
+
+internal data class ChromeVisualShieldGloshiaAnalysis(
+    val decision: ChromeVisualShieldGloshiaDecision,
+    val regionalEvidence: ChromeVisualShieldRegionalAnalysisEvidence?,
+)
+
 /**
  * R1 adapter from the RAM-only Visual Shield crop to the existing GloshIA R3.1 policy.
  * The prepared RGB buffer is always zeroed before returning and inference is serialized.
@@ -79,41 +95,66 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
         bitmap: Bitmap,
         identity: ChromeVisualShieldIdentity,
         canContinue: () -> Boolean,
-    ): ChromeVisualShieldGloshiaDecision {
+        includeCanonicalRegions: Boolean = false,
+    ): ChromeVisualShieldGloshiaAnalysis {
         if (!canContinue()) {
-            return ChromeVisualShieldGloshiaDecision.FailClosed(
-                identity,
-                GloshiaVisualPolicyContract.AnalysisExpiredReason,
+            return ChromeVisualShieldGloshiaAnalysis(
+                ChromeVisualShieldGloshiaDecision.FailClosed(
+                    identity,
+                    GloshiaVisualPolicyContract.AnalysisExpiredReason,
+                ),
+                null,
             )
         }
-        val prepared =
-            runCatching {
-                AndroidGloshiaImagePreprocessor.prepareVideoCapturedRaster(
-                    bitmap = bitmap,
-                    maxLongEdge = maxOf(bitmap.width, bitmap.height),
+        val views =
+            ChromeVisualShieldCapturedRasterViews.prepare(bitmap, includeCanonicalRegions)
+                ?: return ChromeVisualShieldGloshiaAnalysis(
+                    ChromeVisualShieldGloshiaDecision.FailClosed(
+                        identity,
+                        GloshiaVisualPolicyContract.DecodeFailedReason,
+                    ),
+                    null,
                 )
-            }.getOrNull()
-                ?: return ChromeVisualShieldGloshiaDecision.FailClosed(
-                    identity,
-                    GloshiaVisualPolicyContract.DecodeFailedReason,
-                )
-        try {
+        views.use { ownedViews ->
             val currentAnalyzer =
                 engine()
-                    ?: return ChromeVisualShieldGloshiaDecision.FailClosed(
-                        identity,
-                        GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
+                    ?: return ChromeVisualShieldGloshiaAnalysis(
+                        ChromeVisualShieldGloshiaDecision.FailClosed(
+                            identity,
+                            GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
+                        ),
+                        null,
                     )
-            return ChromeVisualShieldAnalyzerExecution.decide(identity, fault) {
-                GloshiaPreparedRasterPolicy.decide(
-                    candidateId = identity.regionId,
-                    preparedImages = listOf(prepared),
-                    analyzer = currentAnalyzer,
-                    canContinue = canContinue,
-                )
-            }
-        } finally {
-            prepared.rgb888.fill(0)
+            val probabilities = mutableListOf<Float>()
+            var policyDecision: GloshiaVisualDecision? = null
+            val decision =
+                ChromeVisualShieldAnalyzerExecution.decide(identity, fault) {
+                    GloshiaPreparedRasterPolicy.decide(
+                        candidateId = identity.regionId,
+                        preparedImages = ownedViews.preparedImages,
+                        analyzer = currentAnalyzer,
+                        canContinue = canContinue,
+                        analyze = { analyzer, image ->
+                            analyzer.analyze(image).also { result ->
+                                if (result is GloshiaVisualAnalysisResult.Classified) {
+                                    probabilities += result.filterProbability
+                                }
+                            }
+                        },
+                    ).also { policyDecision = it }
+                }
+            val evidence =
+                policyDecision?.let { result ->
+                    ChromeVisualShieldRegionalAnalysisEvidence(
+                        cropPlans = ownedViews.cropPlans,
+                        preparedImageCount = result.preparedImageCount,
+                        regionalImageCount = result.regionalImageCount,
+                        probabilities = probabilities.toList(),
+                        basis = result.basis,
+                        fullImageProbability = result.fullImageProbability,
+                    )
+                }
+            return ChromeVisualShieldGloshiaAnalysis(decision, evidence)
         }
     }
 

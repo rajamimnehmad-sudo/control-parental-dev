@@ -402,6 +402,7 @@ internal class ChromeVisualShieldController(
                 reason = decision.reason,
                 filterProbability = decision.filterProbability,
                 inferenceCount = r1Metrics.snapshot().inferenceCompleted,
+                regionalEvidence = delivery.regionalEvidence,
             )
         if (renderProbeCompleted) onCurrentDecision(delivery.sentinelMatches)
         log(
@@ -410,6 +411,12 @@ internal class ChromeVisualShieldController(
                 "region=${delivery.work.identity.region} crop=${cropEvidence.width}x${cropEvidence.height} " +
                 "cropSha=${cropEvidence.rgbaSha256} action=${decision.logValue()} " +
                 "reason=${decision.reason} filterProbability=${decision.filterProbability} " +
+                "regionalPlans=${delivery.regionalEvidence?.cropPlans ?: emptyList<com.glosh.visual.GloshiaImageCropPlan>()} " +
+                "preparedImageCount=${delivery.regionalEvidence?.preparedImageCount ?: 0} " +
+                "regionalImageCount=${delivery.regionalEvidence?.regionalImageCount ?: 0} " +
+                "probabilities=${delivery.regionalEvidence?.probabilities ?: emptyList<Float>()} " +
+                "decisionBasis=${delivery.regionalEvidence?.basis ?: com.glosh.visual.GloshiaVisualDecisionBasis.None} " +
+                "fullProbability=${delivery.regionalEvidence?.fullImageProbability} " +
                 "inferenceCount=${r1Metrics.snapshot().inferenceCompleted} result=$result neverRelease=true rawPresented=false",
         )
     }
