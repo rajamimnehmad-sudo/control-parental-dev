@@ -3,6 +3,7 @@ package com.contentfilter.user.chromedataplane
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ChromePixelProvenanceFixtureTest {
@@ -54,6 +55,32 @@ class ChromePixelProvenanceFixtureTest {
         assertTrue(html.contains("/web13a/report"))
         assertTrue(html.contains("/web13a/state"))
         assertTrue(html.contains("GLOSH13A_COMPLETE"))
+    }
+
+    @Test
+    fun `inline SVG rendered requires browser rasterization and known pixel samples`() {
+        val response = fixture.responseFor(ChromePhotosProxyRequest("GET", "/web13a/"))!!
+        val html = response.originalBytes.toString(Charsets.UTF_8)
+
+        assertFalse(html.contains("getBoundingClientRect"))
+        assertTrue(html.contains("new XMLSerializer().serializeToString(svg)"))
+        assertTrue(html.contains("context.drawImage(image,0,0,320,180)"))
+        assertTrue(html.contains("getImageData(60,90,1,1)"))
+        assertTrue(html.contains("getImageData(20,90,1,1)"))
+        assertTrue(html.contains("pixelMatches(redPixel,220,20,48)"))
+        assertTrue(html.contains("pixelMatches(blackPixel,0,0,0)"))
+    }
+
+    @Test
+    fun `storage cleanup verifies registration and cache postconditions`() {
+        val response = fixture.responseFor(ChromePhotosProxyRequest("GET", "/web13a/"))!!
+        val html = response.originalBytes.toString(Charsets.UTF_8)
+
+        assertTrue(html.contains("remainingRegistrations"))
+        assertTrue(html.contains("registrationAbsent"))
+        assertTrue(html.contains("caches.has('glosh-13a-v1')"))
+        assertTrue(html.contains("cacheAbsent"))
+        assertTrue(html.contains("registrationAbsent&&cacheAbsent&&clean"))
     }
 
     @Test

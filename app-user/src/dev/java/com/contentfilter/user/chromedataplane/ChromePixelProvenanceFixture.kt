@@ -203,6 +203,23 @@ internal class ChromePixelProvenanceFixture {
               const pixel=new Uint8Array(4);gl.readPixels(1,1,1,1,gl.RGBA,gl.UNSIGNED_BYTE,pixel);
               return pixel[0]>150?'RENDERED':'ERROR';
             };
+            const pixelMatches=(pixel,red,green,blue)=>
+              Math.abs(pixel[0]-red)<=4&&Math.abs(pixel[1]-green)<=4&&Math.abs(pixel[2]-blue)<=4&&pixel[3]===255;
+            const probeInlineSvg=async(svg)=>{
+              const serialized=new XMLSerializer().serializeToString(svg);
+              const image=new Image();
+              const objectUrl=URL.createObjectURL(new Blob([serialized],{type:'image/svg+xml'}));
+              try{
+                image.src=objectUrl;
+                if((await bounded(imageResult(image),5000))!=='RENDERED')return 'BLOCKED';
+                const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;
+                const context=canvas.getContext('2d');if(!context)return 'ERROR';
+                context.drawImage(image,0,0,320,180);
+                const redPixel=context.getImageData(60,90,1,1).data;
+                const blackPixel=context.getImageData(20,90,1,1).data;
+                return pixelMatches(redPixel,220,20,48)&&pixelMatches(blackPixel,0,0,0)?'RENDERED':'ERROR';
+              }catch(error){return 'ERROR';}finally{URL.revokeObjectURL(objectUrl);}
+            };
             const waitForController=async()=>{
               if(navigator.serviceWorker.controller)return true;
               await bounded(new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true})),5000);
@@ -212,10 +229,14 @@ internal class ChromePixelProvenanceFixture {
               let clean=true;
               try{
                 const registrations=await navigator.serviceWorker.getRegistrations();
-                for(const registration of registrations){
-                  if(new URL(registration.scope).pathname==='$RunnerPath')clean=(await registration.unregister())&&clean;
-                }
+                const scopedRegistrations=registrations.filter(registration=>new URL(registration.scope).pathname==='$RunnerPath');
+                clean=scopedRegistrations.length>0&&clean;
+                for(const registration of scopedRegistrations)clean=(await registration.unregister())&&clean;
                 clean=(await caches.delete('$StorageCacheName'))&&clean;
+                const remainingRegistrations=await navigator.serviceWorker.getRegistrations();
+                const registrationAbsent=!remainingRegistrations.some(registration=>new URL(registration.scope).pathname==='$RunnerPath');
+                const cacheAbsent=!(await caches.has('$StorageCacheName'));
+                clean=registrationAbsent&&cacheAbsent&&clean;
               }catch(error){clean=false;}
               return clean?'PASS':'FAIL';
             };
@@ -227,8 +248,7 @@ internal class ChromePixelProvenanceFixture {
               mark('BLOB_URL',await bounded(imageResult(blobImage),5000));
               mark('CANVAS_2D',paint(document.getElementById('canvas-2d'),'#dc1430','#000')?'RENDERED':'ERROR');
               mark('WEBGL',paintWebGl(document.getElementById('webgl')));
-              const svg=document.getElementById('inline-svg').getBoundingClientRect();
-              mark('INLINE_SVG',svg.width>0&&svg.height>0?'RENDERED':'ERROR');
+              mark('INLINE_SVG',await probeInlineSvg(document.getElementById('inline-svg')));
               mark('JAVASCRIPT',window.__glosh13aExternalJs==='RENDERED'?'RENDERED':'ERROR');
               try{
                 const config=await (await fetch('$JsonPath',{cache:'no-store'})).json();
@@ -304,8 +324,7 @@ internal class ChromePixelProvenanceFixture {
     private fun htmlResponse(
         id: String,
         body: String,
-    ): ChromePhotosFixtureResponse =
-        bytesResponse(id, HtmlContentType, body.toByteArray(Charsets.UTF_8))
+    ): ChromePhotosFixtureResponse = bytesResponse(id, HtmlContentType, body.toByteArray(Charsets.UTF_8))
 
     private fun textResponse(
         id: String,
