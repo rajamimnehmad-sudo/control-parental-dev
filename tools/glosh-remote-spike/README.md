@@ -25,6 +25,10 @@ The app does not accept or capture the pairing PIN. This prevents an early code
 from being queued before the pairing endpoint exists and makes the notification
 the single authority for manual code entry.
 
+Broker delivery and foreground-service startup use a two-phase handoff: the
+descriptor remains owned by the coordinator until `RemotePairingService` reports
+`PREPARING` or `CONNECTED`. There is no elapsed-time reset between those states.
+
 The customer never sees or enters a link, IP address, TCP port, relay descriptor, session key, shell command or terminal.
 
 The earlier guided-assistant design remains historical context in

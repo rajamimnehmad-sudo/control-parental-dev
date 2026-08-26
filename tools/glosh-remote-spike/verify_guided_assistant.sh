@@ -7,10 +7,10 @@ MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
 FINAL_APK="$APK_DIR/GloshRemote-Notification-PIN-DEV.apk"
-REPORT="$APK_DIR/REMOTE-NOTIFICATION-PIN-19-report.txt"
+REPORT="$APK_DIR/REMOTE-NOTIFICATION-PIN-20-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-pin-only-python.XXXXXX")"
-MIN_DEV_VERSION_CODE=19
+MIN_DEV_VERSION_CODE=20
 
 # macOS may expose /usr/bin/java as a GUI-install stub even though Android Studio's
 # JBR is available and Gradle can use it. apksigner/keytool need the same real JDK.
@@ -59,6 +59,7 @@ printf '\n[1/5] Product architecture + stable DEV signing guard\n'
 MANIFEST="$SCRIPT_DIR/app/src/main/AndroidManifest.xml"
 MAIN="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/MainActivity.java"
 SERVICE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/RemotePairingService.java"
+START_HANDOFF="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/session/ServiceStartHandoff.java"
 COORDINATOR="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/broker/SupportSessionCoordinator.java"
 ONBOARDING="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/OnboardingState.java"
 MAC_CONSOLE="$SCRIPT_DIR/mac/broker_console.py"
@@ -94,6 +95,22 @@ if ! grep -q 'requestDirectSession' "$MAIN" \
   || ! grep -q 'onRequestPermissionsResult' "$MAIN" \
   || ! grep -q 'CONECTAR CON SOPORTE' "$MAIN"; then
   echo "ERROR: falta el contrato notification-PIN: una acción, permiso explícito y broker directo." >&2
+  exit 3
+fi
+if grep -q 'SERVICE_START_GRACE_MS' "$MAIN" \
+  || ! grep -q 'ServiceStartHandoff.Decision.ACKNOWLEDGE' "$MAIN" \
+  || ! grep -q 'ServiceStartHandoff.Decision.WAIT' "$MAIN" \
+  || ! grep -q 'coordinator.descriptor()' "$MAIN" \
+  || ! grep -q 'coordinator.markSessionStarted()' "$MAIN"; then
+  echo "ERROR: el handoff broker -> foreground service volvió a depender de un timeout o perdió el acuse en dos fases." >&2
+  exit 3
+fi
+if grep -Eq 'currentTimeMillis|elapsedRealtime|nanoTime' "$START_HANDOFF" \
+  || ! grep -q 'Decision.DISPATCH' "$START_HANDOFF" \
+  || ! grep -q 'Decision.WAIT' "$START_HANDOFF" \
+  || ! grep -q 'Decision.ACKNOWLEDGE' "$START_HANDOFF" \
+  || ! grep -q 'Decision.FINISH' "$START_HANDOFF"; then
+  echo "ERROR: el contrato de handoff dejó de ser dirigido por estado y libre de reloj." >&2
   exit 3
 fi
 if ! grep -q 'requestDirectSession' "$COORDINATOR" \
@@ -205,7 +222,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 {
-  echo "TASK=REMOTE-NOTIFICATION-PIN-19"
+  echo "TASK=REMOTE-NOTIFICATION-PIN-20"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"

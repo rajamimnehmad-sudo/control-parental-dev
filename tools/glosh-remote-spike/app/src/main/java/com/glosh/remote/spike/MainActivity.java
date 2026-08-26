@@ -14,6 +14,7 @@ import android.view.WindowManager;
 
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.session.PairingUiState;
+import com.glosh.remote.spike.session.ServiceStartHandoff;
 import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.OemFamily;
 import com.glosh.remote.spike.wizard.OnboardingState;
@@ -28,7 +29,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     public static final String ACTION_GUIDE_NEXT = "com.glosh.remote.spike.GUIDE_NEXT";
 
     private static final long STATE_REFRESH_MS = 250L;
-    private static final long SERVICE_START_GRACE_MS = 3_000L;
     private static final long BROKER_RETRY_MS = 2_000L;
     private static final int REQUEST_NOTIFICATIONS = 9001;
 
@@ -49,7 +49,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private boolean notificationPermissionDenied;
     private boolean serviceStartIssued;
     private boolean directDescriptorSeeded;
-    private long serviceStartAtMs;
     private long nextBrokerRetryAtMs;
     private String lastRenderKey;
 
@@ -135,14 +134,35 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
         SessionState session = RemotePairingService.getSessionState();
-        long now = SystemClock.elapsedRealtime();
-
-        if (session == SessionState.CONNECTED) {
+        OnboardingState.Step step = coordinator.step();
+        ServiceStartHandoff.Decision handoff = ServiceStartHandoff.decide(
+                step,
+                serviceStartIssued,
+                session);
+        if (handoff == ServiceStartHandoff.Decision.ACKNOWLEDGE) {
+            coordinator.markSessionStarted();
+            serviceStartIssued = true;
+        } else if (handoff == ServiceStartHandoff.Decision.FINISH) {
+            coordinator.reset();
+            connectRequested = false;
             serviceStartIssued = false;
+            directDescriptorSeeded = false;
+            nextBrokerRetryAtMs = 0L;
+            lastRenderKey = null;
+            return;
+        } else if (handoff == ServiceStartHandoff.Decision.DISPATCH) {
+            serviceStartIssued = startSupportSession();
+            return;
+        } else if (handoff == ServiceStartHandoff.Decision.WAIT) {
             return;
         }
 
-        OnboardingState.Step step = coordinator.step();
+        if (session == SessionState.CONNECTED) {
+            return;
+        }
+
+        long now = SystemClock.elapsedRealtime();
+        step = coordinator.step();
         if (session == SessionState.IDLE) {
             if (step == OnboardingState.Step.HOME || step == OnboardingState.Step.UNAVAILABLE) {
                 directDescriptorSeeded = false;
@@ -153,22 +173,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 return;
             }
 
-            if (step == OnboardingState.Step.WIRELESS_DEBUGGING && !serviceStartIssued) {
-                if (startSupportSession()) {
-                    serviceStartIssued = true;
-                    serviceStartAtMs = now;
-                }
-                return;
-            }
-
-            if (step == OnboardingState.Step.SESSION_ACTIVE
-                    && serviceStartIssued
-                    && now - serviceStartAtMs >= SERVICE_START_GRACE_MS) {
-                serviceStartIssued = false;
-                directDescriptorSeeded = false;
-                coordinator.reset();
-                nextBrokerRetryAtMs = 0L;
-            }
+            // WIRELESS_DEBUGGING and SESSION_ACTIVE are handled by ServiceStartHandoff above.
         }
     }
 
@@ -176,14 +181,21 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         if (RemotePairingService.getSessionState() != SessionState.IDLE) {
             return true;
         }
-        String descriptor = coordinator.markSessionStarted();
+        String descriptor = coordinator.descriptor();
         if (descriptor == null) {
             return false;
         }
-        startForegroundService(new Intent(this, RemotePairingService.class)
-                .setAction(RemotePairingService.ACTION_START)
-                .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
-        return true;
+        try {
+            startForegroundService(new Intent(this, RemotePairingService.class)
+                    .setAction(RemotePairingService.ACTION_START)
+                    .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
+            return true;
+        } catch (Throwable ignored) {
+            coordinator.reset();
+            connectRequested = false;
+            lastRenderKey = null;
+            return false;
+        }
     }
 
     private void render() {
@@ -383,7 +395,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         notificationPermissionRequestInFlight = false;
         serviceStartIssued = false;
         directDescriptorSeeded = false;
-        serviceStartAtMs = 0L;
         nextBrokerRetryAtMs = 0L;
         lastRenderKey = null;
         driveConnection();
