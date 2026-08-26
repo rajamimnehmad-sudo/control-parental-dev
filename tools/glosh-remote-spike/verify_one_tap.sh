@@ -6,8 +6,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
-FINAL_APK="$APK_DIR/GloshRemote-Simple-Notification-DEV.apk"
-REPORT="$APK_DIR/REMOTE-SIMPLE-NOTIFICATION-23-report.txt"
+FINAL_APK="$APK_DIR/GloshRemote-Full-ADB-DEV.apk"
+REPORT="$APK_DIR/REMOTE-FULL-ADB-24-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PYTHON_VENV=""
 
@@ -54,7 +54,7 @@ prepare_python() {
     -r "$MAC_DIR/requirements.txt"
 }
 
-printf '\n=== Glosh Remote Simple Notification gate ===\n'
+printf '\n=== Glosh Remote Full ADB gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
@@ -70,7 +70,8 @@ printf '\n[2/5] Python protocol/broker/standby tests\n'
   "$PYTHON_VENV/bin/python" -m unittest \
     test_protocol.py \
     test_broker.py \
-    test_one_tap_standby.py
+    test_one_tap_standby.py \
+    test_remote_access.py
 )
 
 printf '\n[3/5] Android JVM unit tests\n'
@@ -94,7 +95,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" status --short)"
 
 {
-  echo "TASK=REMOTE-SIMPLE-NOTIFICATION-23"
+  echo "TASK=REMOTE-FULL-ADB-24"
   echo "RESULT=PASS"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"

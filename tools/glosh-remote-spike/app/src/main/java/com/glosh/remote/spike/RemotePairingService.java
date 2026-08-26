@@ -55,7 +55,7 @@ public final class RemotePairingService extends Service {
     private static final int REQUEST_REPLY = 7411;
     private static final int REQUEST_STOP = 7412;
     private static final long CONNECT_TIMEOUT_MS = 15_000;
-    private static final int SUPPORT_SESSION_MINUTES = 30;
+    private static final int MAX_SUPPORT_SESSION_MINUTES = 121;
     private static volatile SessionState sessionState = SessionState.IDLE;
     private static volatile PairingUiState pairingUiState = PairingUiState.INACTIVE;
 
@@ -319,10 +319,10 @@ public final class RemotePairingService extends Service {
             if (canary.length() == 0) {
                 throw new IllegalStateException("ADB respondió sin identidad shell.");
             }
-            screenAwakeLease.acquireForSessionMinutes(SUPPORT_SESSION_MINUTES);
+            screenAwakeLease.acquireForSessionMinutes(MAX_SUPPORT_SESSION_MINUTES);
 
             updateForeground("Ya casi estamos", "Conectando de forma segura con soporte…");
-            RelayClient client = new RelayClient(shell);
+            RelayClient client = new RelayClient(getApplicationContext(), shell);
             relayClient = client;
             client.connect(joinUri, new RelayClient.Listener() {
                 @Override

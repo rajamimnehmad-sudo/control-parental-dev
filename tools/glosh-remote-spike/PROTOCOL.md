@@ -72,11 +72,12 @@ AAD is directional and monotonic:
 
 Frames with a repeated or decreasing sequence are rejected.
 
-## Command model
+## Remote ADB model
 
-The Mac sends **action names only**. It cannot supply raw shell strings.
+After the user explicitly pairs Wireless Debugging and the relay proves the one-time session key, the
+Mac receives the practical authority of `uid=2000(shell)`, matching an ADB cable without root.
 
-Current allowlist:
+Convenience actions remain:
 
 - `ping` — app-local round trip
 - `whoami` — `id`
@@ -85,7 +86,16 @@ Current allowlist:
 - `users` — `pm list users`
 - `battery` — `dumpsys battery`
 
-Any other action is rejected on Android even if the transport relay is compromised.
+The authenticated protocol also carries:
+
+- `shell` with a command string up to 32 KiB; output is capped to 2 MiB;
+- `push-start`, ordered `push-chunk` and `push-finish` for files up to 512 MiB;
+- a declared size and SHA-256 which Android verifies before opening ADB Sync;
+- Mac-side `install`, `owner` and `provision` transactions built from `push` plus `shell`.
+
+File chunks are at most 96 KiB on the wire and 128 KiB at the Android boundary. A disconnect aborts
+and deletes the app-private staging file. The ADB destination is still constrained by the actual
+permissions Android grants to `shell`; this protocol never provides root.
 
 ## Revocation
 
@@ -97,10 +107,10 @@ Any other action is rejected on Android even if the transport relay is compromis
 
 ## Explicit non-goals for v1
 
-- no arbitrary remote shell;
-- no Glosh APK installation yet;
-- no Device Owner mutation yet;
-- no screen control;
+- no root or SELinux bypass;
+- no hidden or persistent access after session close;
+- no bypass of Android's Device Owner eligibility rules or protected user confirmations;
+- no interactive framebuffer protocol; diagnostics and permitted `shell` tools remain available;
 - no persistence across reboot;
 - no production relay/backend;
 - no root;

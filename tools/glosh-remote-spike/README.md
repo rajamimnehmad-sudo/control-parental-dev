@@ -1,6 +1,6 @@
 # Glosh Remote Spike
 
-`REMOTE-INSTALL-CONNECTION-00`
+`REMOTE-FULL-ADB-24`
 
 Laboratory project to prove remote technical access to an **already-used Android phone, without a PC on the client side**.
 
@@ -33,12 +33,16 @@ PASS requires all of the following on Android 11+:
 - Mac and phone may be on different networks;
 - Android opens an outbound WSS connection to the temporary Mac relay;
 - mutual one-time-key authentication succeeds;
-- Mac runs only allowlisted actions: `ping`, `whoami`, `device`, `owners`, `users`, `battery`;
+- after explicit user pairing, Mac has the practical `uid=2000(shell)` surface of a USB ADB session;
+- shell diagnostics, `logcat`, `dumpsys`, ADB Sync file transfer, APK installation and `dpm` work remotely;
+- every transferred file is bounded and verified by declared size plus SHA-256 before ADB Sync;
 - command/results are additionally AES-256-GCM encrypted end-to-end;
 - closing, losing or revoking the session closes local ADB too;
 - a new process/session requires a new ADB pairing identity.
 
-No Device Owner mutation is performed in this ticket. The next pilot may use the proven channel to install/prepare Glosh adaptively.
+The operator can install Glosh and run the exact Device Owner provisioning command. Android still
+enforces its normal prerequisites: no incompatible existing owner, eligible primary user and account
+state, and any OEM/user confirmations that cannot be bypassed by ADB shell.
 
 ## Ephemeral ADB identity
 
@@ -124,7 +128,7 @@ python glosh_remote_relay.py \
 In broker mode the relay does not print the descriptor. It prints pending requests and requires
 `accept <request-id>`. Without broker flags it retains the direct descriptor as a DEV-only gate tool.
 
-On the Mac the V0 actions are:
+On the Mac the support commands are:
 
 ```text
 ping
@@ -133,6 +137,11 @@ device
 owners
 users
 battery
+shell <command>
+push <local-file> <remote-path>
+install <local-apk>
+owner <package/admin-component>
+provision <local-apk> <package/admin-component>
 status
 requests
 accept <request-id>
@@ -140,7 +149,8 @@ help
 quit
 ```
 
-There is intentionally **no arbitrary remote shell**.
+`shell` is deliberately equivalent to an authorized ADB shell, not root. `provision` transfers the
+APK, installs it, removes the temporary copy and invokes `dpm set-device-owner --user 0`.
 
 ## Gate 0 — relay without Android
 
@@ -156,7 +166,7 @@ Run `glosh_remote_relay.py` in one terminal and `mock_agent.py '<descriptor>'` i
 6. Tap **Pair device with pairing code**.
 7. Pull down the Glosh Remote notification and enter the six digits.
 8. Wait for **Conectado con soporte**.
-9. From the Mac run the allowlisted actions.
+9. From the Mac run diagnostics, file transfer, install or Device Owner provisioning.
 10. Use `quit` / **Cancelar conexión** and prove commands no longer execute.
 11. Turn Wireless debugging off after the lab gate.
 
@@ -169,8 +179,10 @@ Run `glosh_remote_relay.py` in one terminal and `mock_agent.py '<descriptor>'` i
 - Mutual HMAC challenge/response authenticates both ends before command traffic.
 - Command/result bodies use AES-256-GCM with directional sequence-bound AAD.
 - Monotonic sequence numbers reject replayed encrypted frames.
-- Android receives action names, never raw shell text; a fixed local allowlist maps those actions to read-only diagnostic commands.
-- Output is capped to 64 KiB per action.
+- Shell text and file chunks exist only inside authenticated AES-256-GCM frames.
+- Shell output is capped to 2 MiB per command and relay frames to 4 MiB.
+- A file is accepted only in order, up to 512 MiB, and must match its declared size and SHA-256.
+- Staging files are deleted on success, failure, disconnect or process cleanup.
 - Relay loss is fail-closed and the temporary ADB identity is discarded.
 - `FLAG_SECURE` remains enabled throughout the guided flow.
 - Notification permission is required on Android 13+ because the six-digit pairing input lives in the notification.
@@ -178,10 +190,12 @@ Run `glosh_remote_relay.py` in one terminal and `mock_agent.py '<descriptor>'` i
 ## Known limitations / next gates
 
 - Android 11+ only for V0.
-- The stable DEV broker is configured, but the no-link physical Internet and cross-network gates remain pending.
+- The stable DEV broker and no-link cross-network connection have passed on the S22; full shell,
+  ADB Sync and provisioning still require the v24 physical gate.
 - Wireless debugging remains enabled during V0. After this path passes, the next architecture experiment can start a short-lived shell-side bridge and ask the user to turn Wireless debugging off earlier.
 - Some OEMs may change Developer options or mDNS behavior; real pilots will build manufacturer/model recipes before automation.
 - Android 17 local-network permission changes are deferred until the target SDK is raised to API 37.
-- The `libadb-android` dependency explicitly says it has not undergone a security audit; V0 confines it to same-device bootstrap and does not expose its API over the remote protocol.
+- The `libadb-android` dependency explicitly says it has not undergone a security audit; the user must
+  explicitly pair every ephemeral session and the relay expires automatically.
 
 See [`PROTOCOL.md`](PROTOCOL.md) and [`THIRD_PARTY.md`](THIRD_PARTY.md).
