@@ -58,6 +58,17 @@ require(
 require("currentScreenLease.release()" in service, "screen lease must be released on cleanup")
 require('case "shell":' in (APP / "java" / "com" / "glosh" / "remote" / "spike" / "adb" / "AdbShell.java").read_text(), "authenticated shell access is required")
 require('manager.openStream("sync:")' in (APP / "java" / "com" / "glosh" / "remote" / "spike" / "adb" / "AdbShell.java").read_text(), "ADB Sync file transfer is required")
+pairing_body = service.split("private void pairAndConnect", 1)[1].split(
+    "private void showCodeFailure", 1
+)[0]
+require(
+    "stopPairingEndpointDiscovery();" in pairing_body,
+    "pairing-code mDNS must stop before TLS connect without releasing multicast",
+)
+require(
+    pairing_body.index("manager.connectTls") < pairing_body.index("releaseMulticastLock();"),
+    "multicast lock must remain held until TLS endpoint discovery completes",
+)
 require(
     "if (identity == null)" in broker_client,
     "request renewal must reuse the original ephemeral identity",

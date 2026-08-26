@@ -304,7 +304,7 @@ public final class RemotePairingService extends Service {
                 return;
             }
 
-            stopPairingDiscovery();
+            stopPairingEndpointDiscovery();
             pairingHost = null;
             pairingPort = -1;
             updateForeground("Perfecto, conectando…", "Estamos terminando la conexión segura.");
@@ -313,6 +313,7 @@ public final class RemotePairingService extends Service {
             if (!connected && !manager.isConnected()) {
                 throw new IllegalStateException("No se pudo abrir el canal TLS local de ADB.");
             }
+            releaseMulticastLock();
 
             AdbShell shell = new AdbShell(manager);
             String canary = shell.execute("whoami").trim();
@@ -443,6 +444,11 @@ public final class RemotePairingService extends Service {
     }
 
     private void stopPairingDiscovery() {
+        stopPairingEndpointDiscovery();
+        releaseMulticastLock();
+    }
+
+    private void stopPairingEndpointDiscovery() {
         AdbMdns current = pairingDiscovery;
         pairingDiscovery = null;
         if (current != null) {
@@ -451,7 +457,6 @@ public final class RemotePairingService extends Service {
             } catch (Throwable ignored) {
             }
         }
-        releaseMulticastLock();
     }
 
     private void acquireMulticastLock() {

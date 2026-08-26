@@ -19,8 +19,8 @@ android {
         applicationId = "com.glosh.remote.spike"
         minSdk = 30
         targetSdk = 35
-        versionCode = 24
-        versionName = "0.24.0-full-adb-session"
+        versionCode = 25
+        versionName = "0.25.0-tls-discovery-lock"
 
         buildConfigField("String", "BROKER_BASE_URL", "\"$escapedBrokerBaseUrl\"")
 

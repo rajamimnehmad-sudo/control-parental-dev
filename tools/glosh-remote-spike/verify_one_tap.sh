@@ -7,7 +7,7 @@ MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
 FINAL_APK="$APK_DIR/GloshRemote-Full-ADB-DEV.apk"
-REPORT="$APK_DIR/REMOTE-FULL-ADB-24-report.txt"
+REPORT="$APK_DIR/REMOTE-FULL-ADB-25-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PYTHON_VENV=""
 
@@ -95,7 +95,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" status --short)"
 
 {
-  echo "TASK=REMOTE-FULL-ADB-24"
+  echo "TASK=REMOTE-FULL-ADB-25"
   echo "RESULT=PASS"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
