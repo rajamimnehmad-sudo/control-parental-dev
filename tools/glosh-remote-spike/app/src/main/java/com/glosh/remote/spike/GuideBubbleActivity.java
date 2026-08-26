@@ -20,11 +20,12 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.GuideNotification;
-import com.glosh.remote.spike.wizard.GuideOverlayController;
 import com.glosh.remote.spike.wizard.GuideOverlayView;
+import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.SamsungGuideStep;
 import com.glosh.remote.spike.wizard.SamsungGuideStore;
 
@@ -47,10 +48,13 @@ public final class GuideBubbleActivity extends Activity {
 
     private SamsungGuideStore guideStore;
     private GuideNotification guideNotification;
+    private SupportSessionCoordinator coordinator;
     private FrameLayout root;
     private SamsungGuideStep renderedStep;
     private PairingUiState renderedPairing;
     private SessionState renderedSession;
+    private OnboardingState.Step renderedOnboarding;
+    private String transientInstruction;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +63,7 @@ public final class GuideBubbleActivity extends Activity {
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
         guideStore = new SamsungGuideStore(this);
         guideNotification = new GuideNotification(this);
+        coordinator = SupportSessionCoordinator.get(this);
         root = new FrameLayout(this);
         root.setPadding(dp(8), dp(8), dp(8), dp(8));
         setContentView(root);
@@ -88,7 +93,12 @@ public final class GuideBubbleActivity extends Activity {
         SamsungGuideStep step = guideStore.step();
         PairingUiState pairing = RemotePairingService.getPairingUiState();
         SessionState session = RemotePairingService.getSessionState();
-        if (step != renderedStep || pairing != renderedPairing || session != renderedSession) {
+        OnboardingState.Step onboarding = coordinator.step();
+        if (step != renderedStep
+                || pairing != renderedPairing
+                || session != renderedSession
+                || onboarding != renderedOnboarding) {
+            transientInstruction = null;
             render(false);
         }
     }
@@ -107,12 +117,18 @@ public final class GuideBubbleActivity extends Activity {
 
         SamsungGuideStep step = guideStore.step();
         PairingUiState pairing = RemotePairingService.getPairingUiState();
-        if (!force && step == renderedStep && pairing == renderedPairing && session == renderedSession) {
+        OnboardingState.Step onboarding = coordinator.step();
+        if (!force
+                && step == renderedStep
+                && pairing == renderedPairing
+                && session == renderedSession
+                && onboarding == renderedOnboarding) {
             return;
         }
         renderedStep = step;
         renderedPairing = pairing;
         renderedSession = session;
+        renderedOnboarding = onboarding;
 
         root.removeAllViews();
         if (step == SamsungGuideStep.ENTER_CODE) {
@@ -123,12 +139,12 @@ public final class GuideBubbleActivity extends Activity {
         GuideOverlayView guide = new GuideOverlayView(this, new GuideOverlayView.Listener() {
             @Override
             public void onBack() {
-                sendGuideAction(GuideOverlayController.ACTION_BUBBLE_BACK);
+                handleBubbleBack();
             }
 
             @Override
             public void onNext() {
-                sendGuideAction(GuideOverlayController.ACTION_BUBBLE_NEXT);
+                handleBubbleNext();
             }
 
             @Override
@@ -136,7 +152,7 @@ public final class GuideBubbleActivity extends Activity {
                 // SystemUI owns Bubble positioning. No app-owned overlay coordinates are used.
             }
         });
-        guide.setStep(step);
+        guide.setStep(step, transientInstruction);
         root.addView(guide, match());
     }
 
@@ -184,9 +200,103 @@ public final class GuideBubbleActivity extends Activity {
         card.addView(connect, margins(0, 0, 0, 8));
 
         TextView back = action("ATRÁS", false);
-        back.setOnClickListener(view -> sendGuideAction(GuideOverlayController.ACTION_BUBBLE_BACK));
+        back.setOnClickListener(view -> handleBubbleBack());
         card.addView(back, margins(0, 0, 0, 0));
         return card;
+    }
+
+    /**
+     * Bubble controls must remain functional even if Samsung stops/destroys MainActivity while
+     * Settings is foreground. Progress therefore lives here instead of relying on an Activity-
+     * scoped broadcast receiver.
+     */
+    private void handleBubbleNext() {
+        SamsungGuideStep current = guideStore.step();
+        if (current == SamsungGuideStep.ENTER_CODE) {
+            openGloshFromBubble();
+            return;
+        }
+
+        if (current == SamsungGuideStep.BUILD_NUMBER) {
+            if (coordinator.step() == OnboardingState.Step.GUIDE_PERMISSION) {
+                coordinator.guideReady();
+            }
+            if (coordinator.step() == OnboardingState.Step.DEVELOPER_OPTIONS) {
+                coordinator.confirmDeveloperOptions();
+            }
+            advanceTo(SamsungGuideStep.DEVELOPER_OPTIONS);
+            return;
+        }
+
+        if (current == SamsungGuideStep.WIRELESS_DEBUGGING) {
+            if (RemotePairingService.getSessionState() == SessionState.IDLE) {
+                if (coordinator.step() == OnboardingState.Step.REQUESTING_SUPPORT) {
+                    showWaiting(current, "Esperá un momento: estamos preparando la sesión segura con soporte.");
+                    return;
+                }
+                if (!startSupportSession()) {
+                    showWaiting(current, "Todavía estamos preparando soporte. Probá nuevamente en unos segundos.");
+                    return;
+                }
+            }
+            advanceTo(SamsungGuideStep.PAIR_DEVICE);
+            return;
+        }
+
+        if (current == SamsungGuideStep.PAIR_DEVICE) {
+            advanceTo(SamsungGuideStep.ENTER_CODE);
+            return;
+        }
+
+        advanceTo(current.next());
+    }
+
+    private void handleBubbleBack() {
+        SamsungGuideStep current = guideStore.step();
+        if (!current.canGoBack()) {
+            openGloshFromBubble();
+            return;
+        }
+        advanceTo(current.previous());
+    }
+
+    private void advanceTo(SamsungGuideStep step) {
+        transientInstruction = null;
+        guideStore.setStep(step);
+        if (RemotePairingService.getSessionState() == SessionState.IDLE) {
+            guideNotification.showBubbleStep(step, false);
+        }
+        render(true);
+    }
+
+    private void showWaiting(SamsungGuideStep step, String message) {
+        transientInstruction = message;
+        guideNotification.showWaiting(step, message);
+        render(true);
+    }
+
+    private boolean startSupportSession() {
+        if (RemotePairingService.getSessionState() != SessionState.IDLE) {
+            return true;
+        }
+        String descriptor = coordinator.markSessionStarted();
+        if (descriptor == null) {
+            return false;
+        }
+        startForegroundService(new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_START)
+                .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
+        return true;
+    }
+
+    private void openGloshFromBubble() {
+        Intent intent = new Intent(this, MainActivity.class)
+                .setAction(MainActivity.ACTION_GUIDE_OPEN)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        | Intent.FLAG_ACTIVITY_CLEAR_TOP
+                        | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        startActivity(intent);
+        finishAndRemoveTask();
     }
 
     private void submitPairingCode(EditText input) {
@@ -203,13 +313,6 @@ public final class GuideBubbleActivity extends Activity {
                 .setAction(RemotePairingService.ACTION_SUBMIT_CODE)
                 .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, code));
         input.setEnabled(false);
-    }
-
-    private void sendGuideAction(String action) {
-        Intent intent = new Intent(action)
-                .setPackage(getPackageName());
-        sendBroadcast(intent);
-        handler.postDelayed(() -> render(true), 80L);
     }
 
     private TextView action(String label, boolean primary) {
