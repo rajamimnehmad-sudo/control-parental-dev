@@ -8,46 +8,34 @@ It is deliberately isolated under `tools/glosh-remote-spike/`. It does not modif
 
 The connection stack already passed the no-link/cross-network DEV gate. The current work is the customer experience that prepares Wireless ADB safely.
 
-The normal product is a **professional guided assistant**, not a bot that blindly presses Android controls.
+The current Samsung DEV candidate is a **notification-PIN flow**. It keeps Android
+Settings under the customer's control and accepts the six-digit pairing code only
+after local mDNS has identified the matching pairing endpoint.
 
 ### Customer flow
 
 1. Open Glosh Remote and tap **CONECTAR CON SOPORTE**.
-2. **Paso 1 de 4:** activate Glosh Remote Accessibility.
-3. **Paso 2 de 4:** confirm Developer options; Samsung enable-development screens are highlighted only if needed.
-4. **Paso 3 de 4:** Glosh opens Wireless Debugging directly; the customer activates it and confirms the Wi‑Fi network if Android asks.
-5. **Paso 4 de 4:** the customer taps **Pair device with pairing code**. Glosh reads a unique contextual six-digit code locally and submits it automatically when safe.
-6. Local ADB pairing, TLS connection and the encrypted Mac relay continue automatically.
+2. Grant notification permission when Android asks; the broker session then opens.
+3. In Wireless Debugging, tap **Pair device with pairing code**.
+4. After Glosh detects that endpoint, expand its notification, tap
+   **Ingresar código**, and submit the six digits through Android `RemoteInput`.
+5. Local ADB pairing, TLS connection and the encrypted Mac relay continue automatically.
 
-The app, persistent notification and compact floating coach show the same instruction and the same four-step progress. The floating card includes a small native animation for tap, switch, seven taps, code, waiting and success.
-
-If automatic code reading is not safe, the existing six-box input and notification `RemoteInput` remain available.
+The app does not accept or capture the pairing PIN. This prevents an early code
+from being queued before the pairing endpoint exists and makes the notification
+the single authority for manual code entry.
 
 The customer never sees or enters a link, IP address, TCP port, relay descriptor, session key, shell command or terminal.
 
-Detailed design and gate:
-
-`GUIDED_ASSISTANT_08.md`
+The earlier guided-assistant design remains historical context in
+`GUIDED_ASSISTANT_08.md`; it is not the active Samsung route.
 
 ## Interaction authority
 
-Normal guided mode uses Accessibility for:
-
-- selecting one trusted Settings application window;
-- stable immutable snapshots;
-- observing real state changes;
-- highlighting known labels;
-- reading the contextual pairing code;
-- a Samsung enable-development fallback.
-
-Normal guided mode does **not**:
-
-- automatically click Settings rows, buttons or switches;
-- automatically scroll Settings;
-- use screen coordinates;
-- read device PIN, pattern or password.
-
-Glosh opens the narrowest resolvable Settings destination first. The customer performs Android-protected actions; Glosh observes the result and opens the next destination.
+The active Samsung route uses no Accessibility service, overlay, Bubble, automatic
+Settings click, automatic scroll, coordinate gesture or contextual code capture.
+The customer owns every Android Settings action. Glosh owns broker rendezvous,
+endpoint-bound notification input, local ADB pairing and the encrypted relay.
 
 ## Connection architecture
 
@@ -91,7 +79,7 @@ Standalone Gradle project:
 ./gradlew -p tools/glosh-remote-spike :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
-Canonical guided verification:
+Canonical notification-PIN verification:
 
 ```bash
 ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk \
@@ -100,7 +88,8 @@ ANDROID_HOME=/Users/yejielnehmad/Library/Android/sdk \
 
 The gate runs:
 
-- source architecture guard: no click/scroll ownership in the guided coordinator;
+- source architecture guard: no app/capture PIN path, explicit notification
+  permission and endpoint-bound `RemoteInput`;
 - Python protocol, broker and standby tests;
 - Android JVM tests;
 - Android lint;
@@ -110,7 +99,7 @@ The gate runs:
 Expected artifact:
 
 ```text
-tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Guided-DEV.apk
+tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Notification-PIN-DEV.apk
 ```
 
 ## Mac relay
@@ -147,16 +136,14 @@ There is intentionally no arbitrary remote shell.
 
 ## Physical validation order
 
-1. Build and automated gate on the exact guided HEAD.
-2. A23 Samsung laboratory run:
-   - zero automatic clicks;
-   - zero programmatic scrolls;
-   - exact direct routes;
-   - visual fallback only when needed;
-   - automatic or notification pairing code;
-   - local ADB + Mac support;
+1. Build and automated gate on the exact notification-PIN HEAD.
+2. One cable-free S22 run:
+   - one **CONECTAR CON SOPORTE** action;
+   - notification permission granted explicitly;
+   - no PIN input or capture inside the app;
+   - `RemoteInput` appears only after the pairing endpoint is detected;
+   - local ADB + authenticated Mac support;
    - complete cleanup/restoration.
-3. Same exact APK on S22 cable-free as a real customer UX run.
-4. Add Motorola/Xiaomi adapters only from real evidence; keep the common guided engine.
+3. Add other Samsung/OEM coverage only from real evidence.
 
-No Device Owner mutation is performed by this guided bootstrap task.
+No Device Owner mutation is performed by this task.

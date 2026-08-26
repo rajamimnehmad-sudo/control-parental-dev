@@ -6,11 +6,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
-FINAL_APK="$APK_DIR/GloshRemote-Samsung-Bubble-DEV.apk"
-REPORT="$APK_DIR/REMOTE-SAMSUNG-BUBBLE-GUIDE-12-report.txt"
+FINAL_APK="$APK_DIR/GloshRemote-Notification-PIN-DEV.apk"
+REPORT="$APK_DIR/REMOTE-NOTIFICATION-PIN-19-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-pin-only-python.XXXXXX")"
-MIN_DEV_VERSION_CODE=18
+MIN_DEV_VERSION_CODE=19
 
 cleanup() {
   rm -rf "$VENV_DIR"
@@ -39,7 +39,7 @@ normalize_digest() {
   tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:'
 }
 
-printf '\n=== Glosh Remote Samsung PIN-only gate ===\n'
+printf '\n=== Glosh Remote notification-PIN gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
@@ -73,12 +73,15 @@ if grep -Eq 'GuideOverlayController|GuideNotification|SamsungGuideStep|SettingsN
   echo "ERROR: MainActivity volvió a depender de la guía/Bubble superseded." >&2
   exit 3
 fi
-if ! grep -q 'showPairingInput' "$MAIN" \
-  || ! grep -q 'focusPairingInput' "$MAIN" \
-  || ! grep -q 'requestDirectSession' "$MAIN" \
-  || ! grep -q 'ACTION_SUBMIT_CODE' "$MAIN" \
-  || ! grep -q 'pendingPairingCode' "$MAIN"; then
-  echo "ERROR: falta el contrato PIN-only: seis dígitos -> sesión directa -> submit automático." >&2
+if grep -Eq 'showPairingInput|focusPairingInput|ACTION_SUBMIT_CODE|pendingPairingCode|ContextualPairingCodeDetector' "$MAIN"; then
+  echo "ERROR: MainActivity volvió a aceptar/capturar el PIN fuera de la notificación ligada al endpoint." >&2
+  exit 3
+fi
+if ! grep -q 'requestDirectSession' "$MAIN" \
+  || ! grep -q 'POST_NOTIFICATIONS' "$MAIN" \
+  || ! grep -q 'onRequestPermissionsResult' "$MAIN" \
+  || ! grep -q 'CONECTAR CON SOPORTE' "$MAIN"; then
+  echo "ERROR: falta el contrato notification-PIN: una acción, permiso explícito y broker directo." >&2
   exit 3
 fi
 if ! grep -q 'requestDirectSession' "$COORDINATOR" \
@@ -91,7 +94,9 @@ if ! grep -q 'AdbMdns.SERVICE_TYPE_TLS_PAIRING' "$SERVICE" \
   || ! grep -q 'manager.pair(host, port, code)' "$SERVICE" \
   || ! grep -q 'connectTls' "$SERVICE" \
   || ! grep -q 'RelayClient' "$SERVICE" \
-  || ! grep -q 'pendingPairingCode' "$SERVICE"; then
+  || ! grep -q 'RemoteInput.Builder' "$SERVICE" \
+  || ! grep -q 'ACTION_REPLY' "$SERVICE" \
+  || ! grep -q 'VISIBILITY_SECRET' "$SERVICE"; then
   echo "ERROR: pairing ADB local/mDNS/relay dejó de cumplir el contrato seguro existente." >&2
   exit 3
 fi
@@ -114,10 +119,10 @@ if ! grep -q 'create("stableDev")' "$BUILD_GRADLE" \
   || ! grep -q 'signingConfig = signingConfigs.getByName("stableDev")' "$BUILD_GRADLE" \
   || [[ ! "$VERSION_CODE" =~ ^[0-9]+$ ]] \
   || (( VERSION_CODE < MIN_DEV_VERSION_CODE )); then
-  echo "ERROR: PIN-only debug debe usar stableDev y versionCode >= $MIN_DEV_VERSION_CODE (actual=${VERSION_CODE:-missing})." >&2
+  echo "ERROR: notification-PIN debug debe usar stableDev y versionCode >= $MIN_DEV_VERSION_CODE (actual=${VERSION_CODE:-missing})." >&2
   exit 3
 fi
-printf 'PASS: Samsung PIN-only + direct broker + local ADB pairing + Mac autoaccept + stable DEV signing (versionCode %s)\n' "$VERSION_CODE"
+printf 'PASS: notification RemoteInput + direct broker + local ADB pairing + Mac autoaccept + stable DEV signing (versionCode %s)\n' "$VERSION_CODE"
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -188,7 +193,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 {
-  echo "TASK=REMOTE-PIN-ONLY-18"
+  echo "TASK=REMOTE-NOTIFICATION-PIN-19"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
