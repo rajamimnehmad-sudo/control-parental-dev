@@ -11,7 +11,7 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
-        if (!context.packageName.endsWith(".dev")) return
+        if (!ChromeVisualShieldLabReceiverContract.accepts(context.packageName)) return
         val result =
             when (intent.action) {
                 ActionStart -> ChromeVisualShieldLabControl.start()
@@ -27,6 +27,7 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
                 ActionInjectStale -> ChromeVisualShieldLabControl.injectStale()
                 ActionCancelStress -> ChromeVisualShieldLabControl.cancelStress()
                 ActionArmAnalyzerFailure -> ChromeVisualShieldLabControl.armAnalyzerFailure()
+                ActionRenderProbe -> renderProbe(intent)
                 ActionFixtureReset -> fixtureReset(intent)
                 ActionFixtureAppend -> fixtureAppend(intent)
                 ActionFixtureCommit -> fixtureCommit(intent)
@@ -52,6 +53,15 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
         return ChromeVisualShieldFixtureSampleStore.commit(sample)
     }
 
+    private fun renderProbe(intent: Intent): String {
+        val sample = fixtureSample(intent) ?: return "result=fixture_unknown_sample"
+        return ChromeVisualShieldLabControl.renderProbe(
+            sampleId = sample.wireName,
+            sourceSha256 = sample.expectedSha256,
+            renderContract = ChromeVisualShieldContainContract.Version,
+        )
+    }
+
     private fun fixtureSample(intent: Intent): ChromeVisualShieldFixtureSample? =
         ChromeVisualShieldFixtureSample.fromWireName(intent.getStringExtra(ExtraFixtureSample))
 
@@ -66,6 +76,8 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
             "com.contentfilter.user.chromevisualshield.command.CANCEL_STRESS"
         const val ActionArmAnalyzerFailure =
             "com.contentfilter.user.chromevisualshield.command.ARM_ANALYZER_FAILURE"
+        const val ActionRenderProbe =
+            "com.contentfilter.user.chromevisualshield.command.RENDER_PROBE"
         const val ActionFixtureReset =
             "com.contentfilter.user.chromevisualshield.command.FIXTURE_RESET"
         const val ActionFixtureAppend =
@@ -76,4 +88,10 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
         const val ExtraFixtureChunk = "fixture_chunk_base64"
         private const val LogTag = "GloshVisualShieldLab"
     }
+}
+
+internal object ChromeVisualShieldLabReceiverContract {
+    const val RequiredManifestPermission = "android.permission.DUMP"
+
+    fun accepts(packageName: String): Boolean = packageName.endsWith(".dev")
 }

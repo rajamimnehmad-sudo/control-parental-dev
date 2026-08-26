@@ -10,7 +10,16 @@ import kotlinx.coroutines.launch
 internal data class ChromeVisualShieldWork(
     val identity: ChromeVisualShieldIdentity,
     val trigger: String,
+    val mode: ChromeVisualShieldWorkMode = ChromeVisualShieldWorkMode.Normal,
 )
+
+internal sealed interface ChromeVisualShieldWorkMode {
+    data object Normal : ChromeVisualShieldWorkMode
+
+    data class RenderProbe(
+        val request: ChromeVisualShieldRenderProbeRequest,
+    ) : ChromeVisualShieldWorkMode
+}
 
 /**
  * Coalesces only pending work. Every authority invalidation happens before request(), while active

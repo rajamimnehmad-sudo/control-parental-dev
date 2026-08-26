@@ -6,7 +6,6 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.contentfilter.feature.accessibility.R
-import com.glosh.visual.GloshiaVisualModelInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicBoolean
@@ -22,9 +21,11 @@ internal class ChromeVisualShieldController(
 ) : AutoCloseable,
     ChromeVisualShieldLabControl.Endpoint {
     private val enabled =
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
-            service.packageName.endsWith(".dev") &&
-            service.resources.getBoolean(R.bool.chrome_visual_shield_lab_enabled)
+        ChromeVisualShieldLabAvailability.isEnabled(
+            sdkInt = Build.VERSION.SDK_INT,
+            packageName = service.packageName,
+            resourceEnabled = service.resources.getBoolean(R.bool.chrome_visual_shield_lab_enabled),
+        )
     private val metrics = ChromeVisualShieldMetrics()
     private val r1Metrics = ChromeVisualShieldR1Metrics()
     private val identityGate = ChromeVisualShieldIdentityGate(metrics::onStaleDropped)
@@ -49,6 +50,7 @@ internal class ChromeVisualShieldController(
             metrics = r1Metrics,
             releaseSurface = ::releaseSafeSurface,
         )
+    private val renderProbeAuthority = ChromeVisualShieldRenderProbeAuthority(identityGate, r1Metrics)
     private val workProcessor =
         ChromeVisualShieldWorkProcessor(
             capture = capture,
@@ -73,6 +75,9 @@ internal class ChromeVisualShieldController(
     private var opaqueCommittedCount = 0L
     private var labOwnershipPublished = false
     private var labActive = false
+    private var renderProbeRequest: ChromeVisualShieldRenderProbeRequest? = null
+    private var renderProbeCompleted = false
+    private var renderProbeObservation: ChromeVisualShieldRenderProbeObservation? = null
     private val closed = AtomicBoolean(false)
 
     init {
@@ -118,22 +123,18 @@ internal class ChromeVisualShieldController(
 
     override fun start(): String =
         commandOnMain {
-            if (!enabled) return@commandOnMain "result=disabled"
-            val window = windowInspector.find(AnyWindowId) ?: return@commandOnMain "result=chrome_absent"
-            val viewport = windowInspector.viewport(window) ?: return@commandOnMain "result=viewport_absent"
-            cancelWorkAndJoin()
-            labActive = true
-            ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
-            val started =
-                identityGate.start(window.id, viewport, regionContract)
-                    ?: return@commandOnMain "result=invalid_fixture_contract"
-            if (!protectThenCapture(started, "start")) {
-                labActive = false
-                identityGate.stop()
-                ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
-                return@commandOnMain "result=surface_failed ${statusValue()}"
-            }
-            "result=started ${statusValue()}"
+            startSession(null, "start")
+        }
+
+    override fun renderProbe(
+        sampleId: String,
+        sourceSha256: String,
+        renderContract: String,
+    ): String =
+        commandOnMain {
+            val request = ChromeVisualShieldRenderProbeRequest(sampleId, sourceSha256, renderContract)
+            if (!request.isValid()) return@commandOnMain "result=invalid_probe_request"
+            startSession(request, "render_probe")
         }
 
     override fun stop(): String =
@@ -144,6 +145,10 @@ internal class ChromeVisualShieldController(
 
     override fun release(): String =
         commandOnMain {
+            if (renderProbeRequest != null) {
+                r1Metrics.onReleaseRejected()
+                return@commandOnMain "result=probe_never_release ${statusValue()}"
+            }
             val context = identityGate.snapshot().context ?: return@commandOnMain "result=no_context"
             if (!identityGate.releaseForExplicitLabGate(context)) {
                 r1Metrics.onReleaseRejected()
@@ -291,8 +296,12 @@ internal class ChromeVisualShieldController(
     }
 
     private fun scheduleCapture(trigger: String) {
+        if (renderProbeRequest != null && renderProbeCompleted) return
         val identity = identityGate.beginCapture() ?: return
-        if (!workCoordinator.request(ChromeVisualShieldWork(identity, trigger))) {
+        val mode =
+            renderProbeRequest?.let { ChromeVisualShieldWorkMode.RenderProbe(it) }
+                ?: ChromeVisualShieldWorkMode.Normal
+        if (!workCoordinator.request(ChromeVisualShieldWork(identity, trigger, mode))) {
             identityGate.failClosed(identity)
         }
     }
@@ -304,6 +313,11 @@ internal class ChromeVisualShieldController(
 
     private fun deliverDecision(delivery: ChromeVisualShieldDecisionDelivery) {
         runOnMain {
+            val probeMode = delivery.work.mode as? ChromeVisualShieldWorkMode.RenderProbe
+            if (probeMode != null) {
+                deliverRenderProbe(probeMode.request, delivery)
+                return@runOnMain
+            }
             val result = decisionAuthority.apply(delivery.work.identity, delivery.decision)
             if (
                 result != ChromeVisualShieldDecisionResult.StaleDropped &&
@@ -318,6 +332,38 @@ internal class ChromeVisualShieldController(
                     "result=${result.logValue()} rawPresented=false",
             )
         }
+    }
+
+    private fun deliverRenderProbe(
+        request: ChromeVisualShieldRenderProbeRequest,
+        delivery: ChromeVisualShieldDecisionDelivery,
+    ) {
+        val cropEvidence = checkNotNull(delivery.cropEvidence)
+        val result = renderProbeAuthority.observe(delivery.work.identity, delivery.decision)
+        renderProbeCompleted =
+            result != ChromeVisualShieldRenderProbeResult.StaleDropped &&
+            result != ChromeVisualShieldRenderProbeResult.IdentityMismatchRejected
+        val decision = delivery.decision
+        renderProbeObservation =
+            ChromeVisualShieldRenderProbeObservation(
+                request = request,
+                identity = delivery.work.identity,
+                crop = cropEvidence,
+                result = result,
+                action = decision.logValue(),
+                reason = decision.reason,
+                filterProbability = decision.filterProbability,
+                inferenceCount = r1Metrics.snapshot().inferenceCompleted,
+            )
+        if (renderProbeCompleted) onCurrentDecision(delivery.sentinelMatches)
+        log(
+            "phase=render_probe sample=${request.sampleId} sourceSha=${request.sourceSha256} " +
+                "renderContract=${request.renderContract} viewport=${delivery.work.identity.viewport} " +
+                "region=${delivery.work.identity.region} crop=${cropEvidence.width}x${cropEvidence.height} " +
+                "cropSha=${cropEvidence.rgbaSha256} action=${decision.logValue()} " +
+                "reason=${decision.reason} filterProbability=${decision.filterProbability} " +
+                "inferenceCount=${r1Metrics.snapshot().inferenceCompleted} result=$result neverRelease=true rawPresented=false",
+        )
     }
 
     private fun releaseSafeSurface() {
@@ -336,6 +382,8 @@ internal class ChromeVisualShieldController(
         surface.close()
         pendingCoverEpoch = null
         labActive = false
+        renderProbeRequest = null
+        renderProbeCompleted = false
         publishLabOwnership(false)
         ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
         log("phase=inactive reason=$reason rawPresented=false")
@@ -343,30 +391,45 @@ internal class ChromeVisualShieldController(
     }
 
     private fun statusValue(): String {
-        val state = identityGate.snapshot()
-        val value = metrics.snapshot()
-        val r1 = r1Metrics.snapshot()
-        return "active=$labActive phase=${state.phase} session=${state.context?.protectionSessionId ?: 0} " +
-            "windowId=${state.context?.windowId ?: -1} contentEpoch=${state.context?.contentEpoch ?: 0} " +
-            "viewportEpoch=${state.context?.viewportEpoch ?: 0} regionSequence=${state.context?.regionSequence ?: 0} " +
-            "fullFrameAcquired=${value.fullFrameAcquired} fullFrameClosed=${value.fullFrameClosed} " +
-            "fullFrameOutstanding=${value.fullFrameOutstanding} fullFramePeakBytes=${value.fullFramePeakBytes} " +
-            "cropCreated=${value.cropCreated} cropClosed=${value.cropClosed} cropOutstanding=${value.cropOutstanding} " +
-            "staleDropped=${value.staleDropped} captureCancelled=${value.captureCancelled} " +
-            "secureWindowFailures=${value.secureWindowFailures} captureCycles=$captureCycles " +
-            "opaqueCommitted=$opaqueCommittedCount sentinelCropMatches=$sentinelCropMatches " +
-            "labReleaseCount=${state.labReleaseCount} staleReleaseRejected=${state.staleReleaseRejected} " +
-            "eventsReceived=${r1.eventsReceived} contentInvalidations=${r1.contentInvalidations} " +
-            "workSuperseded=${r1.workSuperseded} inferenceStarted=${r1.inferenceStarted} " +
-            "inferenceCompleted=${r1.inferenceCompleted} inferenceOutstanding=${r1.inferenceOutstanding} " +
-            "inferencePeakOutstanding=${r1.inferencePeakOutstanding} " +
-            "safeCurrent=${r1.safeCurrent} blockCurrent=${r1.blockCurrent} " +
-            "failClosedCurrent=${r1.failClosedCurrent} staleInferenceDropped=${r1.staleInferenceDropped} " +
-            "inferenceCancelled=${r1.inferenceCancelled} identityMismatchRejected=${r1.identityMismatchRejected} " +
-            "releaseCurrent=${r1.releaseCurrent} releaseRejected=${r1.releaseRejected} " +
-            "safeDecisionAtNanos=${r1.safeDecisionAtNanos} releaseAtNanos=${r1.releaseAtNanos} " +
-            "workIdle=${workCoordinator.isIdle()} model=${GloshiaVisualModelInfo.FunctionalVersion} " +
-            "modelSha=${GloshiaVisualModelInfo.ModelSha256} rawPersisted=0 rawUploaded=0"
+        return ChromeVisualShieldStatusFormatter.format(
+            active = labActive,
+            state = identityGate.snapshot(),
+            metrics = metrics.snapshot(),
+            r1 = r1Metrics.snapshot(),
+            captureCycles = captureCycles,
+            opaqueCommitted = opaqueCommittedCount,
+            sentinelCropMatches = sentinelCropMatches,
+            workIdle = workCoordinator.isIdle(),
+            probeActive = renderProbeRequest != null,
+            probeCompleted = renderProbeCompleted,
+            probe = renderProbeObservation,
+        )
+    }
+
+    private fun startSession(
+        probe: ChromeVisualShieldRenderProbeRequest?,
+        trigger: String,
+    ): String {
+        if (!enabled) return "result=disabled"
+        val window = windowInspector.find(AnyWindowId) ?: return "result=chrome_absent"
+        val viewport = windowInspector.viewport(window) ?: return "result=viewport_absent"
+        cancelWorkAndJoin()
+        renderProbeRequest = probe
+        renderProbeCompleted = false
+        if (probe != null) renderProbeObservation = null
+        labActive = true
+        ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
+        val started =
+            identityGate.start(window.id, viewport, regionContract)
+                ?: return "result=invalid_fixture_contract"
+        if (!protectThenCapture(started, trigger)) {
+            labActive = false
+            renderProbeRequest = null
+            identityGate.stop()
+            ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
+            return "result=surface_failed ${statusValue()}"
+        }
+        return "result=${if (probe == null) "started" else "probe_started"} ${statusValue()}"
     }
 
     private fun logMetrics(reason: String) {

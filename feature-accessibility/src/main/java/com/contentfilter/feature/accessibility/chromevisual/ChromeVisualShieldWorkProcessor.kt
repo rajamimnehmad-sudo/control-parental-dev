@@ -9,6 +9,7 @@ internal data class ChromeVisualShieldDecisionDelivery(
     val work: ChromeVisualShieldWork,
     val decision: ChromeVisualShieldGloshiaDecision,
     val sentinelMatches: Boolean,
+    val cropEvidence: ChromeVisualShieldCropEvidence?,
 )
 
 /** Owns one capture/crop/inference cycle; the coordinator serializes these cycles. */
@@ -65,6 +66,12 @@ internal class ChromeVisualShieldWorkProcessor(
             return
         }
         val matches = sentinelMatches(crop.bitmap)
+        val cropEvidence =
+            if (work.mode is ChromeVisualShieldWorkMode.RenderProbe) {
+                ChromeVisualShieldCropEvidenceFactory.from(crop.bitmap)
+            } else {
+                null
+            }
         metrics.onInferenceStarted()
         val decision =
             try {
@@ -85,6 +92,7 @@ internal class ChromeVisualShieldWorkProcessor(
                 work = work,
                 decision = decision,
                 sentinelMatches = matches,
+                cropEvidence = cropEvidence,
             ),
         )
     }

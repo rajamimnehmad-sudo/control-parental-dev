@@ -24,6 +24,12 @@ object ChromeVisualShieldLabControl {
 
     fun armAnalyzerFailure(): String = endpoint?.armAnalyzerFailure() ?: Unavailable
 
+    fun renderProbe(
+        sampleId: String,
+        sourceSha256: String,
+        renderContract: String,
+    ): String = endpoint?.renderProbe(sampleId, sourceSha256, renderContract) ?: Unavailable
+
     fun status(): String = endpoint?.status() ?: Unavailable
 
     internal fun bind(value: Endpoint) {
@@ -46,6 +52,12 @@ object ChromeVisualShieldLabControl {
         fun cancelStress(): String
 
         fun armAnalyzerFailure(): String
+
+        fun renderProbe(
+            sampleId: String,
+            sourceSha256: String,
+            renderContract: String,
+        ): String
 
         fun status(): String
     }

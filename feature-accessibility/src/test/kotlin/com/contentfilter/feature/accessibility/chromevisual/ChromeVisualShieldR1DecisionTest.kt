@@ -142,6 +142,97 @@ class ChromeVisualShieldR1DecisionTest {
         assertIs<ChromeVisualShieldGloshiaDecision.FailClosed>(mapped)
     }
 
+    @Test
+    fun `render probe observes safe but never crosses release authority`() {
+        val harness = Harness()
+        val identity = harness.processingIdentity()
+
+        val result = harness.probe.observe(identity, safe(identity))
+
+        assertEquals(ChromeVisualShieldRenderProbeResult.SafeObserved, result)
+        assertEquals(0, harness.releases)
+        assertEquals(0, harness.metrics.snapshot().releaseCurrent)
+        assertEquals(ChromeVisualShieldPhase.Protected, harness.gate.snapshot().phase)
+    }
+
+    @Test
+    fun `render probe block and failure remain protected`() {
+        listOf(
+            ChromeVisualShieldGloshiaDecision.Block(
+                identity(),
+                GloshiaVisualPolicyContract.ModelFilterReason,
+                0.9f,
+            ),
+            ChromeVisualShieldGloshiaDecision.FailClosed(
+                identity(),
+                GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
+            ),
+        ).forEachIndexed { index, candidate ->
+            val harness = Harness()
+            val expected = harness.processingIdentity()
+            val decision =
+                when (candidate) {
+                    is ChromeVisualShieldGloshiaDecision.Block -> candidate.copy(identity = expected)
+                    is ChromeVisualShieldGloshiaDecision.FailClosed -> candidate.copy(identity = expected)
+                    is ChromeVisualShieldGloshiaDecision.Safe -> error("not used")
+                }
+
+            val result = harness.probe.observe(expected, decision)
+            val expectedResult =
+                if (index == 0) {
+                    ChromeVisualShieldRenderProbeResult.BlockObserved
+                } else {
+                    ChromeVisualShieldRenderProbeResult.FailClosedObserved
+                }
+
+            assertEquals(expectedResult, result)
+            assertEquals(0, harness.releases)
+            assertEquals(ChromeVisualShieldPhase.Protected, harness.gate.snapshot().phase)
+        }
+    }
+
+    @Test
+    fun `render probe stale and identity mismatch can never release`() {
+        val staleHarness = Harness()
+        val stale = staleHarness.processingIdentity()
+        staleHarness.gate.invalidate(7, viewport(), contract(), ChromeVisualShieldInvalidation.Scroll)
+        assertEquals(
+            ChromeVisualShieldRenderProbeResult.StaleDropped,
+            staleHarness.probe.observe(stale, safe(stale)),
+        )
+
+        val mismatchHarness = Harness()
+        val expected = mismatchHarness.processingIdentity()
+        assertEquals(
+            ChromeVisualShieldRenderProbeResult.IdentityMismatchRejected,
+            mismatchHarness.probe.observe(expected, safe(expected.copy(regionSequence = 999))),
+        )
+        assertEquals(0, staleHarness.releases)
+        assertEquals(0, mismatchHarness.releases)
+        assertEquals(ChromeVisualShieldPhase.Protected, staleHarness.gate.snapshot().phase)
+        assertEquals(ChromeVisualShieldPhase.Protected, mismatchHarness.gate.snapshot().phase)
+    }
+
+    @Test
+    fun `render probe request is strict diagnostic metadata`() {
+        assertTrue(
+            ChromeVisualShieldRenderProbeRequest(
+                "flickr-01",
+                "a".repeat(64),
+                "canvas-contain-neutral-v1",
+            ).isValid(),
+        )
+        assertTrue(!ChromeVisualShieldRenderProbeRequest("../bad", "x", "").isValid())
+    }
+
+    @Test
+    fun `render probe controller is unavailable outside api34 dev lab builds`() {
+        assertTrue(ChromeVisualShieldLabAvailability.isEnabled(34, "com.contentfilter.user.dev", true))
+        assertTrue(!ChromeVisualShieldLabAvailability.isEnabled(33, "com.contentfilter.user.dev", true))
+        assertTrue(!ChromeVisualShieldLabAvailability.isEnabled(34, "com.contentfilter.user", true))
+        assertTrue(!ChromeVisualShieldLabAvailability.isEnabled(34, "com.contentfilter.user.dev", false))
+    }
+
     private class Harness(
         private val clockValues: ArrayDeque<Long> = ArrayDeque(listOf(1L, 2L)),
     ) {
@@ -155,6 +246,7 @@ class ChromeVisualShieldR1DecisionTest {
                 releaseSurface = { releases += 1 },
                 monotonicNanos = { clockValues.removeFirst() },
             )
+        val probe = ChromeVisualShieldRenderProbeAuthority(gate, metrics)
 
         fun processingIdentity(): ChromeVisualShieldIdentity {
             if (gate.snapshot().context == null) gate.start(7, viewport(), contract())

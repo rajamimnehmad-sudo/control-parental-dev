@@ -9,10 +9,12 @@ internal object ChromeVisualShieldFixture {
     const val SentinelPath = "/web13br/sentinel"
     const val SecondPath = "/web13br/second"
     const val DelayedPath = "/web13br/delayed"
-    const val SafeCanvasPath = "/web13br/canvas/safe"
-    const val BlockCanvasPath = "/web13br/canvas/block"
-    const val SafePayloadPath = "/web13br/payload/safe"
-    const val BlockPayloadPath = "/web13br/payload/block"
+    const val CanvasPrefix = "/web13br/canvas/"
+    const val PayloadPrefix = "/web13br/payload/"
+    const val SafeCanvasPath = "${CanvasPrefix}safe"
+    const val BlockCanvasPath = "${CanvasPrefix}block"
+    const val SafePayloadPath = "${PayloadPrefix}safe"
+    const val BlockPayloadPath = "${PayloadPrefix}block"
 
     fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse? {
         val path = request.target.substringBefore('?').substringBefore('#')
@@ -22,13 +24,24 @@ internal object ChromeVisualShieldFixture {
                 SentinelPath -> pageResponse(path, page("sentinel", sentinel = true, delayed = false))
                 SecondPath -> pageResponse(path, page("second-document", sentinel = true, delayed = false))
                 DelayedPath -> pageResponse(path, page("delayed", sentinel = false, delayed = true))
-                SafeCanvasPath -> canvasResponse(path, ChromeVisualShieldFixtureSample.Safe)
-                BlockCanvasPath -> canvasResponse(path, ChromeVisualShieldFixtureSample.Block)
-                SafePayloadPath -> payloadResponse(path, ChromeVisualShieldFixtureSample.Safe)
-                BlockPayloadPath -> payloadResponse(path, ChromeVisualShieldFixtureSample.Block)
-                else -> return null
+                else -> dynamicSampleResponse(path) ?: return null
             }
         return response
+    }
+
+    fun canvasPath(sample: ChromeVisualShieldFixtureSample): String = CanvasPrefix + sample.wireName
+
+    fun payloadPath(sample: ChromeVisualShieldFixtureSample): String = PayloadPrefix + sample.wireName
+
+    private fun dynamicSampleResponse(path: String): ChromePhotosFixtureResponse? {
+        val sampleName =
+            when {
+                path.startsWith(CanvasPrefix) -> path.removePrefix(CanvasPrefix)
+                path.startsWith(PayloadPrefix) -> path.removePrefix(PayloadPrefix)
+                else -> return null
+            }
+        val sample = ChromeVisualShieldFixtureSample.fromWireName(sampleName) ?: return null
+        return if (path.startsWith(CanvasPrefix)) canvasResponse(path, sample) else payloadResponse(path, sample)
     }
 
     private fun pageResponse(
@@ -69,7 +82,7 @@ internal object ChromeVisualShieldFixture {
     }
 
     private fun canvasPage(sample: ChromeVisualShieldFixtureSample): String {
-        val payloadPath = if (sample == ChromeVisualShieldFixtureSample.Safe) SafePayloadPath else BlockPayloadPath
+        val payloadPath = payloadPath(sample)
         val left = ChromeVisualShieldLabControl.RegionLeftBasisPoints / 100.0
         val top = ChromeVisualShieldLabControl.RegionTopBasisPoints / 100.0
         val width =
@@ -98,7 +111,7 @@ internal object ChromeVisualShieldFixture {
                   top: ${top}vh;
                   width: ${width}vw;
                   height: ${height}vh;
-                  object-fit: fill;
+                  background: ${ChromeVisualShieldContainContract.NeutralBackground};
                 }
               </style>
             </head>
@@ -116,15 +129,33 @@ internal object ChromeVisualShieldFixture {
                   const observedSha = Array.from(new Uint8Array(digest), value => value.toString(16).padStart(2, '0')).join('');
                   if (observedSha !== expectedSha) throw new Error('fixture sha mismatch');
                   const bitmap = await createImageBitmap(new Blob([bytes], { type: 'application/octet-stream' }));
+                  const sourceWidth = bitmap.width;
+                  const sourceHeight = bitmap.height;
                   const canvas = document.getElementById('fixture-canvas');
-                  canvas.width = bitmap.width;
-                  canvas.height = bitmap.height;
-                  canvas.getContext('2d', { alpha: false }).drawImage(bitmap, 0, 0);
+                  const canvasRect = canvas.getBoundingClientRect();
+                  const dpr = window.devicePixelRatio || 1;
+                  canvas.width = Math.max(1, Math.round(canvasRect.width * dpr));
+                  canvas.height = Math.max(1, Math.round(canvasRect.height * dpr));
+                  const context = canvas.getContext('2d', { alpha: false });
+                  context.fillStyle = '${ChromeVisualShieldContainContract.NeutralBackground}';
+                  context.fillRect(0, 0, canvas.width, canvas.height);
+                  const containScale = Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight);
+                  const drawWidth = sourceWidth * containScale;
+                  const drawHeight = sourceHeight * containScale;
+                  const drawX = (canvas.width - drawWidth) / 2;
+                  const drawY = (canvas.height - drawHeight) / 2;
+                  context.drawImage(bitmap, drawX, drawY, drawWidth, drawHeight);
                   bitmap.close();
                   bytes.fill(0);
                   document.documentElement.dataset.carrierVisible = 'canvas';
                   document.documentElement.dataset.observedSha = observedSha;
-                  console.info('carrierVisible=canvas sample=${sample.wireName} sha=' + observedSha);
+                  document.documentElement.dataset.renderContract = '${ChromeVisualShieldContainContract.Version}';
+                  document.documentElement.dataset.sourceSize = sourceWidth + 'x' + sourceHeight;
+                  document.documentElement.dataset.canvasSize = canvas.width + 'x' + canvas.height;
+                  document.documentElement.dataset.drawRect = [drawX, drawY, drawWidth, drawHeight].join(',');
+                  console.info('carrierVisible=canvas sample=${sample.wireName} sha=' + observedSha +
+                    ' renderContract=${ChromeVisualShieldContainContract.Version} canvas=' + canvas.width + 'x' + canvas.height +
+                    ' draw=' + [drawX, drawY, drawWidth, drawHeight].join(','));
                 })().catch(error => {
                   document.documentElement.dataset.fixtureError = error.message;
                   console.error('carrierVisible=canvas fixtureError=' + error.message);
