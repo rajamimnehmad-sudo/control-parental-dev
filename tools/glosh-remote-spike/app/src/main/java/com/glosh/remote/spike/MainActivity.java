@@ -19,6 +19,12 @@ import com.glosh.remote.spike.wizard.WizardLayout;
 
 /** PIN-only Samsung entry point: six digits in, secure ADB/relay connection out. */
 public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
+    // Compile-only compatibility for dormant Bubble classes retained in source history. The v18
+    // manifest does not expose the Bubble activity and this entry point never sends these actions.
+    public static final String ACTION_GUIDE_OPEN = "com.glosh.remote.spike.GUIDE_OPEN";
+    public static final String ACTION_GUIDE_BACK = "com.glosh.remote.spike.GUIDE_BACK";
+    public static final String ACTION_GUIDE_NEXT = "com.glosh.remote.spike.GUIDE_NEXT";
+
     private static final long STATE_REFRESH_MS = 250L;
     private static final long SERVICE_START_GRACE_MS = 3_000L;
     private static final long BROKER_RETRY_MS = 2_000L;
