@@ -86,9 +86,17 @@ if ! grep -q 'Notification.BubbleMetadata.Builder' "$BUBBLE_NOTIFICATION" \
   echo "ERROR: la notificación no cumple el contrato de Bubble/conversation Android 11+." >&2
   exit 3
 fi
-if ! grep -q 'GuideOverlayView' "$BUBBLE_ACTIVITY" \
-  || ! grep -q 'ACTION_SUBMIT_CODE' "$BUBBLE_ACTIVITY"; then
-  echo "ERROR: la Bubble no contiene la guía interactiva o el ingreso local de 6 dígitos." >&2
+# The compact v17 Bubble intentionally removed the old full-size GuideOverlayView. Keep the
+# architecture gate semantic: SystemUI Bubble, direct lifecycle-independent controls, and a
+# bounded local six-digit ADB entry that submits through the existing pairing service contract.
+if grep -q 'GuideOverlayView' "$BUBBLE_ACTIVITY" \
+  || ! grep -q 'compactPanel' "$BUBBLE_ACTIVITY" \
+  || ! grep -q 'handleBubbleBack' "$BUBBLE_ACTIVITY" \
+  || ! grep -q 'handleBubbleNext' "$BUBBLE_ACTIVITY" \
+  || ! grep -q 'ACTION_SUBMIT_CODE' "$BUBBLE_ACTIVITY" \
+  || ! grep -q 'InputFilter.LengthFilter(6)' "$BUBBLE_ACTIVITY" \
+  || ! grep -q '\\d{6}' "$BUBBLE_ACTIVITY"; then
+  echo "ERROR: la Bubble compacta debe conservar controles directos y entrada local validada de 6 dígitos." >&2
   exit 3
 fi
 if grep -q 'TYPE_APPLICATION_OVERLAY' "$FLOATING_CONTROLLER"; then
@@ -116,7 +124,7 @@ if ! grep -q 'create("stableDev")' "$BUILD_GRADLE" \
   echo "ERROR: Bubble debug debe usar stableDev y versionCode >= $MIN_DEV_VERSION_CODE (actual=${VERSION_CODE:-missing})." >&2
   exit 3
 fi
-printf 'PASS: Samsung-only + system Bubble + no Accessibility/PiP/app-overlay + stable DEV signing (versionCode %s)\n' "$VERSION_CODE"
+printf 'PASS: Samsung-only + compact system Bubble + direct controls + local 6-digit entry + stable DEV signing (versionCode %s)\n' "$VERSION_CODE"
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -191,7 +199,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 {
-  echo "TASK=REMOTE-SAMSUNG-BUBBLE-CONVERSATION-GATE-14"
+  echo "TASK=REMOTE-SAMSUNG-COMPACT-BUBBLE-CODE-17"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"
