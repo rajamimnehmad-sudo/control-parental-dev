@@ -1,5 +1,5 @@
 {
-  "updatedAt": "25 de ago de 2026 · 21:04",
+  "updatedAt": "25 de ago de 2026 · 21:20",
   "sections": [
     {
       "id": "coordination",
@@ -12,7 +12,7 @@
         {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
         {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. Scope token cross-device PASS; quedan gate end-to-end de pairing y deuda Auth del pairing Admin. Sin owner activo.","status":"pending","priority":"critical"},
         {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"PASS técnico en PR #96.","status":"done","priority":"important"},
-        {"id":"chrome-visual-closure-batch-04","title":"Cerrar Chrome Visual en Chrome real","detail":"12/12B están PASS FINAL DEV / CHATGPT REVIEWED. Próximo frente: 13A Provenance Gap; todavía sin owner asignado. Rutas de 12B liberadas. Glosh Remote sigue pausado.","status":"pending","priority":"critical"},
+        {"id":"chrome-visual-closure-batch-04","title":"Cerrar Chrome Visual en Chrome real","detail":"12/12B están PASS FINAL DEV / CHATGPT REVIEWED. 13A Provenance Gap está IN_PROGRESS: ChatGPT completó el delta diagnóstico y transfirió escritura a Codex local para compilación, tests y gate A23 sobre review DEV353/9b24c95b… en work/chrome-provenance-gap-13a @ 1966462d…. Scope exclusivo chromedataplane fixture/tests y versionCode sólo si hace falta APK físico. ChatGPT queda como revisor final; 13B sigue condicional. Glosh Remote continúa pausado.","status":"in_progress","priority":"critical"},
         {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"ChatGPT resuelve análisis/arquitectura/revisión; Codex se reserva principalmente para Mac/local, builds, tests, ADB, dispositivos, scripts y benchmarks.","status":"done","priority":"critical"},
         {"id":"parallel-coordination-v2","title":"Endurecer coordinación paralela","detail":"Owner único, max 2 escritores, worktrees/rutas aisladas, PASS técnico separado de cierre Central y prohibición de pisar/limpiar trabajo ajeno.","status":"done","priority":"critical"},
         {"id":"ai-auto-handoff-01","title":"Autorun experimental de Codex","detail":"Retirado del flujo normal.","status":"done","priority":"normal"},
@@ -93,7 +93,7 @@
     {
       "id": "chrome-visual",
       "title": "Chrome Visual",
-      "context": "10A/10B/11A/11B/12A/12B y navegación general 12 PASS FINAL DEV / CHATGPT REVIEWED. 13A Provenance Gap es el próximo frente preparado, aún sin owner.",
+      "context": "10A/10B/11A/11B/12A/12B y navegación general 12 PASS FINAL DEV / CHATGPT REVIEWED. 13A está IN_PROGRESS con Codex local como owner de escritura para gate técnico/físico; ChatGPT queda como revisor final.",
       "tasks": [
         {"id":"chrome-review-local","title":"Separar y revisar Chrome Visual local","detail":"PASS histórico; gate posterior detectó scroll/lazy y fue superado por arquitectura actual.","status":"done","priority":"critical"},
         {"id":"chrome-a23-physical-images","title":"Validar imágenes reales en Chrome sobre A23","detail":"FAILED histórico superado por superficie protegida + data plane.","status":"done","priority":"critical"},
@@ -121,7 +121,7 @@
         {"id":"chrome-general-web-functional-12","title":"CHROME-GENERAL-WEB-FUNCTIONAL-12 — navegación general","detail":"PASS FINAL DEV / CHATGPT REVIEWED; 12B cerró bloqueadores de queue/TLS.","status":"done","priority":"critical"},
         {"id":"chrome-general-web-functional-12b","title":"CHROME-GENERAL-WEB-FUNCTIONAL-12B — Proxy Admission + TLS Classification","detail":"PASS FINAL DEV353 / CHATGPT REVIEWED. Funcional 525238a1…, review 9b24c95b…; queueRejects0 y TLS clasificable.","status":"done","priority":"critical"},
         {"id":"chrome-accessibility-event-backpressure-12a","title":"CHROME-ACCESSIBILITY-EVENT-BACKPRESSURE-12A — sacar scans del main thread","detail":"PASS FINAL DEV352 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-provenance-gap-13a","title":"CHROME-PROVENANCE-GAP-13A — procedencia de píxeles","detail":"NEXT / PREPARED. data:, blob:, canvas, WebGL, SVG inline, JS/JSON/WASM, Service Worker/CacheStorage/synthetic response. Sin owner todavía.","status":"pending","priority":"critical"},
+        {"id":"chrome-provenance-gap-13a","title":"CHROME-PROVENANCE-GAP-13A — procedencia de píxeles","detail":"IN_PROGRESS. Owner de escritura: Codex local; ChatGPT Chrome queda como revisor final. Base review/chrome-general-web-functional-12b-dev353-final @ 9b24c95be871f2de9ed77dfff91411abf0439130; rama work/chrome-provenance-gap-13a @ 1966462daf92ef6a5d93da930c4be2502e5d2f65. Delta exacto: ChromePixelProvenanceFixture (10 vectores data/blob/canvas/WebGL/inline SVG/JS/JSON/WASM/Service Worker/CacheStorage), router mínimo en ChromeImageAuthorityFixture y tests unitarios/routing. Marcador propio, WASM exporta el valor usado para pintar, SW/Cache distingue fallback al origen y se autolimpia. Rutas permitidas: estos cuatro archivos; app-user/build.gradle.kts sólo para versionCode si hay APK físico. Pendiente compile/tests/ktlint/diff-check y gate A23; no decidir 13B ni cambiar políticas/modelo/thresholds hasta evidencia.","status":"in_progress","priority":"critical"},
         {"id":"chrome-visual-fallback-13b","title":"CHROME-VISUAL-FALLBACK-13B — fallback regional selectivo","detail":"CONDICIONAL solo si 13A confirma huecos no cerrables por data-plane/policies.","status":"pending","priority":"important"},
         {"id":"chrome-gloshia-realtime-scheduler-14a","title":"CHROME-GLOSHIA-REALTIME-SCHEDULER-14A — respuesta perceptual","detail":"PREPARED.","status":"pending","priority":"important"},
         {"id":"chrome-general-web-perf-14","title":"CHROME-GENERAL-WEB-PERF-14 — rendimiento y batería","detail":"PREPARED para A23/S22.","status":"pending","priority":"important"},
