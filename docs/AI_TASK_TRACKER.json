@@ -1,5 +1,5 @@
 {
-  "updatedAt": "26 de ago de 2026 · 07:50",
+  "updatedAt": "26 de ago de 2026 · 08:39",
   "sections": [
     {
       "id": "coordination",
@@ -131,6 +131,7 @@
         {"id":"chrome-gloshia-realtime-scheduler-14a","title":"CHROME-GLOSHIA-REALTIME-SCHEDULER-14A — respuesta perceptual","detail":"PREPARED.","status":"pending","priority":"important"},
         {"id":"chrome-general-web-perf-14","title":"CHROME-GENERAL-WEB-PERF-14 — rendimiento y batería","detail":"PREPARED para A23/S22.","status":"pending","priority":"important"},
         {"id":"chrome-product-hardening-15","title":"CHROME-PRODUCT-HARDENING-15 — cierre de producto","detail":"Pendiente final: UX/consent, migration/versioning, AAB/ABI, privacidad/logging, SBOM, long-run, multi-OEM y soporte.","status":"pending","priority":"important"},
+        {"id":"chrome-update-compatibility-16","title":"CHROME-UPDATE-COMPAT-16 — compatibilidad automática con nuevas versiones de Chrome","detail":"FUTURE / PENDING. Después de cerrar Fotos/Video y antes de considerar Chrome product-ready: permitir actualización normal de Chrome, detectar versión instalada, mantener matriz de versiones validadas, actualizar la extensión/pieza Glosh por su canal propio, ejecutar gates automáticos de compatibilidad (11B, procedencia/región/captura, navegación y video cuando exista) y entrar en modo seguro fail-close si aparece una versión no validada o rompe una API. Objetivo: cero configuración manual por dispositivo ante updates normales; sólo requerir nueva versión de Glosh/extensión cuando Google cambie una dependencia real.","status":"pending","priority":"important"},
         {"id":"chrome-video-a23","title":"Revalidar video en hardware","detail":"Pendiente por prioridad; retomar después de Chrome Fotos + GloshIA.","status":"pending","priority":"critical"},
         {"id":"chrome-images","title":"Confirmar fotos estáticas en Chrome","detail":"PASS FINAL DEV para alcance actual HTTPS; siguiente 13A.","status":"done","priority":"important"},
         {"id":"google-ai-field-visible","title":"Evitar que el teclado tape el campo de IA de Google","detail":"Pendiente.","status":"pending","priority":"normal"}
