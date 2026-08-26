@@ -47,8 +47,12 @@ class ChromePixelProvenanceFixtureTest {
         assertTrue(html.contains("getContext('2d')"))
         assertTrue(html.contains("getContext('webgl')"))
         assertTrue(html.contains("WebAssembly.instantiateStreaming"))
+        assertTrue(html.contains("instance.exports.red"))
         assertTrue(html.contains("navigator.serviceWorker.register"))
+        assertTrue(html.contains("registration.unregister"))
+        assertTrue(html.contains("caches.delete"))
         assertTrue(html.contains("/web13a/report"))
+        assertTrue(html.contains("/web13a/state"))
         assertTrue(html.contains("GLOSH13A_COMPLETE"))
     }
 
@@ -62,9 +66,51 @@ class ChromePixelProvenanceFixtureTest {
         assertEquals("application/javascript; charset=utf-8", script.contentType)
         assertEquals("application/json; charset=utf-8", json.contentType)
         assertEquals("application/wasm", wasm.contentType)
-        assertContentEquals(byteArrayOf(0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00), wasm.originalBytes)
+        assertContentEquals(
+            byteArrayOf(
+                0x00,
+                0x61,
+                0x73,
+                0x6d,
+                0x01,
+                0x00,
+                0x00,
+                0x00,
+                0x01,
+                0x05,
+                0x01,
+                0x60,
+                0x00,
+                0x01,
+                0x7f,
+                0x03,
+                0x02,
+                0x01,
+                0x00,
+                0x07,
+                0x07,
+                0x01,
+                0x03,
+                0x72,
+                0x65,
+                0x64,
+                0x00,
+                0x00,
+                0x0a,
+                0x07,
+                0x01,
+                0x05,
+                0x00,
+                0x41,
+                0xdc.toByte(),
+                0x01,
+                0x0b,
+            ),
+            wasm.originalBytes,
+        )
         assertEquals("/web13a/", worker.headers.firstValue("Service-Worker-Allowed"))
         val workerScript = worker.originalBytes.toString(Charsets.UTF_8)
+        assertTrue(workerScript.contains("glosh-13a-v1"))
         assertTrue(workerScript.contains("caches.open"))
         assertTrue(workerScript.contains("respondWith"))
         assertTrue(workerScript.contains("/web13a/sw-synthetic.png"))
