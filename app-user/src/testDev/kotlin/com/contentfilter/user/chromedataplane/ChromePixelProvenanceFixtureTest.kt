@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class ChromePixelProvenanceFixtureTest {
-    private val fixture = ChromePixelProvenanceFixture("sentinel".toByteArray())
+    private val fixture = ChromePixelProvenanceFixture()
 
     @Test
     fun `matrix explicitly separates renderer network and browser storage sources`() {
@@ -25,6 +25,14 @@ class ChromePixelProvenanceFixtureTest {
                 .filter { it.source == ChromePixelProvenanceSource.NetworkCarrier }
                 .mapTo(linkedSetOf()) { it.reportKey },
         )
+    }
+
+    @Test
+    fun `runner redirects to service worker compatible scope`() {
+        val response = fixture.responseFor(ChromePhotosProxyRequest("GET", "/web13a"))!!
+
+        assertEquals(308, response.statusCode)
+        assertEquals("/web13a/", response.headers.firstValue("Location"))
     }
 
     @Test
