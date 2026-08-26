@@ -9,8 +9,10 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -24,12 +26,11 @@ import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.GuideNotification;
-import com.glosh.remote.spike.wizard.GuideOverlayView;
 import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.SamsungGuideStep;
 import com.glosh.remote.spike.wizard.SamsungGuideStore;
 
-/** Expanded content rendered by Android/SystemUI inside the Glosh notification Bubble. */
+/** Compact content rendered by Android/SystemUI inside the Glosh notification Bubble. */
 public final class GuideBubbleActivity extends Activity {
     private static final long REFRESH_MS = 300L;
     private static final int GRAPHITE = Color.rgb(25, 27, 24);
@@ -41,6 +42,8 @@ public final class GuideBubbleActivity extends Activity {
     private final Runnable refresh = new Runnable() {
         @Override
         public void run() {
+            maybeStartSupportSession();
+            flushQueuedPairingCode();
             renderIfChanged();
             handler.postDelayed(this, REFRESH_MS);
         }
@@ -55,6 +58,8 @@ public final class GuideBubbleActivity extends Activity {
     private SessionState renderedSession;
     private OnboardingState.Step renderedOnboarding;
     private String transientInstruction;
+    private String draftCode = "";
+    private String queuedPairingCode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,8 +70,9 @@ public final class GuideBubbleActivity extends Activity {
         guideNotification = new GuideNotification(this);
         coordinator = SupportSessionCoordinator.get(this);
         root = new FrameLayout(this);
-        root.setPadding(dp(8), dp(8), dp(8), dp(8));
+        root.setPadding(dp(6), dp(6), dp(6), dp(6));
         setContentView(root);
+        maybeStartSupportSession();
         render(true);
     }
 
@@ -86,6 +92,8 @@ public final class GuideBubbleActivity extends Activity {
     @Override
     protected void onDestroy() {
         handler.removeCallbacks(refresh);
+        draftCode = "";
+        queuedPairingCode = null;
         super.onDestroy();
     }
 
@@ -98,7 +106,6 @@ public final class GuideBubbleActivity extends Activity {
                 || pairing != renderedPairing
                 || session != renderedSession
                 || onboarding != renderedOnboarding) {
-            transientInstruction = null;
             render(false);
         }
     }
@@ -131,141 +138,132 @@ public final class GuideBubbleActivity extends Activity {
         renderedOnboarding = onboarding;
 
         root.removeAllViews();
-        if (step == SamsungGuideStep.ENTER_CODE) {
-            root.addView(codeCard(pairing), match());
-            return;
-        }
-
-        LinearLayout stack = new LinearLayout(this);
-        stack.setOrientation(LinearLayout.VERTICAL);
-
-        GuideOverlayView guide = new GuideOverlayView(this, new GuideOverlayView.Listener() {
-            @Override
-            public void onBack() {
-                handleBubbleBack();
-            }
-
-            @Override
-            public void onNext() {
-                handleBubbleNext();
-            }
-
-            @Override
-            public void onDragBy(int deltaX, int deltaY) {
-                // SystemUI owns Bubble positioning. No app-owned overlay coordinates are used.
-            }
-        });
-        guide.setStep(step, transientInstruction);
-        stack.addView(guide, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT));
-        stack.addView(compactCodeTray(pairing), margins(0, 8, 0, 0));
-        root.addView(stack, match());
+        root.addView(compactPanel(step, pairing), match());
     }
 
-    /** Always-present compact ADB code entry inside the expanded Bubble. */
-    private View compactCodeTray(PairingUiState pairing) {
-        LinearLayout tray = new LinearLayout(this);
-        tray.setOrientation(LinearLayout.VERTICAL);
-        tray.setPadding(dp(12), dp(10), dp(12), dp(10));
-        tray.setBackground(rounded(Color.WHITE, 16));
-        tray.setElevation(dp(6));
-
-        tray.addView(
-                text("Código ADB · 6 dígitos", 11, GRAPHITE, Typeface.BOLD),
-                margins(0, 0, 0, 6));
-
-        LinearLayout row = new LinearLayout(this);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-
-        EditText code = pairingInput(18);
-        code.setEnabled(pairing != PairingUiState.CONNECTING);
-        row.addView(code, new LinearLayout.LayoutParams(0, dp(42), 1f));
-
-        TextView send = action(pairing == PairingUiState.CONNECTING ? "LISTO" : "ENVIAR", true);
-        send.setEnabled(pairing != PairingUiState.CONNECTING);
-        send.setOnClickListener(view -> submitPairingCode(code));
-        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(94), dp(42));
-        sendParams.setMargins(dp(8), 0, 0, 0);
-        row.addView(send, sendParams);
-        tray.addView(row, margins(0, 0, 0, 0));
-
-        tray.addView(
-                text(codeTrayHint(pairing), 10, MUTED, Typeface.NORMAL),
-                margins(0, 6, 0, 0));
-        return tray;
-    }
-
-    private String codeTrayHint(PairingUiState pairing) {
-        if (pairing == PairingUiState.CONNECTING) {
-            return "Código recibido. Glosh está completando la conexión.";
-        }
-        if (RemotePairingService.getSessionState() == SessionState.PREPARING) {
-            return "Cuando Samsung muestre el código, podés escribirlo acá desde cualquier paso.";
-        }
-        return "Este campo queda disponible durante toda la guía.";
-    }
-
-    private View codeCard(PairingUiState pairing) {
+    /**
+     * The collapsed Bubble/preview carries the instruction. Expanded content stays intentionally
+     * short so Settings remains visible: one line of context, Back/confirm, and ADB code entry.
+     */
+    private View compactPanel(SamsungGuideStep step, PairingUiState pairing) {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(16), dp(14), dp(16), dp(14));
-        card.setBackground(rounded(Color.WHITE, 20));
-        card.setElevation(dp(10));
+        card.setPadding(dp(12), dp(10), dp(12), dp(10));
+        card.setBackground(rounded(Color.WHITE, 18));
+        card.setElevation(dp(8));
 
         LinearLayout header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView wordmark = text("glosh", 17, GRAPHITE, Typeface.BOLD);
-        header.addView(wordmark, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView progress = text("Paso 7/7", 12, GRAPHITE, Typeface.BOLD);
-        progress.setPadding(dp(9), dp(4), dp(9), dp(4));
-        progress.setBackground(rounded(Color.rgb(234, 250, 202), 12));
+
+        TextView title = text(step.title(), 15, GRAPHITE, Typeface.BOLD);
+        title.setMaxLines(2);
+        header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView progress = text(
+                step.number() + "/" + SamsungGuideStep.TOTAL_STEPS,
+                11,
+                GRAPHITE,
+                Typeface.BOLD);
+        progress.setPadding(dp(8), dp(3), dp(8), dp(3));
+        progress.setBackground(rounded(Color.rgb(234, 250, 202), 10));
         header.addView(progress);
-        card.addView(header, margins(0, 0, 0, 12));
+        card.addView(header, margins(0, 0, 0, 8));
 
-        card.addView(text("Ingresá los 6 números", 20, GRAPHITE, Typeface.BOLD), margins(0, 0, 0, 6));
-        String helper = pairing == PairingUiState.CONNECTING
-                ? "Código recibido. Glosh está completando la conexión segura…"
-                : "Dejá visible el código de Samsung detrás. Podés escribir los seis números acá; si el endpoint todavía no apareció, Glosh los guarda y continúa solo cuando esté listo.";
-        card.addView(text(helper, 13, MUTED, Typeface.NORMAL), margins(0, 0, 0, 12));
+        String status = compactStatus(pairing);
+        if (status != null) {
+            card.addView(text(status, 10, MUTED, Typeface.NORMAL), margins(0, 0, 0, 6));
+        }
 
-        EditText code = pairingInput(25);
-        code.setEnabled(pairing != PairingUiState.CONNECTING);
-        card.addView(code, margins(0, 0, 0, 10));
-
-        TextView connect = action(pairing == PairingUiState.CONNECTING ? "CONECTANDO…" : "CONECTAR", true);
-        connect.setEnabled(pairing != PairingUiState.CONNECTING);
-        connect.setOnClickListener(view -> submitPairingCode(code));
-        card.addView(connect, margins(0, 0, 0, 8));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView back = action("ATRÁS", false);
         back.setOnClickListener(view -> handleBubbleBack());
-        card.addView(back, margins(0, 0, 0, 0));
+        actions.addView(back, new LinearLayout.LayoutParams(0, dp(40), 1f));
+
+        if (step.canAdvanceLocally()) {
+            TextView next = action(compactActionLabel(step), true);
+            next.setOnClickListener(view -> handleBubbleNext());
+            LinearLayout.LayoutParams nextParams = new LinearLayout.LayoutParams(0, dp(40), 1.25f);
+            nextParams.setMargins(dp(8), 0, 0, 0);
+            actions.addView(next, nextParams);
+        }
+        card.addView(actions, margins(0, 0, 0, 8));
+
+        card.addView(text("Código ADB", 10, MUTED, Typeface.BOLD), margins(0, 0, 0, 4));
+
+        LinearLayout codeRow = new LinearLayout(this);
+        codeRow.setOrientation(LinearLayout.HORIZONTAL);
+        codeRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        boolean codeLocked = pairing == PairingUiState.CONNECTING || queuedPairingCode != null;
+        EditText code = pairingInput();
+        code.setEnabled(!codeLocked);
+        codeRow.addView(code, new LinearLayout.LayoutParams(0, dp(40), 1f));
+
+        TextView send = action(
+                pairing == PairingUiState.CONNECTING
+                        ? "CONECTANDO"
+                        : queuedPairingCode != null ? "LISTO" : "ENVIAR",
+                true);
+        send.setEnabled(!codeLocked);
+        send.setOnClickListener(view -> submitPairingCode(code));
+        LinearLayout.LayoutParams sendParams = new LinearLayout.LayoutParams(dp(96), dp(40));
+        sendParams.setMargins(dp(8), 0, 0, 0);
+        codeRow.addView(send, sendParams);
+        card.addView(codeRow);
+
         return card;
     }
 
-    private EditText pairingInput(float size) {
+    private String compactStatus(PairingUiState pairing) {
+        if (transientInstruction != null && !transientInstruction.isBlank()) {
+            return transientInstruction;
+        }
+        if (pairing == PairingUiState.CONNECTING) {
+            return "Código recibido · conectando…";
+        }
+        if (RemotePairingService.getSessionState() == SessionState.PREPARING) {
+            return "Listo para recibir los 6 números.";
+        }
+        return null;
+    }
+
+    private EditText pairingInput() {
         EditText code = new EditText(this);
         code.setSingleLine(true);
         code.setGravity(Gravity.CENTER);
-        code.setTextSize(size);
+        code.setTextSize(18);
         code.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         code.setTextColor(GRAPHITE);
         code.setHint("000000");
         code.setInputType(InputType.TYPE_CLASS_NUMBER);
         code.setFilters(new InputFilter[] {new InputFilter.LengthFilter(6)});
-        code.setBackground(rounded(Color.rgb(247, 248, 243), 14));
-        code.setPadding(dp(12), dp(8), dp(12), dp(8));
+        code.setBackground(rounded(Color.rgb(247, 248, 243), 12));
+        code.setPadding(dp(10), dp(6), dp(10), dp(6));
+        if (!draftCode.isEmpty()) {
+            code.setText(draftCode);
+            code.setSelection(code.length());
+        }
+        code.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable editable) {
+                draftCode = editable == null ? "" : editable.toString();
+            }
+        });
         return code;
     }
 
-    /**
-     * Bubble controls must remain functional even if Samsung stops/destroys MainActivity while
-     * Settings is foreground. Progress therefore lives here instead of relying on an Activity-
-     * scoped broadcast receiver.
-     */
     private void handleBubbleNext() {
         SamsungGuideStep current = guideStore.step();
         if (current == SamsungGuideStep.ENTER_CODE) {
@@ -285,15 +283,10 @@ public final class GuideBubbleActivity extends Activity {
         }
 
         if (current == SamsungGuideStep.WIRELESS_DEBUGGING) {
-            if (RemotePairingService.getSessionState() == SessionState.IDLE) {
-                if (coordinator.step() == OnboardingState.Step.REQUESTING_SUPPORT) {
-                    showWaiting(current, "Esperá un momento: estamos preparando la sesión segura con soporte.");
-                    return;
-                }
-                if (!startSupportSession()) {
-                    showWaiting(current, "Todavía estamos preparando soporte. Probá nuevamente en unos segundos.");
-                    return;
-                }
+            maybeStartSupportSession();
+            if (RemotePairingService.getSessionState() == SessionState.IDLE
+                    && coordinator.step() == OnboardingState.Step.REQUESTING_SUPPORT) {
+                transientInstruction = "Preparando soporte…";
             }
             advanceTo(SamsungGuideStep.PAIR_DEVICE);
             return;
@@ -322,27 +315,53 @@ public final class GuideBubbleActivity extends Activity {
         if (RemotePairingService.getSessionState() == SessionState.IDLE) {
             guideNotification.showBubbleStep(step, false);
         }
+        if (step.ordinal() >= SamsungGuideStep.WIRELESS_DEBUGGING.ordinal()) {
+            maybeStartSupportSession();
+        }
         render(true);
     }
 
-    private void showWaiting(SamsungGuideStep step, String message) {
-        transientInstruction = message;
-        guideNotification.showWaiting(step, message);
-        render(true);
-    }
-
-    private boolean startSupportSession() {
+    /** Starts pairing as soon as step 5 is reached, instead of waiting for an extra confirmation. */
+    private void maybeStartSupportSession() {
         if (RemotePairingService.getSessionState() != SessionState.IDLE) {
-            return true;
+            return;
+        }
+        SamsungGuideStep step = guideStore.step();
+        if (step.ordinal() < SamsungGuideStep.WIRELESS_DEBUGGING.ordinal()
+                && queuedPairingCode == null) {
+            return;
+        }
+        if (coordinator.step() != OnboardingState.Step.WIRELESS_DEBUGGING) {
+            return;
         }
         String descriptor = coordinator.markSessionStarted();
         if (descriptor == null) {
-            return false;
+            return;
         }
         startForegroundService(new Intent(this, RemotePairingService.class)
                 .setAction(RemotePairingService.ACTION_START)
                 .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
-        return true;
+        transientInstruction = queuedPairingCode == null
+                ? "Preparando conexión…"
+                : "Código recibido · preparando conexión…";
+    }
+
+    /**
+     * If the customer typed the PIN before the service reached PREPARING, keep it only in memory
+     * for this Bubble Activity and submit automatically on the first safe PREPARING tick.
+     */
+    private void flushQueuedPairingCode() {
+        String code = queuedPairingCode;
+        if (code == null || RemotePairingService.getSessionState() != SessionState.PREPARING) {
+            return;
+        }
+        queuedPairingCode = null;
+        draftCode = "";
+        startService(new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_SUBMIT_CODE)
+                .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, code));
+        transientInstruction = "Código recibido · conectando…";
+        render(true);
     }
 
     private void openGloshFromBubble() {
@@ -361,25 +380,48 @@ public final class GuideBubbleActivity extends Activity {
             input.setError("Ingresá exactamente 6 números");
             return;
         }
-        if (RemotePairingService.getSessionState() != SessionState.PREPARING) {
-            input.setError("Cuando Samsung muestre el código, Glosh lo acepta desde este mismo campo");
+
+        SessionState session = RemotePairingService.getSessionState();
+        if (session == SessionState.CONNECTED) {
             return;
         }
-        startService(new Intent(this, RemotePairingService.class)
-                .setAction(RemotePairingService.ACTION_SUBMIT_CODE)
-                .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, code));
-        input.setEnabled(false);
+        if (session != SessionState.IDLE && session != SessionState.PREPARING) {
+            input.setError("La conexión está ocupada. Esperá un momento.");
+            return;
+        }
+
+        queuedPairingCode = code;
+        draftCode = code;
+        if (session == SessionState.IDLE) {
+            maybeStartSupportSession();
+            transientInstruction = RemotePairingService.getSessionState() == SessionState.IDLE
+                    ? "Código guardado · esperando soporte…"
+                    : "Código recibido · preparando conexión…";
+        }
+        flushQueuedPairingCode();
+        render(true);
     }
 
     private TextView action(String label, boolean primary) {
-        TextView view = text(label, 13, GRAPHITE, Typeface.BOLD);
+        TextView view = text(label, 12, GRAPHITE, Typeface.BOLD);
         view.setGravity(Gravity.CENTER);
-        view.setMinHeight(dp(44));
-        view.setPadding(dp(12), dp(9), dp(12), dp(9));
-        view.setBackground(rounded(primary ? LIME : SOFT, 14));
+        view.setMinHeight(dp(40));
+        view.setPadding(dp(8), dp(7), dp(8), dp(7));
+        view.setBackground(rounded(primary ? LIME : SOFT, 12));
         view.setClickable(true);
         view.setFocusable(true);
         return view;
+    }
+
+    private static String compactActionLabel(SamsungGuideStep step) {
+        return switch (step) {
+            case ABOUT_PHONE, SOFTWARE_INFO -> "YA LO ABRÍ";
+            case BUILD_NUMBER -> "YA ESTÁ ACTIVO";
+            case DEVELOPER_OPTIONS -> "YA ESTOY AHÍ";
+            case WIRELESS_DEBUGGING -> "YA LA ACTIVÉ";
+            case PAIR_DEVICE -> "YA VEO EL CÓDIGO";
+            case ENTER_CODE -> "ABRIR GLOSH";
+        };
     }
 
     private TextView text(String value, float size, int color, int style) {
