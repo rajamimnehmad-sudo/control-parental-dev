@@ -67,7 +67,23 @@ class ChromeVisualShieldFixtureTest {
     }
 
     @Test
-    fun `fixture loader rejects bytes that do not match historical sample sha`() {
+    fun `real fixture samples pin canonical historical provenance`() {
+        assertEquals("https://httpbingo.org/image/png", ChromeVisualShieldFixtureSample.Safe.sourceUrl)
+        assertEquals(8_090, ChromeVisualShieldFixtureSample.Safe.expectedBytes)
+        assertEquals(
+            "541a1ef5373be3dc49fc542fd9a65177b664aec01c8d8608f99e6ec95577d8c1",
+            ChromeVisualShieldFixtureSample.Safe.expectedSha256,
+        )
+        assertEquals("https://www.gstatic.com/webp/gallery/1.webp", ChromeVisualShieldFixtureSample.Block.sourceUrl)
+        assertEquals(30_320, ChromeVisualShieldFixtureSample.Block.expectedBytes)
+        assertEquals(
+            "4a5afeaff8483923da964bc7896f02d0283e8bff99b5b8f82a31ae3214dab1d0",
+            ChromeVisualShieldFixtureSample.Block.expectedSha256,
+        )
+    }
+
+    @Test
+    fun `fixture loader rejects bytes that cannot be the historical sample`() {
         val sample = ChromeVisualShieldFixtureSample.Block
         ChromeVisualShieldFixtureSampleStore.reset(sample)
         ChromeVisualShieldFixtureSampleStore.append(
@@ -77,7 +93,19 @@ class ChromeVisualShieldFixtureTest {
 
         val result = ChromeVisualShieldFixtureSampleStore.commit(sample)
 
-        assertContains(result, "result=fixture_sha_mismatch")
+        assertContains(result, "result=fixture_size_mismatch")
+        assertContains(result, "sample=block")
+        ChromeVisualShieldFixtureSampleStore.clear()
+    }
+
+    @Test
+    fun `fixture loader rejects oversized chunks before staging growth`() {
+        val sample = ChromeVisualShieldFixtureSample.Block
+        ChromeVisualShieldFixtureSampleStore.reset(sample)
+
+        val result = ChromeVisualShieldFixtureSampleStore.append(sample, "A".repeat(24_580))
+
+        assertContains(result, "result=fixture_chunk_too_large")
         assertContains(result, "sample=block")
         ChromeVisualShieldFixtureSampleStore.clear()
     }

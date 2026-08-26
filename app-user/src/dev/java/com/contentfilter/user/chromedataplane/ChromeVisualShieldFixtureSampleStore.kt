@@ -7,14 +7,20 @@ import java.util.Base64
 internal enum class ChromeVisualShieldFixtureSample(
     val wireName: String,
     val expectedSha256: String,
+    val expectedBytes: Int,
+    val sourceUrl: String,
 ) {
     Safe(
         wireName = "safe",
-        expectedSha256 = "541a1ef54364c3a8ac499fbc02bb6275c1a479e8b9bd2aed723f4518c44fd8c1",
+        expectedSha256 = "541a1ef5373be3dc49fc542fd9a65177b664aec01c8d8608f99e6ec95577d8c1",
+        expectedBytes = 8_090,
+        sourceUrl = "https://httpbingo.org/image/png",
     ),
     Block(
         wireName = "block",
-        expectedSha256 = "4a5afeaf6c80b4393c590e1c000485faa47b86825738ac8d898159cccc361d00",
+        expectedSha256 = "4a5afeaff8483923da964bc7896f02d0283e8bff99b5b8f82a31ae3214dab1d0",
+        expectedBytes = 30_320,
+        sourceUrl = "https://www.gstatic.com/webp/gallery/1.webp",
     ),
     ;
 
@@ -24,14 +30,16 @@ internal enum class ChromeVisualShieldFixtureSample(
     }
 }
 
-/** RAM-only loader: fixture image files remain outside Git and are supplied in bounded chunks. */
+/** RAM-only loader for the two immutable public R3.1 gate samples. */
 internal object ChromeVisualShieldFixtureSampleStore {
-    private val staging = mutableMapOf<ChromeVisualShieldFixtureSample, ByteArrayOutputStream>()
+    private const val MaxEncodedChunkChars = 24_576
+
+    private val staging = mutableMapOf<ChromeVisualShieldFixtureSample, WipeableBuffer>()
     private val verified = mutableMapOf<ChromeVisualShieldFixtureSample, ByteArray>()
 
     @Synchronized
     fun reset(sample: ChromeVisualShieldFixtureSample): String {
-        staging[sample] = ByteArrayOutputStream()
+        staging.put(sample, WipeableBuffer(sample.expectedBytes))?.wipe()
         verified.remove(sample)?.fill(0)
         return "result=fixture_reset sample=${sample.wireName}"
     }
@@ -42,19 +50,33 @@ internal object ChromeVisualShieldFixtureSampleStore {
         encodedChunk: String,
     ): String {
         val target = staging[sample] ?: return "result=fixture_not_reset sample=${sample.wireName}"
+        if (encodedChunk.length > MaxEncodedChunkChars) {
+            return "result=fixture_chunk_too_large sample=${sample.wireName} chars=${encodedChunk.length}"
+        }
         val bytes =
             runCatching { Base64.getDecoder().decode(encodedChunk) }.getOrNull()
                 ?: return "result=fixture_invalid_base64 sample=${sample.wireName}"
-        target.write(bytes)
-        bytes.fill(0)
-        return "result=fixture_chunk sample=${sample.wireName} bytes=${target.size()}"
+        try {
+            if (target.size() + bytes.size > sample.expectedBytes) {
+                return "result=fixture_size_overflow sample=${sample.wireName} bytes=${target.size() + bytes.size} expected=${sample.expectedBytes}"
+            }
+            target.write(bytes)
+            return "result=fixture_chunk sample=${sample.wireName} bytes=${target.size()}"
+        } finally {
+            bytes.fill(0)
+        }
     }
 
     @Synchronized
     fun commit(sample: ChromeVisualShieldFixtureSample): String {
-        val bytes =
-            staging.remove(sample)?.toByteArray()
-                ?: return "result=fixture_not_reset sample=${sample.wireName}"
+        val target = staging.remove(sample) ?: return "result=fixture_not_reset sample=${sample.wireName}"
+        val bytes = target.toByteArray()
+        target.wipe()
+        if (bytes.size != sample.expectedBytes) {
+            val observedBytes = bytes.size
+            bytes.fill(0)
+            return "result=fixture_size_mismatch sample=${sample.wireName} observedBytes=$observedBytes expectedBytes=${sample.expectedBytes}"
+        }
         val observed = sha256(bytes)
         if (observed != sample.expectedSha256) {
             bytes.fill(0)
@@ -69,7 +91,7 @@ internal object ChromeVisualShieldFixtureSampleStore {
 
     @Synchronized
     fun clear() {
-        staging.values.forEach { buffer -> buffer.toByteArray().fill(0) }
+        staging.values.forEach(WipeableBuffer::wipe)
         staging.clear()
         verified.values.forEach { bytes -> bytes.fill(0) }
         verified.clear()
@@ -79,4 +101,11 @@ internal object ChromeVisualShieldFixtureSampleStore {
         MessageDigest.getInstance("SHA-256")
             .digest(bytes)
             .joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
+
+    private class WipeableBuffer(initialSize: Int) : ByteArrayOutputStream(initialSize) {
+        fun wipe() {
+            buf.fill(0)
+            reset()
+        }
+    }
 }
