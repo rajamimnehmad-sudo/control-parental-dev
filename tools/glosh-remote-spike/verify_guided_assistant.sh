@@ -12,6 +12,18 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-pin-only-python.XXXXXX")"
 MIN_DEV_VERSION_CODE=19
 
+# macOS may expose /usr/bin/java as a GUI-install stub even though Android Studio's
+# JBR is available and Gradle can use it. apksigner/keytool need the same real JDK.
+if ! java -version >/dev/null 2>&1 \
+    && [[ -x "/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home/bin/java" ]]; then
+  export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+  export PATH="$JAVA_HOME/bin:$PATH"
+elif ! java -version >/dev/null 2>&1 \
+    && [[ -x "/Applications/Android Studio.app/Contents/jbr/Contents/Home/bin/java" ]]; then
+  export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+
 cleanup() {
   rm -rf "$VENV_DIR"
 }
