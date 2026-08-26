@@ -63,7 +63,9 @@ public final class GuideOverlayController {
             return false;
         }
         ensureReceiver();
-        notification.showBubbleStep(step, overrideInstruction, true);
+        // Product decision: keep the system Bubble collapsed over Settings. One UI may show its
+        // compact conversation preview, and the user expands it only when controls/code are needed.
+        notification.showBubbleStep(step, overrideInstruction, false);
         visible = true;
         return true;
     }
