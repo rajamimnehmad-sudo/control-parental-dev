@@ -150,7 +150,9 @@ public final class SupportSessionBrokerClient {
                     unavailable(current, listener);
                     return;
                 }
-                identity = RendezvousIdentity.generate();
+                if (identity == null) {
+                    identity = RendezvousIdentity.generate();
+                }
                 requestId = randomToken(18);
                 nonce = randomToken(24);
                 JSONObject body = new JSONObject()
@@ -264,7 +266,8 @@ public final class SupportSessionBrokerClient {
             if (current != generation) {
                 return;
             }
-            destroyIdentity();
+            // Keep the same ephemeral RSA identity across request renewal. The Mac can then
+            // authenticate that a new request belongs to the already-reserved customer slot.
             requestId = null;
             nonce = null;
             activeCall = null;

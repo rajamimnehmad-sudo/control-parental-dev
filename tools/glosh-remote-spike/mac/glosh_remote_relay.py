@@ -118,6 +118,7 @@ class RemoteSession:
         self.pending: Dict[str, asyncio.Future] = {}
         self.support_slot_claimed = False
         self.accepted_request_id: Optional[str] = None
+        self.accepted_client_fingerprint: Optional[str] = None
         self.server_seq = 0
         self.agent_seq = 0
 
