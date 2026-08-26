@@ -19,8 +19,8 @@ android {
         applicationId = "com.glosh.remote.spike"
         minSdk = 30
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0-spike"
+        versionCode = 21
+        versionName = "0.21.0-simple-notification"
 
         buildConfigField("String", "BROKER_BASE_URL", "\"$escapedBrokerBaseUrl\"")
 
@@ -45,6 +45,7 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
 }
 
 dependencies {

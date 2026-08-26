@@ -6,8 +6,8 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
-FINAL_APK="$APK_DIR/GloshRemote-OneTap-DEV.apk"
-REPORT="$APK_DIR/REMOTE-INSTALL-ONE-TAP-HARDENING-05-report.txt"
+FINAL_APK="$APK_DIR/GloshRemote-Simple-Notification-DEV.apk"
+REPORT="$APK_DIR/REMOTE-SIMPLE-NOTIFICATION-21-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PYTHON_VENV=""
 
@@ -54,14 +54,17 @@ prepare_python() {
     -r "$MAC_DIR/requirements.txt"
 }
 
-printf '\n=== Glosh Remote One-Tap gate ===\n'
+printf '\n=== Glosh Remote Simple Notification gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
-printf '\n[0/4] Python isolated environment\n'
+printf '\n[0/5] Notification-only architecture guard\n'
+"$PYTHON_BIN" "$SCRIPT_DIR/verify_simple_notification_architecture.py"
+
+printf '\n[1/5] Python isolated environment\n'
 prepare_python
 
-printf '\n[1/4] Python protocol/broker/standby tests\n'
+printf '\n[2/5] Python protocol/broker/standby tests\n'
 (
   cd "$MAC_DIR"
   "$PYTHON_VENV/bin/python" -m unittest \
@@ -70,13 +73,13 @@ printf '\n[1/4] Python protocol/broker/standby tests\n'
     test_one_tap_standby.py
 )
 
-printf '\n[2/4] Android JVM unit tests\n'
+printf '\n[3/5] Android JVM unit tests\n'
 "$REPO_ROOT/gradlew" -p "$SCRIPT_DIR" :app:testDebugUnitTest
 
-printf '\n[3/4] Android lint\n'
+printf '\n[4/5] Android lint\n'
 "$REPO_ROOT/gradlew" -p "$SCRIPT_DIR" :app:lintDebug
 
-printf '\n[4/4] Android assemble\n'
+printf '\n[5/5] Android assemble\n'
 "$REPO_ROOT/gradlew" -p "$SCRIPT_DIR" :app:assembleDebug
 
 if [[ ! -f "$SOURCE_APK" ]]; then
@@ -91,9 +94,10 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" status --short)"
 
 {
-  echo "TASK=REMOTE-INSTALL-ONE-TAP-HARDENING-05"
+  echo "TASK=REMOTE-SIMPLE-NOTIFICATION-21"
   echo "RESULT=PASS"
   echo "HEAD=$HEAD_SHA"
+  echo "ARCHITECTURE_GUARD=PASS"
   echo "PYTHON_ENV=isolated-venv"
   echo "PYTHON_TESTS=PASS"
   echo "ANDROID_UNIT_TESTS=PASS"

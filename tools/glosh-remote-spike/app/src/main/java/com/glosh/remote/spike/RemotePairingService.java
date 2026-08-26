@@ -17,8 +17,6 @@ import android.util.Log;
 import com.glosh.remote.spike.adb.AdbConnectionManager;
 import com.glosh.remote.spike.adb.AdbShell;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
-import com.glosh.remote.spike.guide.state.GuideStage;
-import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
 import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.relay.RelayClient;
 import com.glosh.remote.spike.session.PairingSubmissionGuard;
@@ -154,7 +152,6 @@ public final class RemotePairingService extends Service {
     public void onDestroy() {
         sessionState = SessionState.IDLE;
         pairingUiState = PairingUiState.INACTIVE;
-        LiveGuideRuntime.reset();
         cleanupRuntime();
         executor.shutdownNow();
         super.onDestroy();
@@ -215,10 +212,9 @@ public final class RemotePairingService extends Service {
         }
         pairingHost = host;
         pairingPort = port;
-        LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
         notifyCodeEntry(
-                "Glosh · Último paso",
-                "Escribí acá los 6 números que muestra Android.",
+                "Ingresá los 6 dígitos",
+                "Escribí el código que muestra Android y tocá Enviar.",
                 PairingUiState.WAITING_FOR_CODE);
     }
 
@@ -239,12 +235,12 @@ public final class RemotePairingService extends Service {
                 mutableFlags);
 
         RemoteInput remoteInput = new RemoteInput.Builder(REMOTE_INPUT_CODE)
-                .setLabel("Código de 6 dígitos")
+                .setLabel("Ingresá los 6 dígitos")
                 .build();
 
         Notification.Action replyAction = new Notification.Action.Builder(
                 android.R.drawable.ic_menu_send,
-                "Ingresar código",
+                "Ingresar 6 dígitos",
                 replyPendingIntent)
                 .addRemoteInput(remoteInput)
                 .build();
@@ -291,7 +287,6 @@ public final class RemotePairingService extends Service {
         }
 
         pairingUiState = PairingUiState.CONNECTING;
-        LiveGuideRuntime.setStage(GuideStage.PAIRING);
         updateForeground("Perfecto, conectando…", "Esto tarda sólo unos segundos.");
         executor.execute(() -> pairAndConnect(host, port, code));
     }
@@ -347,7 +342,6 @@ public final class RemotePairingService extends Service {
                         sessionState = SessionState.CONNECTED;
                         pairingUiState = PairingUiState.INACTIVE;
                         pairingGuard.finish();
-                        LiveGuideRuntime.connected();
                         updateForeground(
                                 "¡Listo, Glosher!",
                                 "Soporte ya está conectado de forma segura.");
@@ -384,7 +378,6 @@ public final class RemotePairingService extends Service {
             return;
         }
         pairingGuard.finish();
-        LiveGuideRuntime.setStage(GuideStage.PAIR_CODE_TARGET);
         String host = pairingHost;
         int port = pairingPort;
         if (host != null && port > 0) {
@@ -407,7 +400,6 @@ public final class RemotePairingService extends Service {
         sessionState = SessionState.IDLE;
         pairingUiState = PairingUiState.INACTIVE;
         pairingGuard.finish();
-        LiveGuideRuntime.reset();
         cleanupRuntime();
         stopForeground(STOP_FOREGROUND_REMOVE);
 
@@ -503,6 +495,7 @@ public final class RemotePairingService extends Service {
         return new Notification.Builder(this, CHANNEL_ID)
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
                 .setCategory(Notification.CATEGORY_SERVICE)
+                .setVisibility(Notification.VISIBILITY_SECRET)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(openPendingIntent);
     }

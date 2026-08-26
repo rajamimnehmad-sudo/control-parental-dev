@@ -3,16 +3,11 @@ package com.glosh.remote.spike.broker;
 import android.content.Context;
 import android.os.Build;
 
-import com.glosh.remote.spike.protocol.JoinDescriptor;
-import com.glosh.remote.spike.guide.state.LiveGuideRuntime;
-import com.glosh.remote.spike.wizard.DeveloperGuidePhase;
 import com.glosh.remote.spike.wizard.DeviceProfile;
 import com.glosh.remote.spike.wizard.OemDetector;
-import com.glosh.remote.spike.wizard.OemGuideRecipe;
 import com.glosh.remote.spike.wizard.OnboardingState;
-import com.glosh.remote.spike.wizard.WizardPersistence;
-import com.glosh.remote.spike.wizard.WizardSnapshot;
 
+/** Owns the single linear broker rendezvous used by the notification-only flow. */
 public final class SupportSessionCoordinator {
     public interface Listener {
         void onStateChanged();
@@ -22,39 +17,18 @@ public final class SupportSessionCoordinator {
 
     private final OnboardingState onboarding = new OnboardingState();
     private final SupportSessionBrokerClient broker;
-    private final WizardPersistence persistence;
     private final DeviceProfile profile;
-    private final OemGuideRecipe recipe;
     private Listener listener;
     private String descriptor;
-    private DeveloperGuidePhase developerPhase;
-    private boolean developerConfirmed;
-    private boolean wirelessHelp;
 
     private SupportSessionCoordinator(Context context) {
         broker = new SupportSessionBrokerClient(BrokerConfig.baseUrl());
-        persistence = new WizardPersistence(context);
-        DeviceProfile detected = OemDetector.detect(
+        profile = OemDetector.detect(
                 Build.MANUFACTURER,
                 Build.BRAND,
                 Build.MODEL,
                 Build.VERSION.RELEASE,
                 Build.VERSION.SDK_INT);
-        WizardSnapshot restored = persistence.load(detected.family());
-        profile = new DeviceProfile(
-                detected.manufacturer(),
-                detected.brand(),
-                detected.model(),
-                detected.androidVersion(),
-                detected.sdk(),
-                detected.oemVersion(),
-                restored.family());
-        recipe = OemGuideRecipe.forProfile(profile);
-        LiveGuideRuntime.initialize(context, profile.family());
-        onboarding.restore(restored.step());
-        developerPhase = restored.developerPhase();
-        developerConfirmed = restored.developerConfirmed();
-        wirelessHelp = restored.wirelessHelp();
     }
 
     public static synchronized SupportSessionCoordinator get(Context context) {
@@ -66,38 +40,6 @@ public final class SupportSessionCoordinator {
 
     public synchronized OnboardingState.Step step() {
         return onboarding.step();
-    }
-
-    public synchronized String descriptor() {
-        return descriptor;
-    }
-
-    public synchronized DeviceProfile profile() {
-        return profile;
-    }
-
-    public synchronized OemGuideRecipe recipe() {
-        return recipe;
-    }
-
-    public synchronized DeveloperGuidePhase developerPhase() {
-        return developerPhase;
-    }
-
-    public synchronized boolean developerConfirmed() {
-        return developerConfirmed;
-    }
-
-    public synchronized boolean wirelessHelp() {
-        return wirelessHelp;
-    }
-
-    public synchronized void guideReady() {
-        if (onboarding.step() == OnboardingState.Step.GUIDE_PERMISSION) {
-            onboarding.guideReady();
-            persist();
-            notifyChanged();
-        }
     }
 
     public synchronized void attach(Listener value) {
@@ -116,12 +58,8 @@ public final class SupportSessionCoordinator {
                     && onboarding.step() != OnboardingState.Step.UNAVAILABLE) {
                 return;
             }
+            descriptor = null;
             onboarding.requestSupport();
-            developerPhase = DeveloperGuidePhase.GUIDE;
-            developerConfirmed = false;
-            wirelessHelp = false;
-            LiveGuideRuntime.reset();
-            persist();
         }
         notifyChanged();
         broker.discover(new SupportSessionBrokerClient.AvailabilityListener() {
@@ -131,10 +69,10 @@ public final class SupportSessionCoordinator {
                     if (onboarding.step() != OnboardingState.Step.CHECKING_SUPPORT) {
                         return;
                     }
-                    onboarding.supportAvailable();
-                    persist();
+                    onboarding.directSupportAvailable();
                 }
                 notifyChanged();
+                requestDescriptor();
             }
 
             @Override
@@ -149,18 +87,7 @@ public final class SupportSessionCoordinator {
         });
     }
 
-    public void confirmDeveloperOptions() {
-        synchronized (this) {
-            if (onboarding.step() != OnboardingState.Step.DEVELOPER_OPTIONS) {
-                return;
-            }
-            onboarding.developerOptionsReady();
-            developerConfirmed = true;
-            developerPhase = DeveloperGuidePhase.CONFIRMATION;
-            LiveGuideRuntime.setStage(com.glosh.remote.spike.guide.state.GuideStage.SUPPORT_PREPARING);
-            persist();
-        }
-        notifyChanged();
+    private void requestDescriptor() {
         broker.request(
                 new SupportSessionBrokerClient.DeviceMetadata(
                         profile.manufacturer(),
@@ -180,10 +107,6 @@ public final class SupportSessionCoordinator {
                             }
                             descriptor = value;
                             onboarding.sessionReady();
-                            wirelessHelp = false;
-                            LiveGuideRuntime.setStage(
-                                    com.glosh.remote.spike.guide.state.GuideStage.WIRELESS_DEBUGGING);
-                            persist();
                         }
                         notifyChanged();
                     }
@@ -200,66 +123,14 @@ public final class SupportSessionCoordinator {
                 });
     }
 
-    public synchronized void openedDeveloperSettings() {
-        if (onboarding.step() == OnboardingState.Step.DEVELOPER_OPTIONS) {
-            developerPhase = DeveloperGuidePhase.CONFIRMATION;
-            persist();
-            notifyChanged();
-        }
-    }
-
-    public synchronized void showDeveloperHelp() {
-        if (onboarding.step() == OnboardingState.Step.DEVELOPER_OPTIONS) {
-            developerPhase = DeveloperGuidePhase.HELP;
-            persist();
-            notifyChanged();
-        }
-    }
-
-    public synchronized void showDeveloperGuide() {
-        if (onboarding.step() == OnboardingState.Step.DEVELOPER_OPTIONS) {
-            developerPhase = DeveloperGuidePhase.GUIDE;
-            persist();
-            notifyChanged();
-        }
-    }
-
-    public synchronized void showWirelessHelp() {
-        if (onboarding.step() == OnboardingState.Step.WIRELESS_DEBUGGING) {
-            wirelessHelp = true;
-            persist();
-            notifyChanged();
-        }
-    }
-
-    public synchronized void showWirelessGuide() {
-        if (onboarding.step() == OnboardingState.Step.WIRELESS_DEBUGGING) {
-            wirelessHelp = false;
-            persist();
-            notifyChanged();
-        }
-    }
-
-    public synchronized void seedDebugDescriptor(String raw) {
-        if (onboarding.step() != OnboardingState.Step.HOME) {
-            return;
-        }
-        JoinDescriptor parsed = JoinDescriptor.parse(raw);
-        parsed.destroy();
-        descriptor = raw;
-        onboarding.sessionReady();
-        persist();
-        notifyChanged();
-    }
-
-    public synchronized String markSessionStarted() {
+    /** Atomically consumes the one-time descriptor before the foreground service is dispatched. */
+    public synchronized String takeDescriptor() {
         if (onboarding.step() != OnboardingState.Step.WIRELESS_DEBUGGING || descriptor == null) {
             return null;
         }
         String value = descriptor;
         descriptor = null;
         onboarding.sessionStarted();
-        persist();
         notifyChanged();
         return value;
     }
@@ -268,11 +139,6 @@ public final class SupportSessionCoordinator {
         broker.cancel();
         descriptor = null;
         onboarding.reset();
-        developerPhase = DeveloperGuidePhase.GUIDE;
-        developerConfirmed = false;
-        wirelessHelp = false;
-        LiveGuideRuntime.reset();
-        persistence.clear();
         notifyChanged();
     }
 
@@ -284,7 +150,6 @@ public final class SupportSessionCoordinator {
             }
             descriptor = null;
             onboarding.unavailable();
-            persist();
         }
         notifyChanged();
     }
@@ -297,14 +162,5 @@ public final class SupportSessionCoordinator {
         if (current != null) {
             current.onStateChanged();
         }
-    }
-
-    private synchronized void persist() {
-        persistence.save(new WizardSnapshot(
-                profile.family(),
-                onboarding.step(),
-                developerPhase,
-                developerConfirmed,
-                wirelessHelp));
     }
 }

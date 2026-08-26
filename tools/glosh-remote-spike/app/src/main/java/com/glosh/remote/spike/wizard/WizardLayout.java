@@ -113,9 +113,8 @@ public final class WizardLayout {
         progress.setVisibility(View.GONE);
         title.setText("Soporte remoto Glosh");
         body.setText(
-                "Conectate con soporte en un toque.\n\n"
-                        + "Glosh prepara el teléfono automáticamente y sólo te pide intervenir "
-                        + "si Android necesita una confirmación protegida.");
+                "Tocá el botón. Android abrirá Depuración inalámbrica.\n\n"
+                        + "Cuando veas el código, ingresá los 6 dígitos en la notificación de Glosh y tocá Enviar.");
         information.setVisibility(View.GONE);
         clearVisual();
         homeDetails.setVisibility(View.VISIBLE);
