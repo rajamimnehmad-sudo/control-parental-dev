@@ -3,7 +3,6 @@ package com.glosh.remote.spike;
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -39,6 +38,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private String pendingPairingCode;
     private boolean pairingCodeDispatched;
     private boolean serviceStartIssued;
+    private boolean directDescriptorSeeded;
     private long serviceStartAtMs;
     private long nextBrokerRetryAtMs;
     private String lastRenderKey;
@@ -55,10 +55,13 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         setContentView(ui.view());
 
         consumeIntent(getIntent());
+        // v18 intentionally supersedes every persisted Bubble/guide checkpoint. A descriptor
+        // supplied explicitly through the DEV deep link is the only state that may start in
+        // WIRELESS_DEBUGGING without a fresh broker rendezvous.
         if (RemotePairingService.getSessionState() == SessionState.IDLE
+                && !directDescriptorSeeded
                 && coordinator.step() != OnboardingState.Step.HOME
-                && coordinator.step() != OnboardingState.Step.UNAVAILABLE
-                && coordinator.step() != OnboardingState.Step.WIRELESS_DEBUGGING) {
+                && coordinator.step() != OnboardingState.Step.UNAVAILABLE) {
             coordinator.reset();
         }
         driveConnection();
@@ -113,6 +116,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         }
         coordinator.reset();
         coordinator.seedDebugDescriptor(data.toString());
+        directDescriptorSeeded = true;
         serviceStartIssued = false;
         pairingCodeDispatched = false;
         intent.setData(null);
@@ -138,6 +142,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         OnboardingState.Step step = coordinator.step();
         if (session == SessionState.IDLE) {
             if (step == OnboardingState.Step.HOME || step == OnboardingState.Step.UNAVAILABLE) {
+                directDescriptorSeeded = false;
                 if (now >= nextBrokerRetryAtMs) {
                     nextBrokerRetryAtMs = now + BROKER_RETRY_MS;
                     coordinator.requestDirectSession();
@@ -158,6 +163,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                     && now - serviceStartAtMs >= SERVICE_START_GRACE_MS) {
                 serviceStartIssued = false;
                 pairingCodeDispatched = false;
+                directDescriptorSeeded = false;
                 coordinator.reset();
                 nextBrokerRetryAtMs = 0L;
             }
@@ -279,6 +285,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         pendingPairingCode = null;
         pairingCodeDispatched = false;
         serviceStartIssued = false;
+        directDescriptorSeeded = false;
         serviceStartAtMs = 0L;
         nextBrokerRetryAtMs = 0L;
         lastRenderKey = null;
