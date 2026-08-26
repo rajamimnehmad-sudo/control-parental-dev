@@ -23,6 +23,7 @@ import com.glosh.remote.spike.session.PairingSubmissionGuard;
 import com.glosh.remote.spike.session.PairingAuthorityPolicy;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
+import com.glosh.remote.spike.session.ScreenAwakeLease;
 
 import java.net.InetAddress;
 import java.util.concurrent.ExecutorService;
@@ -54,6 +55,7 @@ public final class RemotePairingService extends Service {
     private static final int REQUEST_REPLY = 7411;
     private static final int REQUEST_STOP = 7412;
     private static final long CONNECT_TIMEOUT_MS = 15_000;
+    private static final int SUPPORT_SESSION_MINUTES = 30;
     private static volatile SessionState sessionState = SessionState.IDLE;
     private static volatile PairingUiState pairingUiState = PairingUiState.INACTIVE;
 
@@ -65,6 +67,7 @@ public final class RemotePairingService extends Service {
     private AdbMdns pairingDiscovery;
     private WifiManager.MulticastLock multicastLock;
     private RelayClient relayClient;
+    private ScreenAwakeLease screenAwakeLease;
     private String joinUri;
     private volatile String pairingHost;
     private volatile int pairingPort = -1;
@@ -82,6 +85,7 @@ public final class RemotePairingService extends Service {
     public void onCreate() {
         super.onCreate();
         notifications = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        screenAwakeLease = new ScreenAwakeLease(this);
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "Conexión de soporte Glosh",
@@ -315,6 +319,7 @@ public final class RemotePairingService extends Service {
             if (canary.length() == 0) {
                 throw new IllegalStateException("ADB respondió sin identidad shell.");
             }
+            screenAwakeLease.acquireForSessionMinutes(SUPPORT_SESSION_MINUTES);
 
             updateForeground("Ya casi estamos", "Conectando de forma segura con soporte…");
             RelayClient client = new RelayClient(shell);
@@ -415,6 +420,11 @@ public final class RemotePairingService extends Service {
 
     private void cleanupRuntime() {
         stopPairingDiscovery();
+
+        ScreenAwakeLease currentScreenLease = screenAwakeLease;
+        if (currentScreenLease != null) {
+            currentScreenLease.release();
+        }
 
         RelayClient currentRelay = relayClient;
         relayClient = null;

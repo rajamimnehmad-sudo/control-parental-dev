@@ -26,6 +26,7 @@ require("BIND_ACCESSIBILITY_SERVICE" not in manifest, "Accessibility must not be
 require("LiveGuideAccessibilityService" not in manifest, "guide service must not be exposed")
 require(not guide_sources, "legacy guide and overlay code must be absent from the APK sources")
 require("SYSTEM_ALERT_WINDOW" not in manifest, "overlay permission is forbidden")
+require("android.permission.WAKE_LOCK" in manifest, "scoped screen wake lock is required")
 require("ACTION_MANAGE_OVERLAY_PERMISSION" not in activity, "overlay settings are forbidden")
 require("guide.accessibility" not in activity, "activity must not depend on Accessibility")
 require("LiveGuideRuntime" not in activity, "activity must not activate the legacy guide")
@@ -35,5 +36,15 @@ require("RemoteInput.Builder" in service, "notification RemoteInput is required"
 require('"Ingresar 6 dígitos"' in service, "the notification PIN action is required")
 require("openWirelessDebugging(this)" in activity, "official Wireless Debugging route is required")
 require("takeDescriptor()" in activity, "one-time descriptor consumption is required")
+require(
+    "screenAwakeLease.acquireForSessionMinutes(SUPPORT_SESSION_MINUTES)" in service,
+    "screen lease must start only after local ADB authentication",
+)
+require(
+    service.index("screenAwakeLease.acquireForSessionMinutes(SUPPORT_SESSION_MINUTES)")
+    > service.index('shell.execute("whoami")'),
+    "screen lease must start after the authenticated ADB canary",
+)
+require("currentScreenLease.release()" in service, "screen lease must be released on cleanup")
 
 print("ARCHITECTURE_GUARD_PASS")
