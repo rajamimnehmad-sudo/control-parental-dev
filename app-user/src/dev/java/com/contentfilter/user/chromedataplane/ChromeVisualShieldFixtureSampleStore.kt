@@ -18,9 +18,9 @@ internal enum class ChromeVisualShieldFixtureSample(
     ),
     Block(
         wireName = "block",
-        expectedSha256 = "4a5afeaff8483923da964bc7896f02d0283e8bff99b5b8f82a31ae3214dab1d0",
-        expectedBytes = 30_320,
-        sourceUrl = "https://www.gstatic.com/webp/gallery/1.webp",
+        expectedSha256 = "9f0d22f322d06dd08a8a349b628de5136c66ee6ef601d8c9492e0e286120ff94",
+        expectedBytes = 146_249,
+        sourceUrl = "https://farm6.staticflickr.com/3200/2970012318_98f7c80583_o.jpg",
     ),
     ;
 

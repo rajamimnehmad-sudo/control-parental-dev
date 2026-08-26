@@ -74,10 +74,13 @@ class ChromeVisualShieldFixtureTest {
             "541a1ef5373be3dc49fc542fd9a65177b664aec01c8d8608f99e6ec95577d8c1",
             ChromeVisualShieldFixtureSample.Safe.expectedSha256,
         )
-        assertEquals("https://www.gstatic.com/webp/gallery/1.webp", ChromeVisualShieldFixtureSample.Block.sourceUrl)
-        assertEquals(30_320, ChromeVisualShieldFixtureSample.Block.expectedBytes)
         assertEquals(
-            "4a5afeaff8483923da964bc7896f02d0283e8bff99b5b8f82a31ae3214dab1d0",
+            "https://farm6.staticflickr.com/3200/2970012318_98f7c80583_o.jpg",
+            ChromeVisualShieldFixtureSample.Block.sourceUrl,
+        )
+        assertEquals(146_249, ChromeVisualShieldFixtureSample.Block.expectedBytes)
+        assertEquals(
+            "9f0d22f322d06dd08a8a349b628de5136c66ee6ef601d8c9492e0e286120ff94",
             ChromeVisualShieldFixtureSample.Block.expectedSha256,
         )
     }
