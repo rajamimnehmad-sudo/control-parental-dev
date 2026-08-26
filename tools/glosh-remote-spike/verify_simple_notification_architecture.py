@@ -47,15 +47,17 @@ require('"Ingresar 6 dígitos"' in service, "the notification PIN action is requ
 require("openWirelessDebugging(this)" in activity, "official Wireless Debugging route is required")
 require("takeDescriptor()" in activity, "one-time descriptor consumption is required")
 require(
-    "screenAwakeLease.acquireForSessionMinutes(SUPPORT_SESSION_MINUTES)" in service,
+    "screenAwakeLease.acquireForSessionMinutes(MAX_SUPPORT_SESSION_MINUTES)" in service,
     "screen lease must start only after local ADB authentication",
 )
 require(
-    service.index("screenAwakeLease.acquireForSessionMinutes(SUPPORT_SESSION_MINUTES)")
+    service.index("screenAwakeLease.acquireForSessionMinutes(MAX_SUPPORT_SESSION_MINUTES)")
     > service.index('shell.execute("whoami")'),
     "screen lease must start after the authenticated ADB canary",
 )
 require("currentScreenLease.release()" in service, "screen lease must be released on cleanup")
+require('case "shell":' in (APP / "java" / "com" / "glosh" / "remote" / "spike" / "adb" / "AdbShell.java").read_text(), "authenticated shell access is required")
+require('manager.openStream("sync:")' in (APP / "java" / "com" / "glosh" / "remote" / "spike" / "adb" / "AdbShell.java").read_text(), "ADB Sync file transfer is required")
 require(
     "if (identity == null)" in broker_client,
     "request renewal must reuse the original ephemeral identity",

@@ -1,8 +1,10 @@
 package com.glosh.remote.spike.relay;
 
+import android.content.Context;
 import android.os.Build;
 
 import com.glosh.remote.spike.adb.AdbShell;
+import com.glosh.remote.spike.adb.IncomingFileTransfer;
 import com.glosh.remote.spike.crypto.SessionCrypto;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 
@@ -31,6 +33,7 @@ public final class RelayClient implements Closeable {
     }
 
     private final AdbShell shell;
+    private final IncomingFileTransfer fileTransfer;
     private final OkHttpClient client;
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
 
@@ -43,8 +46,9 @@ public final class RelayClient implements Closeable {
     private long outboundSeq;
     private long generation;
 
-    public RelayClient(AdbShell shell) {
+    public RelayClient(Context context, AdbShell shell) {
         this.shell = shell;
+        this.fileTransfer = new IncomingFileTransfer(context, shell);
         this.client = new OkHttpClient.Builder()
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -82,6 +86,7 @@ public final class RelayClient implements Closeable {
     private void disconnectLocked() {
         authenticated = false;
         challengeNonce = null;
+        fileTransfer.abort();
         WebSocket currentSocket = socket;
         socket = null;
         if (currentSocket != null) {
@@ -279,10 +284,19 @@ public final class RelayClient implements Closeable {
             throw new SecurityException("Comando fuera de límites.");
         }
 
-        commandExecutor.execute(() -> executeAndReply(expectedGeneration, requestId, action));
+        JSONObject arguments = payload.optJSONObject("arguments");
+        commandExecutor.execute(() -> executeAndReply(
+                expectedGeneration,
+                requestId,
+                action,
+                arguments));
     }
 
-    private void executeAndReply(long expectedGeneration, String requestId, String action) {
+    private void executeAndReply(
+            long expectedGeneration,
+            String requestId,
+            String action,
+            JSONObject arguments) {
         if (!isCurrentGeneration(expectedGeneration)) {
             return;
         }
@@ -291,6 +305,24 @@ public final class RelayClient implements Closeable {
         try {
             if ("ping".equals(action)) {
                 output = "pong";
+            } else if ("push-start".equals(action)) {
+                JSONObject required = requireArguments(arguments);
+                output = fileTransfer.start(
+                        required.getString("transferId"),
+                        required.getLong("size"),
+                        required.getString("sha256"),
+                        required.getString("remotePath"));
+            } else if ("push-chunk".equals(action)) {
+                JSONObject required = requireArguments(arguments);
+                output = fileTransfer.append(
+                        required.getString("transferId"),
+                        required.getLong("offset"),
+                        required.getString("data"));
+            } else if ("push-finish".equals(action)) {
+                JSONObject required = requireArguments(arguments);
+                output = fileTransfer.finish(required.getString("transferId"));
+            } else if ("shell".equals(action)) {
+                output = shell.execute("shell", requireArguments(arguments).getString("command"));
             } else {
                 output = shell.execute(action);
             }
@@ -308,6 +340,13 @@ public final class RelayClient implements Closeable {
                 fail(expectedGeneration, current, "No se pudo devolver el resultado remoto.", error);
             }
         }
+    }
+
+    private static JSONObject requireArguments(JSONObject arguments) {
+        if (arguments == null) {
+            throw new IllegalArgumentException("La acción requiere argumentos.");
+        }
+        return arguments;
     }
 
     private void sendResult(long expectedGeneration, String requestId, String action, boolean ok, String output)

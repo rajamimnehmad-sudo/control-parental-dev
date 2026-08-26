@@ -2,8 +2,8 @@
 """Temporary Mac-side relay for REMOTE-INSTALL-CONNECTION-00.
 
 This is intentionally a lab tool. It binds only to localhost and asks cloudflared
-for an outbound Quick Tunnel. Commands are allowlisted action names and their
-payloads/results are encrypted end-to-end with a one-time 256-bit session key.
+for an outbound Quick Tunnel. The explicitly authorized session exposes the ADB
+shell and file transfer while payloads/results remain encrypted end-to-end.
 """
 from __future__ import annotations
 
@@ -25,26 +25,15 @@ from typing import Dict, Optional, Tuple, Union
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from websockets.legacy.server import WebSocketServerProtocol, serve
 from broker_client import BrokerOperatorClient
-from broker_console import (
-    accept_request,
-    announce_pending_requests,
-    maintain_operator_presence,
-    print_pending_requests,
-)
+from broker_console import announce_pending_requests, maintain_operator_presence
+from operator_cli import interactive_cli
 PROTOCOL_VERSION = 1
-MAX_MESSAGE_BYTES = 256 * 1024
+MAX_MESSAGE_BYTES = 4 * 1024 * 1024
 DEFAULT_PORT = 8765
 DEFAULT_SESSION_MINUTES = 30
 TUNNEL_PATTERN = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
 
-ACTIONS = {
-    "ping": "Round-trip de la sesión, sin ADB",
-    "whoami": "Identidad shell (id)",
-    "device": "Fabricante, modelo y Android",
-    "owners": "Device/Profile Owner",
-    "users": "Usuarios Android",
-    "battery": "Estado de batería",
-}
+ACTION_PATTERN = re.compile(r"[a-z][a-z0-9-]{0,39}")
 
 
 def b64u(value: bytes) -> str:
@@ -214,9 +203,14 @@ class RemoteSession:
         if future is not None and not future.done():
             future.set_result(payload)
 
-    async def command(self, action: str, timeout: float = 20.0) -> dict:
-        if action not in ACTIONS:
-            raise ValueError(f"action not allowlisted: {action}")
+    async def command(
+        self,
+        action: str,
+        arguments: Optional[dict] = None,
+        timeout: float = 20.0,
+    ) -> dict:
+        if not ACTION_PATTERN.fullmatch(action):
+            raise ValueError(f"invalid action name: {action}")
         websocket = self.agent
         if websocket is None:
             raise ConnectionError("no agent connected")
@@ -232,6 +226,8 @@ class RemoteSession:
             "requestId": request_id,
             "action": action,
         }
+        if arguments is not None:
+            payload["arguments"] = arguments
 
         async with self.send_lock:
             self.server_seq += 1
@@ -295,95 +291,6 @@ async def start_cloudflared(port: int) -> Tuple[asyncio.subprocess.Process, str]
 
     asyncio.create_task(drain_logs())
     return process, public_url
-
-
-async def async_input(prompt: str) -> str:
-    """Cancelable stdin reader for the Mac event loop (no stuck executor thread on expiry)."""
-    loop = asyncio.get_running_loop()
-    future = loop.create_future()
-    fd = sys.stdin.fileno()
-    print(prompt, end="", flush=True)
-
-    def on_readable() -> None:
-        try:
-            line = sys.stdin.readline()
-            if not future.done():
-                future.set_result(line)
-        except Exception as exc:
-            if not future.done():
-                future.set_exception(exc)
-        finally:
-            try:
-                loop.remove_reader(fd)
-            except Exception:
-                pass
-
-    loop.add_reader(fd, on_readable)
-    try:
-        return await future
-    finally:
-        try:
-            loop.remove_reader(fd)
-        except Exception:
-            pass
-
-
-async def interactive_cli(
-    session: RemoteSession,
-    descriptor: str,
-    broker: Optional[BrokerOperatorClient],
-) -> None:
-    print("\nEsperando al Android…")
-    print("Comandos: " + ", ".join(ACTIONS) + ", status, requests, accept <request-id>, help, quit")
-    while not session.stop_event.is_set():
-        try:
-            raw = (await async_input("glosh-remote> ")).strip()
-        except (EOFError, KeyboardInterrupt):
-            raw = "quit"
-
-        command = raw.lower()
-        if not command:
-            continue
-        if command == "quit":
-            session.stop_event.set()
-            return
-        if command == "help":
-            for name, description in ACTIONS.items():
-                print(f"  {name:8} {description}")
-            print("  status                 Muestra el agente actual")
-            print("  requests               Muestra solicitudes pendientes del broker")
-            print("  accept <request-id>     Acepta explícitamente un teléfono")
-            print("  quit                    Revoca la sesión")
-            continue
-        if command == "status":
-            print(session.agent_info or "sin agente")
-            continue
-        if command == "requests":
-            if broker is None:
-                print("Broker no configurado; esta sesión usa el fallback DEV por descriptor.")
-            else:
-                await print_pending_requests(broker)
-            continue
-        if command.startswith("accept "):
-            if broker is None:
-                print("Broker no configurado.")
-                continue
-            request_id = raw.split(maxsplit=1)[1].strip()
-            try:
-                print(await accept_request(broker, request_id, descriptor, session))
-            except Exception as exc:
-                print(f"[broker] no se pudo aceptar la solicitud: {exc}")
-            continue
-        if command not in ACTIONS:
-            print("Comando no permitido. Usá help.")
-            continue
-
-        try:
-            result = await session.command(command)
-            marker = "PASS" if result.get("ok") else "ERROR"
-            print(f"[{marker}] {command}\n{result.get('output', '')}".rstrip())
-        except Exception as exc:
-            print(f"[ERROR] {exc}")
 
 
 async def expire_session(session: RemoteSession) -> None:
