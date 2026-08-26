@@ -40,6 +40,47 @@ class ChromeVisualShieldR1DecisionTest {
     }
 
     @Test
+    fun `safe from portrait is stale after viewport rotates to landscape`() {
+        val harness = Harness()
+        val portraitSafe = harness.processingIdentity()
+        val landscape = ChromeVisualViewport(0, 0, 2200, 1080)
+        harness.gate.invalidate(7, landscape, contract(), ChromeVisualShieldInvalidation.Viewport)
+
+        val result = harness.authority.apply(portraitSafe, safe(portraitSafe))
+
+        assertEquals(ChromeVisualShieldDecisionResult.StaleDropped, result)
+        assertEquals(0, harness.releases)
+        assertEquals(ChromeVisualShieldPhase.Protected, harness.gate.snapshot().phase)
+        assertEquals(landscape, harness.gate.snapshot().context!!.viewport)
+    }
+
+    @Test
+    fun `new viewport releases only after opaque redraw current attestation and current safe`() {
+        val harness = Harness()
+        val oldSafe = harness.processingIdentity()
+        val landscape = ChromeVisualViewport(0, 0, 2200, 1080)
+        val protected =
+            harness.gate.invalidate(7, landscape, contract(), ChromeVisualShieldInvalidation.Rotation)!!
+        val context = protected.context!!
+        val renderGate = ChromeVisualShieldViewportRenderGate()
+        renderGate.requireCurrentRender(context)
+        renderGate.recordOpaqueCommit(context)
+
+        assertTrue(!renderGate.consumeCapturePermission(context))
+        assertEquals(
+            ChromeVisualShieldDecisionResult.StaleDropped,
+            harness.authority.apply(oldSafe, safe(oldSafe)),
+        )
+        assertEquals(0, harness.releases)
+        assertTrue(renderGate.recordAttestation(context.renderIdentityToken(), context))
+        assertTrue(renderGate.consumeCapturePermission(context))
+        val current = harness.processingIdentity()
+
+        assertEquals(ChromeVisualShieldDecisionResult.SafeReleased, harness.authority.apply(current, safe(current)))
+        assertEquals(1, harness.releases)
+    }
+
+    @Test
     fun `embedded decision identity mismatch is rejected and fails closed`() {
         val harness = Harness()
         val expected = harness.processingIdentity()
@@ -70,6 +111,30 @@ class ChromeVisualShieldR1DecisionTest {
             )
 
         assertEquals(ChromeVisualShieldDecisionResult.BlockProtected, result)
+        assertEquals(0, harness.releases)
+        assertEquals(ChromeVisualShieldPhase.Protected, harness.gate.snapshot().phase)
+    }
+
+    @Test
+    fun `block remains protected before and after viewport rotation`() {
+        val harness = Harness()
+        val portrait = harness.processingIdentity()
+        assertEquals(
+            ChromeVisualShieldDecisionResult.BlockProtected,
+            harness.authority.apply(portrait, block(portrait)),
+        )
+        harness.gate.invalidate(
+            7,
+            ChromeVisualViewport(0, 0, 2200, 1080),
+            contract(),
+            ChromeVisualShieldInvalidation.Rotation,
+        )
+        val landscape = harness.processingIdentity()
+
+        assertEquals(
+            ChromeVisualShieldDecisionResult.BlockProtected,
+            harness.authority.apply(landscape, block(landscape)),
+        )
         assertEquals(0, harness.releases)
         assertEquals(ChromeVisualShieldPhase.Protected, harness.gate.snapshot().phase)
     }
@@ -214,6 +279,25 @@ class ChromeVisualShieldR1DecisionTest {
     }
 
     @Test
+    fun `render probe safe is stale across viewport boundary and never releases`() {
+        val harness = Harness()
+        val portrait = harness.processingIdentity()
+        harness.gate.invalidate(
+            7,
+            ChromeVisualViewport(0, 0, 2200, 1080),
+            contract(),
+            ChromeVisualShieldInvalidation.Rotation,
+        )
+
+        assertEquals(
+            ChromeVisualShieldRenderProbeResult.StaleDropped,
+            harness.probe.observe(portrait, safe(portrait)),
+        )
+        assertEquals(0, harness.releases)
+        assertEquals(ChromeVisualShieldPhase.Protected, harness.gate.snapshot().phase)
+    }
+
+    @Test
     fun `render probe request is strict diagnostic metadata`() {
         assertTrue(
             ChromeVisualShieldRenderProbeRequest(
@@ -266,6 +350,13 @@ class ChromeVisualShieldR1DecisionTest {
                 identity,
                 GloshiaVisualPolicyContract.ModelAllowReason,
                 0.1f,
+            )
+
+        fun block(identity: ChromeVisualShieldIdentity) =
+            ChromeVisualShieldGloshiaDecision.Block(
+                identity,
+                GloshiaVisualPolicyContract.ModelFilterReason,
+                0.9f,
             )
 
         fun allowDecision() =

@@ -29,6 +29,7 @@ internal class ChromeVisualShieldController(
     private val metrics = ChromeVisualShieldMetrics()
     private val r1Metrics = ChromeVisualShieldR1Metrics()
     private val identityGate = ChromeVisualShieldIdentityGate(metrics::onStaleDropped)
+    private val viewportRenderGate = ChromeVisualShieldViewportRenderGate()
     private val capture = ChromeWindowCapture(service, ChromeVisualShieldCaptureObserver(metrics))
     private val frameProcessor = ChromeVisualShieldFrameProcessor(metrics)
     private val analyzerFault = ChromeVisualShieldAnalyzerFault()
@@ -137,6 +138,17 @@ internal class ChromeVisualShieldController(
             startSession(request, "render_probe")
         }
 
+    override fun currentRenderIdentityToken(): String? = identityGate.snapshot().context?.renderIdentityToken()
+
+    override fun renderAttested(renderIdentityToken: String): String {
+        val context = identityGate.snapshot().context ?: return "result=render_identity_unavailable"
+        if (!viewportRenderGate.recordAttestation(renderIdentityToken, context)) {
+            return "result=render_identity_mismatch"
+        }
+        runOnMain { scheduleCaptureWhenViewportReady("render_attested") }
+        return "result=render_identity_attested"
+    }
+
     override fun stop(): String =
         commandOnMain {
             deactivate("explicit_stop")
@@ -229,9 +241,18 @@ internal class ChromeVisualShieldController(
     ) {
         if (!labActive) return
         r1Metrics.onContentInvalidation()
+        val current = identityGate.snapshot().context ?: return
+        val hardViewportBoundary =
+            reason == ChromeVisualShieldInvalidation.Viewport ||
+                reason == ChromeVisualShieldInvalidation.Rotation ||
+                current.windowId != windowId ||
+                current.viewport != viewport
         val protected = identityGate.invalidate(windowId, viewport, regionContract, reason) ?: return
         workCoordinator.invalidateAuthority()
+        val context = protected.context ?: return
+        if (hardViewportBoundary) viewportRenderGate.requireCurrentRender(context)
         protectThenCapture(protected, reason.name.lowercase())
+        if (hardViewportBoundary) cancelWorkAndJoin()
     }
 
     private fun invalidateWithoutNewWindow(reason: ChromeVisualShieldInvalidation) {
@@ -291,8 +312,21 @@ internal class ChromeVisualShieldController(
             pendingCoverEpoch = null
             opaqueCommittedCount += 1
             publishLabOwnership(true)
-            scheduleCapture(trigger)
+            viewportRenderGate.recordOpaqueCommit(current)
+            scheduleCaptureWhenViewportReady(trigger)
         }
+    }
+
+    private fun scheduleCaptureWhenViewportReady(trigger: String) {
+        val context = identityGate.snapshot().context ?: return
+        if (!viewportRenderGate.consumeCapturePermission(context)) {
+            log(
+                "phase=viewport_wait trigger=$trigger viewportEpoch=${context.viewportEpoch} " +
+                    "result=protected_pending_render_attestation",
+            )
+            return
+        }
+        scheduleCapture(trigger)
     }
 
     private fun scheduleCapture(trigger: String) {
@@ -379,6 +413,7 @@ internal class ChromeVisualShieldController(
     private fun deactivate(reason: String) {
         cancelWorkAndJoin()
         identityGate.stop()
+        viewportRenderGate.reset()
         surface.close()
         pendingCoverEpoch = null
         labActive = false
@@ -414,6 +449,7 @@ internal class ChromeVisualShieldController(
         val window = windowInspector.find(AnyWindowId) ?: return "result=chrome_absent"
         val viewport = windowInspector.viewport(window) ?: return "result=viewport_absent"
         cancelWorkAndJoin()
+        viewportRenderGate.reset()
         renderProbeRequest = probe
         renderProbeCompleted = false
         if (probe != null) renderProbeObservation = null

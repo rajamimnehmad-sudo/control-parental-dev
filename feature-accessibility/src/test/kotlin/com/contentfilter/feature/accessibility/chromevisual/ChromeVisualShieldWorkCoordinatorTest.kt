@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 
 class ChromeVisualShieldWorkCoordinatorTest {
     @Test
-    fun `new inference waits until cancelled non cooperative inference exits and cleans up`() =
+    fun `rotation waits until cancelled non cooperative inference exits and cleans up`() =
         runBlocking {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val firstStarted = CountDownLatch(1)

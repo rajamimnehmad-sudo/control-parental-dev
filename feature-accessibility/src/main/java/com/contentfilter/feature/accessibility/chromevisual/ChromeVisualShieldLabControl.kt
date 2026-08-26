@@ -30,6 +30,11 @@ object ChromeVisualShieldLabControl {
         renderContract: String,
     ): String = endpoint?.renderProbe(sampleId, sourceSha256, renderContract) ?: Unavailable
 
+    fun currentRenderIdentityToken(): String? = endpoint?.currentRenderIdentityToken()
+
+    fun renderAttested(renderIdentityToken: String): String =
+        endpoint?.renderAttested(renderIdentityToken) ?: Unavailable
+
     fun status(): String = endpoint?.status() ?: Unavailable
 
     internal fun bind(value: Endpoint) {
@@ -58,6 +63,10 @@ object ChromeVisualShieldLabControl {
             sourceSha256: String,
             renderContract: String,
         ): String
+
+        fun currentRenderIdentityToken(): String?
+
+        fun renderAttested(renderIdentityToken: String): String
 
         fun status(): String
     }

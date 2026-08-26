@@ -4,6 +4,7 @@ import kotlin.math.abs
 
 internal data class ChromeVisualShieldRenderAttestation(
     val sample: ChromeVisualShieldFixtureSample,
+    val renderIdentityToken: String,
     val sourceWidth: Int,
     val sourceHeight: Int,
     val canvasWidth: Int,
@@ -19,22 +20,27 @@ internal object ChromeVisualShieldRenderAttestationStore {
     fun record(
         sample: ChromeVisualShieldFixtureSample,
         body: String,
+        expectedRenderIdentityToken: String,
     ): String {
         val fields = body.split('|')
         if (fields.size != FieldCount) return "result=render_attestation_invalid sample=${sample.wireName}"
-        if (fields[0] != sample.expectedSha256 || fields[1] != ChromeVisualShieldContainContract.Version) {
+        if (
+            fields[0] != sample.expectedSha256 ||
+            fields[1] != ChromeVisualShieldContainContract.Version ||
+            fields[2] != expectedRenderIdentityToken
+        ) {
             return "result=render_attestation_identity_mismatch sample=${sample.wireName}"
         }
-        val sourceWidth = fields[2].toIntOrNull() ?: return invalid(sample)
-        val sourceHeight = fields[3].toIntOrNull() ?: return invalid(sample)
-        val canvasWidth = fields[4].toIntOrNull() ?: return invalid(sample)
-        val canvasHeight = fields[5].toIntOrNull() ?: return invalid(sample)
+        val sourceWidth = fields[3].toIntOrNull() ?: return invalid(sample)
+        val sourceHeight = fields[4].toIntOrNull() ?: return invalid(sample)
+        val canvasWidth = fields[5].toIntOrNull() ?: return invalid(sample)
+        val canvasHeight = fields[6].toIntOrNull() ?: return invalid(sample)
         val observed =
             ChromeVisualShieldContainGeometry(
-                left = fields[6].toDoubleOrNull() ?: return invalid(sample),
-                top = fields[7].toDoubleOrNull() ?: return invalid(sample),
-                width = fields[8].toDoubleOrNull() ?: return invalid(sample),
-                height = fields[9].toDoubleOrNull() ?: return invalid(sample),
+                left = fields[7].toDoubleOrNull() ?: return invalid(sample),
+                top = fields[8].toDoubleOrNull() ?: return invalid(sample),
+                width = fields[9].toDoubleOrNull() ?: return invalid(sample),
+                height = fields[10].toDoubleOrNull() ?: return invalid(sample),
             )
         val expected =
             ChromeVisualShieldContainContract.geometry(
@@ -47,6 +53,7 @@ internal object ChromeVisualShieldRenderAttestationStore {
         ready[sample] =
             ChromeVisualShieldRenderAttestation(
                 sample,
+                expectedRenderIdentityToken,
                 sourceWidth,
                 sourceHeight,
                 canvasWidth,
@@ -58,7 +65,11 @@ internal object ChromeVisualShieldRenderAttestationStore {
     }
 
     @Synchronized
-    fun consume(sample: ChromeVisualShieldFixtureSample): ChromeVisualShieldRenderAttestation? = ready.remove(sample)
+    fun consume(
+        sample: ChromeVisualShieldFixtureSample,
+        expectedRenderIdentityToken: String,
+    ): ChromeVisualShieldRenderAttestation? =
+        ready.remove(sample)?.takeIf { it.renderIdentityToken == expectedRenderIdentityToken }
 
     @Synchronized
     fun clear(sample: ChromeVisualShieldFixtureSample) {
@@ -82,6 +93,6 @@ internal object ChromeVisualShieldRenderAttestationStore {
     private fun invalid(sample: ChromeVisualShieldFixtureSample) =
         "result=render_attestation_invalid sample=${sample.wireName}"
 
-    private const val FieldCount = 10
+    private const val FieldCount = 11
     private const val GeometryTolerance = 0.01
 }

@@ -66,6 +66,11 @@ class ChromeVisualShieldFixtureTest {
         assertContains(html, "Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight)")
         assertContains(html, "context.fillStyle = '${ChromeVisualShieldContainContract.NeutralBackground}'")
         assertContains(html, "context.drawImage(bitmap, drawX, drawY, drawWidth, drawHeight)")
+        assertContains(html, "window.addEventListener('resize', requestRender)")
+        assertContains(html, "window.addEventListener('orientationchange', requestRender)")
+        assertContains(html, "window.visualViewport.addEventListener('resize', requestRender)")
+        assertContains(html, ChromeVisualShieldFixture.RenderIdentityPath)
+        assertContains(html, "renderIdentityToken, sourceWidth")
         assertContains(html, "renderContract=${ChromeVisualShieldContainContract.Version}")
         assertContains(
             html,
@@ -83,12 +88,17 @@ class ChromeVisualShieldFixtureTest {
     fun `render attestation accepts exact contain geometry`() {
         val sample = ChromeVisualShieldFixtureSample.Flickr01
         val body =
-            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|" +
+            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
                 "1600|900|700|660|0.0|133.125|700.0|393.75"
 
         ChromeVisualShieldRenderAttestationStore.clear()
-        assertContains(ChromeVisualShieldRenderAttestationStore.record(sample, body), "result=render_attested")
-        val attestation = assertNotNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
+        assertContains(
+            ChromeVisualShieldRenderAttestationStore.record(sample, body, RenderIdentityToken),
+            "result=render_attested",
+        )
+        val attestation =
+            assertNotNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
+        assertEquals(RenderIdentityToken, attestation.renderIdentityToken)
         assertEquals(1600, attestation.sourceWidth)
         assertEquals(700.0, attestation.draw.width)
         ChromeVisualShieldRenderAttestationStore.clear()
@@ -99,7 +109,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr03
         ChromeVisualShieldFixtureSampleStore.clear()
         val body =
-            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|" +
+            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
                 "1600|900|700|660|0.0|133.125|700.0|393.75"
 
         val response =
@@ -110,22 +120,22 @@ class ChromeVisualShieldFixtureTest {
             )
 
         assertContains(response.originalBytes.toString(Charsets.UTF_8), "request_invalid")
-        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
     }
 
     @Test
     fun `render attestation rejects stretched draw geometry`() {
         val sample = ChromeVisualShieldFixtureSample.Flickr02
         val stretched =
-            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|" +
+            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
                 "1600|900|700|660|0.0|0.0|700.0|660.0"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
-            ChromeVisualShieldRenderAttestationStore.record(sample, stretched),
+            ChromeVisualShieldRenderAttestationStore.record(sample, stretched, RenderIdentityToken),
             "geometry_mismatch",
         )
-        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
         ChromeVisualShieldRenderAttestationStore.clear()
     }
 
@@ -133,15 +143,15 @@ class ChromeVisualShieldFixtureTest {
     fun `render attestation rejects wrong source SHA`() {
         val sample = ChromeVisualShieldFixtureSample.Flickr04
         val wrongSha =
-            "${"0".repeat(64)}|${ChromeVisualShieldContainContract.Version}|" +
+            "${"0".repeat(64)}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
                 "1600|900|700|660|0.0|133.125|700.0|393.75"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
-            ChromeVisualShieldRenderAttestationStore.record(sample, wrongSha),
+            ChromeVisualShieldRenderAttestationStore.record(sample, wrongSha, RenderIdentityToken),
             "identity_mismatch",
         )
-        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
         ChromeVisualShieldRenderAttestationStore.clear()
     }
 
@@ -149,15 +159,15 @@ class ChromeVisualShieldFixtureTest {
     fun `render attestation rejects wrong render contract`() {
         val sample = ChromeVisualShieldFixtureSample.Flickr05
         val wrongContract =
-            "${sample.expectedSha256}|canvas-fill-v1|" +
+            "${sample.expectedSha256}|canvas-fill-v1|$RenderIdentityToken|" +
                 "1600|900|700|660|0.0|133.125|700.0|393.75"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
-            ChromeVisualShieldRenderAttestationStore.record(sample, wrongContract),
+            ChromeVisualShieldRenderAttestationStore.record(sample, wrongContract, RenderIdentityToken),
             "identity_mismatch",
         )
-        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
         ChromeVisualShieldRenderAttestationStore.clear()
     }
 
@@ -165,13 +175,49 @@ class ChromeVisualShieldFixtureTest {
     fun `render attestation is consumable only once`() {
         val sample = ChromeVisualShieldFixtureSample.Flickr06
         val valid =
-            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|" +
+            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
                 "1600|900|700|660|0.0|133.125|700.0|393.75"
 
         ChromeVisualShieldRenderAttestationStore.clear()
-        assertContains(ChromeVisualShieldRenderAttestationStore.record(sample, valid), "result=render_attested")
-        assertNotNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
-        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
+        assertContains(
+            ChromeVisualShieldRenderAttestationStore.record(sample, valid, RenderIdentityToken),
+            "result=render_attested",
+        )
+        assertNotNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
+        ChromeVisualShieldRenderAttestationStore.clear()
+    }
+
+    @Test
+    fun `render attestation from old viewport identity is rejected and consumed fail closed`() {
+        val sample = ChromeVisualShieldFixtureSample.Flickr08
+        val valid =
+            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
+                "1600|900|700|660|0.0|133.125|700.0|393.75"
+
+        ChromeVisualShieldRenderAttestationStore.clear()
+        assertContains(
+            ChromeVisualShieldRenderAttestationStore.record(sample, valid, RenderIdentityToken),
+            "result=render_attested",
+        )
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RotatedRenderIdentityToken))
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
+        ChromeVisualShieldRenderAttestationStore.clear()
+    }
+
+    @Test
+    fun `render attestation record rejects viewport identity mismatch`() {
+        val sample = ChromeVisualShieldFixtureSample.Flickr09
+        val stale =
+            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
+                "1600|900|700|660|0.0|133.125|700.0|393.75"
+
+        ChromeVisualShieldRenderAttestationStore.clear()
+        assertContains(
+            ChromeVisualShieldRenderAttestationStore.record(sample, stale, RotatedRenderIdentityToken),
+            "identity_mismatch",
+        )
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RotatedRenderIdentityToken))
         ChromeVisualShieldRenderAttestationStore.clear()
     }
 
@@ -180,12 +226,12 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr07
 
         val valid =
-            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|" +
+            "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
                 "1600|900|700|660|0.0|133.125|700.0|393.75"
         ChromeVisualShieldRenderAttestationStore.clear()
-        ChromeVisualShieldRenderAttestationStore.record(sample, valid)
+        ChromeVisualShieldRenderAttestationStore.record(sample, valid, RenderIdentityToken)
         ChromeVisualShieldFixtureSampleStore.reset(sample)
-        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample))
+        assertNull(ChromeVisualShieldRenderAttestationStore.consume(sample, RenderIdentityToken))
         ChromeVisualShieldFixtureSampleStore.clear()
     }
 
@@ -298,4 +344,9 @@ class ChromeVisualShieldFixtureTest {
         headers = emptyList(),
         body = body.toByteArray(Charsets.UTF_8),
     )
+
+    private companion object {
+        const val RenderIdentityToken = "1:7:2:0:0:1080:2200:fixture:162:550:918:1210"
+        const val RotatedRenderIdentityToken = "1:7:3:0:0:2200:1080:fixture:330:270:1870:594"
+    }
 }
