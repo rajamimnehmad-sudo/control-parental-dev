@@ -55,11 +55,17 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
 
     private fun renderProbe(intent: Intent): String {
         val sample = fixtureSample(intent) ?: return "result=fixture_unknown_sample"
-        return ChromeVisualShieldLabControl.renderProbe(
-            sampleId = sample.wireName,
-            sourceSha256 = sample.expectedSha256,
-            renderContract = ChromeVisualShieldContainContract.Version,
-        )
+        val attestation =
+            ChromeVisualShieldRenderAttestationStore.consume(sample)
+                ?: return "result=render_not_attested sample=${sample.wireName}"
+        val result =
+            ChromeVisualShieldLabControl.renderProbe(
+                sampleId = sample.wireName,
+                sourceSha256 = sample.expectedSha256,
+                renderContract = ChromeVisualShieldContainContract.Version,
+            )
+        return "$result renderAttested=true source=${attestation.sourceWidth}x${attestation.sourceHeight} " +
+            "canvas=${attestation.canvasWidth}x${attestation.canvasHeight} draw=${attestation.draw}"
     }
 
     private fun fixtureSample(intent: Intent): ChromeVisualShieldFixtureSample? =

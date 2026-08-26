@@ -138,6 +138,7 @@ internal object ChromeVisualShieldFixtureSampleStore {
 
     @Synchronized
     fun reset(sample: ChromeVisualShieldFixtureSample): String {
+        ChromeVisualShieldRenderAttestationStore.clear(sample)
         staging.put(sample, WipeableBuffer(sample.expectedBytes))?.wipe()
         verified.remove(sample)?.fill(0)
         return "result=fixture_reset sample=${sample.wireName}"
@@ -189,7 +190,11 @@ internal object ChromeVisualShieldFixtureSampleStore {
     fun payload(sample: ChromeVisualShieldFixtureSample): ByteArray? = verified[sample]?.copyOf()
 
     @Synchronized
+    fun isReady(sample: ChromeVisualShieldFixtureSample): Boolean = sample in verified
+
+    @Synchronized
     fun clear() {
+        ChromeVisualShieldRenderAttestationStore.clear()
         staging.values.forEach(WipeableBuffer::wipe)
         staging.clear()
         verified.values.forEach { bytes -> bytes.fill(0) }

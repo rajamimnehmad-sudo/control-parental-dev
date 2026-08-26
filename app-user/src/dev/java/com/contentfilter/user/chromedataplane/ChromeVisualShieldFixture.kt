@@ -11,6 +11,7 @@ internal object ChromeVisualShieldFixture {
     const val DelayedPath = "/web13br/delayed"
     const val CanvasPrefix = "/web13br/canvas/"
     const val PayloadPrefix = "/web13br/payload/"
+    const val RenderedPrefix = "/web13br/rendered/"
     const val SafeCanvasPath = "${CanvasPrefix}safe"
     const val BlockCanvasPath = "${CanvasPrefix}block"
     const val SafePayloadPath = "${PayloadPrefix}safe"
@@ -24,7 +25,7 @@ internal object ChromeVisualShieldFixture {
                 SentinelPath -> pageResponse(path, page("sentinel", sentinel = true, delayed = false))
                 SecondPath -> pageResponse(path, page("second-document", sentinel = true, delayed = false))
                 DelayedPath -> pageResponse(path, page("delayed", sentinel = false, delayed = true))
-                else -> dynamicSampleResponse(path) ?: return null
+                else -> dynamicSampleResponse(request, path) ?: return null
             }
         return response
     }
@@ -33,15 +34,50 @@ internal object ChromeVisualShieldFixture {
 
     fun payloadPath(sample: ChromeVisualShieldFixtureSample): String = PayloadPrefix + sample.wireName
 
-    private fun dynamicSampleResponse(path: String): ChromePhotosFixtureResponse? {
+    fun renderedPath(sample: ChromeVisualShieldFixtureSample): String = RenderedPrefix + sample.wireName
+
+    private fun dynamicSampleResponse(
+        request: ChromePhotosProxyRequest,
+        path: String,
+    ): ChromePhotosFixtureResponse? {
         val sampleName =
             when {
+                path.startsWith(RenderedPrefix) -> path.removePrefix(RenderedPrefix)
                 path.startsWith(CanvasPrefix) -> path.removePrefix(CanvasPrefix)
                 path.startsWith(PayloadPrefix) -> path.removePrefix(PayloadPrefix)
                 else -> return null
             }
         val sample = ChromeVisualShieldFixtureSample.fromWireName(sampleName) ?: return null
-        return if (path.startsWith(CanvasPrefix)) canvasResponse(path, sample) else payloadResponse(path, sample)
+        return when {
+            path.startsWith(CanvasPrefix) -> canvasResponse(path, sample)
+            path.startsWith(PayloadPrefix) -> payloadResponse(path, sample)
+            else -> renderedResponse(request, path, sample)
+        }
+    }
+
+    private fun renderedResponse(
+        request: ChromePhotosProxyRequest,
+        path: String,
+        sample: ChromeVisualShieldFixtureSample,
+    ): ChromePhotosFixtureResponse {
+        val body =
+            if (
+                request.method != "POST" ||
+                request.body.size > MaxRenderAttestationBytes ||
+                !ChromeVisualShieldFixtureSampleStore.isReady(sample)
+            ) {
+                "result=render_attestation_request_invalid"
+            } else {
+                ChromeVisualShieldRenderAttestationStore.record(
+                    sample,
+                    request.body.toString(Charsets.UTF_8),
+                )
+            }
+        return ChromePhotosFixtureResponse(
+            resourceId = "chrome-visual-shield-${path.substringAfterLast('/')}-rendered",
+            contentType = "text/plain; charset=utf-8",
+            originalBytes = body.toByteArray(Charsets.UTF_8),
+        )
     }
 
     private fun pageResponse(
@@ -83,6 +119,7 @@ internal object ChromeVisualShieldFixture {
 
     private fun canvasPage(sample: ChromeVisualShieldFixtureSample): String {
         val payloadPath = payloadPath(sample)
+        val renderedPath = renderedPath(sample)
         val left = ChromeVisualShieldLabControl.RegionLeftBasisPoints / 100.0
         val top = ChromeVisualShieldLabControl.RegionTopBasisPoints / 100.0
         val width =
@@ -153,6 +190,16 @@ internal object ChromeVisualShieldFixture {
                   document.documentElement.dataset.sourceSize = sourceWidth + 'x' + sourceHeight;
                   document.documentElement.dataset.canvasSize = canvas.width + 'x' + canvas.height;
                   document.documentElement.dataset.drawRect = [drawX, drawY, drawWidth, drawHeight].join(',');
+                  const attestation = [observedSha, '${ChromeVisualShieldContainContract.Version}',
+                    sourceWidth, sourceHeight, canvas.width, canvas.height,
+                    drawX, drawY, drawWidth, drawHeight].join('|');
+                  const attested = await fetch('$renderedPath', {
+                    method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: attestation
+                  });
+                  if (!attested.ok || !(await attested.text()).startsWith('result=render_attested')) {
+                    throw new Error('fixture render attestation rejected');
+                  }
+                  document.documentElement.dataset.renderAttested = 'true';
                   console.info('carrierVisible=canvas sample=${sample.wireName} sha=' + observedSha +
                     ' renderContract=${ChromeVisualShieldContainContract.Version} canvas=' + canvas.width + 'x' + canvas.height +
                     ' draw=' + [drawX, drawY, drawWidth, drawHeight].join(','));
@@ -233,4 +280,5 @@ internal object ChromeVisualShieldFixture {
 
     private const val SentinelMarkup =
         "<div id=\"shield-sentinel\" aria-hidden=\"true\"></div>"
+    private const val MaxRenderAttestationBytes = 1_024
 }
