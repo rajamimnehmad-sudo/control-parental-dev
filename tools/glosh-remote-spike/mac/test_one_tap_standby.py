@@ -16,6 +16,7 @@ class FakeSession:
         self.agent = None
         self.support_slot_claimed = False
         self.accepted_request_id = None
+        self.accepted_client_fingerprint = None
 
 
 class FakeBroker:
@@ -101,7 +102,7 @@ class OneTapStandbyTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_exactly_one_request_autoaccepts_once_and_claims_slot(self) -> None:
         session = FakeSession()
-        request = PendingRequest("request-one", "", "", "Samsung", "S22", "16", 60)
+        request = PendingRequest("request-one", "client-key-a", "", "Samsung", "S22", "16", 60)
         broker = FakeBroker(session, [request], stop_after_pending=4)
         await announce_pending_requests(
             session, broker, "gloshremote://secret", poll_interval_seconds=0.001
@@ -142,12 +143,41 @@ class OneTapStandbyTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("Esta sesión ya aceptó un cliente.", blocked)
         self.assertEqual([("request-one", "gloshremote://secret")], broker.accepted)
 
-    async def test_claimed_slot_never_autoaccepts_new_single_request(self) -> None:
+    async def test_claimed_slot_accepts_renewal_from_same_ephemeral_identity(self) -> None:
         session = FakeSession()
         session.support_slot_claimed = True
         session.accepted_request_id = "already-accepted"
-        request = PendingRequest("request-two", "", "", "Samsung", "A23", "14", 60)
+        from broker_console import client_fingerprint
+
+        original = PendingRequest(
+            "request-one", "client-key-a", "", "Samsung", "S22", "16", 60
+        )
+        session.accepted_client_fingerprint = client_fingerprint(original)
+        request = PendingRequest(
+            "request-two", "client-key-a", "", "Samsung", "S22", "16", 60
+        )
         broker = FakeBroker(session, [request], stop_after_pending=2)
+
+        await announce_pending_requests(
+            session, broker, "gloshremote://secret", poll_interval_seconds=0.001
+        )
+        self.assertEqual([("request-two", "gloshremote://secret")], broker.accepted)
+        self.assertEqual("request-two", session.accepted_request_id)
+
+    async def test_claimed_slot_blocks_request_from_different_identity(self) -> None:
+        session = FakeSession()
+        session.support_slot_claimed = True
+        session.accepted_request_id = "already-accepted"
+        from broker_console import client_fingerprint
+
+        original = PendingRequest(
+            "request-one", "client-key-a", "", "Samsung", "S22", "16", 60
+        )
+        session.accepted_client_fingerprint = client_fingerprint(original)
+        attacker = PendingRequest(
+            "request-two", "client-key-b", "", "Samsung", "S22", "16", 60
+        )
+        broker = FakeBroker(session, [attacker], stop_after_pending=2)
 
         await announce_pending_requests(
             session, broker, "gloshremote://secret", poll_interval_seconds=0.001

@@ -7,7 +7,7 @@ MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
 FINAL_APK="$APK_DIR/GloshRemote-Simple-Notification-DEV.apk"
-REPORT="$APK_DIR/REMOTE-SIMPLE-NOTIFICATION-21-report.txt"
+REPORT="$APK_DIR/REMOTE-SIMPLE-NOTIFICATION-23-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 PYTHON_VENV=""
 
@@ -94,7 +94,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" status --short)"
 
 {
-  echo "TASK=REMOTE-SIMPLE-NOTIFICATION-21"
+  echo "TASK=REMOTE-SIMPLE-NOTIFICATION-23"
   echo "RESULT=PASS"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"

@@ -20,6 +20,16 @@ activity = (
 service = (
     APP / "java" / "com" / "glosh" / "remote" / "spike" / "RemotePairingService.java"
 ).read_text()
+broker_client = (
+    APP
+    / "java"
+    / "com"
+    / "glosh"
+    / "remote"
+    / "spike"
+    / "broker"
+    / "SupportSessionBrokerClient.java"
+).read_text()
 guide_sources = list((APP / "java" / "com" / "glosh" / "remote" / "spike" / "guide").rglob("*.java"))
 
 require("BIND_ACCESSIBILITY_SERVICE" not in manifest, "Accessibility must not be registered")
@@ -46,5 +56,16 @@ require(
     "screen lease must start after the authenticated ADB canary",
 )
 require("currentScreenLease.release()" in service, "screen lease must be released on cleanup")
+require(
+    "if (identity == null)" in broker_client,
+    "request renewal must reuse the original ephemeral identity",
+)
+renewal_body = broker_client.split("private void renewExpiredRequest", 1)[1].split(
+    "private synchronized boolean shouldRenew", 1
+)[0]
+require(
+    "destroyIdentity()" not in renewal_body,
+    "request renewal must not destroy the accepted client identity",
+)
 
 print("ARCHITECTURE_GUARD_PASS")
