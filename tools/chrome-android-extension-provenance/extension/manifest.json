@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Glosh Chrome Android Provenance Lab",
+  "version": "0.1.0",
+  "minimum_chrome_version": "146",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1nfFZilkpXkU6zAyjh07Ij7g1ecZQscNlBbz0wPFp3zyBbAy9gfOlUy/SfUISl0LxVlO4Szi/uVrVpRYiywSDFmIcFG1JRsGDA2t42nkN4pXH9xpmxY+zjBJUC134USEkDxOhzL6zdvanz5IQvSI0miJNnMOWnaItJBO8NHYfxexpaAigqcXUWdaEIhCSAaMcA1U+X/wXUgeAe3dMDRzgjtQPMKrcjWygVlpD8Y2Yujv0GlsHyBTNH5H+94zzH8UjtaZZaXOWSCFqPY1gxALO9SMr7zkEbYmTzNxyF4aWBu/ox7loIaTqH0Re4rkqHb6iBUigj+Xwg2p5CgA38KZMQIDAQAB",
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "permissions": [
+    "debugger",
+    "storage",
+    "tabs",
+    "webNavigation",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "https://glosh-photos.test/*",
+    "http://127.0.0.1:8765/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://glosh-photos.test/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_start",
+      "all_frames": true,
+      "match_origin_as_fallback": true,
+      "world": "ISOLATED"
+    }
+  ]
+}
