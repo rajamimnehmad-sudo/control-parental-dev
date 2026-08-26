@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.contentfilter.feature.accessibility.R
+import com.glosh.visual.GloshiaVisualModelInfo
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,8 +17,8 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * DEV-only foundation gate. It protects Chrome first, captures underneath that protection, keeps
- * only a bounded crop, and never turns a captured result into production release authority.
+ * DEV-only R1 gate. It protects Chrome first, captures underneath that protection, keeps only a
+ * bounded crop, and allows release only after a current GloshIA SAFE decision.
  */
 internal class ChromeVisualShieldController(
     private val service: AccessibilityService,
@@ -30,9 +31,12 @@ internal class ChromeVisualShieldController(
             service.packageName.endsWith(".dev") &&
             service.resources.getBoolean(R.bool.chrome_visual_shield_lab_enabled)
     private val metrics = ChromeVisualShieldMetrics()
+    private val r1Metrics = ChromeVisualShieldR1Metrics()
     private val identityGate = ChromeVisualShieldIdentityGate(metrics::onStaleDropped)
     private val capture = ChromeWindowCapture(service, ChromeVisualShieldCaptureObserver(metrics))
     private val frameProcessor = ChromeVisualShieldFrameProcessor(metrics)
+    private val gloshiaAnalyzer = ChromeVisualShieldGloshiaAnalyzer(service)
+    private val eventCoalescer = ChromeVisualShieldEventCoalescer()
     private val windowInspector = ChromeVisualWindowInspector(service)
     private val surface = ChromePhotosProtectedSurface(service, ::onHostPublicationChanged)
     private val regionContract =
@@ -62,8 +66,10 @@ internal class ChromeVisualShieldController(
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!enabled || !labActive || closed.get()) return
         runOnMain {
+            r1Metrics.onEventReceived()
             val packageName = event.packageName?.toString().orEmpty()
             if (!windowInspector.isChromePackage(packageName)) {
+                eventCoalescer.reset()
                 invalidateWithoutNewWindow(ChromeVisualShieldInvalidation.Suspension)
                 return@runOnMain
             }
@@ -72,12 +78,34 @@ internal class ChromeVisualShieldController(
                 windowInspector.find(event.windowId.takeIf { it >= 0 } ?: current.windowId)
                     ?: windowInspector.find(AnyWindowId)
             if (window == null) {
+                eventCoalescer.reset()
                 invalidateWithoutNewWindow(ChromeVisualShieldInvalidation.WindowReplaced)
                 return@runOnMain
             }
             val viewport = windowInspector.viewport(window)
             if (viewport == null) {
+                eventCoalescer.reset()
                 invalidateWithoutNewWindow(ChromeVisualShieldInvalidation.Viewport)
+                return@runOnMain
+            }
+            val state = identityGate.snapshot()
+            val fingerprint =
+                ChromeVisualShieldEventFingerprint(
+                    eventType = event.eventType,
+                    eventTime = event.eventTime,
+                    contentChangeTypes = event.contentChangeTypes,
+                    windowId = window.id,
+                    viewport = viewport,
+                )
+            if (
+                eventCoalescer.shouldCoalesce(
+                    fingerprint = fingerprint,
+                    phase = state.phase,
+                    eligible = event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                )
+            ) {
+                r1Metrics.onEventCoalesced()
+                log("phase=event result=coalesced type=${event.eventType}")
                 return@runOnMain
             }
             invalidateProtectCapture(window.id, viewport, reasonFor(event, current, window.id, viewport))
@@ -101,6 +129,7 @@ internal class ChromeVisualShieldController(
             val window = windowInspector.find(AnyWindowId) ?: return@commandOnMain "result=chrome_absent"
             val viewport = windowInspector.viewport(window) ?: return@commandOnMain "result=viewport_absent"
             cancelCapture()
+            eventCoalescer.reset()
             labActive = true
             ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
             val started =
@@ -125,6 +154,7 @@ internal class ChromeVisualShieldController(
         commandOnMain {
             val context = identityGate.snapshot().context ?: return@commandOnMain "result=no_context"
             if (!identityGate.releaseForExplicitLabGate(context)) {
+                r1Metrics.onReleaseRejected()
                 return@commandOnMain "result=release_rejected ${statusValue()}"
             }
             cancelCapture()
@@ -146,6 +176,7 @@ internal class ChromeVisualShieldController(
                 reason = ChromeVisualShieldInvalidation.Navigation,
             )
             val result = identityGate.completeProcessing(stale)
+            if (result is ChromeVisualShieldResult.Stale) r1Metrics.onStaleInferenceDropped()
             log("phase=stale_injection result=${result.logValue()} rawPresented=false")
             "result=${result.logValue()} ${statusValue()}"
         }
@@ -169,7 +200,10 @@ internal class ChromeVisualShieldController(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         ChromeVisualShieldLabControl.unbind(this)
-        runOnMain { deactivate("service_closed") }
+        runOnMain {
+            deactivate("service_closed")
+            gloshiaAnalyzer.close()
+        }
     }
 
     private fun invalidateProtectCapture(
@@ -178,6 +212,7 @@ internal class ChromeVisualShieldController(
         reason: ChromeVisualShieldInvalidation,
     ) {
         if (!labActive) return
+        r1Metrics.onContentInvalidation()
         cancelCapture()
         val protected = identityGate.invalidate(windowId, viewport, regionContract, reason) ?: return
         protectThenCapture(protected, reason.name.lowercase())
@@ -185,6 +220,7 @@ internal class ChromeVisualShieldController(
 
     private fun invalidateWithoutNewWindow(reason: ChromeVisualShieldInvalidation) {
         val current = identityGate.snapshot().context ?: return
+        r1Metrics.onContentInvalidation()
         cancelCapture()
         val protected =
             identityGate.invalidate(current.windowId, current.viewport, regionContract, reason) ?: return
@@ -286,28 +322,106 @@ internal class ChromeVisualShieldController(
                             val processing =
                                 withContext(Dispatchers.Main.immediate) {
                                     identityGate.beginProcessing(identity)
+                                }
+                            if (processing is ChromeVisualShieldResult.Stale) {
+                                r1Metrics.onStaleInferenceDropped()
+                                return@processCrop
                             }
-                            if (processing is ChromeVisualShieldResult.Stale) return@processCrop
                             val matches = sentinelMatches(ownedCrop.bitmap)
-                            val completed =
+                            r1Metrics.onInferenceStarted()
+                            val decision =
+                                try {
+                                    gloshiaAnalyzer.analyze(
+                                        bitmap = ownedCrop.bitmap,
+                                        identity = identity,
+                                        canContinue = { isCurrentProcessingIdentity(identity) },
+                                    )
+                                } catch (cancelled: CancellationException) {
+                                    r1Metrics.onInferenceCancelled()
+                                    throw cancelled
+                                } finally {
+                                    r1Metrics.onInferenceCompleted()
+                                }
+                            val resultLabel =
                                 withContext(Dispatchers.Main.immediate) {
-                                    val completion = identityGate.completeProcessing(identity)
-                                    if (completion is ChromeVisualShieldResult.Current) {
-                                        if (matches) sentinelCropMatches += 1
-                                        lastCaptureIdentity = identity
-                                        captureCycles += 1
-                                    }
-                                    completion
+                                    applyGloshiaDecision(identity, decision, matches)
                                 }
                             log(
                                 "phase=process trigger=$trigger sentinelMatched=$matches " +
-                                    "result=${completed.logValue()} rawPresented=false",
+                                    "decision=${decision.logValue()} reason=${decision.reason} " +
+                                    "result=$resultLabel rawPresented=false",
                             )
                         }
                     }
             }
         }
     }
+
+    private fun applyGloshiaDecision(
+        identity: ChromeVisualShieldIdentity,
+        decision: ChromeVisualShieldGloshiaDecision,
+        sentinelMatches: Boolean,
+    ): String {
+        val completion = identityGate.completeProcessing(identity)
+        if (completion is ChromeVisualShieldResult.Stale) {
+            r1Metrics.onStaleInferenceDropped()
+            return "stale_drop"
+        }
+        if (sentinelMatches) sentinelCropMatches += 1
+        lastCaptureIdentity = identity
+        captureCycles += 1
+        return when (decision) {
+            is ChromeVisualShieldGloshiaDecision.Safe -> {
+                r1Metrics.onSafeCurrent()
+                if (!identityGate.releaseForExplicitLabGate(identity.toContext())) {
+                    r1Metrics.onReleaseRejected()
+                    identityGate.failClosed(null)
+                    "safe_release_rejected"
+                } else {
+                    r1Metrics.onReleaseCurrent()
+                    surface.close()
+                    pendingCoverEpoch = null
+                    publishLabOwnership(false)
+                    "safe_released"
+                }
+            }
+            is ChromeVisualShieldGloshiaDecision.Block -> {
+                r1Metrics.onBlockCurrent()
+                "block_protected"
+            }
+            is ChromeVisualShieldGloshiaDecision.FailClosed -> {
+                r1Metrics.onFailClosedCurrent()
+                "fail_closed"
+            }
+        }
+    }
+
+    private fun isCurrentProcessingIdentity(identity: ChromeVisualShieldIdentity): Boolean {
+        val state = identityGate.snapshot()
+        val context = state.context ?: return false
+        return state.phase == ChromeVisualShieldPhase.Processing &&
+            state.nextCaptureSequence == identity.captureSequence + 1 &&
+            context.protectionSessionId == identity.protectionSessionId &&
+            context.windowId == identity.windowId &&
+            context.contentEpoch == identity.contentEpoch &&
+            context.viewport == identity.viewport &&
+            context.viewportEpoch == identity.viewportEpoch &&
+            context.regionId == identity.regionId &&
+            context.regionSequence == identity.regionSequence &&
+            context.region == identity.region
+    }
+
+    private fun ChromeVisualShieldIdentity.toContext() =
+        ChromeVisualShieldContext(
+            protectionSessionId = protectionSessionId,
+            windowId = windowId,
+            contentEpoch = contentEpoch,
+            viewport = viewport,
+            viewportEpoch = viewportEpoch,
+            regionId = regionId,
+            regionSequence = regionSequence,
+            region = region,
+        )
 
     private fun sentinelMatches(bitmap: android.graphics.Bitmap): Boolean {
         if (bitmap.width < 4 || bitmap.height < 2) return false
@@ -342,6 +456,7 @@ internal class ChromeVisualShieldController(
         cancelCapture()
         identityGate.stop()
         surface.close()
+        eventCoalescer.reset()
         pendingCoverEpoch = null
         labActive = false
         publishLabOwnership(false)
@@ -353,6 +468,7 @@ internal class ChromeVisualShieldController(
     private fun statusValue(): String {
         val state = identityGate.snapshot()
         val value = metrics.snapshot()
+        val r1 = r1Metrics.snapshot()
         return "active=$labActive phase=${state.phase} session=${state.context?.protectionSessionId ?: 0} " +
             "windowId=${state.context?.windowId ?: -1} contentEpoch=${state.context?.contentEpoch ?: 0} " +
             "viewportEpoch=${state.context?.viewportEpoch ?: 0} regionSequence=${state.context?.regionSequence ?: 0} " +
@@ -362,8 +478,15 @@ internal class ChromeVisualShieldController(
             "staleDropped=${value.staleDropped} captureCancelled=${value.captureCancelled} " +
             "secureWindowFailures=${value.secureWindowFailures} captureCycles=$captureCycles " +
             "opaqueCommitted=$opaqueCommittedCount sentinelCropMatches=$sentinelCropMatches " +
-            "labReleaseCount=${state.labReleaseCount} " +
-            "staleReleaseRejected=${state.staleReleaseRejected} rawPersisted=0 rawUploaded=0"
+            "labReleaseCount=${state.labReleaseCount} staleReleaseRejected=${state.staleReleaseRejected} " +
+            "eventsReceived=${r1.eventsReceived} eventsCoalesced=${r1.eventsCoalesced} " +
+            "contentInvalidations=${r1.contentInvalidations} inferenceStarted=${r1.inferenceStarted} " +
+            "inferenceCompleted=${r1.inferenceCompleted} inferenceOutstanding=${r1.inferenceOutstanding} " +
+            "safeCurrent=${r1.safeCurrent} blockCurrent=${r1.blockCurrent} " +
+            "failClosedCurrent=${r1.failClosedCurrent} staleInferenceDropped=${r1.staleInferenceDropped} " +
+            "inferenceCancelled=${r1.inferenceCancelled} releaseCurrent=${r1.releaseCurrent} " +
+            "releaseRejected=${r1.releaseRejected} model=${GloshiaVisualModelInfo.FunctionalVersion} " +
+            "modelSha=${GloshiaVisualModelInfo.ModelSha256} rawPersisted=0 rawUploaded=0"
     }
 
     private fun logMetrics(reason: String) {
@@ -409,8 +532,15 @@ internal class ChromeVisualShieldController(
             ChromeVisualShieldResult.Stale -> "stale_drop"
         }
 
+    private fun ChromeVisualShieldGloshiaDecision.logValue(): String =
+        when (this) {
+            is ChromeVisualShieldGloshiaDecision.Safe -> "safe"
+            is ChromeVisualShieldGloshiaDecision.Block -> "block"
+            is ChromeVisualShieldGloshiaDecision.FailClosed -> "fail_closed"
+        }
+
     private fun log(message: String) {
-        Log.i(LogTag, "$message gloshIAConnected=false")
+        Log.i(LogTag, "$message gloshIAConnected=true")
     }
 
     private companion object {
