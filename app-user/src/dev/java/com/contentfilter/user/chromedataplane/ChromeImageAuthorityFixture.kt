@@ -5,17 +5,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import java.util.zip.GZIPOutputStream
 
-/** Deterministic, in-memory 11B gate. It never persists source media. */
+/** Deterministic in-memory controlled fixture router. It never persists source media. */
 internal class ChromeImageAuthorityFixture(
     private val safeBytes: ByteArray,
     private val placeholderBytes: ByteArray,
 ) {
     private val report = AtomicReference(NotRun)
     private val normalizedImageRequestObserved = AtomicBoolean(false)
+    private val provenanceFixture = ChromePixelProvenanceFixture()
 
     fun report(): String = report.get()
 
     fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse? {
+        provenanceFixture.responseFor(request)?.let { return it }
         val path = request.target.substringBefore('?').substringBefore('#')
         return when (path) {
             RunnerPath -> html("web11b-runner", runnerHtml())
