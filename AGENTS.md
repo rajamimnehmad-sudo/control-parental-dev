@@ -14,9 +14,9 @@ Antes de cualquier tarea en este repositorio:
 
 Para planificacion, captura de ideas o seleccion de tickets:
 
-- Leer `docs/BACKLOG_PRODUCTO.md` solo cuando realmente se este planificando/priorizando.
+- Leer `docs/BACKLOG_PRODUCTO.md` solo cuando realmente se este planificando/priorizando. Ese path puede ser un stub historico; si remite a un snapshot archivado, no tratar ese snapshot como estado vigente.
 - Tratar Glosh Central / Control Center como verdad de coordinacion y GitHub como verdad compartida de codigo, commits, ramas, PR y evidencia.
-- `docs/HANDOFF_ACTUAL.md` puede aportar contexto tecnico, pero no debe contradecir el estado vigente de Central/GitHub.
+- `docs/HANDOFF_ACTUAL.md` puede aportar contexto tecnico historico, pero no debe contradecir el estado vigente de Central/GitHub y puede ser solo un stub hacia un snapshot archivado.
 - No escribir codigo sin una tarea/autorizacion vigente del usuario o de ChatGPT Central dentro del alcance ya autorizado.
 
 ## Esfuerzo de razonamiento
@@ -49,6 +49,7 @@ Regla transversal permanente del proyecto, autorizada por el usuario el 2026-08-
 - ChatGPT resuelve directamente todo lo viable: analisis, arquitectura, revision, UX/UI, documentacion, definicion de gates y cambios que no requieren el entorno local.
 - Codex se reserva principalmente para trabajo que necesita Mac/local: codigo, compilaciones, tests, ADB, dispositivos, emuladores, scripts, entrenamiento y benchmarks.
 - Los tickets deben agrupar lotes coherentes para evitar interacciones puntuales innecesarias.
+- Los cambios de gobernanza/documentacion que forman una misma decision deben agruparse en un lote y, cuando sea posible, en un commit coherente. Evitar cadenas de microcommits que solo reescriben la misma regla.
 
 ### Ticket delta por defecto
 
@@ -63,7 +64,9 @@ Regla transversal permanente del proyecto, autorizada por el usuario el 2026-08-
 - La evidencia documental separada es proporcional: se exige cuando aporta trazabilidad real (seguridad, navegador/medios, dispositivo, performance, migraciones, release o cierre relevante). Un fix rutinario con diff/tests suficientes no necesita crear un documento largo solo por costumbre.
 - El push no destructivo de ramas `review/*` y ramas de preservacion necesarias para revision/handoff queda PREAUTORIZADO de forma permanente dentro de Glosh. No hace falta pedir un OK nuevo en cada ticket.
 - No abrir una interaccion Codex adicional solo para hacer un push de review que podia haberse realizado al final del mismo ticket.
+- Preferir una sola rama `review/*-final` por cierre tecnico. Sufijos como `-copy`, `-check`, `-v2` o ramas intermedias nuevas solo cuando representan un estado realmente distinto que deba preservarse; no crearlas por rutina.
 - Si el resultado es BLOCKED o FAILED, puede publicarse una rama de preservacion/review cuando sea necesario para que ChatGPT inspeccione el estado exacto, sin ocultar el fallo ni ampliar scope.
+- Ramas `work/*`, `gate/*` o `review/*` superseded no se borran automaticamente. Se marcan como candidatas a limpieza y solo se eliminan con autorizacion explicita despues de confirmar que su contenido unico esta preservado.
 
 ### Handoff compacto por defecto
 

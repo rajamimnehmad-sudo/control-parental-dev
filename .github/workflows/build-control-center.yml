@@ -6,9 +6,12 @@ on:
       - build/glosh-control-center-v2
     paths:
       - "app-control-center/**"
-      - "docs/AI_TASK_TRACKER.json"
       - "settings.gradle.kts"
       - ".github/workflows/build-control-center.yml"
+
+concurrency:
+  group: glosh-control-center-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -54,6 +57,7 @@ jobs:
           name: glosh-control-center-apk
           path: app-control-center/build/outputs/apk/debug/app-control-center-debug.apk
           if-no-files-found: error
+          retention-days: 14
 
       - name: Publish final status
         if: always()
