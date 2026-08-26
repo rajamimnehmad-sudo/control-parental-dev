@@ -5,17 +5,25 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.SystemClock
 import kotlinx.coroutines.suspendCancellableCoroutine
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
 internal data class ChromeWindowFrame(
     val bitmap: Bitmap,
     val latencyMillis: Long,
+    private val onClosed: (Long) -> Unit = {},
 ) : AutoCloseable {
+    private val closed = AtomicBoolean(false)
     val width: Int get() = bitmap.width
     val height: Int get() = bitmap.height
     val temporaryBytes: Long get() = width.toLong() * height * BytesPerPixel
 
-    override fun close() = bitmap.recycle()
+    override fun close() {
+        if (!closed.compareAndSet(false, true)) return
+        val bytes = temporaryBytes
+        bitmap.recycle()
+        onClosed(bytes)
+    }
 
     private companion object {
         const val BytesPerPixel = 4L
@@ -30,6 +38,8 @@ internal sealed interface ChromeWindowCaptureResult {
 
 internal class ChromeWindowCapture(
     private val service: AccessibilityService,
+    private val observer: ChromeVisualShieldFullFrameObserver =
+        NoOpChromeVisualShieldFullFrameObserver,
 ) {
     // Both Chrome Visual controllers reject events below API 34 before reaching capture().
     @SuppressLint("NewApi")
@@ -47,9 +57,12 @@ internal class ChromeWindowCapture(
                                 val wrapped = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshot.colorSpace)
                                 try {
                                     wrapped?.copy(Bitmap.Config.ARGB_8888, false)?.let { bitmap ->
+                                        val bytes = bitmap.width.toLong() * bitmap.height * BytesPerPixel
+                                        observer.onAcquired(bytes)
                                         ChromeWindowFrame(
                                             bitmap = bitmap,
                                             latencyMillis = SystemClock.elapsedRealtime() - startedAt,
+                                            onClosed = observer::onClosed,
                                         )
                                     }
                                 } finally {
@@ -58,6 +71,7 @@ internal class ChromeWindowCapture(
                             } finally {
                                 hardwareBuffer.close()
                             }
+                        if (frame == null) observer.onFailure(InvalidBitmapErrorCode)
                         if (continuation.isActive) {
                             continuation.resume(
                                 frame?.let(ChromeWindowCaptureResult::Captured)
@@ -69,6 +83,7 @@ internal class ChromeWindowCapture(
                     }
 
                     override fun onFailure(errorCode: Int) {
+                        observer.onFailure(errorCode)
                         if (continuation.isActive) {
                             continuation.resume(ChromeWindowCaptureResult.Failed(errorCode))
                         }
@@ -78,6 +93,7 @@ internal class ChromeWindowCapture(
         }
 
     private companion object {
+        const val BytesPerPixel = 4L
         const val InvalidBitmapErrorCode = -1
     }
 }

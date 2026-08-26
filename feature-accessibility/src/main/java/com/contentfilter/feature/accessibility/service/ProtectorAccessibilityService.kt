@@ -27,6 +27,7 @@ import com.contentfilter.core.domain.repository.UsageSessionRepository
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualController
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualProbeController
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldController
 import com.contentfilter.feature.accessibility.policy.AccessibilityAppPolicyEvaluator
 import com.contentfilter.feature.accessibility.policy.AccessibilityClock
 import com.contentfilter.feature.accessibility.policy.AccessibilityPolicySnapshotProvider
@@ -83,6 +84,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var lastExplicitSearchNoticeAt: Long = 0L
     private val foregroundDecisionDiagnosticGate = ForegroundDecisionDiagnosticGate()
     private var chromeVisualProbeController: ChromeVisualProbeController? = null
+    private var chromeVisualShieldController: ChromeVisualShieldController? = null
     private var chromeVisualController: ChromeVisualController? = null
 
     override fun onServiceConnected() {
@@ -91,6 +93,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val scope = CoroutineScope(SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
         serviceScope = scope
         chromeVisualProbeController = ChromeVisualProbeController(this, scope)
+        chromeVisualShieldController =
+            ChromeVisualShieldController(this, scope) { active ->
+                if (active) chromeVisualProbeController?.suspendForVisualShield()
+            }
         chromeVisualController = ChromeVisualController(this, scope)
         treeProtectionCoordinator =
             AccessibilityTreeProtectionCoordinator(
@@ -126,12 +132,18 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 protectedSessionActive = ChromePhotosDataPlaneRuntimeAttestation.snapshot().sessionId.isNotBlank(),
             )
         if (AccessibilityEventFilter.isChromeVisualOnly(event.eventType) || protectedChromeVisualOnly) {
-            chromeVisualProbeController?.onAccessibilityEvent(event)
+            chromeVisualShieldController?.onAccessibilityEvent(event)
+            if (chromeVisualShieldController?.ownsLabSession() != true) {
+                chromeVisualProbeController?.onAccessibilityEvent(event)
+            }
             chromeVisualController?.onAccessibilityEvent(event)
             return
         }
         if (!AccessibilityEventFilter.isHandled(event.eventType)) return
-        chromeVisualProbeController?.onAccessibilityEvent(event)
+        chromeVisualShieldController?.onAccessibilityEvent(event)
+        if (chromeVisualShieldController?.ownsLabSession() != true) {
+            chromeVisualProbeController?.onAccessibilityEvent(event)
+        }
         chromeVisualController?.onAccessibilityEvent(event)
         val packageName = eventPackageName ?: return
         val couldContainProtectedSettings = treeProtectionCoordinator?.observePackage(packageName) ?: false
@@ -242,11 +254,14 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        chromeVisualShieldController?.onAccessibilityUnavailable()
         serviceScope?.launch { telemetryReporter.recordServiceState("Accessibility service interrupted.") }
     }
 
     override fun onDestroy() {
         ChromePhotosDataPlaneRuntimeAttestation.markAccessibilityBound(false)
+        chromeVisualShieldController?.close()
+        chromeVisualShieldController = null
         chromeVisualProbeController?.close()
         chromeVisualProbeController = null
         chromeVisualController?.close()

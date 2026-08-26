@@ -65,6 +65,15 @@ internal class ChromeVisualProbeController(
         scope.launch(Dispatchers.Main.immediate) { handleOnMain(signal) }
     }
 
+    fun suspendForVisualShield() {
+        if (!enabled) return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            deactivateOnMain("visual_shield_owned")
+        } else {
+            service.mainExecutor.execute { deactivateOnMain("visual_shield_owned") }
+        }
+    }
+
     override fun close() {
         synchronized(jobLock) {
             activeJob?.cancel()

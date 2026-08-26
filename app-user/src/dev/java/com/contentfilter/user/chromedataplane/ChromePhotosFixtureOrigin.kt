@@ -48,6 +48,7 @@ internal class ChromePhotosFixtureOrigin(
     override fun imageAuthorityReport(): String = imageAuthorityFixture.report()
 
     override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse {
+        ChromeVisualShieldFixture.responseFor(request)?.let { return it }
         imageAuthorityFixture.responseFor(request)?.let { return it }
         val requestTarget = request.target
         val path = requestTarget.substringBefore('?').substringBefore('#')
