@@ -120,20 +120,25 @@ class ChromeExtensionPolicyLabService : Service() {
                 .coerceIn(MinimumLeaseMillis, MaximumLeaseMillis)
         val current = currentRestrictions()
         val merged = Bundle(current)
-        merged.putStringArray(
+        val mutation =
+            ChromeExtensionPolicyContract.mutation(
+                current.get(ChromeExtensionPolicyContract.ExtensionInstallForcelist),
+                extensionId = extensionId,
+                updateUrl = updateUrl,
+            )
+        merged.putString(
             ChromeExtensionPolicyContract.ExtensionInstallForcelist,
-            ChromeExtensionPolicyContract.forceList(
-                current.getStringArray(ChromeExtensionPolicyContract.ExtensionInstallForcelist),
-                extensionId,
-                updateUrl,
-            ),
+            mutation.appliedValue,
         )
         devicePolicyManager.setApplicationRestrictions(admin, ChromeExtensionPolicyContract.ChromePackage, merged)
         val applied = currentRestrictions()
-        check(
-            applied.getStringArray(ChromeExtensionPolicyContract.ExtensionInstallForcelist)
-                ?.any { it == "$extensionId;$updateUrl" } == true,
-        ) { "ExtensionInstallForcelist did not persist" }
+        val appliedValue = applied.get(ChromeExtensionPolicyContract.ExtensionInstallForcelist)
+        check(appliedValue is String) {
+            "ExtensionInstallForcelist type mismatch: ${appliedValue?.javaClass?.name ?: "null"}"
+        }
+        check(ChromeExtensionPolicyContract.entries(appliedValue).any { it == "$extensionId;$updateUrl" }) {
+            "ExtensionInstallForcelist did not persist"
+        }
         devicePolicyManager.setPackagesSuspended(
             admin,
             arrayOf(ChromeExtensionPolicyContract.ChromePackage),
@@ -148,7 +153,8 @@ class ChromeExtensionPolicyLabService : Service() {
         Log.i(
             LogTag,
             "phase=applied extensionId=$extensionId leaseMillis=$leaseMillis " +
-                "bundle=${canonicalBundle(applied)}",
+                "legacy_type_detected=${mutation.legacyTypeDetected} " +
+                "types=${bundleTypes(applied)} bundle=${canonicalBundle(applied)}",
         )
     }
 
@@ -245,6 +251,11 @@ class ChromeExtensionPolicyLabService : Service() {
     private fun canonicalBundle(bundle: Bundle): String =
         bundle.keySet().sorted().joinToString(prefix = "{", postfix = "}") { key ->
             "${jsonString(key)}:${canonicalValue(bundle.get(key))}"
+        }
+
+    private fun bundleTypes(bundle: Bundle): String =
+        bundle.keySet().sorted().joinToString(prefix = "{", postfix = "}") { key ->
+            "${jsonString(key)}:${jsonString(bundle.get(key)?.javaClass?.name ?: "null")}"
         }
 
     private fun canonicalValue(value: Any?): String =

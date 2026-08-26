@@ -3,7 +3,7 @@
   "name": "Glosh Chrome Android Provenance Lab",
   "version": "0.1.0",
   "minimum_chrome_version": "146",
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1nfFZilkpXkU6zAyjh07Ij7g1ecZQscNlBbz0wPFp3zyBbAy9gfOlUy/SfUISl0LxVlO4Szi/uVrVpRYiywSDFmIcFG1JRsGDA2t42nkN4pXH9xpmxY+zjBJUC134USEkDxOhzL6zdvanz5IQvSI0miJNnMOWnaItJBO8NHYfxexpaAigqcXUWdaEIhCSAaMcA1U+X/wXUgeAe3dMDRzgjtQPMKrcjWygVlpD8Y2Yujv0GlsHyBTNH5H+94zzH8UjtaZZaXOWSCFqPY1gxALO9SMr7zkEbYmTzNxyF4aWBu/ox7loIaTqH0Re4rkqHb6iBUigj+Xwg2p5CgA38KZMQIDAQAB",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3rWuLSSsOt2uEzM3djPf6zdercJDfumoQfaBmUNIF7TBeN2yxrrZdTstjlNjcJSHXcZD4ujdbcGIG9D7TJJM8IehRw0Bj8VSsXvWpfck881aRHVM9i9Wx1MLL2Rm10nzSJgJdydDzjWk/AHYx9oKHsmQPYwhCTR+lP5bTHVEFF6PnjB9rWhQ4XwVe43NEOd8rco3R9k9rnIWkTuAd/rw6zawFi5PgcI0cHdwGUghVDd+eImQ2l0/a3mH6JWZbjB6edj6p9B3wrFvsoDxpEBVYjmd6pKCvNOlbnRXG/EPRdGYjK9TrX7F6ZLVHdujuhpFej/UZFQpuLqx7xri8FxnmQIDAQAB",
   "background": {
     "service_worker": "service-worker.js",
     "type": "module"

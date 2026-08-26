@@ -3,15 +3,17 @@ import { appendFileSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 
 const host = "127.0.0.1";
-const port = 8765;
+const port = Number(process.env.GLOSH_EXTENSION_BRIDGE_PORT ?? "8765");
 const extensionId = process.env.GLOSH_EXTENSION_ID;
 const nonce = process.env.GLOSH_EXTENSION_SESSION_NONCE;
 const artifactDirectory = resolve(process.env.GLOSH_EXTENSION_ARTIFACT_DIR ?? ".");
 const eventLog = resolve(process.env.GLOSH_EXTENSION_EVENT_LOG ?? "./extension-events.jsonl");
+const accessLog = resolve(process.env.GLOSH_EXTENSION_ACCESS_LOG ?? "./extension-access.jsonl");
 const expectedOrigin = `chrome-extension://${extensionId}`;
 
 if (!/^[a-p]{32}$/.test(extensionId ?? "")) throw new Error("GLOSH_EXTENSION_ID is required");
 if ((nonce ?? "").length < 32) throw new Error("GLOSH_EXTENSION_SESSION_NONCE must have at least 32 characters");
+if (!Number.isInteger(port) || port < 1024 || port > 65_535) throw new Error("invalid bridge port");
 
 function send(response, status, contentType, body) {
   response.writeHead(status, { "Content-Type": contentType, "Cache-Control": "no-store" });
@@ -35,6 +37,18 @@ function extensionOrigin(request) {
 
 const server = createServer((request, response) => {
   const url = new URL(request.url, `http://${host}:${port}`);
+  response.once("finish", () => {
+    const record = {
+      timestamp: new Date().toISOString(),
+      method: request.method ?? null,
+      path: url.pathname,
+      userAgent: request.headers["user-agent"] ?? null,
+      remoteAddress: request.socket.remoteAddress ?? null,
+      status: response.statusCode,
+    };
+    appendFileSync(accessLog, `${JSON.stringify(record)}\n`, { encoding: "utf8", mode: 0o600 });
+    process.stdout.write(`access=${JSON.stringify(record)}\n`);
+  });
   if (request.method === "GET" && url.pathname === "/health") return send(response, 200, "text/plain", "ready\n");
   if (request.method === "GET" && url.pathname === "/update.xml") return serveFile(response, "update.xml", "application/xml");
   if (request.method === "GET" && url.pathname === "/extension.crx") {
@@ -72,7 +86,9 @@ const server = createServer((request, response) => {
 });
 
 server.listen(port, host, () => {
-  process.stdout.write(`bridge=ready host=${host} port=${port} extensionId=${extensionId} origin=${expectedOrigin}\n`);
+  process.stdout.write(
+    `bridge=ready host=${host} port=${port} extensionId=${extensionId} origin=${expectedOrigin} accessLog=${accessLog}\n`,
+  );
 });
 
 for (const signal of ["SIGINT", "SIGTERM"]) {

@@ -26,7 +26,7 @@ const checks = {
   isolatedWorld: content?.world === "ISOLATED",
   scopedFixtureHost: content?.matches?.length === 1 && content.matches[0] === "https://glosh-photos.test/*",
   noWindowMessages: !contentScript.includes("postMessage") && !contentScript.includes('addEventListener("message"'),
-  expectedId: extensionId === "hdjdhkkibdhlmmoemopmbgiklklkpofp",
+  expectedId: extensionId === "ilkhmclganbfbpefgbibpgjlfjgffpdf",
 };
 const failures = Object.entries(checks).filter(([, passed]) => !passed).map(([name]) => name);
 if (failures.length) throw new Error(`source checks failed: ${failures.join(",")}`);
