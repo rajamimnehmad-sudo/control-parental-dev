@@ -13,8 +13,8 @@ val escapedBrokerBaseUrl = brokerBaseUrl
     .replace("\r", "")
     .replace("\n", "")
 
-// DEV-ONLY signing identity. It is intentionally repository-stable so Bubble builds from
-// GitHub Actions can update one another on physical devices. Never reuse it for production.
+// DEV-ONLY signing identity. It is intentionally repository-stable so physical DEV builds from
+// GitHub Actions can update one another. Never reuse it for production.
 val stableDevStoreSource = rootProject.file("dev-signing/glosh-remote-dev.p12.b64")
 val stableDevStoreFile = layout.buildDirectory
     .file("stable-dev-signing/glosh-remote-dev.p12")
@@ -35,8 +35,8 @@ android {
         applicationId = "com.glosh.remote.spike"
         minSdk = 30
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.1.0-dev17"
+        versionCode = 18
+        versionName = "0.1.0-dev18"
 
         buildConfigField("String", "BROKER_BASE_URL", "\"$escapedBrokerBaseUrl\"")
 

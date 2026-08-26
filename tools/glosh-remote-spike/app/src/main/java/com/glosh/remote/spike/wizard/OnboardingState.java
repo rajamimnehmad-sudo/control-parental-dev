@@ -24,6 +24,12 @@ public final class OnboardingState {
         return BrokerAction.DISCOVER;
     }
 
+    public synchronized BrokerAction requestDirectSupport() {
+        require(Step.HOME, Step.UNAVAILABLE);
+        step = Step.REQUESTING_SUPPORT;
+        return BrokerAction.REQUEST;
+    }
+
     public synchronized void supportAvailable() {
         require(Step.CHECKING_SUPPORT);
         step = Step.GUIDE_PERMISSION;

@@ -27,6 +27,17 @@ public class OnboardingStateTest {
     }
 
     @Test
+    public void pinOnlyFlowRequestsBrokerImmediately() {
+        OnboardingState state = new OnboardingState();
+        assertEquals(OnboardingState.BrokerAction.REQUEST, state.requestDirectSupport());
+        assertEquals(OnboardingState.Step.REQUESTING_SUPPORT, state.step());
+        state.sessionReady();
+        assertEquals(OnboardingState.Step.WIRELESS_DEBUGGING, state.step());
+        state.sessionStarted();
+        assertEquals(OnboardingState.Step.SESSION_ACTIVE, state.step());
+    }
+
+    @Test
     public void invalidTransitionFailsClosed() {
         OnboardingState state = new OnboardingState();
         try {
@@ -38,11 +49,17 @@ public class OnboardingStateTest {
     }
 
     @Test
-    public void unavailableCanRetry() {
-        OnboardingState state = new OnboardingState();
-        state.requestSupport();
-        state.unavailable();
-        assertEquals(OnboardingState.BrokerAction.DISCOVER, state.requestSupport());
-        assertEquals(OnboardingState.Step.CHECKING_SUPPORT, state.step());
+    public void unavailableCanRetryEitherRoute() {
+        OnboardingState guided = new OnboardingState();
+        guided.requestSupport();
+        guided.unavailable();
+        assertEquals(OnboardingState.BrokerAction.DISCOVER, guided.requestSupport());
+        assertEquals(OnboardingState.Step.CHECKING_SUPPORT, guided.step());
+
+        OnboardingState direct = new OnboardingState();
+        direct.requestDirectSupport();
+        direct.unavailable();
+        assertEquals(OnboardingState.BrokerAction.REQUEST, direct.requestDirectSupport());
+        assertEquals(OnboardingState.Step.REQUESTING_SUPPORT, direct.step());
     }
 }

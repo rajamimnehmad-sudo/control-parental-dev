@@ -12,7 +12,7 @@ import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.WizardPersistence;
 import com.glosh.remote.spike.wizard.WizardSnapshot;
 
-/** Broker/session state only. The Samsung visual guide owns its own UI progress. */
+/** Broker/session state. The current product entry point requests a session directly. */
 public final class SupportSessionCoordinator {
     public interface Listener {
         void onStateChanged();
@@ -147,6 +147,23 @@ public final class SupportSessionCoordinator {
         });
     }
 
+    /** PIN-only route: immediately asks the active Mac operator for a secure session. */
+    public void requestDirectSession() {
+        synchronized (this) {
+            if (onboarding.step() != OnboardingState.Step.HOME
+                    && onboarding.step() != OnboardingState.Step.UNAVAILABLE) {
+                return;
+            }
+            onboarding.requestDirectSupport();
+            developerPhase = DeveloperGuidePhase.CONFIRMATION;
+            developerConfirmed = true;
+            wirelessHelp = false;
+            persist();
+        }
+        notifyChanged();
+        requestBrokerSession();
+    }
+
     /** Starts broker rendezvous once the customer confirms Developer mode is active. */
     public void confirmDeveloperOptions() {
         synchronized (this) {
@@ -159,6 +176,10 @@ public final class SupportSessionCoordinator {
             persist();
         }
         notifyChanged();
+        requestBrokerSession();
+    }
+
+    private void requestBrokerSession() {
         broker.request(
                 new SupportSessionBrokerClient.DeviceMetadata(
                         profile.manufacturer(),

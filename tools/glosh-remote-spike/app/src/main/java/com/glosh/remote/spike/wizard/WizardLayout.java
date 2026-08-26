@@ -185,6 +185,12 @@ public final class WizardLayout {
         }
     }
 
+    public void focusPairingInput() {
+        if (pairingInput != null) {
+            pairingInput.focusKeyboard();
+        }
+    }
+
     public void clearVisual() {
         if (guideAnimation != null) {
             guideAnimation.onHostPause();
@@ -261,13 +267,21 @@ public final class WizardLayout {
         button.setVisibility(View.GONE);
     }
 
-    private TextView text(String value, float size, int color, int style) {
+    private TextView text(String value, int sp, int color, int style) {
         TextView view = new TextView(activity);
         view.setText(value);
-        view.setTextSize(size);
+        view.setTextSize(sp);
         view.setTextColor(color);
         view.setTypeface(Typeface.DEFAULT, style);
         return view;
+    }
+
+    private void add(LinearLayout parent, View child, int top, int bottom) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.setMargins(0, dp(top), 0, dp(bottom));
+        parent.addView(child, params);
     }
 
     private GradientDrawable rounded(int color, int radiusDp) {
@@ -275,14 +289,6 @@ public final class WizardLayout {
         drawable.setColor(color);
         drawable.setCornerRadius(dp(radiusDp));
         return drawable;
-    }
-
-    private void add(LinearLayout parent, View child, int topDp, int bottomDp) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.setMargins(0, dp(topDp), 0, dp(bottomDp));
-        parent.addView(child, params);
     }
 
     private int dp(int value) {
