@@ -220,7 +220,7 @@ public final class GuideNotification {
                 flags);
         Icon icon = Icon.createWithResource(context, R.drawable.ic_glosh_bubble);
         return new Notification.BubbleMetadata.Builder(bubbleIntent, icon)
-                .setDesiredHeight(430)
+                .setDesiredHeight(250)
                 .setAutoExpandBubble(autoExpand)
                 .setSuppressNotification(false)
                 .build();
