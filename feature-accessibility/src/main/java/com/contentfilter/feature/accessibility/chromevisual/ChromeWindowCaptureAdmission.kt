@@ -8,7 +8,7 @@ import kotlinx.coroutines.ensureActive
 
 /** Serializes the platform screenshot interval independently for each accessibility window. */
 internal class ChromeWindowCaptureAdmission(
-    private val nowMillis: () -> Long = SystemClock::elapsedRealtime,
+    private val nowMillis: () -> Long = SystemClock::uptimeMillis,
     private val awaitMillis: suspend (Long) -> Unit = { delay(it) },
     private val onPlatformRequest: (ChromeWindowCaptureAdmissionEvent) -> Unit = ::logPlatformRequest,
 ) {
@@ -104,7 +104,7 @@ internal class ChromeWindowCaptureAdmission(
             Log.i(
                 LogTag,
                 "phase=platform_request windowId=${event.windowId} " +
-                    "requestedAtElapsedMs=${event.requestedAtMillis} intervalMs=${interval ?: "first"}",
+                    "requestedAtUptimeMs=${event.requestedAtMillis} intervalMs=${interval ?: "first"}",
             )
         }
     }
