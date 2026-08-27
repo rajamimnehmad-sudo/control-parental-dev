@@ -70,4 +70,5 @@ internal data class ChromeVisualShieldRenderProbeObservation(
     val filterProbability: Float?,
     val inferenceCount: Long,
     val regionalEvidence: ChromeVisualShieldRegionalAnalysisEvidence?,
+    val normalizedEvidence: ChromeVisualShieldNormalizedAnalysisEvidence?,
 )

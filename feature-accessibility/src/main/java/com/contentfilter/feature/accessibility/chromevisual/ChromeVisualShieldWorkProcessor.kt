@@ -11,6 +11,7 @@ internal data class ChromeVisualShieldDecisionDelivery(
     val sentinelMatches: Boolean,
     val cropEvidence: ChromeVisualShieldCropEvidence?,
     val regionalEvidence: ChromeVisualShieldRegionalAnalysisEvidence?,
+    val normalizedEvidence: ChromeVisualShieldNormalizedAnalysisEvidence?,
 )
 
 /** Owns one capture/crop/inference cycle; the coordinator serializes these cycles. */
@@ -81,6 +82,7 @@ internal class ChromeVisualShieldWorkProcessor(
                     identity = identity,
                     canContinue = { identityGate.isCurrentProcessing(identity) },
                     includeCanonicalRegions = work.mode is ChromeVisualShieldWorkMode.RenderProbe,
+                    includeNormalizedProbe = work.mode is ChromeVisualShieldWorkMode.RenderProbe,
                 ).also { currentCoroutineContext().ensureActive() }
             } catch (cancelled: CancellationException) {
                 metrics.onInferenceCancelled()
@@ -96,6 +98,7 @@ internal class ChromeVisualShieldWorkProcessor(
                 sentinelMatches = matches,
                 cropEvidence = cropEvidence,
                 regionalEvidence = analysis.regionalEvidence,
+                normalizedEvidence = analysis.normalizedEvidence,
             ),
         )
     }

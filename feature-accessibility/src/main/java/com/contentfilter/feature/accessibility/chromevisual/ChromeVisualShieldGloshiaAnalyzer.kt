@@ -75,9 +75,20 @@ internal data class ChromeVisualShieldRegionalAnalysisEvidence(
     val fullImageProbability: Float?,
 )
 
+internal data class ChromeVisualShieldNormalizedAnalysisEvidence(
+    val action: GloshiaVisualAction,
+    val reason: String,
+    val filterProbability: Float?,
+    val basis: GloshiaVisualDecisionBasis,
+    val preparedImageCount: Int,
+    val regionalImageCount: Int,
+    val modelInferenceCount: Int,
+)
+
 internal data class ChromeVisualShieldGloshiaAnalysis(
     val decision: ChromeVisualShieldGloshiaDecision,
     val regionalEvidence: ChromeVisualShieldRegionalAnalysisEvidence?,
+    val normalizedEvidence: ChromeVisualShieldNormalizedAnalysisEvidence?,
 )
 
 /**
@@ -96,6 +107,7 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
         identity: ChromeVisualShieldIdentity,
         canContinue: () -> Boolean,
         includeCanonicalRegions: Boolean = false,
+        includeNormalizedProbe: Boolean = false,
     ): ChromeVisualShieldGloshiaAnalysis {
         if (!canContinue()) {
             return ChromeVisualShieldGloshiaAnalysis(
@@ -103,6 +115,7 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
                     identity,
                     GloshiaVisualPolicyContract.AnalysisExpiredReason,
                 ),
+                null,
                 null,
             )
         }
@@ -114,6 +127,7 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
                         GloshiaVisualPolicyContract.DecodeFailedReason,
                     ),
                     null,
+                    null,
                 )
         views.use { ownedViews ->
             val currentAnalyzer =
@@ -123,6 +137,7 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
                             identity,
                             GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
                         ),
+                        null,
                         null,
                     )
             val probabilities = mutableListOf<Float>()
@@ -154,7 +169,13 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
                         fullImageProbability = result.fullImageProbability,
                     )
                 }
-            return ChromeVisualShieldGloshiaAnalysis(decision, evidence)
+            val normalizedEvidence =
+                if (includeNormalizedProbe) {
+                    analyzeNormalized(bitmap, identity, currentAnalyzer, canContinue)
+                } else {
+                    null
+                }
+            return ChromeVisualShieldGloshiaAnalysis(decision, evidence, normalizedEvidence)
         }
     }
 
@@ -172,4 +193,42 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
                     LifecycleGloshiaVisualAnalyzer(created).also { analyzer = it }
                 }
         }
+
+    private fun analyzeNormalized(
+        bitmap: Bitmap,
+        identity: ChromeVisualShieldIdentity,
+        currentAnalyzer: GloshiaVisualAnalyzer,
+        canContinue: () -> Boolean,
+    ): ChromeVisualShieldNormalizedAnalysisEvidence {
+        val normalized = ChromeVisualShieldNormalizedRaster.prepare(bitmap)
+        val modelResults = mutableListOf<GloshiaVisualAnalysisResult>()
+        val policyDecision =
+            if (normalized == null) {
+                GloshiaPreparedRasterPolicy.decide(
+                    candidateId = identity.regionId,
+                    preparedImages = emptyList(),
+                    analyzer = currentAnalyzer,
+                    canContinue = canContinue,
+                )
+            } else {
+                normalized.use { owned ->
+                    ChromeVisualShieldNormalizedRasterPolicyProbe.decide(
+                        candidateId = identity.regionId,
+                        preparedImage = owned.preparedImage,
+                        analyzer = currentAnalyzer,
+                        canContinue = canContinue,
+                        onModelResult = modelResults::add,
+                    )
+                }
+            }
+        return ChromeVisualShieldNormalizedAnalysisEvidence(
+            action = policyDecision.action,
+            reason = policyDecision.reason,
+            filterProbability = policyDecision.filterProbability,
+            basis = policyDecision.basis,
+            preparedImageCount = policyDecision.preparedImageCount,
+            regionalImageCount = policyDecision.regionalImageCount,
+            modelInferenceCount = modelResults.size,
+        )
+    }
 }
