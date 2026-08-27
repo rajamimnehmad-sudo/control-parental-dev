@@ -13,12 +13,14 @@ import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.session.PairingFailureKind;
 import com.glosh.remote.spike.session.PairingUiState;
+import com.glosh.remote.spike.session.PinOnlyBootstrapPolicy;
 import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.OemFamily;
 import com.glosh.remote.spike.wizard.OnboardingState;
+import com.glosh.remote.spike.wizard.SettingsNavigator;
 import com.glosh.remote.spike.wizard.WizardLayout;
 
-/** PIN-only Samsung entry point: six digits in, secure ADB/relay connection out. */
+/** PIN-only Samsung entry point: six digits in, recoverable local ADB + secure relay out. */
 public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
     public static final String ACTION_GUIDE_OPEN = "com.glosh.remote.spike.GUIDE_OPEN";
     public static final String ACTION_GUIDE_BACK = "com.glosh.remote.spike.GUIDE_BACK";
@@ -29,6 +31,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private static final long BROKER_RETRY_MS = 2_000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final SettingsNavigator settingsNavigator = new SettingsNavigator();
     private final Runnable refreshState = new Runnable() {
         @Override
         public void run() {
@@ -42,9 +45,11 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     private WizardLayout ui;
     private String pendingPairingCode;
     private boolean pairingCodeDispatched;
-    private boolean serviceStartIssued;
+    private boolean bootstrapStartIssued;
+    private boolean descriptorAttached;
     private boolean directDescriptorSeeded;
-    private long serviceStartAtMs;
+    private boolean wirelessSettingsOpened;
+    private long bootstrapStartAtMs;
     private long nextBrokerRetryAtMs;
     private String lastRenderKey;
 
@@ -117,7 +122,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         coordinator.reset();
         coordinator.seedDebugDescriptor(data.toString());
         directDescriptorSeeded = true;
-        serviceStartIssued = false;
+        descriptorAttached = false;
         pairingCodeDispatched = false;
         intent.setData(null);
     }
@@ -127,65 +132,86 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         PairingUiState pairing = RemotePairingService.getPairingUiState();
         long now = SystemClock.elapsedRealtime();
 
-        if (session == SessionState.CONNECTED || session == SessionState.RECONNECTING) {
+        if (session == SessionState.CONNECTED
+                || session == SessionState.RECONNECTING
+                || session == SessionState.ADB_READY) {
             pendingPairingCode = null;
             pairingCodeDispatched = false;
-            serviceStartIssued = false;
-            return;
         }
         if (pairing == PairingUiState.CODE_FAILED && !pairingCodeDispatched) {
             pendingPairingCode = null;
         }
 
+        if (session == SessionState.IDLE && !bootstrapStartIssued) {
+            startAdbBootstrap();
+            bootstrapStartIssued = true;
+            bootstrapStartAtMs = now;
+        } else if (session != SessionState.IDLE) {
+            bootstrapStartIssued = true;
+        }
+
         OnboardingState.Step step = coordinator.step();
-        if (session == SessionState.IDLE) {
-            if (step == OnboardingState.Step.HOME || step == OnboardingState.Step.UNAVAILABLE) {
-                directDescriptorSeeded = false;
-                if (now >= nextBrokerRetryAtMs) {
-                    nextBrokerRetryAtMs = now + BROKER_RETRY_MS;
-                    coordinator.requestDirectSession();
-                }
-                return;
+        if (step == OnboardingState.Step.HOME || step == OnboardingState.Step.UNAVAILABLE) {
+            directDescriptorSeeded = false;
+            descriptorAttached = false;
+            if (now >= nextBrokerRetryAtMs) {
+                nextBrokerRetryAtMs = now + BROKER_RETRY_MS;
+                coordinator.requestDirectSession();
             }
-            if (step == OnboardingState.Step.WIRELESS_DEBUGGING && !serviceStartIssued) {
-                if (startSupportSession()) {
-                    serviceStartIssued = true;
-                    serviceStartAtMs = now;
-                }
-                return;
-            }
-            if (step == OnboardingState.Step.SESSION_ACTIVE
-                    && serviceStartIssued
-                    && now - serviceStartAtMs >= SERVICE_START_GRACE_MS) {
-                serviceStartIssued = false;
-                pairingCodeDispatched = false;
-                directDescriptorSeeded = false;
-                coordinator.reset();
-                nextBrokerRetryAtMs = 0L;
-            }
+        }
+
+        session = RemotePairingService.getSessionState();
+        pairing = RemotePairingService.getPairingUiState();
+        step = coordinator.step();
+
+        if (step == OnboardingState.Step.WIRELESS_DEBUGGING
+                && PinOnlyBootstrapPolicy.canAttachDescriptor(session, descriptorAttached)) {
+            attachSupportDescriptor();
+        }
+
+        if (session == SessionState.PREPARING
+                && PairingPin.isValid(pendingPairingCode)
+                && !pairingCodeDispatched) {
+            dispatchPairingCode(pendingPairingCode);
+        }
+
+        if (PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
+                session,
+                pairing,
+                wirelessSettingsOpened)) {
+            wirelessSettingsOpened = true;
+            settingsNavigator.openWirelessDebugging(this);
             return;
         }
 
-        if (session == SessionState.PREPARING) {
-            serviceStartIssued = true;
-            if (PairingPin.isValid(pendingPairingCode) && !pairingCodeDispatched) {
-                dispatchPairingCode(pendingPairingCode);
-            }
+        if (session == SessionState.IDLE
+                && bootstrapStartIssued
+                && now - bootstrapStartAtMs >= SERVICE_START_GRACE_MS
+                && coordinator.step() == OnboardingState.Step.SESSION_ACTIVE) {
+            bootstrapStartIssued = false;
+            descriptorAttached = false;
+            pairingCodeDispatched = false;
+            directDescriptorSeeded = false;
+            wirelessSettingsOpened = false;
+            coordinator.reset();
+            nextBrokerRetryAtMs = 0L;
         }
     }
 
-    private boolean startSupportSession() {
-        if (RemotePairingService.getSessionState() != SessionState.IDLE) {
-            return true;
-        }
+    private void startAdbBootstrap() {
+        startForegroundService(new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_START));
+    }
+
+    private void attachSupportDescriptor() {
         String descriptor = coordinator.markSessionStarted();
         if (descriptor == null) {
-            return false;
+            return;
         }
-        startForegroundService(new Intent(this, RemotePairingService.class)
-                .setAction(RemotePairingService.ACTION_START)
+        descriptorAttached = true;
+        startService(new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_ATTACH_DESCRIPTOR)
                 .putExtra(RemotePairingService.EXTRA_JOIN_URI, descriptor));
-        return true;
     }
 
     private void submitPairingCode(String code) {
@@ -223,6 +249,10 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             renderMode("reconnecting", this::renderReconnecting);
             return;
         }
+        if (session == SessionState.ADB_READY) {
+            renderMode("adb-ready", this::renderAdbReady);
+            return;
+        }
         if (pairing == PairingUiState.CONNECTING) {
             renderMode("connecting", () -> renderConnecting(true));
             return;
@@ -236,7 +266,31 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             renderMode("retry-" + failure.name(), () -> renderCodeInput(failure));
             return;
         }
-        renderMode("input", () -> renderCodeInput(PairingFailureKind.NONE));
+        if (PinOnlyBootstrapPolicy.shouldShowCodeInput(pairing)) {
+            renderMode("input", () -> renderCodeInput(PairingFailureKind.NONE));
+            return;
+        }
+        if (pairing == PairingUiState.CHECKING_SAVED_IDENTITY) {
+            renderMode(
+                    "checking-saved",
+                    () -> renderPreparing(
+                            "Preparando ADB",
+                            "Glosh está comprobando si este teléfono ya quedó vinculado. No hagas nada."));
+            return;
+        }
+        if (pairing == PairingUiState.DISCOVERING_ENDPOINT) {
+            renderMode(
+                    "discovering",
+                    () -> renderPreparing(
+                            "Abrí la vinculación",
+                            "Glosh abrió Depuración inalámbrica. Tocá “Vincular dispositivo con código” y luego escribí sólo los 6 números."));
+            return;
+        }
+        renderMode(
+                "preparing",
+                () -> renderPreparing(
+                        "Preparando conexión",
+                        "Glosh está preparando ADB y la sesión segura automáticamente."));
     }
 
     private void renderMode(String key, Runnable renderer) {
@@ -271,7 +325,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             case NONE:
             default:
                 title = "Ingresá el código";
-                text = "Escribí los 6 números que muestra “Vincular dispositivo con código”. Al completar el sexto número, Glosh se conecta solo.";
+                text = "Escribí los 6 números que muestra “Vincular dispositivo con código”. Al completar el sexto número, Glosh vincula ADB y continúa solo.";
                 break;
         }
         ui.showScreen("", title, text, "");
@@ -280,13 +334,29 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         ui.focusPairingInput();
     }
 
+    private void renderPreparing(String title, String text) {
+        ui.showScreen("", title, text, "");
+        ui.clearVisual();
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
+    }
+
     private void renderConnecting(boolean activePairing) {
         ui.showScreen(
                 "",
                 activePairing ? "Conectando…" : "Código recibido",
                 activePairing
-                        ? "Glosh está completando ADB y abriendo la conexión segura con la Mac."
-                        : "No hagas nada. Glosh está preparando la conexión y usará el código automáticamente.",
+                        ? "Glosh está completando ADB. La sesión remota se engancha automáticamente cuando esté disponible."
+                        : "No hagas nada. Glosh está usando el código y preparando ADB automáticamente.",
+                "");
+        ui.clearVisual();
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
+    }
+
+    private void renderAdbReady() {
+        ui.showScreen(
+                "",
+                "Vinculación lista",
+                "ADB ya quedó vinculado. Glosh está esperando o abriendo la conexión segura automáticamente. No generes otro código.",
                 "");
         ui.clearVisual();
         ui.showTertiary("CANCELAR", view -> cancelConnection());
@@ -316,9 +386,11 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         coordinator.reset();
         pendingPairingCode = null;
         pairingCodeDispatched = false;
-        serviceStartIssued = false;
+        bootstrapStartIssued = false;
+        descriptorAttached = false;
         directDescriptorSeeded = false;
-        serviceStartAtMs = 0L;
+        wirelessSettingsOpened = false;
+        bootstrapStartAtMs = 0L;
         nextBrokerRetryAtMs = 0L;
         lastRenderKey = null;
         driveConnection();

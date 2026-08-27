@@ -3,6 +3,7 @@ package com.glosh.remote.spike.session;
 public enum SessionState {
     IDLE,
     PREPARING,
+    ADB_READY,
     CONNECTED,
     RECONNECTING;
 

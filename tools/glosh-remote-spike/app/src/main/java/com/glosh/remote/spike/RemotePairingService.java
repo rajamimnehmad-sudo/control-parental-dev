@@ -38,6 +38,7 @@ import io.github.muntashirakon.adb.android.AdbMdns;
 /** Foreground owner of Wireless ADB bootstrap and the recoverable secure support session. */
 public final class RemotePairingService extends Service {
     public static final String ACTION_START = "com.glosh.remote.spike.START";
+    public static final String ACTION_ATTACH_DESCRIPTOR = "com.glosh.remote.spike.ATTACH_DESCRIPTOR";
     public static final String ACTION_REPLY = "com.glosh.remote.spike.REPLY";
     public static final String ACTION_SUBMIT_CODE = "com.glosh.remote.spike.SUBMIT_CODE";
     public static final String ACTION_STOP = "com.glosh.remote.spike.STOP";
@@ -67,9 +68,9 @@ public final class RemotePairingService extends Service {
     private NotificationManager notifications;
     private AdbMdns pairingDiscovery;
     private WifiManager.MulticastLock multicastLock;
-    private LocalAdbSession localAdbSession;
-    private RelaySessionSupervisor relaySession;
-    private String joinUri;
+    private volatile LocalAdbSession localAdbSession;
+    private volatile RelaySessionSupervisor relaySession;
+    private volatile String joinUri;
     private volatile String pendingPairingCode;
     private volatile boolean reusedAdbIdentity;
 
@@ -123,7 +124,7 @@ public final class RemotePairingService extends Service {
                         initialStep,
                         "Glosh · Paso " + initialStep + " de " + TOTAL_STEPS,
                         initialStep == 6
-                                ? "Preparando ADB. Si hace falta, abrí Vincular dispositivo con código."
+                                ? "Preparando ADB local. Glosh abrirá Depuración inalámbrica si hace falta."
                                 : "Glosh está completando la conexión segura."));
 
         if (ACTION_STOP.equals(action)) {
@@ -137,6 +138,12 @@ public final class RemotePairingService extends Service {
         if (ACTION_SUBMIT_CODE.equals(action)) {
             handlePairingCode(intent.getStringExtra(EXTRA_PAIRING_CODE));
             intent.removeExtra(EXTRA_PAIRING_CODE);
+            return START_NOT_STICKY;
+        }
+        if (ACTION_ATTACH_DESCRIPTOR.equals(action)) {
+            String rawJoin = intent.getStringExtra(EXTRA_JOIN_URI);
+            intent.removeExtra(EXTRA_JOIN_URI);
+            handleSupportDescriptor(rawJoin);
             return START_NOT_STICKY;
         }
         if (ACTION_START.equals(action)) {
@@ -178,11 +185,9 @@ public final class RemotePairingService extends Service {
 
         final AdbConnectionManager manager;
         try {
-            JoinDescriptor check = JoinDescriptor.parse(rawJoin);
-            check.destroy();
+            joinUri = validateOptionalDescriptor(rawJoin);
             sessionState = SessionState.PREPARING;
-            pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
-            joinUri = rawJoin;
+            pairingUiState = PairingUiState.CHECKING_SAVED_IDENTITY;
             manager = AdbConnectionManager.getInstance(getApplicationContext());
         } catch (Throwable error) {
             finishWithError("La sesión de soporte no es válida. Intentá nuevamente.");
@@ -192,16 +197,57 @@ public final class RemotePairingService extends Service {
         updateForeground(
                 6,
                 "Preparando ADB",
-                "Glosh está buscando una vinculación guardada. Si no existe, usará el código nuevo automáticamente.");
+                "Glosh está comprobando si este teléfono ya quedó vinculado.");
         executor.execute(() -> reuseIdentityOrStartPairing(manager));
+    }
+
+    private String validateOptionalDescriptor(String rawJoin) {
+        String clean = rawJoin == null ? "" : rawJoin.trim();
+        if (clean.isEmpty()) {
+            return null;
+        }
+        JoinDescriptor check = JoinDescriptor.parse(clean);
+        check.destroy();
+        return clean;
+    }
+
+    private void handleSupportDescriptor(String rawJoin) {
+        final String validated;
+        try {
+            validated = validateOptionalDescriptor(rawJoin);
+            if (validated == null) {
+                throw new IllegalArgumentException("Missing support descriptor");
+            }
+        } catch (Throwable error) {
+            finishWithError("La sesión de soporte no es válida. Intentá nuevamente.");
+            return;
+        }
+        if (ending.get()) {
+            return;
+        }
+        if (sessionState == SessionState.IDLE) {
+            begin(validated);
+            return;
+        }
+        joinUri = validated;
+        LocalAdbSession local = localAdbSession;
+        if (local != null && local.isConnected()) {
+            sessionState = SessionState.PREPARING;
+            pairingUiState = PairingUiState.CONNECTING;
+            startRelayRuntime(local);
+        } else {
+            updateForeground(
+                    7,
+                    "Sesión segura lista",
+                    "Glosh completará primero ADB y después abrirá la sesión automáticamente.");
+        }
     }
 
     private void reuseIdentityOrStartPairing(AdbConnectionManager manager) {
         try {
             if (manager.ensureConnected(this, REUSE_IDENTITY_TIMEOUT_MS)) {
                 reusedAdbIdentity = true;
-                pairingUiState = PairingUiState.CONNECTING;
-                startConnectedRuntime(manager);
+                startLocalRuntime(manager);
                 return;
             }
         } catch (Throwable expectedWhenNotPaired) {
@@ -218,6 +264,14 @@ public final class RemotePairingService extends Service {
 
     private void startPairingDiscovery() {
         stopPairingDiscovery();
+        if (ending.get()) {
+            return;
+        }
+        pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
+        updateForeground(
+                6,
+                "Abrí Vincular dispositivo con código",
+                "Glosh está esperando la vinculación local de Android.");
         acquireMulticastLock();
         pairingDiscovery = new AdbMdns(
                 this,
@@ -259,7 +313,7 @@ public final class RemotePairingService extends Service {
         }
         notifyCodeEntry(
                 "Glosh · Paso 7 de " + TOTAL_STEPS,
-                "Mirá los 6 números que muestra Android y escribilos acá. No hace falta volver a Glosh.",
+                "Mirá los 6 números que muestra Android y escribilos en Glosh.",
                 PairingUiState.WAITING_FOR_CODE);
     }
 
@@ -319,21 +373,20 @@ public final class RemotePairingService extends Service {
         }
         pairingFailureKind = PairingFailureKind.NONE;
         PairingEndpointTracker.Endpoint endpoint = pairingEndpoints.current();
-        if (sessionState == SessionState.PREPARING && joinUri != null && endpoint == null) {
+        if (sessionState == SessionState.PREPARING && endpoint == null) {
             pendingPairingCode = code;
             pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
             updateForeground(
                     7,
                     "Código recibido",
-                    "Esperando la vinculación local de Android para continuar automáticamente…");
+                    "Esperando la vinculación local de Android para usar el código automáticamente…");
             return;
         }
         if (!PairingAuthorityPolicy.canSubmit(
                 sessionState,
                 pairingUiState,
                 pairingGuard.isActive(),
-                endpoint != null,
-                joinUri != null)
+                endpoint != null)
                 || !pairingGuard.tryStart()) {
             return;
         }
@@ -384,16 +437,16 @@ public final class RemotePairingService extends Service {
             if (!manager.ensureConnected(this, CONNECT_TIMEOUT_MS)) {
                 throw new IllegalStateException("No se pudo abrir el canal TLS local de ADB.");
             }
-            startConnectedRuntime(manager);
+            startLocalRuntime(manager);
         } catch (Throwable error) {
-            Log.w(TAG, "ADB paired but local/support connection failed", error);
+            Log.w(TAG, "ADB paired but local connection failed", error);
             if (!ending.get()) {
-                finishWithError("ADB se vinculó, pero no pudimos abrir la sesión. Intentá nuevamente.");
+                finishWithError("ADB se vinculó, pero no pudimos abrir la conexión local. Intentá nuevamente.");
             }
         }
     }
 
-    private void startConnectedRuntime(AdbConnectionManager manager) throws Exception {
+    private void startLocalRuntime(AdbConnectionManager manager) throws Exception {
         stopPairingDiscovery();
         pairingEndpoints.clear();
         LocalAdbSession local = new LocalAdbSession(this, manager);
@@ -403,7 +456,9 @@ public final class RemotePairingService extends Service {
                 if (ending.get()) {
                     return;
                 }
-                if (sessionState == SessionState.CONNECTED) {
+                if (sessionState == SessionState.CONNECTED
+                        || sessionState == SessionState.ADB_READY
+                        || sessionState == SessionState.PREPARING) {
                     sessionState = SessionState.RECONNECTING;
                     pairingUiState = PairingUiState.INACTIVE;
                 }
@@ -416,10 +471,29 @@ public final class RemotePairingService extends Service {
                     return;
                 }
                 RelaySessionSupervisor relay = relaySession;
-                if (relay != null && relay.isAuthenticated()) {
-                    sessionState = SessionState.CONNECTED;
+                if (relay != null) {
+                    if (relay.isAuthenticated()) {
+                        sessionState = SessionState.CONNECTED;
+                        pairingUiState = PairingUiState.INACTIVE;
+                        updateForeground(7, "Conectado con soporte", "La sesión temporal y segura ya está activa.");
+                    } else {
+                        sessionState = SessionState.RECONNECTING;
+                        pairingUiState = PairingUiState.INACTIVE;
+                    }
+                    return;
+                }
+                LocalAdbSession currentLocal = localAdbSession;
+                if (joinUri != null && currentLocal != null && currentLocal.isConnected()) {
+                    sessionState = SessionState.PREPARING;
+                    pairingUiState = PairingUiState.CONNECTING;
+                    startRelayRuntime(currentLocal);
+                } else {
+                    sessionState = SessionState.ADB_READY;
                     pairingUiState = PairingUiState.INACTIVE;
-                    updateForeground(7, "Conectado con soporte", "La sesión temporal y segura ya está activa.");
+                    updateForeground(
+                            7,
+                            "ADB vinculado",
+                            "ADB ya está listo. Glosh espera la sesión segura sin pedir otro código.");
                 }
             }
 
@@ -429,7 +503,28 @@ public final class RemotePairingService extends Service {
             }
         });
         localAdbSession = local;
+        pairingFailureKind = PairingFailureKind.NONE;
 
+        if (joinUri == null) {
+            sessionState = SessionState.ADB_READY;
+            pairingUiState = PairingUiState.INACTIVE;
+            updateForeground(
+                    7,
+                    "ADB vinculado",
+                    "ADB ya está listo. Glosh espera la sesión segura sin pedir otro código.");
+            return;
+        }
+        sessionState = SessionState.PREPARING;
+        pairingUiState = PairingUiState.CONNECTING;
+        startRelayRuntime(local);
+    }
+
+    private synchronized void startRelayRuntime(LocalAdbSession local) {
+        if (ending.get() || relaySession != null || joinUri == null || local == null || !local.isConnected()) {
+            return;
+        }
+        sessionState = SessionState.PREPARING;
+        pairingUiState = PairingUiState.CONNECTING;
         RelaySessionSupervisor relay = new RelaySessionSupervisor();
         relaySession = relay;
         relay.start(joinUri, local.shell(), new RelaySessionSupervisor.Listener() {

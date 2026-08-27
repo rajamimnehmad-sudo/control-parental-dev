@@ -8,14 +8,12 @@ public final class PairingAuthorityPolicy {
             SessionState session,
             PairingUiState pairing,
             boolean submitAlreadyActive,
-            boolean endpointReady,
-            boolean requestReady) {
+            boolean endpointReady) {
         return session == SessionState.PREPARING
                 && (pairing == PairingUiState.WAITING_FOR_CODE
                 || pairing == PairingUiState.CODE_FAILED)
                 && !submitAlreadyActive
-                && endpointReady
-                && requestReady;
+                && endpointReady;
     }
 
     public static boolean canBecomeConnected(

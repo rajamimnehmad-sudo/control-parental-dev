@@ -7,13 +7,16 @@ import org.junit.Test;
 
 public class PairingAuthorityPolicyTest {
     @Test
-    public void pairingOutsideCodeStateIsRejected() {
+    public void pairingRequiresCurrentEndpointButNotRelayDescriptor() {
         assertFalse(PairingAuthorityPolicy.canSubmit(
                 SessionState.PREPARING, PairingUiState.DISCOVERING_ENDPOINT,
-                false, true, true));
+                false, true));
+        assertFalse(PairingAuthorityPolicy.canSubmit(
+                SessionState.PREPARING, PairingUiState.WAITING_FOR_CODE,
+                false, false));
         assertTrue(PairingAuthorityPolicy.canSubmit(
                 SessionState.PREPARING, PairingUiState.WAITING_FOR_CODE,
-                false, true, true));
+                false, true));
     }
 
     @Test
