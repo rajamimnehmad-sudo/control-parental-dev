@@ -35,6 +35,17 @@ Reglas locales/especiales para Codex. `AGENTS.md` y `START_HERE.md` definen el w
 - Análisis, arquitectura o revisión que ChatGPT pueda resolver no deben duplicarse en Codex.
 - No producir documentos de evidencia extensos por rutina. Crearlos cuando el riesgo o la trazabilidad lo justifiquen.
 
+## Ejecución autónoma por lote
+
+- **Ticket DELTA significa prompt corto, no ticket chico.** Por defecto el objetivo debe ser terminal y suficientemente amplio para cerrar el problema coherente.
+- Mientras permanezca dentro del mismo objetivo, root cause y scope autorizado, continuar autónomamente: diagnóstico → fix → tests → gate físico cuando corresponda → nuevo fix, tantas veces como sea necesario.
+- Corregir bugs localizados descubiertos durante el lote sin handoff intermedio cuando siguen dentro del mismo frente/objetivo/root cause/scope; no requieren decisión funcional/producto; no cambian materialmente arquitectura o base; no necesitan rutas fuera de scope; no chocan con otro writer; y no implican acción sensible.
+- No detenerse para pedir revisión por cada microarreglo técnico reversible. El resultado terminal del lote debe ser PASS, BLOCKED o FAILED.
+- **STOP obligatorio** si aparece un root cause realmente distinto que requiera otra arquitectura/estrategia, una decisión funcional o de producto, cambio material de base/owner/rutas/scope, necesidad de modificar modelo/thresholds/release authority u otra ruta expresamente fuera de scope, colisión real con otro writer o cualquier acción sensible no autorizada.
+- PR, merge, `main`, Production, deploy, borrados destructivos y gastos siempre permanecen fuera de esta autonomía salvo autorización específica.
+- Si una modificación tardía puede afectar escenarios acreditados previamente, revalidar de forma focalizada esos escenarios sobre el HEAD/APK definitivo. No repetir gates que el cambio final no pueda afectar.
+- Al finalizar, dejar commits cohesivos, tests/evidencia proporcionales, validación física cuando corresponda y un único handoff compacto. En PASS publicar y verificar `review/*-final`; en BLOCKED/FAILED preservar/publicar una rama sólo si existe código o evidencia útil que deba quedar disponible para revisión.
+
 ## Cierre técnico, Central y handoff
 
 - Codex termina como PASS, BLOCKED o FAILED. PASS es técnico; ChatGPT decide el cierre final.
