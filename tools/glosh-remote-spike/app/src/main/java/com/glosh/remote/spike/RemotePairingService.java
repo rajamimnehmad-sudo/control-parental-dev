@@ -22,6 +22,7 @@ import com.glosh.remote.spike.session.PairingAuthorityPolicy;
 import com.glosh.remote.spike.session.PairingEndpointTracker;
 import com.glosh.remote.spike.session.PairingFailureClassifier;
 import com.glosh.remote.spike.session.PairingFailureKind;
+import com.glosh.remote.spike.session.PairingReusePolicy;
 import com.glosh.remote.spike.session.PairingSubmissionGuard;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
@@ -304,6 +305,10 @@ public final class RemotePairingService extends Service {
     }
 
     private void handlePairingCode(String rawCode) {
+        if (PairingReusePolicy.shouldIgnoreSubmittedCode(reusedAdbIdentity, pairingUiState)) {
+            pendingPairingCode = null;
+            return;
+        }
         String code = rawCode == null ? "" : rawCode.trim();
         if (!PairingPin.isValid(code)) {
             showPairingFailure(
@@ -505,10 +510,7 @@ public final class RemotePairingService extends Service {
         }
     }
 
-    private void showPairingFailure(
-            PairingFailureKind failure,
-            String message,
-            Throwable error) {
+    private void showPairingFailure(PairingFailureKind failure, String message, Throwable error) {
         if (ending.get()) {
             return;
         }

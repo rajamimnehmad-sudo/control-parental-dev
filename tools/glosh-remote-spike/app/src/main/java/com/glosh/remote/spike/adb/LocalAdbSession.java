@@ -25,7 +25,7 @@ public final class LocalAdbSession implements Closeable {
     private final ScreenAwakeLease screenAwakeLease;
     private final ScheduledExecutorService watchdog = Executors.newSingleThreadScheduledExecutor();
     private final AtomicBoolean closed = new AtomicBoolean(false);
-    private final AtomicBoolean lossAnnounced = new AtomicBoolean(false);
+    private final ConnectionRecoveryLatch recoveryLatch = new ConnectionRecoveryLatch();
 
     private volatile Listener listener;
 
@@ -59,11 +59,17 @@ public final class LocalAdbSession implements Closeable {
     }
 
     private void checkConnection() {
-        if (closed.get() || manager.isConnected()) {
+        if (closed.get()) {
             return;
         }
         Listener current = listener;
-        if (lossAnnounced.compareAndSet(false, true) && current != null) {
+        if (manager.isConnected()) {
+            if (recoveryLatch.markHealthy() && current != null) {
+                current.onConnectionRestored();
+            }
+            return;
+        }
+        if (recoveryLatch.markLost() && current != null) {
             current.onConnectionLost();
         }
         try {
@@ -71,9 +77,8 @@ public final class LocalAdbSession implements Closeable {
                 throw new IllegalStateException("Wireless ADB reconnect returned false.");
             }
             screenAwakeLease.ensureApplied(shell);
-            lossAnnounced.set(false);
             current = listener;
-            if (!closed.get() && current != null) {
+            if (recoveryLatch.markHealthy() && !closed.get() && current != null) {
                 current.onConnectionRestored();
             }
         } catch (Throwable error) {
