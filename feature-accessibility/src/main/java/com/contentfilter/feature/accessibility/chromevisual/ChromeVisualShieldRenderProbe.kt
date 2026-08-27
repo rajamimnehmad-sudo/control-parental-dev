@@ -12,11 +12,19 @@ internal data class ChromeVisualShieldRenderProbeRequest(
     val sampleId: String,
     val sourceSha256: String,
     val renderContract: String,
+    val exactDrawOracleRequired: Boolean = false,
+    val exactDrawOracle: ChromeVisualShieldExactDrawOracle? = null,
 ) {
     fun isValid(): Boolean =
         sampleId.matches(Regex("[a-z0-9-]{1,40}")) &&
             sourceSha256.matches(Regex("[0-9a-f]{64}")) &&
-            renderContract.matches(Regex("[a-z0-9-]{1,80}"))
+            renderContract.matches(Regex("[a-z0-9-]{1,80}")) &&
+            (!exactDrawOracleRequired || exactDrawOracle == null || exactDrawOracle.matches(this))
+
+    private fun ChromeVisualShieldExactDrawOracle.matches(request: ChromeVisualShieldRenderProbeRequest): Boolean =
+        isStructurallyValid() &&
+            sourceSha256 == request.sourceSha256 &&
+            renderContract == request.renderContract
 }
 
 internal data class ChromeVisualShieldCropEvidence(
@@ -63,6 +71,7 @@ internal class ChromeVisualShieldRenderProbeAuthority(
 internal data class ChromeVisualShieldRenderProbeObservation(
     val request: ChromeVisualShieldRenderProbeRequest,
     val identity: ChromeVisualShieldIdentity,
+    val analyzedRegion: ChromeVisualRegion,
     val crop: ChromeVisualShieldCropEvidence,
     val result: ChromeVisualShieldRenderProbeResult,
     val action: String,

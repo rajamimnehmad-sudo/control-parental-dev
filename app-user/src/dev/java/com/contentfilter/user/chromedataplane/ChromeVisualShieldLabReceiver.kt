@@ -28,6 +28,7 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
                 ActionCancelStress -> ChromeVisualShieldLabControl.cancelStress()
                 ActionArmAnalyzerFailure -> ChromeVisualShieldLabControl.armAnalyzerFailure()
                 ActionRenderProbe -> renderProbe(intent)
+                ActionExactDrawOracleProbe -> exactDrawOracleProbe(intent)
                 ActionFixtureReset -> fixtureReset(intent)
                 ActionFixtureAppend -> fixtureAppend(intent)
                 ActionFixtureCommit -> fixtureCommit(intent)
@@ -71,6 +72,18 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
             "canvas=${attestation.canvasWidth}x${attestation.canvasHeight} draw=${attestation.draw}"
     }
 
+    private fun exactDrawOracleProbe(intent: Intent): String {
+        val sample = fixtureSample(intent) ?: return "result=fixture_unknown_sample"
+        if (!ChromeVisualShieldFixtureSampleStore.isReady(sample)) {
+            return "result=fixture_not_ready sample=${sample.wireName}"
+        }
+        return ChromeVisualShieldLabControl.exactDrawOracleProbe(
+            sampleId = sample.wireName,
+            sourceSha256 = sample.expectedSha256,
+            renderContract = ChromeVisualShieldContainContract.Version,
+        )
+    }
+
     private fun fixtureSample(intent: Intent): ChromeVisualShieldFixtureSample? =
         ChromeVisualShieldFixtureSample.fromWireName(intent.getStringExtra(ExtraFixtureSample))
 
@@ -87,6 +100,8 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
             "com.contentfilter.user.chromevisualshield.command.ARM_ANALYZER_FAILURE"
         const val ActionRenderProbe =
             "com.contentfilter.user.chromevisualshield.command.RENDER_PROBE"
+        const val ActionExactDrawOracleProbe =
+            "com.contentfilter.user.chromevisualshield.command.EXACT_DRAW_ORACLE_PROBE"
         const val ActionFixtureReset =
             "com.contentfilter.user.chromevisualshield.command.FIXTURE_RESET"
         const val ActionFixtureAppend =

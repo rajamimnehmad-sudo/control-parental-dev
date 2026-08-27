@@ -138,6 +138,23 @@ internal class ChromeVisualShieldController(
             startSession(request, "render_probe")
         }
 
+    override fun exactDrawOracleProbe(
+        sampleId: String,
+        sourceSha256: String,
+        renderContract: String,
+    ): String =
+        commandOnMain {
+            val request =
+                ChromeVisualShieldRenderProbeRequest(
+                    sampleId = sampleId,
+                    sourceSha256 = sourceSha256,
+                    renderContract = renderContract,
+                    exactDrawOracleRequired = true,
+                )
+            if (!request.isValid()) return@commandOnMain "result=invalid_oracle_probe_request"
+            startSession(request, "exact_draw_oracle_probe")
+        }
+
     override fun currentRenderIdentityToken(): String? = identityGate.snapshot().context?.renderIdentityToken()
 
     override fun beginFixtureRender(): String? =
@@ -152,8 +169,24 @@ internal class ChromeVisualShieldController(
             identityGate.snapshot().context?.renderIdentityToken()
         }
 
-    override fun renderAttested(renderIdentityToken: String): String {
+    override fun renderAttested(
+        renderIdentityToken: String,
+        exactDrawOracle: ChromeVisualShieldExactDrawOracle?,
+    ): String {
         val context = identityGate.snapshot().context ?: return "result=render_identity_unavailable"
+        val currentProbe = renderProbeRequest
+        if (currentProbe?.exactDrawOracleRequired == true) {
+            val oracle = exactDrawOracle ?: return "result=render_oracle_missing"
+            val currentIdentity = context.toProbeIdentity()
+            val candidate = currentProbe.copy(exactDrawOracle = oracle)
+            if (
+                !candidate.isValid() ||
+                ChromeVisualShieldExactDrawOracleMapper.resolve(currentIdentity, candidate) == null
+            ) {
+                return "result=render_oracle_mismatch"
+            }
+            renderProbeRequest = candidate
+        }
         if (!viewportRenderGate.recordAttestation(renderIdentityToken, context)) {
             return "result=render_identity_mismatch"
         }
@@ -396,6 +429,7 @@ internal class ChromeVisualShieldController(
             ChromeVisualShieldRenderProbeObservation(
                 request = request,
                 identity = delivery.work.identity,
+                analyzedRegion = delivery.analyzedRegion,
                 crop = cropEvidence,
                 result = result,
                 action = decision.logValue(),
@@ -407,7 +441,7 @@ internal class ChromeVisualShieldController(
         log(
             "phase=render_probe sample=${request.sampleId} sourceSha=${request.sourceSha256} " +
                 "renderContract=${request.renderContract} viewport=${delivery.work.identity.viewport} " +
-                "region=${delivery.work.identity.region} crop=${cropEvidence.width}x${cropEvidence.height} " +
+                "region=${delivery.analyzedRegion} crop=${cropEvidence.width}x${cropEvidence.height} " +
                 "cropSha=${cropEvidence.rgbaSha256} action=${decision.logValue()} " +
                 "reason=${decision.reason} filterProbability=${decision.filterProbability} " +
                 "inferenceCount=${r1Metrics.snapshot().inferenceCompleted} result=$result neverRelease=true rawPresented=false",
@@ -472,6 +506,9 @@ internal class ChromeVisualShieldController(
         val started =
             identityGate.start(window.id, viewport, regionContract)
                 ?: return "result=invalid_fixture_contract"
+        if (probe?.exactDrawOracleRequired == true) {
+            started.context?.let(viewportRenderGate::requireCurrentRender)
+        }
         if (!protectThenCapture(started, trigger)) {
             labActive = false
             renderProbeRequest = null
@@ -543,6 +580,19 @@ internal class ChromeVisualShieldController(
             is ChromeVisualShieldGloshiaDecision.Block -> "block"
             is ChromeVisualShieldGloshiaDecision.FailClosed -> "fail_closed"
         }
+
+    private fun ChromeVisualShieldContext.toProbeIdentity(): ChromeVisualShieldIdentity =
+        ChromeVisualShieldIdentity(
+            protectionSessionId = protectionSessionId,
+            windowId = windowId,
+            contentEpoch = contentEpoch,
+            viewport = viewport,
+            viewportEpoch = viewportEpoch,
+            captureSequence = identityGate.snapshot().nextCaptureSequence,
+            regionId = regionId,
+            regionSequence = regionSequence,
+            region = region,
+        )
 
     private fun log(message: String) {
         Log.i(LogTag, "$message gloshIAConnected=true")

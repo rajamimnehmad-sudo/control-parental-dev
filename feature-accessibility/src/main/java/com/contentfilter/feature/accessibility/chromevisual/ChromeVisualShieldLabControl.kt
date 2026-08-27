@@ -30,12 +30,20 @@ object ChromeVisualShieldLabControl {
         renderContract: String,
     ): String = endpoint?.renderProbe(sampleId, sourceSha256, renderContract) ?: Unavailable
 
+    fun exactDrawOracleProbe(
+        sampleId: String,
+        sourceSha256: String,
+        renderContract: String,
+    ): String = endpoint?.exactDrawOracleProbe(sampleId, sourceSha256, renderContract) ?: Unavailable
+
     fun currentRenderIdentityToken(): String? = endpoint?.currentRenderIdentityToken()
 
     fun beginFixtureRender(): String? = endpoint?.beginFixtureRender()
 
-    fun renderAttested(renderIdentityToken: String): String =
-        endpoint?.renderAttested(renderIdentityToken) ?: Unavailable
+    fun renderAttested(
+        renderIdentityToken: String,
+        exactDrawOracle: ChromeVisualShieldExactDrawOracle? = null,
+    ): String = endpoint?.renderAttested(renderIdentityToken, exactDrawOracle) ?: Unavailable
 
     fun status(): String = endpoint?.status() ?: Unavailable
 
@@ -66,11 +74,20 @@ object ChromeVisualShieldLabControl {
             renderContract: String,
         ): String
 
+        fun exactDrawOracleProbe(
+            sampleId: String,
+            sourceSha256: String,
+            renderContract: String,
+        ): String
+
         fun currentRenderIdentityToken(): String?
 
         fun beginFixtureRender(): String?
 
-        fun renderAttested(renderIdentityToken: String): String
+        fun renderAttested(
+            renderIdentityToken: String,
+            exactDrawOracle: ChromeVisualShieldExactDrawOracle?,
+        ): String
 
         fun status(): String
     }

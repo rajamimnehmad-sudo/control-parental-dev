@@ -69,6 +69,7 @@
                 <action android:name="com.contentfilter.user.chromevisualshield.command.CANCEL_STRESS" />
                 <action android:name="com.contentfilter.user.chromevisualshield.command.ARM_ANALYZER_FAILURE" />
                 <action android:name="com.contentfilter.user.chromevisualshield.command.RENDER_PROBE" />
+                <action android:name="com.contentfilter.user.chromevisualshield.command.EXACT_DRAW_ORACLE_PROBE" />
                 <action android:name="com.contentfilter.user.chromevisualshield.command.FIXTURE_RESET" />
                 <action android:name="com.contentfilter.user.chromevisualshield.command.FIXTURE_APPEND" />
                 <action android:name="com.contentfilter.user.chromevisualshield.command.FIXTURE_COMMIT" />

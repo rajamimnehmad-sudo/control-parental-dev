@@ -63,7 +63,7 @@ internal object ChromeVisualShieldFixture {
         sample: ChromeVisualShieldFixtureSample,
     ): ChromePhotosFixtureResponse {
         val renderIdentityToken = ChromeVisualShieldLabControl.currentRenderIdentityToken()
-        var acceptedRenderIdentityToken: String? = null
+        var acceptedAttestation: ChromeVisualShieldRenderAttestation? = null
         val body =
             if (
                 request.method != "POST" ||
@@ -79,13 +79,18 @@ internal object ChromeVisualShieldFixture {
                     renderIdentityToken,
                 ).also {
                     if (it.startsWith("result=render_attested")) {
-                        acceptedRenderIdentityToken = renderIdentityToken
+                        acceptedAttestation =
+                            ChromeVisualShieldRenderAttestationStore.peek(sample, renderIdentityToken)
                     }
                 }
             }
         val result =
-            acceptedRenderIdentityToken?.let { token ->
-                val nativeResult = ChromeVisualShieldLabControl.renderAttested(token)
+            acceptedAttestation?.let { attestation ->
+                val nativeResult =
+                    ChromeVisualShieldLabControl.renderAttested(
+                        renderIdentityToken = attestation.renderIdentityToken,
+                        exactDrawOracle = attestation.exactDrawOracle(),
+                    )
                 if (nativeResult == "result=render_identity_attested") {
                     body
                 } else {
@@ -245,9 +250,17 @@ internal object ChromeVisualShieldFixture {
                           document.documentElement.dataset.drawRect = [drawX, drawY, drawWidth, drawHeight].join(',');
                           await nextFrame();
                           if (requestedRevision !== 0) continue;
+                          const visualViewport = window.visualViewport;
+                          const viewportLeft = visualViewport ? visualViewport.offsetLeft : 0;
+                          const viewportTop = visualViewport ? visualViewport.offsetTop : 0;
+                          const viewportWidth = visualViewport ? visualViewport.width : window.innerWidth;
+                          const viewportHeight = visualViewport ? visualViewport.height : window.innerHeight;
+                          const viewportScale = visualViewport ? visualViewport.scale : 1;
                           const attestation = [observedSha, '${ChromeVisualShieldContainContract.Version}',
                             renderIdentityToken, sourceWidth, sourceHeight, canvas.width, canvas.height,
-                            drawX, drawY, drawWidth, drawHeight].join('|');
+                            drawX, drawY, drawWidth, drawHeight,
+                            canvasRect.left, canvasRect.top, canvasRect.width, canvasRect.height,
+                            viewportLeft, viewportTop, viewportWidth, viewportHeight, viewportScale, dpr].join('|');
                           const attested = await fetch('$renderedPath', {
                             method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: attestation
                           });

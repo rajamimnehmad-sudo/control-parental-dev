@@ -1,5 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldExactDrawOracle
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabRect
 import kotlin.math.abs
 
 internal data class ChromeVisualShieldRenderAttestation(
@@ -10,7 +12,27 @@ internal data class ChromeVisualShieldRenderAttestation(
     val canvasWidth: Int,
     val canvasHeight: Int,
     val draw: ChromeVisualShieldContainGeometry,
-)
+    val carrierCss: ChromeVisualShieldLabRect,
+    val visualViewportCss: ChromeVisualShieldLabRect,
+    val visualViewportScale: Double,
+    val devicePixelRatio: Double,
+) {
+    fun exactDrawOracle(): ChromeVisualShieldExactDrawOracle =
+        ChromeVisualShieldExactDrawOracle(
+            renderIdentityToken = renderIdentityToken,
+            sourceSha256 = sample.expectedSha256,
+            renderContract = ChromeVisualShieldContainContract.Version,
+            sourceWidth = sourceWidth,
+            sourceHeight = sourceHeight,
+            canvasWidth = canvasWidth,
+            canvasHeight = canvasHeight,
+            carrierCss = carrierCss,
+            visualViewportCss = visualViewportCss,
+            visualViewportScale = visualViewportScale,
+            devicePixelRatio = devicePixelRatio,
+            drawCanvas = ChromeVisualShieldLabRect(draw.left, draw.top, draw.width, draw.height),
+        )
+}
 
 /** One-shot browser-to-fixture proof that the expected source was drawn with the contain contract. */
 internal object ChromeVisualShieldRenderAttestationStore {
@@ -42,6 +64,22 @@ internal object ChromeVisualShieldRenderAttestationStore {
                 width = fields[9].toDoubleOrNull() ?: return invalid(sample),
                 height = fields[10].toDoubleOrNull() ?: return invalid(sample),
             )
+        val carrierCss =
+            ChromeVisualShieldLabRect(
+                left = fields[11].toDoubleOrNull() ?: return invalid(sample),
+                top = fields[12].toDoubleOrNull() ?: return invalid(sample),
+                width = fields[13].toDoubleOrNull() ?: return invalid(sample),
+                height = fields[14].toDoubleOrNull() ?: return invalid(sample),
+            )
+        val visualViewportCss =
+            ChromeVisualShieldLabRect(
+                left = fields[15].toDoubleOrNull() ?: return invalid(sample),
+                top = fields[16].toDoubleOrNull() ?: return invalid(sample),
+                width = fields[17].toDoubleOrNull() ?: return invalid(sample),
+                height = fields[18].toDoubleOrNull() ?: return invalid(sample),
+            )
+        val visualViewportScale = fields[19].toDoubleOrNull() ?: return invalid(sample)
+        val devicePixelRatio = fields[20].toDoubleOrNull() ?: return invalid(sample)
         val expected =
             ChromeVisualShieldContainContract.geometry(
                 sourceWidth,
@@ -50,7 +88,7 @@ internal object ChromeVisualShieldRenderAttestationStore {
                 canvasHeight,
             ) ?: return invalid(sample)
         if (!observed.matches(expected)) return "result=render_attestation_geometry_mismatch sample=${sample.wireName}"
-        ready[sample] =
+        val attestation =
             ChromeVisualShieldRenderAttestation(
                 sample,
                 expectedRenderIdentityToken,
@@ -59,7 +97,15 @@ internal object ChromeVisualShieldRenderAttestationStore {
                 canvasWidth,
                 canvasHeight,
                 observed,
+                carrierCss,
+                visualViewportCss,
+                visualViewportScale,
+                devicePixelRatio,
             )
+        if (!attestation.exactDrawOracle().isStructurallyValid()) {
+            return "result=render_attestation_mapping_invalid sample=${sample.wireName}"
+        }
+        ready[sample] = attestation
         return "result=render_attested sample=${sample.wireName} source=${sourceWidth}x$sourceHeight " +
             "canvas=${canvasWidth}x$canvasHeight draw=${observed.asLogValue()}"
     }
@@ -70,6 +116,13 @@ internal object ChromeVisualShieldRenderAttestationStore {
         expectedRenderIdentityToken: String,
     ): ChromeVisualShieldRenderAttestation? =
         ready.remove(sample)?.takeIf { it.renderIdentityToken == expectedRenderIdentityToken }
+
+    @Synchronized
+    fun peek(
+        sample: ChromeVisualShieldFixtureSample,
+        expectedRenderIdentityToken: String,
+    ): ChromeVisualShieldRenderAttestation? =
+        ready[sample]?.takeIf { it.renderIdentityToken == expectedRenderIdentityToken }
 
     @Synchronized
     fun clear(sample: ChromeVisualShieldFixtureSample) {
@@ -93,6 +146,6 @@ internal object ChromeVisualShieldRenderAttestationStore {
     private fun invalid(sample: ChromeVisualShieldFixtureSample) =
         "result=render_attestation_invalid sample=${sample.wireName}"
 
-    private const val FieldCount = 11
+    private const val FieldCount = 21
     private const val GeometryTolerance = 0.01
 }

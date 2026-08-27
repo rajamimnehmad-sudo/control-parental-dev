@@ -23,10 +23,11 @@ internal class ChromeVisualShieldFrameProcessor(
     fun crop(
         frame: ChromeWindowFrame,
         identity: ChromeVisualShieldIdentity,
+        region: ChromeVisualRegion = identity.region,
     ): ChromeVisualShieldCrop? {
         val frameRegion =
             ChromeVisualGeometryMapper.toFrame(
-                identity.region,
+                region,
                 identity.viewport,
                 frame.width,
                 frame.height,

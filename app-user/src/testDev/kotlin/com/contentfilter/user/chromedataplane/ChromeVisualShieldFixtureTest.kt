@@ -71,6 +71,8 @@ class ChromeVisualShieldFixtureTest {
         assertContains(html, "window.visualViewport.addEventListener('resize', requestRender)")
         assertContains(html, ChromeVisualShieldFixture.RenderIdentityPath)
         assertContains(html, "renderIdentityToken, sourceWidth")
+        assertContains(html, "canvasRect.left, canvasRect.top, canvasRect.width, canvasRect.height")
+        assertContains(html, "viewportLeft, viewportTop, viewportWidth, viewportHeight, viewportScale, dpr")
         assertContains(html, "renderContract=${ChromeVisualShieldContainContract.Version}")
         assertContains(
             html,
@@ -89,7 +91,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr01
         val body =
             "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
@@ -101,6 +103,9 @@ class ChromeVisualShieldFixtureTest {
         assertEquals(RenderIdentityToken, attestation.renderIdentityToken)
         assertEquals(1600, attestation.sourceWidth)
         assertEquals(700.0, attestation.draw.width)
+        assertEquals(700.0, attestation.carrierCss.width)
+        assertEquals(2200.0, attestation.visualViewportCss.height)
+        assertTrue(attestation.exactDrawOracle().isStructurallyValid())
         ChromeVisualShieldRenderAttestationStore.clear()
     }
 
@@ -110,7 +115,7 @@ class ChromeVisualShieldFixtureTest {
         ChromeVisualShieldFixtureSampleStore.clear()
         val body =
             "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
 
         val response =
             assertNotNull(
@@ -128,7 +133,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr02
         val stretched =
             "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|0.0|700.0|660.0"
+                "1600|900|700|660|0.0|0.0|700.0|660.0|$MappingFields"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
@@ -144,7 +149,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr04
         val wrongSha =
             "${"0".repeat(64)}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
@@ -160,7 +165,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr05
         val wrongContract =
             "${sample.expectedSha256}|canvas-fill-v1|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
@@ -176,7 +181,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr06
         val valid =
             "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
@@ -193,7 +198,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr08
         val valid =
             "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
@@ -210,7 +215,7 @@ class ChromeVisualShieldFixtureTest {
         val sample = ChromeVisualShieldFixtureSample.Flickr09
         val stale =
             "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
 
         ChromeVisualShieldRenderAttestationStore.clear()
         assertContains(
@@ -227,7 +232,7 @@ class ChromeVisualShieldFixtureTest {
 
         val valid =
             "${sample.expectedSha256}|${ChromeVisualShieldContainContract.Version}|$RenderIdentityToken|" +
-                "1600|900|700|660|0.0|133.125|700.0|393.75"
+                "1600|900|700|660|0.0|133.125|700.0|393.75|$MappingFields"
         ChromeVisualShieldRenderAttestationStore.clear()
         ChromeVisualShieldRenderAttestationStore.record(sample, valid, RenderIdentityToken)
         ChromeVisualShieldFixtureSampleStore.reset(sample)
@@ -278,6 +283,10 @@ class ChromeVisualShieldFixtureTest {
         assertEquals(
             "com.contentfilter.user.chromevisualshield.command.RENDER_PROBE",
             ChromeVisualShieldLabReceiver.ActionRenderProbe,
+        )
+        assertEquals(
+            "com.contentfilter.user.chromevisualshield.command.EXACT_DRAW_ORACLE_PROBE",
+            ChromeVisualShieldLabReceiver.ActionExactDrawOracleProbe,
         )
     }
 
@@ -348,5 +357,6 @@ class ChromeVisualShieldFixtureTest {
     private companion object {
         const val RenderIdentityToken = "1:7:2:0:0:1080:2200:fixture:162:550:918:1210"
         const val RotatedRenderIdentityToken = "1:7:3:0:0:2200:1080:fixture:330:270:1870:594"
+        const val MappingFields = "150.0|550.0|700.0|660.0|0.0|0.0|1000.0|2200.0|1.0|1.0"
     }
 }

@@ -8,6 +8,7 @@ import kotlinx.coroutines.ensureActive
 internal data class ChromeVisualShieldDecisionDelivery(
     val work: ChromeVisualShieldWork,
     val decision: ChromeVisualShieldGloshiaDecision,
+    val analyzedRegion: ChromeVisualRegion,
     val sentinelMatches: Boolean,
     val cropEvidence: ChromeVisualShieldCropEvidence?,
 )
@@ -36,6 +37,12 @@ internal class ChromeVisualShieldWorkProcessor(
 
     private suspend fun captureAndProcess(work: ChromeVisualShieldWork) {
         val identity = work.identity
+        val analyzedRegion = analysisRegion(work)
+        if (analyzedRegion == null) {
+            identityGate.failClosed(identity)
+            log("phase=oracle_geometry trigger=${work.trigger} result=fail_close")
+            return
+        }
         when (val result = capture.capture(identity.windowId)) {
             is ChromeWindowCaptureResult.Failed -> {
                 identityGate.failClosed(identity)
@@ -45,19 +52,20 @@ internal class ChromeVisualShieldWorkProcessor(
                 ChromeVisualShieldCaptureResources<ChromeWindowFrame, ChromeVisualShieldCrop>()
                     .use { resources ->
                         resources.attachFullFrame(result.frame)
-                        val crop = resources.deriveCrop { frameProcessor.crop(it, identity) }
+                        val crop = resources.deriveCrop { frameProcessor.crop(it, identity, analyzedRegion) }
                         if (crop == null) {
                             identityGate.failClosed(identity)
                             log("phase=crop trigger=${work.trigger} result=fail_close")
                             return
                         }
-                        resources.processCrop { ownedCrop -> processCrop(work, ownedCrop) }
+                        resources.processCrop { ownedCrop -> processCrop(work, analyzedRegion, ownedCrop) }
                     }
         }
     }
 
     private suspend fun processCrop(
         work: ChromeVisualShieldWork,
+        analyzedRegion: ChromeVisualRegion,
         crop: ChromeVisualShieldCrop,
     ) {
         val identity = work.identity
@@ -91,10 +99,17 @@ internal class ChromeVisualShieldWorkProcessor(
             ChromeVisualShieldDecisionDelivery(
                 work = work,
                 decision = decision,
+                analyzedRegion = analyzedRegion,
                 sentinelMatches = matches,
                 cropEvidence = cropEvidence,
             ),
         )
+    }
+
+    private fun analysisRegion(work: ChromeVisualShieldWork): ChromeVisualRegion? {
+        val probe = (work.mode as? ChromeVisualShieldWorkMode.RenderProbe)?.request
+        if (probe?.exactDrawOracleRequired != true) return work.identity.region
+        return ChromeVisualShieldExactDrawOracleMapper.resolve(work.identity, probe)
     }
 
     private fun sentinelMatches(bitmap: android.graphics.Bitmap): Boolean {

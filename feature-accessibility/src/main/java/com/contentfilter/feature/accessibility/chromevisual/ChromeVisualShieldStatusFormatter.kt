@@ -41,6 +41,8 @@ internal object ChromeVisualShieldStatusFormatter {
             "probeMode=$probeActive probeCompleted=$probeCompleted " +
             "probeSample=${probe?.request?.sampleId ?: "none"} probeSourceSha=${probe?.request?.sourceSha256 ?: "none"} " +
             "probeRenderContract=${probe?.request?.renderContract ?: "none"} " +
+            "probeExactDraw=${probe?.request?.exactDrawOracleRequired ?: false} " +
+            "probeRegion=${probe?.analyzedRegion ?: "none"} " +
             "probeCrop=${probe?.crop?.width ?: 0}x${probe?.crop?.height ?: 0} " +
             "probeCropSha=${probe?.crop?.rgbaSha256 ?: "none"} probeAction=${probe?.action ?: "none"} " +
             "probeReason=${probe?.reason ?: "none"} probeProbability=${probe?.filterProbability ?: "none"} " +
