@@ -1,10 +1,12 @@
-name: Remote Samsung Bubble Guide APK
+name: Remote PIN-only APK
 
 on:
   push:
     branches:
       - work/remote-samsung-bubble-guide-12-chatgpt
       - work/remote-samsung-bubble-stable-signing-13-chatgpt
+      - work/remote-pin-only-19-chatgpt
+      - review/remote-pin-only-19-final
     paths:
       - "tools/glosh-remote-spike/**"
       - ".github/workflows/remote-guided-artifact.yml"
@@ -13,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  build-remote-samsung-bubble:
+  build-remote-pin-only:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -39,7 +41,7 @@ jobs:
           chmod +x ./gradlew
           chmod +x tools/glosh-remote-spike/verify_guided_assistant.sh
 
-      - name: Run full Samsung Bubble gate
+      - name: Run full PIN-only gate
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
         run: bash tools/glosh-remote-spike/verify_guided_assistant.sh
@@ -47,9 +49,9 @@ jobs:
       - name: Preserve exact APK and report
         uses: actions/upload-artifact@v4
         with:
-          name: GloshRemote-Samsung-Bubble-${{ github.sha }}
+          name: GloshRemote-PIN-ONLY-19-${{ github.sha }}
           path: |
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Samsung-Bubble-DEV.apk
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-SAMSUNG-BUBBLE-GUIDE-12-report.txt
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-PIN-ONLY-19-DEV.apk
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-PIN-ONLY-19-report.txt
           if-no-files-found: error
           retention-days: 14

@@ -6,11 +6,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 MAC_DIR="$SCRIPT_DIR/mac"
 APK_DIR="$SCRIPT_DIR/app/build/outputs/apk/debug"
 SOURCE_APK="$APK_DIR/app-debug.apk"
-FINAL_APK="$APK_DIR/GloshRemote-Samsung-Bubble-DEV.apk"
-REPORT="$APK_DIR/REMOTE-SAMSUNG-BUBBLE-GUIDE-12-report.txt"
+FINAL_APK="$APK_DIR/GloshRemote-PIN-ONLY-19-DEV.apk"
+REPORT="$APK_DIR/REMOTE-PIN-ONLY-19-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-pin-only-python.XXXXXX")"
-MIN_DEV_VERSION_CODE=18
+MIN_DEV_VERSION_CODE=19
 
 cleanup() {
   rm -rf "$VENV_DIR"
@@ -43,10 +43,12 @@ printf '\n=== Glosh Remote Samsung PIN-only gate ===\n'
 printf 'Repo: %s\n' "$REPO_ROOT"
 printf 'HEAD: %s\n' "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
-printf '\n[1/5] Product architecture + stable DEV signing guard\n'
+printf '\n[1/5] Product architecture + pairing stability + stable DEV signing guard\n'
 MANIFEST="$SCRIPT_DIR/app/src/main/AndroidManifest.xml"
 MAIN="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/MainActivity.java"
 SERVICE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/RemotePairingService.java"
+ENDPOINT_TRACKER="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/session/PairingEndpointTracker.java"
+FAILURE_CLASSIFIER="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/session/PairingFailureClassifier.java"
 COORDINATOR="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/broker/SupportSessionCoordinator.java"
 ONBOARDING="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/OnboardingState.java"
 MAC_CONSOLE="$SCRIPT_DIR/mac/broker_console.py"
@@ -77,8 +79,9 @@ if ! grep -q 'showPairingInput' "$MAIN" \
   || ! grep -q 'focusPairingInput' "$MAIN" \
   || ! grep -q 'requestDirectSession' "$MAIN" \
   || ! grep -q 'ACTION_SUBMIT_CODE' "$MAIN" \
-  || ! grep -q 'pendingPairingCode' "$MAIN"; then
-  echo "ERROR: falta el contrato PIN-only: seis dígitos -> sesión directa -> submit automático." >&2
+  || ! grep -q 'pendingPairingCode' "$MAIN" \
+  || ! grep -q 'dispatchPairingCode' "$MAIN"; then
+  echo "ERROR: falta el contrato PIN-only: seis dígitos -> sesión directa -> submit automático/retry." >&2
   exit 3
 fi
 if ! grep -q 'requestDirectSession' "$COORDINATOR" \
@@ -88,11 +91,21 @@ if ! grep -q 'requestDirectSession' "$COORDINATOR" \
   exit 3
 fi
 if ! grep -q 'AdbMdns.SERVICE_TYPE_TLS_PAIRING' "$SERVICE" \
-  || ! grep -q 'manager.pair(host, port, code)' "$SERVICE" \
+  || ! grep -q 'manager.pair(endpoint.host(), endpoint.port(), code)' "$SERVICE" \
   || ! grep -q 'connectTls' "$SERVICE" \
   || ! grep -q 'RelayClient' "$SERVICE" \
-  || ! grep -q 'pendingPairingCode' "$SERVICE"; then
-  echo "ERROR: pairing ADB local/mDNS/relay dejó de cumplir el contrato seguro existente." >&2
+  || ! grep -q 'pendingPairingCode' "$SERVICE" \
+  || ! grep -q 'pairingEndpoints.lost' "$SERVICE" \
+  || ! grep -q 'PairingFailureClassifier.classify' "$SERVICE"; then
+  echo "ERROR: pairing ADB local perdió frescura de endpoint o clasificación de fallos." >&2
+  exit 3
+fi
+if grep -q 'rejectedEndpoint' "$SERVICE"; then
+  echo "ERROR: volvió el blacklist de endpoint que bloqueaba retries válidos." >&2
+  exit 3
+fi
+if [[ ! -s "$ENDPOINT_TRACKER" || ! -s "$FAILURE_CLASSIFIER" ]]; then
+  echo "ERROR: faltan guards de pairing stability." >&2
   exit 3
 fi
 if ! grep -q 'len(requests) == 1' "$MAC_CONSOLE" \
@@ -117,7 +130,7 @@ if ! grep -q 'create("stableDev")' "$BUILD_GRADLE" \
   echo "ERROR: PIN-only debug debe usar stableDev y versionCode >= $MIN_DEV_VERSION_CODE (actual=${VERSION_CODE:-missing})." >&2
   exit 3
 fi
-printf 'PASS: Samsung PIN-only + direct broker + local ADB pairing + Mac autoaccept + stable DEV signing (versionCode %s)\n' "$VERSION_CODE"
+printf 'PASS: PIN-only + pairing stability + direct broker + Mac autoaccept + stable DEV signing (versionCode %s)\n' "$VERSION_CODE"
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -188,7 +201,7 @@ HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
 STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 
 {
-  echo "TASK=REMOTE-PIN-ONLY-18"
+  echo "TASK=REMOTE-PIN-ONLY-19"
   echo "RESULT=PASS_AUTOMATED"
   echo "HEAD=$HEAD_SHA"
   echo "ARCHITECTURE_GUARD=PASS"

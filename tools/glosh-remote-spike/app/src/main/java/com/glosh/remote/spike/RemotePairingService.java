@@ -19,6 +19,9 @@ import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.relay.RelayClient;
 import com.glosh.remote.spike.session.PairingAuthorityPolicy;
+import com.glosh.remote.spike.session.PairingEndpointTracker;
+import com.glosh.remote.spike.session.PairingFailureClassifier;
+import com.glosh.remote.spike.session.PairingFailureKind;
 import com.glosh.remote.spike.session.PairingSubmissionGuard;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
@@ -51,9 +54,11 @@ public final class RemotePairingService extends Service {
     private static final long CONNECT_TIMEOUT_MS = 15_000L;
     private static volatile SessionState sessionState = SessionState.IDLE;
     private static volatile PairingUiState pairingUiState = PairingUiState.INACTIVE;
+    private static volatile PairingFailureKind pairingFailureKind = PairingFailureKind.NONE;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final PairingSubmissionGuard pairingGuard = new PairingSubmissionGuard();
+    private final PairingEndpointTracker pairingEndpoints = new PairingEndpointTracker();
     private final AtomicBoolean ending = new AtomicBoolean(false);
 
     private NotificationManager notifications;
@@ -61,9 +66,6 @@ public final class RemotePairingService extends Service {
     private WifiManager.MulticastLock multicastLock;
     private RelayClient relayClient;
     private String joinUri;
-    private volatile String pairingHost;
-    private volatile int pairingPort = -1;
-    private volatile String rejectedEndpoint;
     private volatile String pendingPairingCode;
 
     public static SessionState getSessionState() {
@@ -72,6 +74,10 @@ public final class RemotePairingService extends Service {
 
     public static PairingUiState getPairingUiState() {
         return pairingUiState;
+    }
+
+    public static PairingFailureKind getPairingFailureKind() {
+        return pairingFailureKind;
     }
 
     @Override
@@ -113,7 +119,7 @@ public final class RemotePairingService extends Service {
                         initialStep,
                         "Glosh · Paso " + initialStep + " de " + TOTAL_STEPS,
                         initialStep == 6
-                                ? "Tocá Vincular dispositivo con código. Glosh detectará el endpoint local automáticamente."
+                                ? "Tocá Vincular dispositivo con código. Glosh detectará la vinculación local automáticamente."
                                 : "Glosh está completando la conexión segura."));
 
         if (ACTION_STOP.equals(action)) {
@@ -149,6 +155,7 @@ public final class RemotePairingService extends Service {
     public void onDestroy() {
         sessionState = SessionState.IDLE;
         pairingUiState = PairingUiState.INACTIVE;
+        pairingFailureKind = PairingFailureKind.NONE;
         cleanupRuntime();
         executor.shutdownNow();
         super.onDestroy();
@@ -158,6 +165,7 @@ public final class RemotePairingService extends Service {
         cleanupRuntime();
         ending.set(false);
         pairingGuard.finish();
+        pairingFailureKind = PairingFailureKind.NONE;
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             finishWithError("Glosh Remote requiere Android 11 o superior.");
@@ -191,25 +199,34 @@ public final class RemotePairingService extends Service {
                 this,
                 AdbMdns.SERVICE_TYPE_TLS_PAIRING,
                 (InetAddress address, int port) -> {
-                    if (address != null && port > 0 && !ending.get()) {
-                        String endpoint = address.getHostAddress() + ":" + port;
-                        if (pairingUiState == PairingUiState.CODE_FAILED
-                                && endpoint.equals(rejectedEndpoint)) {
-                            return;
+                    if (ending.get()) {
+                        return;
+                    }
+                    String host = address == null ? null : address.getHostAddress();
+                    if (host == null || port <= 0) {
+                        pairingEndpoints.lost(host);
+                        if (!pairingGuard.isActive() && sessionState == SessionState.PREPARING) {
+                            pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
+                            updateForeground(
+                                    6,
+                                    "Esperando vinculación",
+                                    "Abrí Vincular dispositivo con código. Glosh detectará la vinculación nueva automáticamente.");
                         }
-                        rejectedEndpoint = null;
-                        showPairingCodeNotification(address.getHostAddress(), port);
+                        return;
+                    }
+
+                    PairingEndpointTracker.Endpoint endpoint = pairingEndpoints.observe(host, port);
+                    if (!pairingGuard.isActive()) {
+                        showPairingCodeNotification(endpoint);
                     }
                 });
         pairingDiscovery.start();
     }
 
-    private void showPairingCodeNotification(String host, int port) {
-        if (pairingGuard.isActive() || ending.get()) {
+    private void showPairingCodeNotification(PairingEndpointTracker.Endpoint endpoint) {
+        if (ending.get() || !pairingEndpoints.isCurrent(endpoint)) {
             return;
         }
-        pairingHost = host;
-        pairingPort = port;
 
         String pendingCode = pendingPairingCode;
         if (PairingPin.isValid(pendingCode)) {
@@ -276,20 +293,24 @@ public final class RemotePairingService extends Service {
     private void handlePairingCode(String rawCode) {
         String code = rawCode == null ? "" : rawCode.trim();
         if (!PairingPin.isValid(code)) {
-            showCodeFailure("Ingresá exactamente los 6 números que muestra Android.");
+            showPairingFailure(
+                    PairingFailureKind.PIN_REJECTED,
+                    "Ingresá exactamente los 6 números que muestra Android.",
+                    null);
             return;
         }
 
-        String host = pairingHost;
-        int port = pairingPort;
+        pairingFailureKind = PairingFailureKind.NONE;
+        PairingEndpointTracker.Endpoint endpoint = pairingEndpoints.current();
         if (sessionState == SessionState.PREPARING
                 && joinUri != null
-                && (host == null || port <= 0)) {
+                && endpoint == null) {
             pendingPairingCode = code;
+            pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
             updateForeground(
                     7,
                     "Código recibido",
-                    "Esperando el endpoint local de Android para continuar automáticamente…");
+                    "Esperando la vinculación local de Android para continuar automáticamente…");
             return;
         }
 
@@ -297,7 +318,7 @@ public final class RemotePairingService extends Service {
                 sessionState,
                 pairingUiState,
                 pairingGuard.isActive(),
-                host != null && port > 0,
+                endpoint != null,
                 joinUri != null)) {
             return;
         }
@@ -310,21 +331,50 @@ public final class RemotePairingService extends Service {
                 7,
                 "Glosh · Paso 7 de " + TOTAL_STEPS,
                 "Código recibido. Completando la conexión segura…");
-        executor.execute(() -> pairAndConnect(host, port, code));
+        executor.execute(() -> pairAndConnect(endpoint, code));
     }
 
-    private void pairAndConnect(String host, int port, String code) {
+    private void pairAndConnect(PairingEndpointTracker.Endpoint endpoint, String code) {
+        AdbConnectionManager manager;
         try {
-            AdbConnectionManager manager = AdbConnectionManager.getInstance(getApplicationContext());
-            boolean paired = manager.pair(host, port, code);
+            manager = AdbConnectionManager.getInstance(getApplicationContext());
+        } catch (Throwable error) {
+            showPairingFailure(
+                    PairingFailureKind.ADB_ERROR,
+                    "No pudimos preparar ADB. Abrí nuevamente Vincular dispositivo con código.",
+                    error);
+            return;
+        }
+
+        if (!pairingEndpoints.isCurrent(endpoint)) {
+            showPairingFailure(
+                    PairingFailureKind.ENDPOINT_CHANGED,
+                    "Android cambió la vinculación mientras conectábamos. Generá un código nuevo.",
+                    null);
+            return;
+        }
+
+        try {
+            boolean paired = manager.pair(endpoint.host(), endpoint.port(), code);
             if (!paired) {
-                showCodeFailure("Ese código ya no sirve. Generá uno nuevo y escribilo acá.");
+                showPairingFailure(
+                        PairingFailureKind.ADB_ERROR,
+                        "Android no completó el emparejamiento. Generá un código nuevo.",
+                        null);
                 return;
             }
+        } catch (Throwable error) {
+            PairingFailureKind failure = PairingFailureClassifier.classify(
+                    error,
+                    pairingEndpoints.isCurrent(endpoint));
+            showPairingFailure(failure, pairingMessage(failure), error);
+            return;
+        }
 
+        try {
             stopPairingDiscovery();
-            pairingHost = null;
-            pairingPort = -1;
+            pairingEndpoints.clear();
+            pairingFailureKind = PairingFailureKind.NONE;
             updateForeground(
                     7,
                     "Glosh · Paso 7 de " + TOTAL_STEPS,
@@ -372,6 +422,7 @@ public final class RemotePairingService extends Service {
                         }
                         sessionState = SessionState.CONNECTED;
                         pairingUiState = PairingUiState.INACTIVE;
+                        pairingFailureKind = PairingFailureKind.NONE;
                         pairingGuard.finish();
                         updateForeground(
                                 7,
@@ -396,33 +447,49 @@ public final class RemotePairingService extends Service {
                 }
             });
         } catch (Throwable error) {
-            Log.w(TAG, "Pairing or support connection failed", error);
-            if (!ending.get() && pairingDiscovery != null) {
-                showCodeFailure("Ese código ya no sirve. Generá uno nuevo y escribilo acá.");
-            } else if (!ending.get()) {
-                finishWithError("La conexión se interrumpió. Intentá nuevamente.");
+            Log.w(TAG, "ADB paired but local/support connection failed", error);
+            if (!ending.get()) {
+                finishWithError("ADB se vinculó, pero no pudimos abrir la sesión. Intentá nuevamente.");
             }
         }
     }
 
-    private void showCodeFailure(String message) {
+    private String pairingMessage(PairingFailureKind failure) {
+        switch (failure) {
+            case PIN_REJECTED:
+                return "Android rechazó el código. Generá uno nuevo y escribilo acá.";
+            case ENDPOINT_CHANGED:
+                return "Android cambió la vinculación mientras conectábamos. Generá un código nuevo.";
+            case ENDPOINT_UNAVAILABLE:
+                return "La vinculación anterior dejó de estar disponible. Generá un código nuevo.";
+            case ADB_ERROR:
+            case NONE:
+            default:
+                return "No pudimos completar ADB. Abrí nuevamente Vincular dispositivo con código.";
+        }
+    }
+
+    private void showPairingFailure(
+            PairingFailureKind failure,
+            String message,
+            Throwable error) {
         if (ending.get()) {
             return;
         }
+        if (error != null) {
+            Log.w(TAG, "Pairing failed kind=" + failure, error);
+        } else {
+            Log.w(TAG, "Pairing failed kind=" + failure);
+        }
         pendingPairingCode = null;
         pairingGuard.finish();
-        String host = pairingHost;
-        int port = pairingPort;
-        if (host != null && port > 0) {
-            rejectedEndpoint = host + ":" + port;
-            notifyCodeEntry(
-                    "Necesitamos un código nuevo",
-                    message,
-                    PairingUiState.CODE_FAILED);
-        } else {
-            pairingUiState = PairingUiState.CODE_FAILED;
-            updateForeground(7, "Necesitamos un código nuevo", message);
-        }
+        pairingFailureKind = failure;
+        notifyCodeEntry(
+                failure == PairingFailureKind.PIN_REJECTED
+                        ? "Necesitamos un código nuevo"
+                        : "Reintentemos la vinculación",
+                message,
+                PairingUiState.CODE_FAILED);
     }
 
     private void finishWithError(String message) {
@@ -435,6 +502,7 @@ public final class RemotePairingService extends Service {
         }
         sessionState = SessionState.IDLE;
         pairingUiState = PairingUiState.INACTIVE;
+        pairingFailureKind = PairingFailureKind.NONE;
         pairingGuard.finish();
         cleanupRuntime();
         stopForeground(STOP_FOREGROUND_REMOVE);
@@ -464,10 +532,8 @@ public final class RemotePairingService extends Service {
         }
 
         AdbConnectionManager.resetIdentity();
+        pairingEndpoints.clear();
         joinUri = null;
-        pairingHost = null;
-        pairingPort = -1;
-        rejectedEndpoint = null;
         pendingPairingCode = null;
     }
 

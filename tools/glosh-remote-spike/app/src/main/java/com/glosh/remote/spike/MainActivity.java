@@ -11,6 +11,7 @@ import android.view.WindowManager;
 
 import com.glosh.remote.spike.broker.SupportSessionCoordinator;
 import com.glosh.remote.spike.protocol.PairingPin;
+import com.glosh.remote.spike.session.PairingFailureKind;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
 import com.glosh.remote.spike.wizard.OemFamily;
@@ -19,7 +20,7 @@ import com.glosh.remote.spike.wizard.WizardLayout;
 
 /** PIN-only Samsung entry point: six digits in, secure ADB/relay connection out. */
 public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
-    // Compile-only compatibility for dormant Bubble classes retained in source history. The v18
+    // Compile-only compatibility for dormant Bubble classes retained in source history. The v19
     // manifest does not expose the Bubble activity and this entry point never sends these actions.
     public static final String ACTION_GUIDE_OPEN = "com.glosh.remote.spike.GUIDE_OPEN";
     public static final String ACTION_GUIDE_BACK = "com.glosh.remote.spike.GUIDE_BACK";
@@ -61,7 +62,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         setContentView(ui.view());
 
         consumeIntent(getIntent());
-        // v18 intentionally supersedes every persisted Bubble/guide checkpoint. A descriptor
+        // v19 intentionally supersedes every persisted Bubble/guide checkpoint. A descriptor
         // supplied explicitly through the DEV deep link is the only state that may start in
         // WIRELESS_DEBUGGING without a fresh broker rendezvous.
         if (RemotePairingService.getSessionState() == SessionState.IDLE
@@ -140,9 +141,8 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
 
-        if (pairing == PairingUiState.CODE_FAILED) {
+        if (pairing == PairingUiState.CODE_FAILED && !pairingCodeDispatched) {
             pendingPairingCode = null;
-            pairingCodeDispatched = false;
         }
 
         OnboardingState.Step step = coordinator.step();
@@ -179,10 +179,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         if (session == SessionState.PREPARING) {
             serviceStartIssued = true;
             if (PairingPin.isValid(pendingPairingCode) && !pairingCodeDispatched) {
-                pairingCodeDispatched = true;
-                startService(new Intent(this, RemotePairingService.class)
-                        .setAction(RemotePairingService.ACTION_SUBMIT_CODE)
-                        .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, pendingPairingCode));
+                dispatchPairingCode(pendingPairingCode);
             }
         }
     }
@@ -207,8 +204,18 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         }
         pendingPairingCode = code;
         pairingCodeDispatched = false;
+        if (RemotePairingService.getSessionState() == SessionState.PREPARING) {
+            dispatchPairingCode(code);
+        }
         driveConnection();
         render();
+    }
+
+    private void dispatchPairingCode(String code) {
+        pairingCodeDispatched = true;
+        startService(new Intent(this, RemotePairingService.class)
+                .setAction(RemotePairingService.ACTION_SUBMIT_CODE)
+                .putExtra(RemotePairingService.EXTRA_PAIRING_CODE, code));
     }
 
     private void render() {
@@ -225,18 +232,19 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             return;
         }
 
-        if (pairing == PairingUiState.CODE_FAILED) {
-            renderMode("retry", () -> renderCodeInput(true));
-            return;
-        }
-
         if (PairingPin.isValid(pendingPairingCode) || pairingCodeDispatched) {
             String mode = pairing == PairingUiState.CONNECTING ? "connecting" : "received";
             renderMode(mode, () -> renderConnecting(pairing == PairingUiState.CONNECTING));
             return;
         }
 
-        renderMode("input", () -> renderCodeInput(false));
+        if (pairing == PairingUiState.CODE_FAILED) {
+            PairingFailureKind failure = RemotePairingService.getPairingFailureKind();
+            renderMode("retry-" + failure.name(), () -> renderCodeInput(failure));
+            return;
+        }
+
+        renderMode("input", () -> renderCodeInput(PairingFailureKind.NONE));
     }
 
     private void renderMode(String key, Runnable renderer) {
@@ -247,14 +255,34 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         renderer.run();
     }
 
-    private void renderCodeInput(boolean retry) {
-        ui.showScreen(
-                "",
-                retry ? "Ingresá un código nuevo" : "Ingresá el código",
-                retry
-                        ? "El código anterior venció. Generá otro código de 6 dígitos en Depuración inalámbrica y escribilo acá."
-                        : "Escribí los 6 números que muestra “Vincular dispositivo con código”. Al completar el sexto número, Glosh se conecta solo.",
-                "");
+    private void renderCodeInput(PairingFailureKind failure) {
+        boolean retry = failure != PairingFailureKind.NONE;
+        String title;
+        String text;
+        switch (failure) {
+            case PIN_REJECTED:
+                title = "Código rechazado";
+                text = "Android rechazó el código. Generá uno nuevo en “Vincular dispositivo con código” y escribilo acá.";
+                break;
+            case ENDPOINT_CHANGED:
+                title = "La vinculación cambió";
+                text = "Android cambió la vinculación mientras conectábamos. Generá un código nuevo y escribilo acá.";
+                break;
+            case ENDPOINT_UNAVAILABLE:
+                title = "La vinculación venció";
+                text = "La vinculación anterior dejó de estar disponible. Generá un código nuevo y escribilo acá.";
+                break;
+            case ADB_ERROR:
+                title = "No pudimos completar ADB";
+                text = "Abrí nuevamente “Vincular dispositivo con código”, generá un código nuevo y escribilo acá.";
+                break;
+            case NONE:
+            default:
+                title = "Ingresá el código";
+                text = "Escribí los 6 números que muestra “Vincular dispositivo con código”. Al completar el sexto número, Glosh se conecta solo.";
+                break;
+        }
+        ui.showScreen("", title, text, "");
         ui.clearVisual();
         ui.showPairingInput(this::submitPairingCode, retry);
         ui.focusPairingInput();
