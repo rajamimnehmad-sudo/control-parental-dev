@@ -18,7 +18,7 @@ import com.contentfilter.feature.activation.InstalledAppVersionProvider
 import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
-import com.contentfilter.user.apps.isProtectedBrowserPackage
+import com.contentfilter.user.apps.ProtectedBrowserPackageNames
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionHealthMonitor
 import com.contentfilter.user.protection.UserLauncherController
@@ -96,6 +96,9 @@ class UserApplication :
 
     override fun onCreate() {
         super.onCreate()
+        // The DEV-only Chrome guard is a minimal independent process. It must not
+        // duplicate VPN, sync, Room or remote coordinators from the main process.
+        if (Application.getProcessName().endsWith(ChromeGuardProcessSuffix)) return
         runCatching { VpnController.enableDevProtection(this) }
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
@@ -129,11 +132,7 @@ class UserApplication :
                 installApprovalStore.initializeBaseline(
                     installedAppPublisher.installedApps().map(InstalledAppPublisher.DetectedApp::packageName).toSet(),
                 )
-                listOf(
-                    "com.contentfilter.dagbrowser",
-                    "com.contentfilter.dagbrowser.dev",
-                    "com.contentfilter.dagbrowser.lab",
-                ).filter(::isProtectedBrowserPackage).forEach(installApprovalStore::markApproved)
+                ProtectedBrowserPackageNames.forEach(installApprovalStore::markApproved)
             }.logFailure("install-approval-baseline")
             runCatching { localDataRepair.repairIfNeeded() }
                 .logFailure("local-data-repair")
@@ -234,5 +233,6 @@ class UserApplication :
         const val WebDomainListRefreshIntervalMillis = 6 * 60 * 60 * 1_000L
         const val ProtectionControlRefreshIntervalMillis = 60_000L
         const val ProtectionHealthCheckIntervalMillis = 30_000L
+        const val ChromeGuardProcessSuffix = ":chrome_guard"
     }
 }

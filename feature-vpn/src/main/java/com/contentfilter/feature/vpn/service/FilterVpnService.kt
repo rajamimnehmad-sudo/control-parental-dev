@@ -38,6 +38,12 @@ import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
 import com.contentfilter.feature.vpn.policy.VpnPolicyState
 import com.contentfilter.feature.vpn.search.SearchProtectionSignals
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
+import com.contentfilter.feature.vpn.transport.VpnPacketDispatcher
+import com.contentfilter.feature.vpn.transport.VpnTransportGate09A
+import com.contentfilter.feature.vpn.transport.VpnTransportResourceDiagnostics
+import com.contentfilter.feature.vpn.transport.VpnTransportRuntimeAuthority
+import com.contentfilter.feature.vpn.transport.toDevInactiveStatusLog
+import com.contentfilter.feature.vpn.transport.toDevStatusLog
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -51,11 +57,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.net.InetAddress
 import java.net.Socket
 import javax.inject.Inject
@@ -98,6 +100,9 @@ class FilterVpnService : VpnService() {
     private var requestedVpnReconnectKey: String? = null
     private var appliedDomainListVersion: Long? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
+    private var connectionOwnerDiagnostics: VpnConnectionOwnerDiagnostics? = null
+    private var packetDispatcher: VpnPacketDispatcher? = null
+    private var transportGate09A: VpnTransportGate09A? = null
 
     @Volatile
     private var lastBlockedDestinationInvalidationAtMillis: Long? = null
@@ -116,9 +121,19 @@ class FilterVpnService : VpnService() {
         when (intent?.action ?: ActionStart) {
             ActionStop -> stopVpn(StopReasonApp)
             ActionReconnect -> reconnectVpn(intent?.getStringExtra(ExtraReconnectKey))
+            ActionDevLabRoutesChanged -> refreshDevLabRoutes()
+            ActionDevTransportStatus -> logDevTransportStatus()
+            ActionDevTransportStress -> runDevTransportStress(intent?.getIntExtra(ExtraStressCycles, 0) ?: 0)
+            ActionDevFullTunnelGateChanged ->
+                updateDevFullTunnelGate(intent?.getBooleanExtra(ExtraFullTunnelEnabled, false) == true)
             else -> startVpn()
         }
         return START_STICKY
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        VpnController.registerSocketProtector(this) { socket -> protect(socket) }
     }
 
     override fun onRevoke() {
@@ -127,6 +142,7 @@ class FilterVpnService : VpnService() {
     }
 
     override fun onDestroy() {
+        VpnController.unregisterSocketProtector(this)
         if (VpnController.isRunning(this)) {
             stopVpn(StopReasonAndroid)
         }
@@ -168,6 +184,48 @@ class FilterVpnService : VpnService() {
                     )
                     val establishedInterface = requireNotNull(establishVpn()) { "VPN establish returned null." }
                     vpnInterface = establishedInterface
+                    val dispatcher = VpnPacketDispatcher(establishedInterface)
+                    packetDispatcher = dispatcher
+                    transportGate09A =
+                        if (ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService)) {
+                            val fullTunnelEnabled =
+                                ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(
+                                    this@FilterVpnService,
+                                )
+                            val controlledAddresses =
+                                ChromePhotosDataPlaneLabVpnPolicy.routes(this@FilterVpnService)
+                                    .mapTo(linkedSetOf()) { route -> route.address }
+                            VpnTransportGate09A.start(
+                                vpnService = this@FilterVpnService,
+                                scope = scope,
+                                allowedAddresses = controlledAddresses,
+                                allowedPorts =
+                                    ChromePhotosDataPlaneLabVpnPolicy.allowedTransportPorts(
+                                        this@FilterVpnService,
+                                    ),
+                                udpFixtureGate =
+                                    ChromePhotosDataPlaneLabVpnPolicy.udpFixtureGate(
+                                        this@FilterVpnService,
+                                    ),
+                                fullTunnelEnabled = fullTunnelEnabled,
+                                writeToTun = dispatcher::writePacket,
+                            )
+                        } else {
+                            null
+                        }
+                    connectionOwnerDiagnostics =
+                        if (
+                            ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService) &&
+                            transportGate09A == null
+                        ) {
+                            VpnConnectionOwnerDiagnostics.create(this@FilterVpnService)
+                        } else {
+                            null
+                        }
+                    ChromePhotosDataPlaneLabVpnPolicy.markTunnelState(
+                        this@FilterVpnService,
+                        established = true,
+                    )
                     connectionBarrier?.close()
                     appliedVpnReconnectKey = initialState.vpnReconnectKey
                     appliedDomainListVersion = webDomainListStore.version
@@ -178,7 +236,7 @@ class FilterVpnService : VpnService() {
                     VpnController.markStarted(this@FilterVpnService)
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
-                    readPackets(establishedInterface)
+                    readPackets(dispatcher)
                 } catch (exception: CancellationException) {
                     connectionBarrier?.close()
                     throw exception
@@ -215,6 +273,43 @@ class FilterVpnService : VpnService() {
         } else {
             cleanup()
             startVpn()
+        }
+    }
+
+    private fun refreshDevLabRoutes() {
+        if (!DevProtectionMode.isAvailable(this)) return
+        cleanup()
+        startVpn()
+    }
+
+    private fun updateDevFullTunnelGate(enabled: Boolean) {
+        if (!DevProtectionMode.isAvailable(this)) return
+        val updated = ChromePhotosDataPlaneLabVpnPolicy.setFullTunnelDevGate(this, enabled)
+        Log.i(LogTag, "transport_scope_request=full_tunnel_dev enabled=$enabled accepted=$updated")
+        if (updated) refreshDevLabRoutes()
+    }
+
+    private fun logDevTransportStatus() {
+        if (!DevProtectionMode.isAvailable(this)) return
+        val metrics = transportGate09A?.metrics()
+        if (metrics == null) {
+            val resources = VpnTransportResourceDiagnostics.snapshot()
+            Log.i(TransportLogTag, resources.toDevInactiveStatusLog(VpnTransportRuntimeAuthority.snapshot()))
+            return
+        }
+        Log.i(TransportLogTag, metrics.toDevStatusLog())
+    }
+
+    private fun runDevTransportStress(cycles: Int) {
+        if (!DevProtectionMode.isAvailable(this) || cycles !in 1..MaximumDevStressCycles) return
+        serviceScope?.launch {
+            val result = runCatching { transportGate09A?.runNativeStress(cycles) ?: 0 }
+            Log.i(
+                TransportLogTag,
+                "stress=${if (result.isSuccess) "complete" else "failed"} " +
+                    "cycles=${result.getOrDefault(0)} error=${result.exceptionOrNull()?.javaClass?.simpleName ?: "none"}",
+            )
+            logDevTransportStatus()
         }
     }
 
@@ -316,6 +411,8 @@ class FilterVpnService : VpnService() {
                 enforceEncryptedDns = encryptedDnsEnforcementMode,
                 blockedDestinations = blockedDestinationRoutes.activeRoutes(),
             )
+            .applyChromePhotosDataPlaneLabRoute()
+            .applyDevFullTunnelRoutes()
             .allowBrowserApps()
             .setMtu(DefaultMtu)
             .setBlocking(true)
@@ -340,6 +437,24 @@ class FilterVpnService : VpnService() {
                     .hostRoutes(upstreamServers, enforceEncryptedDns, blockedDestinations)
                     .forEach { route -> addRoute(route.address, route.prefixLength) }
             }
+        }
+
+    private fun Builder.applyChromePhotosDataPlaneLabRoute(): Builder =
+        apply {
+            ChromePhotosDataPlaneLabVpnPolicy
+                .routes(this@FilterVpnService)
+                .forEach { route -> addRoute(route.address, route.prefixLength) }
+        }
+
+    private fun Builder.applyDevFullTunnelRoutes(): Builder =
+        apply {
+            val enabled =
+                ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(this@FilterVpnService) &&
+                    !strictWebBlockMode
+            ChromePhotosDataPlaneLabVpnPolicy.fullTunnelRoutes(enabled).forEach { route ->
+                addRoute(route.address, route.prefixLength)
+            }
+            if (enabled) Log.i(LogTag, "transport_scope=full_tunnel_dev routes=ipv4_default,ipv6_default")
         }
 
     private fun observeVpnReconnectPolicy(scope: CoroutineScope) {
@@ -414,6 +529,14 @@ class FilterVpnService : VpnService() {
                 runCatching { addAllowedApplication(packageName) }
                     .onSuccess { allowedCount++ }
             }
+            ChromePhotosDataPlaneLabVpnPolicy.additionalAllowedPackages(this@FilterVpnService).forEach { packageName ->
+                runCatching { addAllowedApplication(packageName) }
+                    .onSuccess { allowedCount++ }
+                    .onFailure { error ->
+                        Log.e(LogTag, "DEV UDP fixture admission failed error=${error.javaClass.simpleName}")
+                        throw error
+                    }
+            }
             if (allowedCount == 0) {
                 AdminPackageNames.forEach { packageName ->
                     runCatching { addDisallowedApplication(packageName) }
@@ -428,11 +551,8 @@ class FilterVpnService : VpnService() {
         return linkProperties?.dnsServers.orEmpty()
     }
 
-    private suspend fun readPackets(interfaceDescriptor: ParcelFileDescriptor) =
+    private suspend fun readPackets(dispatcher: VpnPacketDispatcher) =
         withContext(Dispatchers.IO) {
-            val input = FileInputStream(interfaceDescriptor.fileDescriptor)
-            val output = FileOutputStream(interfaceDescriptor.fileDescriptor)
-            val outputMutex = Mutex()
             val telemetryDispatcher =
                 BoundedDnsRequestDispatcher<suspend () -> Unit>(
                     scope = this,
@@ -448,24 +568,19 @@ class FilterVpnService : VpnService() {
                     scope = this,
                     workerCount = DnsWorkerCount,
                     queueCapacity = DnsQueueCapacity,
-                    handler = { question -> handleDnsQuestion(question, output, outputMutex, telemetryDispatcher) },
+                    handler = { question -> handleDnsQuestion(question, dispatcher, telemetryDispatcher) },
                     onFailure = { exception ->
                         Log.w(LogTag, "DNS request failed: ${exception.javaClass.simpleName}")
                     },
                 )
-            val buffer = ByteArray(PacketBufferSize)
             try {
-                while (isActive) {
-                    val length = runCatching { input.read(buffer) }.getOrDefault(NoBytesRead)
-                    if (length > 0) {
-                        enqueuePacket(buffer, length, requestDispatcher, telemetryDispatcher)
-                    }
+                dispatcher.readLoop { buffer, length ->
+                    enqueuePacket(buffer, length, requestDispatcher, telemetryDispatcher)
                 }
             } finally {
                 requestDispatcher.cancel()
                 telemetryDispatcher.cancel()
-                input.close()
-                output.close()
+                dispatcher.close()
             }
         }
 
@@ -476,6 +591,8 @@ class FilterVpnService : VpnService() {
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
+        if (transportGate09A?.submitIfTransport(packet, length) == true) return
+        connectionOwnerDiagnostics?.observe(packet, length)
         when (val parsed = parser.parse(packet, length)) {
             is DnsParseResult.Parsed -> {
                 maybeRecordParsedPacket(parser.inspect(packet, length), telemetryDispatcher)
@@ -487,12 +604,27 @@ class FilterVpnService : VpnService() {
 
     private suspend fun handleDnsQuestion(
         question: DnsQuestion,
-        output: FileOutputStream,
-        outputMutex: Mutex,
+        packetWriter: VpnPacketDispatcher,
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
         val domain = question.domain.normalizedDomain()
+        if (ChromePhotosDataPlaneLabVpnPolicy.isFixtureDomain(
+                active = ChromePhotosDataPlaneLabVpnPolicy.isActive(this),
+                normalizedDomain = domain,
+            )
+        ) {
+            val addresses = ChromePhotosDataPlaneLabVpnPolicy.fixtureAddresses(question.type)
+            val packet =
+                if (addresses.isEmpty()) {
+                    responseFactory.noDataPacket(question)
+                } else {
+                    responseFactory.safeSearchAddressPacket(question, addresses)
+                }
+            writeResponse(packetWriter, packet)
+            Log.i(LogTag, "Chrome Photos DEV fixture DNS mapped type=${question.type} localOnly=true")
+            return
+        }
         val state = snapshotProvider.current()
         val searchEngine = SearchEngineCatalog.engineForDomain(domain)
         when (val decision = policyEvaluator.evaluate(domain, state.snapshot, state.health)) {
@@ -515,12 +647,11 @@ class FilterVpnService : VpnService() {
                         target = safeSearchTarget,
                         engineId = searchEngine?.id ?: "unknown",
                         policyRevision = state.snapshot.version,
-                        output = output,
-                        outputMutex = outputMutex,
+                        packetWriter = packetWriter,
                         telemetryDispatcher = telemetryDispatcher,
                     )
                 } else {
-                    forwardDns(question, output, outputMutex)
+                    forwardDns(question, packetWriter)
                 }
             }
             is PolicyDecision.GrantExtraTime -> {
@@ -530,7 +661,7 @@ class FilterVpnService : VpnService() {
                     "DNS decision=grant snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
-                forwardDns(question, output, outputMutex)
+                forwardDns(question, packetWriter)
             }
             is PolicyDecision.Block,
             is PolicyDecision.RequestAuthorization,
@@ -544,7 +675,7 @@ class FilterVpnService : VpnService() {
                 if (decision is PolicyDecision.Block && blockedDestinationRoutes.beginPreparation(domain)) {
                     scheduleBlockedDestinationPreparation(domain, question, state)
                 }
-                writeResponse(output, outputMutex, responseFactory.nxdomainPacket(question))
+                writeResponse(packetWriter, responseFactory.nxdomainPacket(question))
             }
             is PolicyDecision.HealthWarning,
             is PolicyDecision.RequireActivation,
@@ -552,12 +683,12 @@ class FilterVpnService : VpnService() {
             -> {
                 logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
-                forwardDns(question, output, outputMutex)
+                forwardDns(question, packetWriter)
             }
             is PolicyDecision.Warn -> {
                 logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
-                forwardDns(question, output, outputMutex)
+                forwardDns(question, packetWriter)
             }
         }
     }
@@ -567,12 +698,11 @@ class FilterVpnService : VpnService() {
         target: String,
         engineId: String,
         policyRevision: Long,
-        output: FileOutputStream,
-        outputMutex: Mutex,
+        packetWriter: VpnPacketDispatcher,
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (!safeSearchAddressResolver.supports(question.type)) {
-            writeResponse(output, outputMutex, responseFactory.noDataPacket(question))
+            writeResponse(packetWriter, responseFactory.noDataPacket(question))
             reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
             return
         }
@@ -586,7 +716,7 @@ class FilterVpnService : VpnService() {
         if (addresses.isEmpty()) {
             Log.w(LogTag, "SafeSearch DNS target address unavailable engine=$engineId type=${question.type}")
         }
-        writeResponse(output, outputMutex, responseFactory.safeSearchAddressPacket(question, addresses))
+        writeResponse(packetWriter, responseFactory.safeSearchAddressPacket(question, addresses))
         reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
     }
 
@@ -634,19 +764,18 @@ class FilterVpnService : VpnService() {
 
     private suspend fun forwardDns(
         question: DnsQuestion,
-        output: FileOutputStream,
-        outputMutex: Mutex,
+        packetWriter: VpnPacketDispatcher,
     ) {
         runCatching {
             val responsePayload = dnsForwarder.forward(question.queryPayload, upstreamDnsServers)
             if (responsePayload != null) {
-                writeResponse(output, outputMutex, responseFactory.responsePacket(question, responsePayload))
+                writeResponse(packetWriter, responseFactory.responsePacket(question, responsePayload))
             } else {
                 Log.w(
                     LogTag,
                     "DNS forward failed upstream=${upstreamDnsServers.safeAddresses()}",
                 )
-                writeResponse(output, outputMutex, responseFactory.servfailPacket(question))
+                writeResponse(packetWriter, responseFactory.servfailPacket(question))
             }
         }.onFailure { telemetryReporter.recordError("DNS forward failed: ${it.javaClass.simpleName}") }
     }
@@ -746,12 +875,11 @@ class FilterVpnService : VpnService() {
         }
     }
 
-    private suspend fun writeResponse(
-        output: FileOutputStream,
-        outputMutex: Mutex,
+    private fun writeResponse(
+        packetWriter: VpnPacketDispatcher,
         packet: ByteArray,
     ) {
-        outputMutex.withLock { output.write(packet) }
+        packetWriter.writePacket(packet)
     }
 
     private fun reportSafeSearchApplied(
@@ -784,6 +912,7 @@ class FilterVpnService : VpnService() {
         diagnostic: VpnPacketDiagnostic,
         telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
+        if (ChromePhotosDataPlaneLabVpnPolicy.recordControlledTransportAttempt(this, diagnostic)) return
         val key =
             "${diagnostic.reason}:${diagnostic.ipVersion}:${diagnostic.protocol}:" +
                 "${diagnostic.sourcePort ?: "none"}:${diagnostic.destinationPort ?: "none"}"
@@ -803,6 +932,7 @@ class FilterVpnService : VpnService() {
     }
 
     private fun cleanup(cancelConnectionInvalidation: Boolean = true) {
+        ChromePhotosDataPlaneLabVpnPolicy.markTunnelState(this, established = false)
         if (cancelConnectionInvalidation) {
             connectionInvalidationJob?.cancel()
             connectionInvalidationJob = null
@@ -811,6 +941,14 @@ class FilterVpnService : VpnService() {
         readerJob?.cancel()
         readerJob = null
         snapshotProvider.stop()
+        transportGate09A?.shutdown()?.let { result ->
+            if (!result.clean) {
+                Log.e(LogTag, "transport_cleanup=quarantined chrome=fail_closed")
+            }
+        }
+        transportGate09A = null
+        packetDispatcher?.close()
+        packetDispatcher = null
         vpnInterface?.close()
         vpnInterface = null
         upstreamDnsServers = emptyList()
@@ -820,6 +958,8 @@ class FilterVpnService : VpnService() {
         requestedVpnReconnectKey = null
         appliedDomainListVersion = null
         lastReportedPolicy = null
+        connectionOwnerDiagnostics?.clear()
+        connectionOwnerDiagnostics = null
         serviceScope?.cancel()
         serviceScope = null
     }
@@ -828,14 +968,19 @@ class FilterVpnService : VpnService() {
         const val ActionStart = "com.contentfilter.feature.vpn.START"
         const val ActionStop = "com.contentfilter.feature.vpn.STOP"
         const val ActionReconnect = "com.contentfilter.feature.vpn.RECONNECT"
+        const val ActionDevLabRoutesChanged = "com.contentfilter.feature.vpn.DEV_LAB_ROUTES_CHANGED"
+        const val ActionDevTransportStatus = "com.contentfilter.feature.vpn.DEV_TRANSPORT_STATUS"
+        const val ActionDevTransportStress = "com.contentfilter.feature.vpn.DEV_TRANSPORT_STRESS"
+        const val ActionDevFullTunnelGateChanged = "com.contentfilter.feature.vpn.DEV_FULL_TUNNEL_GATE_CHANGED"
         private const val ExtraReconnectKey = "vpn_reconnect_key"
+        const val ExtraStressCycles = "stress_cycles"
+        const val ExtraFullTunnelEnabled = "full_tunnel_enabled"
 
         private const val DefaultMtu = 1500
         private const val LocalVpnAddress = "10.8.0.2"
         private const val LocalVpnPrefixLength = 32
         private const val LocalVpnIpv6Address = "fd00:1:fd00:1::2"
         private const val LocalVpnIpv6PrefixLength = 128
-        private const val NoBytesRead = -1
         private const val ConnectionInvalidationMillis = 400L
         private const val ConnectionInvalidationRetryMillis = 100L
         private const val BlockedDestinationBatchWindowMillis = 50L
@@ -845,17 +990,18 @@ class FilterVpnService : VpnService() {
         private const val DnsQueueCapacity = 64
         private const val DnsTelemetryWorkerCount = 1
         private const val DnsTelemetryQueueCapacity = 128
-        private const val PacketBufferSize = 32 * 1024
         private const val AllIpv4Route = "0.0.0.0"
         private const val AllIpv6Route = "::"
         private const val AllTrafficPrefixLength = 0
         private const val PacketDiagnosticCooldownMillis = 5_000L
+        private const val MaximumDevStressCycles = 200
         private const val StopReasonAndroid = "android_stopped_vpn"
         private const val StopReasonApp = "app_stopped_vpn"
         private const val StopReasonDevRescue = "dev_protection_disabled"
         private const val StopReasonFailed = "vpn_failed"
         private const val StopReasonRevoked = "system_revoked_vpn"
         private const val LogTag = "FilterVpnService"
+        private const val TransportLogTag = "VpnTransport09A"
 
         private val BrowserPackageNames =
             listOf(

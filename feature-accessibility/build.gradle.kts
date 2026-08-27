@@ -17,6 +17,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":gloshia-visual-core"))
     implementation(project(":core-domain"))
     implementation(project(":core-policy"))
     implementation(project(":core-sync"))

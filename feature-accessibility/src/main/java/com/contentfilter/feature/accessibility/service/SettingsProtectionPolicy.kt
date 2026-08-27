@@ -12,6 +12,22 @@ class SettingsProtectionPolicy {
             packageName in PackageInstallerPackages ||
             resolvedOwnUninstaller
 
+    /**
+     * True only when tree identity cannot change a blocking decision for this screen.
+     *
+     * App-info/removal and unknown-source screens deliberately return false because the tree is
+     * needed to distinguish the protected User app from Admin/another app. Critical VPN/
+     * Accessibility/Device-Admin screens and ordinary package-install screens can be decided from
+     * class/package + current authorization state without guessing that identity.
+     */
+    fun canBlockImmediatelyWithoutTreeIdentity(
+        packageName: String,
+        className: String?,
+    ): Boolean =
+        isDeviceAdminRemovalScreen(packageName, className) ||
+            isCriticalSettingsScreen(packageName, className) ||
+            isPackageInstallScreen(packageName, className)
+
     fun shouldLeaveProtectedScreen(
         packageName: String,
         className: String?,
@@ -25,7 +41,7 @@ class SettingsProtectionPolicy {
         settingsAuthorized: Boolean,
         removalAuthorized: Boolean,
         trustedInstallAuthorized: Boolean,
-        elapsedRealtimeMillis: Long,
+        @Suppress("UNUSED_PARAMETER") elapsedRealtimeMillis: Long,
     ): Boolean {
         val requiredScope =
             protectedScope(
@@ -64,9 +80,6 @@ class SettingsProtectionPolicy {
         }
         if (requiredScope == ProtectionAuthorizationScope.Settings && settingsAuthorized) return false
         if (requiredScope == ProtectionAuthorizationScope.Removal && removalAuthorized) return false
-        if (elapsedRealtimeMillis - lastActionAtElapsedMillis >= MinActionIntervalMillis) {
-            lastActionAtElapsedMillis = elapsedRealtimeMillis
-        }
         return true
     }
 
@@ -107,9 +120,12 @@ class SettingsProtectionPolicy {
     private fun isPackageInstallScreen(
         packageName: String,
         className: String?,
-    ): Boolean =
-        packageName in PackageInstallerPackages &&
-            InstallClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
+    ): Boolean {
+        if (packageName !in PackageInstallerPackages) return false
+        val simpleClassName = className.orEmpty().substringAfterLast('.')
+        if (UninstallClassHints.any { simpleClassName.contains(it, ignoreCase = true) }) return false
+        return InstallClassHints.any { simpleClassName.contains(it, ignoreCase = true) }
+    }
 
     private fun isUnknownSourcesScreen(
         packageName: String,
@@ -136,10 +152,7 @@ class SettingsProtectionPolicy {
         ) {
             return ProtectionAuthorizationScope.Removal
         }
-        if (
-            packageName in PackageInstallerPackages &&
-            InstallClassHints.any { normalizedClass.contains(it, true) }
-        ) {
+        if (isPackageInstallScreen(packageName, className)) {
             return ProtectionAuthorizationScope.Settings
         }
         if (
@@ -168,14 +181,11 @@ class SettingsProtectionPolicy {
             ownAppIdentityVisible &&
             className.orEmpty().contains(GenericSubSettingsClassHint, ignoreCase = true)
 
-    private var lastActionAtElapsedMillis: Long = -MinActionIntervalMillis
-
     private companion object {
         const val AndroidSettingsPackage = "com.android.settings"
         const val SamsungAccessibilityPackage = "com.samsung.accessibility"
         const val SamsungSubSettingsClassHint = "SubSettings"
         const val GenericSubSettingsClassHint = "SubSettings"
-        const val MinActionIntervalMillis = 2_000L
         val PackageInstallerPackages =
             setOf(
                 "com.android.packageinstaller",

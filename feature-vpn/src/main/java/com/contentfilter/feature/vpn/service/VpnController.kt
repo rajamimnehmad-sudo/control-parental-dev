@@ -9,8 +9,12 @@ import androidx.core.content.ContextCompat
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import java.net.Socket
+import java.util.concurrent.atomic.AtomicReference
 
 object VpnController {
+    private val socketProtector = AtomicReference<SocketProtectorRegistration?>()
+
     fun prepareIntent(context: Context): Intent? = VpnService.prepare(context)
 
     fun start(context: Context) {
@@ -21,6 +25,49 @@ object VpnController {
     fun stop(context: Context) {
         context.startService(serviceIntent(context, FilterVpnService.ActionStop))
     }
+
+    fun refreshDevLabRoutes(context: Context) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(serviceIntent(context, FilterVpnService.ActionDevLabRoutesChanged))
+    }
+
+    fun logDevTransportStatus(context: Context) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(serviceIntent(context, FilterVpnService.ActionDevTransportStatus))
+    }
+
+    fun runDevTransportStress(
+        context: Context,
+        cycles: Int,
+    ) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(
+            serviceIntent(context, FilterVpnService.ActionDevTransportStress)
+                .putExtra(FilterVpnService.ExtraStressCycles, cycles),
+        )
+    }
+
+    fun setDevFullTunnelGate(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        if (!DevProtectionMode.isAvailable(context)) return
+        context.startService(
+            serviceIntent(context, FilterVpnService.ActionDevFullTunnelGateChanged)
+                .putExtra(FilterVpnService.ExtraFullTunnelEnabled, enabled),
+        )
+    }
+
+    fun configureDevFullTunnelGate(
+        context: Context,
+        enabled: Boolean,
+    ): Boolean =
+        DevProtectionMode.isAvailable(context) &&
+            ChromePhotosDataPlaneLabVpnPolicy.setFullTunnelDevGate(context, enabled)
+
+    fun isDevFullTunnelGateActive(context: Context): Boolean =
+        DevProtectionMode.isAvailable(context) &&
+            ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(context)
 
     fun disableDevProtection(context: Context) {
         DevProtectionMode.setProtectionDisabled(context, true)
@@ -34,6 +81,12 @@ object VpnController {
     fun isDevProtectionAvailable(context: Context): Boolean = DevProtectionMode.isAvailable(context)
 
     fun isDevProtectionDisabled(context: Context): Boolean = DevProtectionMode.isProtectionDisabled(context)
+
+    /**
+     * Protects an unconnected app-owned socket through the one active VpnService.
+     * A missing or stale service is fail-closed; callers must close the socket.
+     */
+    fun protectDevUpstreamSocket(socket: Socket): Boolean = socketProtector.get()?.protect?.invoke(socket) == true
 
     fun isRunning(context: Context): Boolean =
         context.applicationContext
@@ -66,6 +119,17 @@ object VpnController {
 
     internal fun markStarted(context: Context) {
         setRunning(context, true)
+    }
+
+    internal fun registerSocketProtector(
+        owner: Any,
+        protect: (Socket) -> Boolean,
+    ) {
+        socketProtector.set(SocketProtectorRegistration(owner, protect))
+    }
+
+    internal fun unregisterSocketProtector(owner: Any) {
+        socketProtector.updateAndGet { current -> current?.takeUnless { it.owner === owner } }
     }
 
     internal fun markStopped(
@@ -113,4 +177,9 @@ object VpnController {
     private const val KeyIsRunning = "is_running"
     private const val KeyLastStopReason = "last_stop_reason"
     private const val ActionStateChanged = "com.contentfilter.feature.vpn.STATE_CHANGED"
+
+    private data class SocketProtectorRegistration(
+        val owner: Any,
+        val protect: (Socket) -> Boolean,
+    )
 }

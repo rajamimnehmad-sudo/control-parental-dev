@@ -62,6 +62,11 @@ android {
             versionCode = 311
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "true")
+            ndk {
+                // 09A packages the pinned feasibility engine for every ABI it
+                // builds; product ABI policy remains a later release decision.
+                abiFilters += listOf("x86", "x86_64")
+            }
         }
         create("beta") {
             dimension = "distribution"
@@ -111,6 +116,9 @@ android {
     }
 
     packaging {
+        resources {
+            excludes += "META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
         jniLibs {
             // Keep the app and the existing TFLite image model compatible with
             // ARM32. The much larger neural text runtime is ARM64-only; ARM32
@@ -179,6 +187,8 @@ dependencies {
     implementation(libs.hilt.android)
     implementation(libs.litertlm.android)
     implementation(libs.okhttp)
+    add("devImplementation", project(":gloshia-visual-core"))
+    add("devImplementation", "org.bouncycastle:bcpkix-jdk18on:1.84")
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
