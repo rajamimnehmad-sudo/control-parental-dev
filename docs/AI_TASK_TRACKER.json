@@ -1,5 +1,5 @@
 {
-  "updatedAt": "27 de ago de 2026 · 12:33",
+  "updatedAt": "27 de ago de 2026 · 12:57",
   "sections": [
     {
       "id": "coordination",
@@ -154,10 +154,10 @@
     {
       "id": "device-operations",
       "title": "Device Owner / instalación",
-      "context": "Glosh Remote reactivado para REMOTE-PIN-ONLY-19D. El candidato v19 adb309fc tuvo FAIL físico reproducible: permitía PIN antes de ADB/descriptor y quedaba en ‘Código recibido’. Hotfix v20 review/remote-pin-only-19-final @ 2028e60edb710b6af45869092ebfdbd23b7d88df está PASS automático; sin writer activo, bloqueado sólo por re-prueba física Samsung.",
+      "context": "Glosh Remote reactivado para REMOTE-PIN-ONLY-19E. v19 adb309fc tuvo FAIL físico; v20 2028e60 corrigió bootstrap/Settings pero la prueba Samsung mostró que volver a Glosh puede perder/cambiar el endpoint. v21 review/remote-pin-only-19-final @ 85da7ade308013714dadd51c8fed78b691bb58d8 usa RemoteInput en la notificación sin salir de Ajustes; PASS automático y pendiente sólo re-prueba física Samsung.",
       "tasks": [
         {"id":"glosh-device-owner-installer-00","title":"GLOSH-DEVICE-OWNER-INSTALLER-00 — instalador seguro de laboratorio","detail":"DONE para laboratorio; A23 DeviceOwner/Affiliated.","status":"done","priority":"critical"},
-        {"id":"remote-pin-only-19","title":"REMOTE-PIN-ONLY-19 — PIN-only estable","detail":"BLOCKED PHYSICAL. adb309fc39291f2d44f4919dd7b2e8ad527d1005 falló físicamente: PIN aceptado por UI y pantalla ‘Código recibido’ sin llegar a pair(), porque ADB bootstrap dependía del descriptor relay y no se abría Depuración inalámbrica. Fix 19D/v20 desacopla ADB local del relay, abre Depuración inalámbrica al iniciar discovery y no muestra PIN hasta endpoint actual. PASS automático en 2028e60edb710b6af45869092ebfdbd23b7d88df; review/remote-pin-only-19-final apunta al mismo SHA. APK v20 SHA-256 5116ffddf516bc62093659caefbc3c7caa60173b22465ce14a04f045acb39f64. Pendiente sólo re-prueba física real.","status":"blocked","priority":"critical"},
+        {"id":"remote-pin-only-19","title":"REMOTE-PIN-ONLY-19 — PIN-only estable","detail":"BLOCKED PHYSICAL. v19 adb309fc39291f2d44f4919dd7b2e8ad527d1005 falló en ‘Código recibido’. v20 2028e60edb710b6af45869092ebfdbd23b7d88df desacopló ADB/relay y abrió Depuración inalámbrica. La prueba física v20 mostró que volver a Glosh desde ‘Vincular dispositivo con código’ puede cerrar/cambiar el endpoint; los campos en app no son una ruta física confiable. v21/19E 85da7ade308013714dadd51c8fed78b691bb58d8 convierte la notificación en ruta primaria: durante el PIN el cuerpo no abre Glosh y la acción ‘INGRESAR 6 DÍGITOS’ usa RemoteInput/semantic reply manteniendo Ajustes abierto. PASS automático run 33090084548; review/remote-pin-only-19-final @ mismo SHA. APK v21 SHA-256 069eeda21d59056337464f6feaa777ef7cf8805d44c8f228ce7f39463b1e63e3. Pendiente sólo prueba física: mantener visible el código Android, bajar notificaciones, ingresar/enviar el PIN desde la notificación y verificar ADB_READY/CONNECTED.","status":"blocked","priority":"critical"},
         {"id":"device-owner-app-protection-00","title":"Endurecer protección de apps con Device Owner","detail":"Pendiente cuando Protection Core sea priorizado.","status":"pending","priority":"important"},
         {"id":"remote-install-connection-00","title":"REMOTE-INSTALL-CONNECTION-00 — probar acceso remoto sin PC del cliente","detail":"PAUSADO. Gate0 + same-Wi-Fi PASS; próximo gate redes distintas reales. Sin owner activo.","status":"pending","priority":"critical"},
         {"id":"remote-install-ux-01","title":"Pulir UX/UI de Glosh Remote","detail":"BUILD PASS técnico local; pendiente revisión/smoke al retomar.","status":"pending","priority":"critical"},
