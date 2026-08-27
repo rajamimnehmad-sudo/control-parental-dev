@@ -4,9 +4,9 @@ import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.os.SystemClock
+import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.coroutines.resume
 
 internal data class ChromeWindowFrame(
     val bitmap: Bitmap,
@@ -72,21 +72,20 @@ internal class ChromeWindowCapture(
                                 hardwareBuffer.close()
                             }
                         if (frame == null) observer.onFailure(InvalidBitmapErrorCode)
-                        if (continuation.isActive) {
-                            continuation.resume(
+                        continuation.resumeWithOwnedResource(
+                            value =
                                 frame?.let(ChromeWindowCaptureResult::Captured)
                                     ?: ChromeWindowCaptureResult.Failed(InvalidBitmapErrorCode),
-                            )
-                        } else {
-                            frame?.close()
-                        }
+                            resource = frame,
+                        )
                     }
 
                     override fun onFailure(errorCode: Int) {
                         observer.onFailure(errorCode)
-                        if (continuation.isActive) {
-                            continuation.resume(ChromeWindowCaptureResult.Failed(errorCode))
-                        }
+                        continuation.resumeWithOwnedResource(
+                            value = ChromeWindowCaptureResult.Failed(errorCode),
+                            resource = null,
+                        )
                     }
                 },
             )
@@ -96,4 +95,19 @@ internal class ChromeWindowCapture(
         const val BytesPerPixel = 4L
         const val InvalidBitmapErrorCode = -1
     }
+}
+
+/** Transfers [resource] with [value], closing it if cancellation wins before consumption. */
+internal fun <T> CancellableContinuation<T>.resumeWithOwnedResource(
+    value: T,
+    resource: AutoCloseable?,
+) {
+    if (!isActive) {
+        resource?.close()
+        return
+    }
+    resume(
+        value = value,
+        onCancellation = { _, _, _ -> resource?.close() },
+    )
 }
