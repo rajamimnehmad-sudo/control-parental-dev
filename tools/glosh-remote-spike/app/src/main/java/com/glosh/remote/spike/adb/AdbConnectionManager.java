@@ -29,15 +29,9 @@ import android.sun.security.x509.X509CertImpl;
 import android.sun.security.x509.X509CertInfo;
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
 
-/**
- * Ephemeral ADB identity for REMOTE-INSTALL-CONNECTION-00.
- *
- * Nothing is written to disk: if this process dies or the session is revoked,
- * the private key disappears and Android must be paired again. That is the
- * intended product behavior for the temporary bootstrap bridge.
- */
+/** Persistent Wireless ADB identity plus a replaceable live connection. */
 public final class AdbConnectionManager extends AbsAdbConnectionManager {
-    private static final long CERT_LIFETIME_MS = TimeUnit.HOURS.toMillis(2);
+    private static final long CERT_LIFETIME_MS = TimeUnit.DAYS.toMillis(3650);
     private static AdbConnectionManager instance;
 
     public static synchronized AdbConnectionManager getInstance(Context context) throws Exception {
@@ -47,19 +41,34 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         return instance;
     }
 
-    public static synchronized void resetIdentity() {
+    /** Drops only the live socket. The encrypted pairing identity intentionally survives. */
+    public static synchronized void releaseConnection() {
         if (instance != null) {
             try {
-                instance.close();
+                instance.disconnect();
             } catch (Exception ignored) {
-                try {
-                    instance.disconnect();
-                } catch (Exception ignoredAgain) {
-                    // Best effort. Dropping the singleton still makes the identity unreachable.
-                }
+                // Best effort. A later instance will reopen a fresh socket with the same key.
             }
             instance = null;
         }
+    }
+
+    /** Explicit destructive revocation hook; not used by the normal PIN-only lifecycle. */
+    public static synchronized void forgetIdentity(Context context) throws Exception {
+        if (instance != null) {
+            try {
+                instance.close();
+            } finally {
+                instance = null;
+            }
+        }
+        AdbIdentityStore.delete(context.getApplicationContext());
+    }
+
+    /** Compatibility alias for dormant historical code; no longer destroys the persistent key. */
+    @Deprecated
+    public static synchronized void resetIdentity() {
+        releaseConnection();
     }
 
     private final PrivateKey privateKey;
@@ -70,9 +79,16 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         setTimeout(15, TimeUnit.SECONDS);
         setThrowOnUnauthorised(true);
 
-        GeneratedIdentity generated = generateIdentity();
-        privateKey = generated.privateKey;
-        certificate = generated.certificate;
+        AdbIdentityStore.Material stored = AdbIdentityStore.load(context);
+        if (stored == null) {
+            GeneratedIdentity generated = generateIdentity();
+            AdbIdentityStore.save(context, generated.privateKey, generated.certificate);
+            privateKey = generated.privateKey;
+            certificate = generated.certificate;
+        } else {
+            privateKey = stored.privateKey;
+            certificate = stored.certificate;
+        }
     }
 
     @Override
@@ -90,6 +106,20 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         return "Glosh Remote";
     }
 
+    /** Reopens the current Wireless ADB TLS endpoint without changing the paired identity. */
+    public synchronized boolean ensureConnected(Context context, long timeoutMillis) throws Exception {
+        if (isConnected()) {
+            return true;
+        }
+        try {
+            disconnect();
+        } catch (Exception ignored) {
+            // The previous transport is already unusable. Continue with fresh mDNS discovery.
+        }
+        boolean connected = connectTls(context.getApplicationContext(), timeoutMillis);
+        return connected || isConnected();
+    }
+
     private static GeneratedIdentity generateIdentity() throws Exception {
         SecureRandom random = new SecureRandom();
         KeyPairGenerator generator = KeyPairGenerator.getInstance("RSA");
@@ -100,7 +130,7 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
 
         String algorithmName = "SHA512withRSA";
         X500Name x500Name = new X500Name("CN=Glosh Remote");
-        Date notBefore = new Date();
+        Date notBefore = new Date(System.currentTimeMillis() - TimeUnit.MINUTES.toMillis(1));
         Date notAfter = new Date(System.currentTimeMillis() + CERT_LIFETIME_MS);
 
         CertificateExtensions extensions = new CertificateExtensions();

@@ -20,8 +20,6 @@ import com.glosh.remote.spike.wizard.WizardLayout;
 
 /** PIN-only Samsung entry point: six digits in, secure ADB/relay connection out. */
 public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
-    // Compile-only compatibility for dormant Bubble classes retained in source history. The v19
-    // manifest does not expose the Bubble activity and this entry point never sends these actions.
     public static final String ACTION_GUIDE_OPEN = "com.glosh.remote.spike.GUIDE_OPEN";
     public static final String ACTION_GUIDE_BACK = "com.glosh.remote.spike.GUIDE_BACK";
     public static final String ACTION_GUIDE_NEXT = "com.glosh.remote.spike.GUIDE_NEXT";
@@ -56,15 +54,10 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         if (!BuildConfig.DEBUG) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         }
-
         coordinator = SupportSessionCoordinator.get(this);
         ui = new WizardLayout(this);
         setContentView(ui.view());
-
         consumeIntent(getIntent());
-        // v19 intentionally supersedes every persisted Bubble/guide checkpoint. A descriptor
-        // supplied explicitly through the DEV deep link is the only state that may start in
-        // WIRELESS_DEBUGGING without a fresh broker rendezvous.
         if (RemotePairingService.getSessionState() == SessionState.IDLE
                 && !directDescriptorSeeded
                 && coordinator.step() != OnboardingState.Step.HOME
@@ -134,13 +127,12 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         PairingUiState pairing = RemotePairingService.getPairingUiState();
         long now = SystemClock.elapsedRealtime();
 
-        if (session == SessionState.CONNECTED) {
+        if (session == SessionState.CONNECTED || session == SessionState.RECONNECTING) {
             pendingPairingCode = null;
             pairingCodeDispatched = false;
             serviceStartIssued = false;
             return;
         }
-
         if (pairing == PairingUiState.CODE_FAILED && !pairingCodeDispatched) {
             pendingPairingCode = null;
         }
@@ -155,7 +147,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 }
                 return;
             }
-
             if (step == OnboardingState.Step.WIRELESS_DEBUGGING && !serviceStartIssued) {
                 if (startSupportSession()) {
                     serviceStartIssued = true;
@@ -163,7 +154,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 }
                 return;
             }
-
             if (step == OnboardingState.Step.SESSION_ACTIVE
                     && serviceStartIssued
                     && now - serviceStartAtMs >= SERVICE_START_GRACE_MS) {
@@ -223,27 +213,29 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
             renderMode("unsupported", () -> ui.showUnsupported(coordinator.profile().manufacturer()));
             return;
         }
-
         SessionState session = RemotePairingService.getSessionState();
         PairingUiState pairing = RemotePairingService.getPairingUiState();
-
         if (session == SessionState.CONNECTED) {
             renderMode("connected", this::renderConnected);
             return;
         }
-
-        if (PairingPin.isValid(pendingPairingCode) || pairingCodeDispatched) {
-            String mode = pairing == PairingUiState.CONNECTING ? "connecting" : "received";
-            renderMode(mode, () -> renderConnecting(pairing == PairingUiState.CONNECTING));
+        if (session == SessionState.RECONNECTING) {
+            renderMode("reconnecting", this::renderReconnecting);
             return;
         }
-
+        if (pairing == PairingUiState.CONNECTING) {
+            renderMode("connecting", () -> renderConnecting(true));
+            return;
+        }
+        if (PairingPin.isValid(pendingPairingCode) || pairingCodeDispatched) {
+            renderMode("received", () -> renderConnecting(false));
+            return;
+        }
         if (pairing == PairingUiState.CODE_FAILED) {
             PairingFailureKind failure = RemotePairingService.getPairingFailureKind();
             renderMode("retry-" + failure.name(), () -> renderCodeInput(failure));
             return;
         }
-
         renderMode("input", () -> renderCodeInput(PairingFailureKind.NONE));
     }
 
@@ -294,18 +286,24 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 activePairing ? "Conectando…" : "Código recibido",
                 activePairing
                         ? "Glosh está completando ADB y abriendo la conexión segura con la Mac."
-                        : "No hagas nada. Glosh está preparando la conexión con la Mac y usará el código automáticamente.",
+                        : "No hagas nada. Glosh está preparando la conexión y usará el código automáticamente.",
+                "");
+        ui.clearVisual();
+        ui.showTertiary("CANCELAR", view -> cancelConnection());
+    }
+
+    private void renderReconnecting() {
+        ui.showScreen(
+                "",
+                "Reconectando…",
+                "Glosh está recuperando la sesión automáticamente. No hace falta generar otro código.",
                 "");
         ui.clearVisual();
         ui.showTertiary("CANCELAR", view -> cancelConnection());
     }
 
     private void renderConnected() {
-        ui.showScreen(
-                "",
-                "Conectado",
-                "La Mac ya tiene la sesión temporal y segura del teléfono.",
-                "");
+        ui.showScreen("", "Conectado", "La sesión temporal y segura está activa.", "");
         ui.clearVisual();
         ui.showSecondary("FINALIZAR CONEXIÓN", view -> cancelConnection());
     }
