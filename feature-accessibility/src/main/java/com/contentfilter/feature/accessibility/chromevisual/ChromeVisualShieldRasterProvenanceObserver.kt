@@ -341,6 +341,7 @@ internal class ChromeVisualShieldRasterProvenanceObserver(
                 visualViewport = oracle.visualViewportCss,
                 devicePixelRatio = oracle.devicePixelRatio,
                 visualViewportScale = oracle.visualViewportScale,
+                navigationInsets = oracle.navigationInsets,
                 id = "raster-provenance-carrier",
             ) ?: return null
         val fullCarrier =

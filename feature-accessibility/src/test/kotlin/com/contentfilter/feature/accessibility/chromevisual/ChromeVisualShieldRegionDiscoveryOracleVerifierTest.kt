@@ -7,6 +7,36 @@ import kotlin.test.assertTrue
 
 class ChromeVisualShieldRegionDiscoveryOracleVerifierTest {
     @Test
+    fun `navigation inset moves browser viewport mapping above system navigation`() {
+        val source = ChromeVisualShieldLabRect(54.0, 135.0, 252.0, 241.0)
+        val target = ChromeVisualViewport(0, 0, 1080, 2408)
+        val visualViewport = ChromeVisualShieldLabRect(0.0, 0.0, 360.0, 739.0)
+
+        val withoutInset =
+            ChromeVisualShieldBrowserViewportMapper.map(
+                source,
+                target,
+                visualViewport,
+                devicePixelRatio = 3.0,
+                visualViewportScale = 1.0,
+                id = "without-inset",
+            )
+        val withInset =
+            ChromeVisualShieldBrowserViewportMapper.map(
+                source,
+                target,
+                visualViewport,
+                devicePixelRatio = 3.0,
+                visualViewportScale = 1.0,
+                navigationInsets = ChromeVisualShieldNavigationInsets(0, 0, 42),
+                id = "with-inset",
+            )
+
+        assertEquals(checkNotNull(withoutInset).top - 42, checkNotNull(withInset).top)
+        assertEquals(withoutInset.bottom - 42, withInset.bottom)
+    }
+
+    @Test
     fun `complete requires one-to-one region coverage`() {
         val identity = identity()
         val expected = region("discovery-1", 20, 30, 80, 90)

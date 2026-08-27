@@ -2,6 +2,9 @@ package com.contentfilter.feature.accessibility.chromevisual
 
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
+import android.os.Build
+import android.view.WindowInsets
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
 import android.view.accessibility.AccessibilityWindowInfo
 
@@ -57,6 +60,16 @@ internal class ChromeVisualWindowInspector(
         root.getBoundsInScreen(bounds)
         return ChromeVisualViewport(bounds.left, bounds.top, bounds.right, bounds.bottom)
             .takeIf { it.width > 0 && it.height > 0 }
+    }
+
+    fun navigationInsets(): ChromeVisualShieldNavigationInsets {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return ChromeVisualShieldNavigationInsets.Zero
+        val windowManager = service.getSystemService(WindowManager::class.java)
+        val insets =
+            windowManager.currentWindowMetrics.windowInsets.getInsetsIgnoringVisibility(
+                WindowInsets.Type.navigationBars(),
+            )
+        return ChromeVisualShieldNavigationInsets(insets.left, insets.right, insets.bottom)
     }
 
     fun collectCandidates(window: AccessibilityWindowInfo): List<ChromeVisualNodeCandidate> {

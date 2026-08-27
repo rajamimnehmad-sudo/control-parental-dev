@@ -229,6 +229,8 @@ internal class ChromeVisualShieldController(
     ): String {
         val context = identityGate.snapshot().context ?: return "result=render_identity_unavailable"
         val currentIdentity = context.toProbeIdentity()
+        val currentRegionDiscoveryOracle =
+            regionDiscoveryOracle?.copy(navigationInsets = windowInspector.navigationInsets())
         val currentProbe = renderProbeRequest
         if (currentProbe?.exactDrawOracleRequired == true) {
             val oracle = exactDrawOracle ?: return "result=render_oracle_missing"
@@ -249,7 +251,7 @@ internal class ChromeVisualShieldController(
                     !regionDiscoveryLab.acceptsAttestation(
                         regionDiscoveryBinding,
                         currentIdentity,
-                        regionDiscoveryOracle,
+                        currentRegionDiscoveryOracle,
                     )
             )
         ) {
@@ -263,12 +265,12 @@ internal class ChromeVisualShieldController(
                 !regionDiscoveryLab.recordAttestation(
                     checkNotNull(regionDiscoveryBinding),
                     currentIdentity,
-                    regionDiscoveryOracle,
+                    currentRegionDiscoveryOracle,
                 )
             ) {
                 return "result=region_discovery_binding_invalidated"
             }
-            rasterProvenanceObserver.onAttestationAccepted(currentIdentity, regionDiscoveryOracle)
+            rasterProvenanceObserver.onAttestationAccepted(currentIdentity, currentRegionDiscoveryOracle)
         }
         runOnMain { scheduleCaptureWhenViewportReady("render_attested") }
         return "result=render_identity_attested"

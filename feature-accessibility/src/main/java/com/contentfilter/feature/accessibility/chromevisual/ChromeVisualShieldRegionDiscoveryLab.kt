@@ -246,6 +246,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
                 visualViewport = visualViewportCss,
                 devicePixelRatio = devicePixelRatio,
                 visualViewportScale = visualViewportScale,
+                navigationInsets = navigationInsets,
                 id = "region-discovery-attested-carrier",
             ) != null
 

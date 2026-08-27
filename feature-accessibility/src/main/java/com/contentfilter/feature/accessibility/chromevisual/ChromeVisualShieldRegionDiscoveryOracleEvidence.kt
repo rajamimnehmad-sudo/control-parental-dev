@@ -15,6 +15,7 @@ data class ChromeVisualShieldRegionDiscoveryOracle(
     val visualViewportCss: ChromeVisualShieldLabRect,
     val visualViewportScale: Double,
     val devicePixelRatio: Double,
+    val navigationInsets: ChromeVisualShieldNavigationInsets = ChromeVisualShieldNavigationInsets.Zero,
     val expectComplete: Boolean,
     val regions: List<ChromeVisualShieldRegionDiscoveryOracleRegion>,
 ) {
@@ -30,12 +31,26 @@ data class ChromeVisualShieldRegionDiscoveryOracle(
             visualViewportScale > 0.0 &&
             devicePixelRatio.isFinite() &&
             devicePixelRatio > 0.0 &&
+            navigationInsets.isValid() &&
             regions.isNotEmpty() &&
             regions.size <= MaximumRegions &&
             regions.all { it.isStructurallyValid(canvasWidth, canvasHeight) }
 
     private companion object {
         const val MaximumRegions = 8
+    }
+}
+
+data class ChromeVisualShieldNavigationInsets(
+    val left: Int,
+    val right: Int,
+    val bottom: Int,
+) {
+    fun isValid(): Boolean = left in 0..MaximumInset && right in 0..MaximumInset && bottom in 0..MaximumInset
+
+    companion object {
+        val Zero = ChromeVisualShieldNavigationInsets(0, 0, 0)
+        private const val MaximumInset = 2_048
     }
 }
 
@@ -179,12 +194,17 @@ internal object ChromeVisualShieldRegionDiscoveryOracleVerifier {
                     visualViewport = oracle.visualViewportCss,
                     devicePixelRatio = oracle.devicePixelRatio,
                     visualViewportScale = oracle.visualViewportScale,
+                    navigationInsets = oracle.navigationInsets,
                     id = "discovery-oracle-carrier",
                 )
             } else {
                 null
             }
-        record("carrierMapping", carrier != null, "carrier=${carrier?.compact() ?: "none"}")
+        record(
+            "carrierMapping",
+            carrier != null,
+            "carrier=${carrier?.compact() ?: "none"},navigationInsets=${oracle.navigationInsets}",
+        )
         if (complete == null || carrier == null) {
             return Verification(false, searchEnvelope, carrier, conditions, emptyList())
         }
@@ -293,19 +313,28 @@ internal object ChromeVisualShieldBrowserViewportMapper {
         visualViewport: ChromeVisualShieldLabRect,
         devicePixelRatio: Double,
         visualViewportScale: Double,
+        navigationInsets: ChromeVisualShieldNavigationInsets = ChromeVisualShieldNavigationInsets.Zero,
         id: String,
     ): ChromeVisualRegion? {
+        if (!navigationInsets.isValid()) return null
         val scale = devicePixelRatio * visualViewportScale
         val projectedViewportWidth = visualViewport.width * scale
         val projectedViewportHeight = visualViewport.height * scale
+        val availableLeft = target.left + navigationInsets.left
+        val availableRight = target.right - navigationInsets.right
+        val availableBottom = target.bottom - navigationInsets.bottom
+        val availableWidth = availableRight - availableLeft
+        val availableHeight = availableBottom - target.top
         if (
-            projectedViewportWidth > target.width + PixelTolerance ||
-            projectedViewportHeight > target.height + PixelTolerance
+            availableWidth <= 0 ||
+            availableHeight <= 0 ||
+            projectedViewportWidth > availableWidth + PixelTolerance ||
+            projectedViewportHeight > availableHeight + PixelTolerance
         ) {
             return null
         }
-        val viewportLeft = target.left + (target.width - projectedViewportWidth) / 2.0
-        val viewportTop = target.bottom - projectedViewportHeight
+        val viewportLeft = availableLeft + (availableWidth - projectedViewportWidth) / 2.0
+        val viewportTop = availableBottom - projectedViewportHeight
         val mapped =
             ChromeVisualRegion(
                 id = id,
@@ -317,10 +346,10 @@ internal object ChromeVisualShieldBrowserViewportMapper {
         return mapped.takeIf {
             it.width > 0 &&
                 it.height > 0 &&
-                it.left >= target.left - PixelTolerance &&
+                it.left >= availableLeft - PixelTolerance &&
                 it.top >= target.top - PixelTolerance &&
-                it.right <= target.right + PixelTolerance &&
-                it.bottom <= target.bottom + PixelTolerance
+                it.right <= availableRight + PixelTolerance &&
+                it.bottom <= availableBottom + PixelTolerance
         }
     }
 
