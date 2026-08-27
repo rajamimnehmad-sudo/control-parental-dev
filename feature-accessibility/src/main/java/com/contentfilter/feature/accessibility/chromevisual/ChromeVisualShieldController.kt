@@ -402,6 +402,7 @@ internal class ChromeVisualShieldController(
                 reason = decision.reason,
                 filterProbability = decision.filterProbability,
                 inferenceCount = r1Metrics.snapshot().inferenceCompleted,
+                normalizedEvidence = delivery.normalizedEvidence,
             )
         if (renderProbeCompleted) onCurrentDecision(delivery.sentinelMatches)
         log(
@@ -410,6 +411,15 @@ internal class ChromeVisualShieldController(
                 "region=${delivery.work.identity.region} crop=${cropEvidence.width}x${cropEvidence.height} " +
                 "cropSha=${cropEvidence.rgbaSha256} action=${decision.logValue()} " +
                 "reason=${decision.reason} filterProbability=${decision.filterProbability} " +
+                "canonicalProbability=${decision.filterProbability} canonicalPolicyVerdict=${decision.reason} " +
+                "canonicalAction=${decision.logValue()} " +
+                "normalizedProbability=${delivery.normalizedEvidence?.filterProbability} " +
+                "normalizedPolicyVerdict=${delivery.normalizedEvidence?.reason ?: "none"} " +
+                "normalizedAction=${delivery.normalizedEvidence?.action ?: "none"} " +
+                "normalizedBasis=${delivery.normalizedEvidence?.basis ?: "none"} " +
+                "normalizedPreparedImageCount=${delivery.normalizedEvidence?.preparedImageCount ?: 0} " +
+                "normalizedRegionalImageCount=${delivery.normalizedEvidence?.regionalImageCount ?: 0} " +
+                "normalizedModelInferenceCount=${delivery.normalizedEvidence?.modelInferenceCount ?: 0} " +
                 "inferenceCount=${r1Metrics.snapshot().inferenceCompleted} result=$result neverRelease=true rawPresented=false",
         )
     }

@@ -6,8 +6,10 @@ import com.contentfilter.feature.accessibility.ChromeVisualGloshiaEngineProvider
 import com.glosh.visual.AndroidGloshiaImagePreprocessor
 import com.glosh.visual.GloshiaPreparedRasterPolicy
 import com.glosh.visual.GloshiaVisualAction
+import com.glosh.visual.GloshiaVisualAnalysisResult
 import com.glosh.visual.GloshiaVisualAnalyzer
 import com.glosh.visual.GloshiaVisualDecision
+import com.glosh.visual.GloshiaVisualDecisionBasis
 import com.glosh.visual.GloshiaVisualPolicyContract
 import com.glosh.visual.LifecycleGloshiaVisualAnalyzer
 
@@ -64,6 +66,16 @@ internal object ChromeVisualShieldGloshiaDecisionPolicy {
         }
 }
 
+internal data class ChromeVisualShieldNormalizedAnalysisEvidence(
+    val action: GloshiaVisualAction,
+    val reason: String,
+    val filterProbability: Float?,
+    val basis: GloshiaVisualDecisionBasis,
+    val preparedImageCount: Int,
+    val regionalImageCount: Int,
+    val modelInferenceCount: Int,
+)
+
 /**
  * R1 adapter from the RAM-only Visual Shield crop to the existing GloshIA R3.1 policy.
  * The prepared RGB buffer is always zeroed before returning and inference is serialized.
@@ -115,6 +127,54 @@ internal class ChromeVisualShieldGloshiaAnalyzer(
         } finally {
             prepared.rgb888.fill(0)
         }
+    }
+
+    fun analyzeNormalizedProbe(
+        bitmap: Bitmap,
+        identity: ChromeVisualShieldIdentity,
+        canContinue: () -> Boolean,
+    ): ChromeVisualShieldNormalizedAnalysisEvidence {
+        val currentAnalyzer =
+            engine()
+                ?: return ChromeVisualShieldNormalizedAnalysisEvidence(
+                    action = GloshiaVisualAction.Block,
+                    reason = GloshiaVisualPolicyContract.AnalyzerUnavailableReason,
+                    filterProbability = null,
+                    basis = GloshiaVisualDecisionBasis.None,
+                    preparedImageCount = 0,
+                    regionalImageCount = 0,
+                    modelInferenceCount = 0,
+                )
+        val normalized = ChromeVisualShieldNormalizedRaster.prepare(bitmap)
+        val modelResults = mutableListOf<GloshiaVisualAnalysisResult>()
+        val policyDecision =
+            if (normalized == null) {
+                GloshiaPreparedRasterPolicy.decide(
+                    candidateId = identity.regionId,
+                    preparedImages = emptyList(),
+                    analyzer = currentAnalyzer,
+                    canContinue = canContinue,
+                )
+            } else {
+                normalized.use { owned ->
+                    ChromeVisualShieldNormalizedRasterPolicyProbe.decide(
+                        candidateId = identity.regionId,
+                        preparedImage = owned.preparedImage,
+                        analyzer = currentAnalyzer,
+                        canContinue = canContinue,
+                        onModelResult = modelResults::add,
+                    )
+                }
+            }
+        return ChromeVisualShieldNormalizedAnalysisEvidence(
+            action = policyDecision.action,
+            reason = policyDecision.reason,
+            filterProbability = policyDecision.filterProbability,
+            basis = policyDecision.basis,
+            preparedImageCount = policyDecision.preparedImageCount,
+            regionalImageCount = policyDecision.regionalImageCount,
+            modelInferenceCount = modelResults.size,
+        )
     }
 
     override fun close() {

@@ -44,5 +44,14 @@ internal object ChromeVisualShieldStatusFormatter {
             "probeCrop=${probe?.crop?.width ?: 0}x${probe?.crop?.height ?: 0} " +
             "probeCropSha=${probe?.crop?.rgbaSha256 ?: "none"} probeAction=${probe?.action ?: "none"} " +
             "probeReason=${probe?.reason ?: "none"} probeProbability=${probe?.filterProbability ?: "none"} " +
-            "probeInferenceCount=${probe?.inferenceCount ?: 0}"
+            "probeInferenceCount=${probe?.inferenceCount ?: 0} " +
+            "canonicalProbability=${probe?.filterProbability ?: "none"} " +
+            "canonicalPolicyVerdict=${probe?.reason ?: "none"} canonicalAction=${probe?.action ?: "none"} " +
+            "normalizedProbability=${probe?.normalizedEvidence?.filterProbability ?: "none"} " +
+            "normalizedPolicyVerdict=${probe?.normalizedEvidence?.reason ?: "none"} " +
+            "normalizedAction=${probe?.normalizedEvidence?.action ?: "none"} " +
+            "normalizedBasis=${probe?.normalizedEvidence?.basis ?: "none"} " +
+            "normalizedPreparedImageCount=${probe?.normalizedEvidence?.preparedImageCount ?: 0} " +
+            "normalizedRegionalImageCount=${probe?.normalizedEvidence?.regionalImageCount ?: 0} " +
+            "normalizedModelInferenceCount=${probe?.normalizedEvidence?.modelInferenceCount ?: 0}"
 }

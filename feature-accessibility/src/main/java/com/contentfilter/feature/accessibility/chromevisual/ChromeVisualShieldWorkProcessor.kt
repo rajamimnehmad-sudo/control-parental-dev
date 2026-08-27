@@ -10,6 +10,7 @@ internal data class ChromeVisualShieldDecisionDelivery(
     val decision: ChromeVisualShieldGloshiaDecision,
     val sentinelMatches: Boolean,
     val cropEvidence: ChromeVisualShieldCropEvidence?,
+    val normalizedEvidence: ChromeVisualShieldNormalizedAnalysisEvidence?,
 )
 
 /** Owns one capture/crop/inference cycle; the coordinator serializes these cycles. */
@@ -73,13 +74,28 @@ internal class ChromeVisualShieldWorkProcessor(
                 null
             }
         metrics.onInferenceStarted()
+        var normalizedEvidence: ChromeVisualShieldNormalizedAnalysisEvidence? = null
         val decision =
             try {
-                analyzer.analyze(
-                    bitmap = crop.bitmap,
-                    identity = identity,
-                    canContinue = { identityGate.isCurrentProcessing(identity) },
-                ).also { currentCoroutineContext().ensureActive() }
+                val canonical =
+                    analyzer.analyze(
+                        bitmap = crop.bitmap,
+                        identity = identity,
+                        canContinue = { identityGate.isCurrentProcessing(identity) },
+                    )
+                currentCoroutineContext().ensureActive()
+                normalizedEvidence =
+                    if (work.mode is ChromeVisualShieldWorkMode.RenderProbe) {
+                        analyzer.analyzeNormalizedProbe(
+                            bitmap = crop.bitmap,
+                            identity = identity,
+                            canContinue = { identityGate.isCurrentProcessing(identity) },
+                        )
+                    } else {
+                        null
+                    }
+                currentCoroutineContext().ensureActive()
+                canonical
             } catch (cancelled: CancellationException) {
                 metrics.onInferenceCancelled()
                 throw cancelled
@@ -93,6 +109,7 @@ internal class ChromeVisualShieldWorkProcessor(
                 decision = decision,
                 sentinelMatches = matches,
                 cropEvidence = cropEvidence,
+                normalizedEvidence = normalizedEvidence,
             ),
         )
     }
