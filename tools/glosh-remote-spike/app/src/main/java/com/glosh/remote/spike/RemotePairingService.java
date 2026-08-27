@@ -312,8 +312,8 @@ public final class RemotePairingService extends Service {
             return;
         }
         notifyCodeEntry(
-                "Glosh · Paso 7 de " + TOTAL_STEPS,
-                "Mirá los 6 números que muestra Android y escribilos en Glosh.",
+                "Ingresá el código acá",
+                "No vuelvas a Glosh. Mantené abierta la vinculación de Android y tocá “INGRESAR 6 DÍGITOS” en esta notificación.",
                 PairingUiState.WAITING_FOR_CODE);
     }
 
@@ -330,20 +330,25 @@ public final class RemotePairingService extends Service {
                 replyIntent,
                 mutableFlags);
         RemoteInput remoteInput = new RemoteInput.Builder(REMOTE_INPUT_CODE)
-                .setLabel("Código de 6 dígitos")
+                .setLabel("6 dígitos")
+                .setAllowFreeFormInput(true)
                 .build();
         Notification.Action replyAction = new Notification.Action.Builder(
                 android.R.drawable.ic_menu_send,
-                "Ingresar código",
+                "INGRESAR 6 DÍGITOS",
                 replyPendingIntent)
                 .addRemoteInput(remoteInput)
+                .setSemanticAction(Notification.Action.SEMANTIC_ACTION_REPLY)
+                .setAllowGeneratedReplies(false)
                 .build();
-        Notification notification = baseNotification()
+        String directText = text
+                + " Tocá “INGRESAR 6 DÍGITOS” abajo y enviá el PIN sin salir de Ajustes.";
+        Notification notification = baseNotification(false)
                 .setOnlyAlertOnce(false)
                 .setContentTitle(title)
-                .setContentText(text)
-                .setStyle(new Notification.BigTextStyle().bigText(text))
-                .setSubText("Último paso")
+                .setContentText(directText)
+                .setStyle(new Notification.BigTextStyle().bigText(directText))
+                .setSubText("PIN de vinculación")
                 .setProgress(TOTAL_STEPS, 7, false)
                 .setOngoing(true)
                 .addAction(replyAction)
@@ -725,17 +730,24 @@ public final class RemotePairingService extends Service {
     }
 
     private Notification.Builder baseNotification() {
+        return baseNotification(true);
+    }
+
+    private Notification.Builder baseNotification(boolean openAppOnTap) {
+        Notification.Builder builder = new Notification.Builder(this, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setOnlyAlertOnce(true);
+        if (!openAppOnTap) {
+            return builder;
+        }
         Intent openIntent = new Intent(this, MainActivity.class);
         int immutable = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             immutable |= PendingIntent.FLAG_IMMUTABLE;
         }
         PendingIntent openPendingIntent = PendingIntent.getActivity(this, 7400, openIntent, immutable);
-        return new Notification.Builder(this, CHANNEL_ID)
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setCategory(Notification.CATEGORY_SERVICE)
-                .setOnlyAlertOnce(true)
-                .setContentIntent(openPendingIntent);
+        return builder.setContentIntent(openPendingIntent);
     }
 
     private Notification.Action stopAction() {

@@ -10,7 +10,7 @@ FINAL_APK="$APK_DIR/GloshRemote-PIN-ONLY-19-DEV.apk"
 REPORT="$APK_DIR/REMOTE-PIN-ONLY-19-report.txt"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="$(mktemp -d "${TMPDIR:-/tmp}/glosh-pin-only-python.XXXXXX")"
-MIN_DEV_VERSION_CODE=20
+MIN_DEV_VERSION_CODE=21
 
 cleanup() { rm -rf "$VENV_DIR"; }
 trap cleanup EXIT
@@ -22,10 +22,10 @@ sha256_file() {
 file_size() { local path="$1"; if stat -f%z "$path" >/dev/null 2>&1; then stat -f%z "$path"; else stat -c%s "$path"; fi; }
 normalize_digest() { tr '[:upper:]' '[:lower:]' | tr -d '[:space:]:'; }
 
-printf '\n=== Glosh Remote PIN-only 19 physical-fix gate ===\n'
+printf '\n=== Glosh Remote PIN-only 19 notification-input gate ===\n'
 printf 'Repo: %s\nHEAD: %s\n' "$REPO_ROOT" "$(git -C "$REPO_ROOT" rev-parse HEAD)"
 
-printf '\n[1/5] Product architecture + physical flow + pairing/session stability + stable DEV signing guard\n'
+printf '\n[1/5] Product architecture + notification PIN + physical flow + pairing/session stability + stable DEV signing guard\n'
 MANIFEST="$SCRIPT_DIR/app/src/main/AndroidManifest.xml"
 MAIN="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/MainActivity.java"
 SERVICE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/RemotePairingService.java"
@@ -56,6 +56,7 @@ if ! grep -q 'requestDirectSession' "$COORDINATOR" || ! grep -q 'requestDirectSu
 if ! grep -q 'ACTION_ATTACH_DESCRIPTOR' "$SERVICE" || ! grep -q 'CHECKING_SAVED_IDENTITY' "$SERVICE" || ! grep -q 'SessionState.ADB_READY' "$SERVICE" || ! grep -q 'validateOptionalDescriptor' "$SERVICE"; then echo "ERROR: ADB local sigue acoplado al descriptor del relay." >&2; exit 3; fi
 if ! grep -q 'pairingEndpoints.lost' "$SERVICE" || ! grep -q 'PairingFailureClassifier.classify' "$SERVICE" || ! grep -q 'reuseIdentityOrStartPairing' "$SERVICE" || ! grep -q 'LocalAdbSession' "$SERVICE" || ! grep -q 'RelaySessionSupervisor' "$SERVICE"; then echo "ERROR: pairing/reconnect lifecycle incompleto." >&2; exit 3; fi
 if grep -q 'rejectedEndpoint' "$SERVICE"; then echo "ERROR: volvió blacklist stale de endpoint." >&2; exit 3; fi
+if ! grep -q 'RemoteInput.Builder' "$SERVICE" || ! grep -q 'setAllowFreeFormInput(true)' "$SERVICE" || ! grep -q 'SEMANTIC_ACTION_REPLY' "$SERVICE" || ! grep -q 'INGRESAR 6 DÍGITOS' "$SERVICE" || ! grep -q 'baseNotification(false)' "$SERVICE"; then echo "ERROR: PIN desde notificación no quedó como ruta primaria sin salir de Ajustes." >&2; exit 3; fi
 if ! grep -q 'shouldShowCodeInput' "$BOOTSTRAP_POLICY" || ! grep -q 'shouldLaunchWirelessSettings' "$BOOTSTRAP_POLICY" || ! grep -q 'canAttachDescriptor' "$BOOTSTRAP_POLICY"; then echo "ERROR: faltan guards del flujo físico PIN-only." >&2; exit 3; fi
 if ! grep -q 'WIRELESS_DEBUGGING' "$SETTINGS_NAVIGATOR"; then echo "ERROR: SettingsNavigator perdió la ruta de Depuración inalámbrica." >&2; exit 3; fi
 if ! grep -q 'AndroidKeyStore' "$IDENTITY_STORE" || ! grep -q 'AES/GCM/NoPadding' "$IDENTITY_STORE" || ! grep -q 'releaseConnection' "$ADB_MANAGER" || ! grep -q 'ensureConnected' "$ADB_MANAGER"; then echo "ERROR: identidad ADB persistente/reutilizable incompleta." >&2; exit 3; fi
@@ -68,7 +69,7 @@ if grep -R -Eq 'SamsungPipCoachView|PictureInPictureParams|RemoteAction' "$SCRIP
 if [[ ! -s "$DEV_SIGNER_SOURCE" ]]; then echo "ERROR: falta identidad DEV estable." >&2; exit 3; fi
 VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' "$BUILD_GRADLE" | head -n 1)"
 if ! grep -q 'create("stableDev")' "$BUILD_GRADLE" || ! grep -q 'signingConfig = signingConfigs.getByName("stableDev")' "$BUILD_GRADLE" || [[ ! "$VERSION_CODE" =~ ^[0-9]+$ ]] || (( VERSION_CODE < MIN_DEV_VERSION_CODE )); then echo "ERROR: firma/versionCode inválidos." >&2; exit 3; fi
-printf 'PASS: PIN-only + direct wireless settings + local ADB before relay + persistent identity + reconnect + screen lease (versionCode %s)\n' "$VERSION_CODE"
+printf 'PASS: PIN-only + notification reply + direct wireless settings + local ADB before relay + persistent identity + reconnect + screen lease (versionCode %s)\n' "$VERSION_CODE"
 
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
@@ -95,7 +96,7 @@ if [[ -z "$APK_CERT_SHA256" || "$APK_CERT_SHA256" != "$KEYSTORE_CERT_SHA256" ]];
 cp -f "$SOURCE_APK" "$FINAL_APK"
 APK_SHA="$(sha256_file "$FINAL_APK")"; APK_SIZE="$(file_size "$FINAL_APK")"; HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"; STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 {
-  echo "TASK=REMOTE-PIN-ONLY-19D-PHYSICAL-FIX"; echo "RESULT=PASS_AUTOMATED"; echo "HEAD=$HEAD_SHA"; echo "ARCHITECTURE_GUARD=PASS"; echo "PYTHON_TESTS=PASS"; echo "ANDROID_UNIT_TESTS=PASS"; echo "LINT=PASS"; echo "ASSEMBLE=PASS"; echo "WIRELESS_SETTINGS_HANDOFF=PASS"; echo "PIN_INPUT_ENDPOINT_GATED=PASS"; echo "LOCAL_ADB_BEFORE_RELAY=PASS"; echo "PAIRING_STABILITY=PASS"; echo "PERSISTENT_ADB_IDENTITY=PASS"; echo "ADB_RECONNECT=PASS"; echo "RELAY_RECONNECT=PASS"; echo "SCREEN_AWAKE_LEASE=PASS"; echo "VERSION_CODE=$VERSION_CODE"; echo "DEV_SIGNER_SHA256=$APK_CERT_SHA256"; echo "APK=$FINAL_APK"; echo "APK_SIZE_BYTES=$APK_SIZE"; echo "APK_SHA256=$APK_SHA";
+  echo "TASK=REMOTE-PIN-ONLY-19E-NOTIFICATION-PIN"; echo "RESULT=PASS_AUTOMATED"; echo "HEAD=$HEAD_SHA"; echo "ARCHITECTURE_GUARD=PASS"; echo "PYTHON_TESTS=PASS"; echo "ANDROID_UNIT_TESTS=PASS"; echo "LINT=PASS"; echo "ASSEMBLE=PASS"; echo "NOTIFICATION_PIN_INPUT=PASS"; echo "WIRELESS_SETTINGS_HANDOFF=PASS"; echo "PIN_INPUT_ENDPOINT_GATED=PASS"; echo "LOCAL_ADB_BEFORE_RELAY=PASS"; echo "PAIRING_STABILITY=PASS"; echo "PERSISTENT_ADB_IDENTITY=PASS"; echo "ADB_RECONNECT=PASS"; echo "RELAY_RECONNECT=PASS"; echo "SCREEN_AWAKE_LEASE=PASS"; echo "VERSION_CODE=$VERSION_CODE"; echo "DEV_SIGNER_SHA256=$APK_CERT_SHA256"; echo "APK=$FINAL_APK"; echo "APK_SIZE_BYTES=$APK_SIZE"; echo "APK_SHA256=$APK_SHA";
   if [[ -z "$STATUS" ]]; then echo "GIT_STATUS=clean"; else echo "GIT_STATUS_BEGIN"; printf '%s\n' "$STATUS"; echo "GIT_STATUS_END"; fi
 } > "$REPORT"
 printf '\nPASS_AUTOMATED\nHEAD: %s\nVERSION_CODE: %s\nDEV_SIGNER_SHA256: %s\nAPK: %s\nAPK_SIZE_BYTES: %s\nAPK_SHA256: %s\nREPORT: %s\n' "$HEAD_SHA" "$VERSION_CODE" "$APK_CERT_SHA256" "$FINAL_APK" "$APK_SIZE" "$APK_SHA" "$REPORT"
