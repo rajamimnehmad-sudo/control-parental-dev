@@ -4,7 +4,7 @@ Fecha: 2026-08-27. Dispositivo: Samsung A23 `SM-A235M`, Android 14/API 34.
 
 ## STATUS
 
-**TECHNICAL/PHYSICAL PASS — PENDING CHATGPT FINAL REVIEW.** R2A localiza y
+**R2A PASS FINAL VALIDATION — READY FOR CHATGPT FINAL REVIEW.** R2A localiza y
 clasifica regiones renderer-local únicamente en fixtures controlados. Todo el
 gate permanece `NEVER RELEASE`; no se agregó autoridad productiva ni se inició
 R2B.
@@ -118,13 +118,49 @@ descartados: `settings user_rotation` no había rotado físicamente la window. E
 gate válido usó `wm user-rotation lock 1` y verificó
 `mCurrentRotation=ROTATION_90`, `cur=2408x1080`.
 
+### FINAL VALIDATION — MISMO APK DEV375
+
+La validación final no recompiló ni reinstaló. Se extrajo el APK instalado y se
+comparó byte a byte con el artefacto final local: ambos midieron `159106869`
+bytes y SHA-256
+`799c328901820cdebf5a5f66e5a7c7b006aa7cc07050aaccedffc18b0b19221b`.
+Los cuatro centered ya acreditados no se repitieron.
+
+Los escenarios que antes se habían acumulado antes del `edgeInset` final se
+ejecutaron sobre ese mismo DEV375 final:
+
+| Caso final DEV375 | Crop SHA-256 | Discovery / oracle | R3.1 |
+|---|---|---|---|
+| BLOCK off-left | `208f037030c4d6d193b494260f6c953dbf8a5b81088ff21766b8d995e68a872a` | Complete / match | Block `model_filter`, p=`0.93844444` |
+| BLOCK off-right | `3a0c9cacb1609a73ff4463e465bc410adc25aa25ae6e76d161b252c48ed31fa2` | Complete / match | Block `model_filter`, p=`0.9408576` |
+| multi SAFE + BLOCK | `6f56bb0aff6a3c538cec552696ac0bcb7fa31300907fc7661cc1d41df5305e90` | Complete / match, 2 regiones | Allow p=`0.028654963`; Block p=`0.93331885` |
+| ambiguous | `e9ca519914b7de7628d3e84b283325c3d10f5ff94e4899af1704a7d973a2bad6` | Unknown `BackgroundAmbiguous` / match | 0 inferencias |
+
+Cada ciclo aceptado registró `attested contentEpoch/regionSequence == capture
+contentEpoch/regionSequence`, `errorCode3=0`, `neverRelease=true` y
+`rawPresented=false`. Un comando inicial off-left emitido antes de que Chrome
+apareciera devolvió `chrome_absent` y no produjo captura; el escenario válido
+se ejecutó inmediatamente después en la misma sesión.
+
+La transición portrait -> landscape -> portrait verificó físicamente
+`ROTATION_0 / cur=1080x2408`, `ROTATION_90 / cur=2408x1080` y nuevamente
+`ROTATION_0 / cur=1080x2408`. `viewportEpoch` avanzó `9 -> 11 -> 14`; las
+capturas posteriores quedaron ligadas a `E198/R198` y `E214/R214`,
+respectivamente, sin liberar resultados anteriores.
+
 ## FULLBLEED ADVERSARIAL
 
 Tests puros cubren múltiples regiones edge-dense, contenido tocando bordes, dos
 contenidos separados con textura fuerte, SAFE+BLOCK edge-dense y layouts donde
 un único full-frame sería incorrecto. Todos producen regiones separadas o
 `Unknown`; nunca un falso `Complete` fusionado. El shortcut permisivo fue
-eliminado y no se relajaron los criterios de residual/ambiguity.
+eliminado y no se relajaron los criterios de residual/ambiguity. Sobre el HEAD
+final se reejecutaron `ChromeVisualShieldRegionDiscoveryPlannerTest`,
+`ChromeVisualShieldRegionDiscoveryOracleVerifierTest`,
+`ChromeVisualShieldRasterGeometryEvidenceTest` y
+`ChromeWindowCaptureOwnershipTest`: `BUILD SUCCESSFUL`, 117 tareas. La búsqueda
+en producción sólo conserva la telemetría `fullBleedAuthority=false`; no existe
+un shortcut `fullBleed` con autoridad `Complete`.
 
 ## NEVER RELEASE / ZERO EXPOSURE
 
@@ -145,12 +181,17 @@ Grabaciones temporales analizadas a 10 fps mediante máscara
 ```text
 DEV375 landscape: 1787 frames, sentinelVisibleFrames=0, peakRedCoverage=0.840274%
 DEV375 portrait:   582 frames, sentinelVisibleFrames=0, peakRedCoverage=0.071187%
+DEV375 final validation: 1820 frames, sentinelVisibleFrames=0, peakRedCoverage=0.836804%
 ```
 
 SHA-256 temporales: landscape
 `4abfea04b6aedff882edc0943209dd809d71c5d7e3264f9499d46a534df055c3`;
 portrait
 `60147d3abc3a79895a2cdf17dc7f17f46403d34b97a71f444a6ac5de4ba85b0e`.
+La grabación de validación final duró `181.969411s`, fue adquirida a
+`720x1280` con cadencia efectiva del dispositivo `1/3 fps` y luego remuestreada
+a 10 fps por el analizador; SHA-256 temporal
+`1f6716a209bbe65e3e193ff2a74cf8edf1971d49cd98e991fa8a0f4b9b4dafe6`.
 Las grabaciones se eliminaron después de extraer métricas. La conclusión es
 exposición observable `0` a la resolución de sampling; no se afirma cobertura
 entre muestras.
@@ -164,21 +205,22 @@ attestedContentEpoch == captureContentEpoch
 attestedRegionSequence == captureRegionSequence
 ```
 
-La inyección stale final produjo:
+La inyección stale de validación final produjo:
 
 ```text
-staleDropped=1
-staleInferenceDropped=1
-releaseRejected=1
+staleDropped=2
+staleInferenceDropped=2
+releaseRejected=2
 releaseCurrent=0
+rawPresented=false
 ```
 
 Estado terminal DEV375:
 
 ```text
-fullFrameAcquired=4 fullFrameClosed=4 fullFrameOutstanding=0
-cropCreated=4 cropClosed=4 cropOutstanding=0
-inferenceStarted=4 inferenceCompleted=4 inferenceOutstanding=0
+fullFrameAcquired=10 fullFrameClosed=10 fullFrameOutstanding=0
+cropCreated=10 cropClosed=10 cropOutstanding=0
+inferenceStarted=10 inferenceCompleted=10 inferenceOutstanding=0
 workIdle=true
 ```
 
