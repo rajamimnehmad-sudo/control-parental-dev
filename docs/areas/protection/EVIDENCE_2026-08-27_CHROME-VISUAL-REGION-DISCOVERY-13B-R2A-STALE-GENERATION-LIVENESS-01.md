@@ -143,6 +143,15 @@ correspond to distinct observed native/geometry states and the third to the
 single stale-generation replacement. Two later status snapshots did not add
 identity or render requests.
 
+Coverage precision: the physical `region_generation_invalidated` above came
+from the already accepted generation's native completion outcome. The new
+pre-claim/post-claim classifier metric remained `generationInvalidations=0` in
+this session, so those two typed branches are proven by deterministic tests but
+were not themselves exercised on the A23. The ticket's allowed physical route
+B was still observed end-to-end (one invalidation, one replacement, matching
+fresh attestation/capture), but this run must not be cited as physical coverage
+of both typed classifier branches.
+
 ## Physical blocker
 
 Immediately after the exact E22/R22 capture binding was accepted, Android
