@@ -3,6 +3,7 @@ package com.contentfilter.user.chromedataplane
 import android.util.Log
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabControl
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryGenerationOutcome
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryNativeGeneration
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryRenderBinding
 
 internal enum class ChromeVisualShieldRegionDiscoveryScenario(
@@ -183,62 +184,40 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
         val fields = request.body.toString(Charsets.UTF_8).split('|')
         val claimedBinding = fields.toRegionDiscoveryBinding()
         val nativeGeneration = ChromeVisualShieldLabControl.currentRegionDiscoveryGeneration()
-        val claim =
+        val claimResult =
             if (
                 request.method == "POST" &&
                 request.body.size <= MaxAttestationBytes &&
                 nativeGeneration != null &&
-                claimedBinding != null
+                claimedBinding != null &&
+                scenario.samples.all { ChromeVisualShieldFixtureSampleStore.isReady(it) }
             ) {
                 ChromeVisualShieldRegionDiscoveryHandshakeStore.claimAttestation(
                     nativeGeneration = nativeGeneration,
                     claimedBinding = claimedBinding,
                 )
             } else {
-                null
+                ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid("request_invalid")
             }
         val result =
-            if (
-                claim == null ||
-                scenario.samples.any { !ChromeVisualShieldFixtureSampleStore.isReady(it) }
-            ) {
-                "result=region_attestation_stale_or_invalid scenario=${scenario.wireName}"
-            } else {
-                val recorded =
-                    ChromeVisualShieldRegionDiscoveryAttestationStore.record(
+            when (claimResult) {
+                is ChromeVisualShieldRegionDiscoveryAttestationClaimResult.GenerationInvalidated -> {
+                    ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
+                    generationInvalidatedResult(
                         scenario = scenario,
-                        body = request.body.toString(Charsets.UTF_8),
-                        expectedBinding = claim.binding,
+                        staleBinding = claimResult.staleBinding,
+                        currentGeneration = claimResult.currentGeneration,
                     )
-                val attestation =
-                    ChromeVisualShieldRegionDiscoveryAttestationStore.peek(
-                        scenario,
-                        claim.binding,
-                    )
-                val accepted =
-                    ChromeVisualShieldRegionDiscoveryHandshakeStore.executeAttestation(
-                        claim,
-                        ChromeVisualShieldLabControl.currentRegionDiscoveryGeneration(),
-                    ) {
-                        if (!recorded.startsWith("result=region_render_attested") || attestation == null) {
-                            false
-                        } else {
-                            ChromeVisualShieldLabControl.renderAttested(
-                                renderIdentityToken = claim.binding.renderIdentityToken,
-                                regionDiscoveryOracle = attestation.oracle(),
-                                regionDiscoveryBinding = claim.binding,
-                            ) == "result=render_identity_attested"
-                        }
-                    }
-                when {
-                    accepted == null ->
-                        "result=region_attestation_stale scenario=${scenario.wireName}"
-                    accepted -> generationResult(scenario, claim.binding, recorded)
-                    else -> {
-                        ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
-                        "result=region_attestation_rejected scenario=${scenario.wireName} detail=$recorded"
-                    }
                 }
+                is ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid ->
+                    "result=region_attestation_stale_or_invalid scenario=${scenario.wireName} " +
+                        "reason=${claimResult.reason}"
+                is ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Claimed ->
+                    executeAttestation(
+                        request = request,
+                        scenario = scenario,
+                        claim = claimResult.claim,
+                    )
             }
         Log.i(
             LogTag,
@@ -246,6 +225,65 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
         )
         return response(path, "text/plain; charset=utf-8", result)
     }
+
+    private fun executeAttestation(
+        request: ChromePhotosProxyRequest,
+        scenario: ChromeVisualShieldRegionDiscoveryScenario,
+        claim: ChromeVisualShieldRegionDiscoveryAttestationClaim,
+    ): String {
+        val recorded =
+            ChromeVisualShieldRegionDiscoveryAttestationStore.record(
+                scenario = scenario,
+                body = request.body.toString(Charsets.UTF_8),
+                expectedBinding = claim.binding,
+            )
+        val attestation = ChromeVisualShieldRegionDiscoveryAttestationStore.peek(scenario, claim.binding)
+        val execution =
+            ChromeVisualShieldRegionDiscoveryHandshakeStore.executeAttestation(
+                claim,
+                ChromeVisualShieldLabControl.currentRegionDiscoveryGeneration(),
+            ) {
+                if (!recorded.startsWith("result=region_render_attested") || attestation == null) {
+                    false
+                } else {
+                    ChromeVisualShieldLabControl.renderAttested(
+                        renderIdentityToken = claim.binding.renderIdentityToken,
+                        regionDiscoveryOracle = attestation.oracle(),
+                        regionDiscoveryBinding = claim.binding,
+                    ) == "result=render_identity_attested"
+                }
+            }
+        return when (execution) {
+            ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Accepted ->
+                generationResult(scenario, claim.binding, recorded)
+            ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Rejected -> {
+                ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
+                "result=region_attestation_rejected scenario=${scenario.wireName} detail=$recorded"
+            }
+            is ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.GenerationInvalidated -> {
+                ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
+                generationInvalidatedResult(
+                    scenario = scenario,
+                    staleBinding = execution.staleBinding,
+                    currentGeneration = execution.currentGeneration,
+                )
+            }
+            is ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.StaleClaim -> {
+                ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
+                "result=region_attestation_stale scenario=${scenario.wireName} reason=${execution.reason}"
+            }
+        }
+    }
+
+    private fun generationInvalidatedResult(
+        scenario: ChromeVisualShieldRegionDiscoveryScenario,
+        staleBinding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+        currentGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration,
+    ): String =
+        "result=region_generation_invalidated scenario=${scenario.wireName} " +
+            "contentEpoch=${staleBinding.contentEpoch} regionSequence=${staleBinding.regionSequence} " +
+            "currentContentEpoch=${currentGeneration.contentEpoch} " +
+            "currentRegionSequence=${currentGeneration.regionSequence}"
 
     private fun generationResult(
         scenario: ChromeVisualShieldRegionDiscoveryScenario,
@@ -510,4 +548,4 @@ private fun ChromeVisualShieldRegionDiscoveryHandshakeMetrics.logText(): String 
     "identityRequests=$requests beginFixtureRenderCount=$beginFixtureRenderCount reused=$reused " +
         "attestationClaims=$attestationClaims attestationAccepted=$attestationAccepted " +
         "attestationRejected=$attestationRejected staleAttestationDropped=$staleAttestationDropped " +
-        "generationReplacements=$generationReplacements"
+        "generationInvalidations=$generationInvalidations generationReplacements=$generationReplacements"

@@ -24,9 +24,11 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
     fun `same generation duplicates remain reuse after attestation`() {
         val fixture = Fixture()
         val started = fixture.newRender(KeyA)
-        val claim = assertNotNull(fixture.policy.claimAttestation(fixture.current, started.binding))
+        val claim = fixture.claim(started.binding)
 
-        assertEquals(true, fixture.policy.executeAttestation(claim, fixture.current) { true })
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Accepted>(
+            fixture.policy.executeAttestation(claim, fixture.current) { true },
+        )
         val repeated = assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(fixture.request(KeyA))
 
         assertEquals(ChromeVisualShieldRegionDiscoveryHandshakePhase.Attested, repeated.phase)
@@ -62,8 +64,10 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
     fun `attestation rejection never auto retries same generation and key`() {
         val fixture = Fixture()
         val started = fixture.newRender(KeyA)
-        val claim = assertNotNull(fixture.policy.claimAttestation(fixture.current, started.binding))
-        assertEquals(false, fixture.policy.executeAttestation(claim, fixture.current) { false })
+        val claim = fixture.claim(started.binding)
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Rejected>(
+            fixture.policy.executeAttestation(claim, fixture.current) { false },
+        )
 
         val repeated = assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(fixture.request(KeyA))
 
@@ -72,50 +76,164 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
     }
 
     @Test
-    fun `stale generation cannot execute attestation callback`() {
+    fun `native generation changing after claim invalidates once without executing callback`() {
         val fixture = Fixture()
         val first = fixture.newRender(KeyA)
-        val staleClaim = assertNotNull(fixture.policy.claimAttestation(fixture.current, first.binding))
+        val staleClaim = fixture.claim(first.binding)
         fixture.invalidateGeneration()
         var actionCalls = 0
 
-        val result =
+        val firstResult =
+            fixture.policy.executeAttestation(staleClaim, fixture.current) {
+                actionCalls += 1
+                true
+            }
+        val repeated =
             fixture.policy.executeAttestation(staleClaim, fixture.current) {
                 actionCalls += 1
                 true
             }
 
-        assertNull(result)
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.GenerationInvalidated>(firstResult)
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.StaleClaim>(repeated)
         assertEquals(0, actionCalls)
         assertEquals(1, fixture.policy.metrics().staleAttestationDropped)
+        assertEquals(1, fixture.policy.metrics().generationInvalidations)
     }
 
     @Test
-    fun `stale binding cannot claim attestation for current generation`() {
+    fun `active stale binding invalidates once before claim`() {
         val fixture = Fixture()
         val first = fixture.newRender(KeyA)
         fixture.invalidateGeneration()
 
-        assertNull(fixture.policy.claimAttestation(fixture.current, first.binding))
+        val firstResult = fixture.policy.claimAttestation(fixture.current, first.binding)
+        val repeated = fixture.policy.claimAttestation(fixture.current, first.binding)
+
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.GenerationInvalidated>(firstResult)
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid>(repeated)
         assertEquals(1, fixture.policy.metrics().staleAttestationDropped)
+        assertEquals(1, fixture.policy.metrics().generationInvalidations)
+        assertEquals(1, fixture.beginCount)
     }
 
     @Test
     fun `duplicate attestation never invokes native callback twice`() {
         val fixture = Fixture()
         val started = fixture.newRender(KeyA)
-        val firstClaim = assertNotNull(fixture.policy.claimAttestation(fixture.current, started.binding))
+        val firstClaim = fixture.claim(started.binding)
         var nativeCalls = 0
-        assertEquals(
-            true,
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Accepted>(
             fixture.policy.executeAttestation(firstClaim, fixture.current) {
                 nativeCalls += 1
                 true
             },
         )
 
-        assertNull(fixture.policy.claimAttestation(fixture.current, started.binding))
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid>(
+            fixture.policy.claimAttestation(fixture.current, started.binding),
+        )
         assertEquals(1, nativeCalls)
+    }
+
+    @Test
+    fun `invalid and foreign bindings never request a new generation`() {
+        val fixture = Fixture()
+        val started = fixture.newRender(KeyA)
+        val malformed = started.binding.copy(renderGeometryKeyDigest = "short")
+        val random =
+            started.binding.copy(
+                contentEpoch = started.binding.contentEpoch + 10,
+                regionSequence = started.binding.regionSequence + 10,
+            )
+        val foreignSession = fixture.current.copy(protectionSessionId = fixture.current.protectionSessionId + 1)
+        val foreignWindow = fixture.current.copy(windowId = fixture.current.windowId + 1)
+
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid>(
+            fixture.policy.claimAttestation(fixture.current, malformed),
+        )
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid>(
+            fixture.policy.claimAttestation(fixture.current, random),
+        )
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid>(
+            fixture.policy.claimAttestation(foreignSession, started.binding),
+        )
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid>(
+            fixture.policy.claimAttestation(foreignWindow, started.binding),
+        )
+        assertEquals(0, fixture.policy.metrics().generationInvalidations)
+        assertEquals(1, fixture.beginCount)
+    }
+
+    @Test
+    fun `foreign native generation after claim is stale without invalidation signal`() {
+        val fixture = Fixture()
+        val started = fixture.newRender(KeyA)
+        val claim = fixture.claim(started.binding)
+        val foreign = fixture.current.copy(windowId = fixture.current.windowId + 1)
+        var actionCalls = 0
+
+        val execution =
+            fixture.policy.executeAttestation(claim, foreign) {
+                actionCalls += 1
+                true
+            }
+
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.StaleClaim>(execution)
+        assertEquals(0, actionCalls)
+        assertEquals(0, fixture.policy.metrics().generationInvalidations)
+    }
+
+    @Test
+    fun `stale invalidation permits exactly one fresh render for same geometry`() {
+        val fixture = Fixture()
+        val stale = fixture.newRender(KeyA)
+        fixture.invalidateGeneration()
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.GenerationInvalidated>(
+            fixture.policy.claimAttestation(fixture.current, stale.binding),
+        )
+
+        val fresh = fixture.newRender(KeyA)
+        val duplicate = assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(fixture.request(KeyA))
+
+        assertEquals(fixture.current, fresh.binding.generation())
+        assertEquals(ChromeVisualShieldRegionDiscoveryHandshakePhase.InFlight, duplicate.phase)
+        assertEquals(2, fixture.beginCount)
+        assertEquals(1, fixture.policy.metrics().generationInvalidations)
+        assertEquals(1, fixture.policy.metrics().generationReplacements)
+        fixture.claim(fresh.binding)
+    }
+
+    @Test
+    fun `normal fresh claim and execute are accepted`() {
+        val fixture = Fixture()
+        val started = fixture.newRender(KeyA)
+
+        val execution = fixture.policy.executeAttestation(fixture.claim(started.binding), fixture.current) { true }
+
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Accepted>(execution)
+        assertEquals(1, fixture.policy.metrics().attestationClaims)
+        assertEquals(1, fixture.policy.metrics().attestationAccepted)
+        assertEquals(0, fixture.policy.metrics().generationInvalidations)
+    }
+
+    @Test
+    fun `clear removes active generation and all one shot metrics`() {
+        val fixture = Fixture()
+        val stale = fixture.newRender(KeyA)
+        fixture.invalidateGeneration()
+        fixture.policy.claimAttestation(fixture.current, stale.binding)
+
+        fixture.policy.clear()
+
+        assertEquals(
+            ChromeVisualShieldRegionDiscoveryHandshakeMetrics(0, 0, 0, 0, 0, 0, 0, 0, 0),
+            fixture.policy.metrics(),
+        )
+        assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid>(
+            fixture.policy.claimAttestation(fixture.current, stale.binding),
+        )
+        assertEquals(0, fixture.policy.metrics().generationInvalidations)
     }
 
     @Test
@@ -189,6 +307,11 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
 
         fun newRender(key: ChromeVisualShieldRegionDiscoveryRenderGeometryKey) =
             assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired>(request(key))
+
+        fun claim(binding: ChromeVisualShieldRegionDiscoveryRenderBinding) =
+            assertIs<ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Claimed>(
+                policy.claimAttestation(current, binding),
+            ).claim
 
         fun invalidateGeneration() {
             current = current.nextGeneration()

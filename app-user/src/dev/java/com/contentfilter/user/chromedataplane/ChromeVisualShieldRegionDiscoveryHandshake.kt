@@ -110,6 +110,7 @@ internal enum class ChromeVisualShieldRegionDiscoveryHandshakePhase {
     InFlight,
     Attesting,
     Attested,
+    Invalidated,
     Rejected,
 }
 
@@ -121,6 +122,7 @@ internal data class ChromeVisualShieldRegionDiscoveryHandshakeMetrics(
     val attestationAccepted: Long,
     val attestationRejected: Long,
     val staleAttestationDropped: Long,
+    val generationInvalidations: Long,
     val generationReplacements: Long,
 )
 
@@ -152,6 +154,36 @@ internal data class ChromeVisualShieldRegionDiscoveryAttestationClaim(
     val binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
 )
 
+internal sealed interface ChromeVisualShieldRegionDiscoveryAttestationClaimResult {
+    data class Claimed(
+        val claim: ChromeVisualShieldRegionDiscoveryAttestationClaim,
+    ) : ChromeVisualShieldRegionDiscoveryAttestationClaimResult
+
+    data class GenerationInvalidated(
+        val staleBinding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+        val currentGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration,
+    ) : ChromeVisualShieldRegionDiscoveryAttestationClaimResult
+
+    data class Invalid(
+        val reason: String,
+    ) : ChromeVisualShieldRegionDiscoveryAttestationClaimResult
+}
+
+internal sealed interface ChromeVisualShieldRegionDiscoveryAttestationExecutionResult {
+    data object Accepted : ChromeVisualShieldRegionDiscoveryAttestationExecutionResult
+
+    data object Rejected : ChromeVisualShieldRegionDiscoveryAttestationExecutionResult
+
+    data class GenerationInvalidated(
+        val staleBinding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+        val currentGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration,
+    ) : ChromeVisualShieldRegionDiscoveryAttestationExecutionResult
+
+    data class StaleClaim(
+        val reason: String,
+    ) : ChromeVisualShieldRegionDiscoveryAttestationExecutionResult
+}
+
 internal class ChromeVisualShieldRegionDiscoveryHandshakePolicy {
     private data class Active(
         val requestSequence: Long,
@@ -169,6 +201,7 @@ internal class ChromeVisualShieldRegionDiscoveryHandshakePolicy {
     private var attestationAccepted = 0L
     private var attestationRejected = 0L
     private var staleAttestationDropped = 0L
+    private var generationInvalidations = 0L
     private var generationReplacements = 0L
 
     @Synchronized
@@ -226,23 +259,33 @@ internal class ChromeVisualShieldRegionDiscoveryHandshakePolicy {
     fun claimAttestation(
         nativeGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration,
         claimedBinding: ChromeVisualShieldRegionDiscoveryRenderBinding,
-    ): ChromeVisualShieldRegionDiscoveryAttestationClaim? {
+    ): ChromeVisualShieldRegionDiscoveryAttestationClaimResult {
         val current = active
-        if (
-            current == null ||
-            current.binding != claimedBinding ||
-            !claimedBinding.matches(nativeGeneration) ||
-            current.key.digest != claimedBinding.renderGeometryKeyDigest ||
-            current.phase != ChromeVisualShieldRegionDiscoveryHandshakePhase.InFlight
-        ) {
-            staleAttestationDropped += 1
-            return null
+        if (current == null) return invalidClaim("no_active_render")
+        if (!claimedBinding.isStructurallyValid()) return invalidClaim("invalid_binding")
+        if (current.binding != claimedBinding) return invalidClaim("binding_not_active")
+        if (current.key.digest != claimedBinding.renderGeometryKeyDigest) return invalidClaim("render_key_mismatch")
+        if (current.phase != ChromeVisualShieldRegionDiscoveryHandshakePhase.InFlight) {
+            return invalidClaim("active_not_in_flight")
+        }
+        if (!claimedBinding.hasSameSessionAndWindow(nativeGeneration)) {
+            return invalidClaim("session_or_window_mismatch")
+        }
+        if (!claimedBinding.matches(nativeGeneration)) {
+            generationInvalidations += 1
+            active = current.copy(phase = ChromeVisualShieldRegionDiscoveryHandshakePhase.Invalidated)
+            return ChromeVisualShieldRegionDiscoveryAttestationClaimResult.GenerationInvalidated(
+                staleBinding = claimedBinding,
+                currentGeneration = nativeGeneration,
+            )
         }
         attestationClaims += 1
         active = current.copy(phase = ChromeVisualShieldRegionDiscoveryHandshakePhase.Attesting)
-        return ChromeVisualShieldRegionDiscoveryAttestationClaim(
-            requestSequence = current.requestSequence,
-            binding = claimedBinding,
+        return ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Claimed(
+            ChromeVisualShieldRegionDiscoveryAttestationClaim(
+                requestSequence = current.requestSequence,
+                binding = claimedBinding,
+            ),
         )
     }
 
@@ -251,18 +294,31 @@ internal class ChromeVisualShieldRegionDiscoveryHandshakePolicy {
         claim: ChromeVisualShieldRegionDiscoveryAttestationClaim,
         nativeGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration?,
         action: () -> Boolean,
-    ): Boolean? {
+    ): ChromeVisualShieldRegionDiscoveryAttestationExecutionResult {
         val current = active
         if (
             current == null ||
             current.requestSequence != claim.requestSequence ||
             current.binding != claim.binding ||
-            nativeGeneration == null ||
-            !claim.binding.matches(nativeGeneration) ||
             current.phase != ChromeVisualShieldRegionDiscoveryHandshakePhase.Attesting
         ) {
             staleAttestationDropped += 1
-            return null
+            return ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.StaleClaim("claim_not_active")
+        }
+        if (nativeGeneration == null || !claim.binding.hasSameSessionAndWindow(nativeGeneration)) {
+            staleAttestationDropped += 1
+            active = current.copy(phase = ChromeVisualShieldRegionDiscoveryHandshakePhase.Rejected)
+            return ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.StaleClaim(
+                "native_generation_unavailable_or_foreign",
+            )
+        }
+        if (!claim.binding.matches(nativeGeneration)) {
+            generationInvalidations += 1
+            active = current.copy(phase = ChromeVisualShieldRegionDiscoveryHandshakePhase.Invalidated)
+            return ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.GenerationInvalidated(
+                staleBinding = claim.binding,
+                currentGeneration = nativeGeneration,
+            )
         }
         val accepted = action()
         if (accepted) {
@@ -279,7 +335,11 @@ internal class ChromeVisualShieldRegionDiscoveryHandshakePolicy {
                         ChromeVisualShieldRegionDiscoveryHandshakePhase.Rejected
                     },
             )
-        return accepted
+        return if (accepted) {
+            ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Accepted
+        } else {
+            ChromeVisualShieldRegionDiscoveryAttestationExecutionResult.Rejected
+        }
     }
 
     @Synchronized
@@ -292,6 +352,7 @@ internal class ChromeVisualShieldRegionDiscoveryHandshakePolicy {
             attestationAccepted = attestationAccepted,
             attestationRejected = attestationRejected,
             staleAttestationDropped = staleAttestationDropped,
+            generationInvalidations = generationInvalidations,
             generationReplacements = generationReplacements,
         )
 
@@ -306,7 +367,13 @@ internal class ChromeVisualShieldRegionDiscoveryHandshakePolicy {
         attestationAccepted = 0L
         attestationRejected = 0L
         staleAttestationDropped = 0L
+        generationInvalidations = 0L
         generationReplacements = 0L
+    }
+
+    private fun invalidClaim(reason: String): ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid {
+        staleAttestationDropped += 1
+        return ChromeVisualShieldRegionDiscoveryAttestationClaimResult.Invalid(reason)
     }
 }
 
@@ -323,13 +390,15 @@ internal object ChromeVisualShieldRegionDiscoveryHandshakeStore {
     fun claimAttestation(
         nativeGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration,
         claimedBinding: ChromeVisualShieldRegionDiscoveryRenderBinding,
-    ): ChromeVisualShieldRegionDiscoveryAttestationClaim? = policy.claimAttestation(nativeGeneration, claimedBinding)
+    ): ChromeVisualShieldRegionDiscoveryAttestationClaimResult =
+        policy.claimAttestation(nativeGeneration, claimedBinding)
 
     fun executeAttestation(
         claim: ChromeVisualShieldRegionDiscoveryAttestationClaim,
         nativeGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration?,
         action: () -> Boolean,
-    ): Boolean? = policy.executeAttestation(claim, nativeGeneration, action)
+    ): ChromeVisualShieldRegionDiscoveryAttestationExecutionResult =
+        policy.executeAttestation(claim, nativeGeneration, action)
 
     fun metrics(): ChromeVisualShieldRegionDiscoveryHandshakeMetrics = policy.metrics()
 
@@ -337,6 +406,12 @@ internal object ChromeVisualShieldRegionDiscoveryHandshakeStore {
 }
 
 private fun Double.hex(): String = java.lang.Double.toHexString(this)
+
+private fun ChromeVisualShieldRegionDiscoveryRenderBinding.hasSameSessionAndWindow(
+    nativeGeneration: ChromeVisualShieldRegionDiscoveryNativeGeneration,
+): Boolean =
+    protectionSessionId == nativeGeneration.protectionSessionId &&
+        windowId == nativeGeneration.windowId
 
 private fun renderKeySha256(bytes: ByteArray): String =
     MessageDigest.getInstance("SHA-256")
