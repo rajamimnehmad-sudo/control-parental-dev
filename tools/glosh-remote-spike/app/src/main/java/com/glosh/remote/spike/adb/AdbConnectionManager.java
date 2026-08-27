@@ -114,10 +114,10 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
     /**
      * Reopens the current Wireless ADB TLS endpoint without changing the paired identity.
      *
-     * libadb 3.1.1's connectTls() wakes its one-shot latch for both a resolved service and a
-     * service-lost callback (port=-1). Immediately after pairing that can fail before Android's
-     * adb-tls-connect service stabilizes. Keep discovery alive until a valid endpoint is resolved,
-     * then retry connect within one bounded budget.
+     * The mDNS address identifies a service hosted by this device, but the actual same-device ADB
+     * socket must be opened through loopback. Connecting back to the Wi-Fi interface address can
+     * fail on OEM networking even though pairing succeeded. Therefore discovery yields only the
+     * current TLS port and the socket is always opened against 127.0.0.1.
      */
     public synchronized boolean ensureConnected(Context context, long timeoutMillis) throws Exception {
         if (isConnected()) {
@@ -146,12 +146,14 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
             }
 
             try {
-                boolean connected = connect(endpoint.host(), endpoint.port());
+                boolean connected = connect(
+                        AdbConnectEndpointPolicy.connectHost(),
+                        endpoint.port());
                 if (connected || isConnected()) {
                     return true;
                 }
                 lastError = new IllegalStateException(
-                        "ADB TLS endpoint resolved but the connection was not established.");
+                        "ADB TLS loopback endpoint resolved but the connection was not established.");
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
                 throw error;
@@ -184,11 +186,11 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
                 context,
                 AdbMdns.SERVICE_TYPE_TLS_CONNECT,
                 (address, port) -> {
-                    String host = address == null ? null : address.getHostAddress();
-                    if (!AdbConnectEndpointPolicy.isUsable(host, port)) {
+                    String discoveredHost = address == null ? null : address.getHostAddress();
+                    if (!AdbConnectEndpointPolicy.isUsable(discoveredHost, port)) {
                         return;
                     }
-                    if (endpointRef.compareAndSet(null, new TlsEndpoint(host, port))) {
+                    if (endpointRef.compareAndSet(null, new TlsEndpoint(port))) {
                         resolved.countDown();
                     }
                 });
@@ -241,7 +243,7 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         return new GeneratedIdentity(privateKey, certificate);
     }
 
-    private record TlsEndpoint(String host, int port) {
+    private record TlsEndpoint(int port) {
     }
 
     private static final class GeneratedIdentity {

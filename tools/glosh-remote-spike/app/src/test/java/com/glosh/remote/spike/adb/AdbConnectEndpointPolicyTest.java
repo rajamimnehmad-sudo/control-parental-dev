@@ -17,9 +17,10 @@ public class AdbConnectEndpointPolicyTest {
     }
 
     @Test
-    public void resolvedTlsEndpointIsAccepted() {
-        assertTrue(AdbConnectEndpointPolicy.isUsable("127.0.0.1", 37001));
-        assertTrue(AdbConnectEndpointPolicy.isUsable("192.168.1.20", 65535));
+    public void resolvedTlsServiceUsesLoopbackForTheLocalSocket() {
+        assertTrue(AdbConnectEndpointPolicy.isUsable("192.168.1.20", 37001));
+        assertTrue(AdbConnectEndpointPolicy.isUsable("fe80::1234", 65535));
+        assertEquals("127.0.0.1", AdbConnectEndpointPolicy.connectHost());
     }
 
     @Test
