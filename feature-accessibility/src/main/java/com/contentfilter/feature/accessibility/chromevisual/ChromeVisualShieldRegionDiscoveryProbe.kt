@@ -6,23 +6,41 @@ internal data class ChromeVisualShieldRegionDiscoveryProbeRequest(
     val scenarioId: String,
     val sourceSha256s: List<String>,
     val renderContract: String,
+    val gateMode: ChromeVisualShieldRegionDiscoveryGateMode =
+        ChromeVisualShieldRegionDiscoveryGateMode.NeverRelease,
 ) {
     fun isValid(): Boolean =
         scenarioId.matches(Regex("[a-z0-9-]{1,48}")) &&
             sourceSha256s.isNotEmpty() &&
             sourceSha256s.size <= MaximumSources &&
             sourceSha256s.all { it.matches(Regex("[0-9a-f]{64}")) } &&
-            sourceSha256s.distinct().size == sourceSha256s.size &&
             renderContract.matches(Regex("[a-z0-9-]{1,80}"))
 
-    private companion object {
-        const val MaximumSources = 8
+    companion object {
+        fun regionSetAuthority(
+            scenarioId: String,
+            sourceSha256s: List<String>,
+            renderContract: String,
+        ) = ChromeVisualShieldRegionDiscoveryProbeRequest(
+            scenarioId,
+            sourceSha256s,
+            renderContract,
+            ChromeVisualShieldRegionDiscoveryGateMode.RegionSetAuthority,
+        )
+
+        private const val MaximumSources = 8
     }
+}
+
+internal enum class ChromeVisualShieldRegionDiscoveryGateMode {
+    NeverRelease,
+    RegionSetAuthority,
 }
 
 internal data class ChromeVisualShieldRegionDecision(
     val region: ChromeVisualShieldDiscoveredRegion,
     val decision: GloshiaVisualDecision,
+    val batchIdentity: ChromeVisualShieldRegionSetBatchIdentity? = null,
 )
 
 internal data class ChromeVisualShieldRegionDiscoveryDelivery(
@@ -72,7 +90,8 @@ internal data class ChromeVisualShieldRegionDiscoveryObservation(
     val crop: ChromeVisualShieldCropEvidence,
     val discovery: ChromeVisualShieldRegionDiscoveryResult,
     val decisions: List<ChromeVisualShieldRegionDecision>,
-    val authorityResult: ChromeVisualShieldRegionDiscoveryAuthorityResult,
+    val authorityResult: ChromeVisualShieldRegionDiscoveryAuthorityResult?,
+    val regionSetAuthorityOutcome: ChromeVisualShieldRegionSetAuthorityOutcome?,
     val oracleMatch: Boolean?,
     val oracleVerification: ChromeVisualShieldRegionDiscoveryOracleVerifier.Verification?,
 )

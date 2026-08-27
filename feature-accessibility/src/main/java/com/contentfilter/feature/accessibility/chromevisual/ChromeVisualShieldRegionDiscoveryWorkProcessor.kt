@@ -99,6 +99,7 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
         discovery: ChromeVisualShieldRegionDiscoveryResult,
     ): List<ChromeVisualShieldRegionDecision> {
         val complete = discovery as? ChromeVisualShieldRegionDiscoveryResult.Complete ?: return emptyList()
+        val batchIdentity = ChromeVisualShieldRegionSetBatchIdentity.from(work.identity, complete)
         return complete.regions.map { region ->
             currentCoroutineContext().ensureActive()
             if (!identityGate.isCurrentProcessing(work.identity)) throw CancellationException("stale discovery")
@@ -113,7 +114,7 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
                     metrics.onInferenceCompleted()
                 }
             currentCoroutineContext().ensureActive()
-            ChromeVisualShieldRegionDecision(region, decision)
+            ChromeVisualShieldRegionDecision(region, decision, batchIdentity)
         }
     }
 

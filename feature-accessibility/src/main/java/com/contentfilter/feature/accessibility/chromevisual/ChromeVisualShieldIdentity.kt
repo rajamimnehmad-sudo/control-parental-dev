@@ -5,6 +5,7 @@ internal enum class ChromeVisualShieldPhase {
     Protected,
     CapturePending,
     Processing,
+    RegionSetReleasePending,
     LabReleased,
 }
 
@@ -199,6 +200,30 @@ internal class ChromeVisualShieldIdentityGate(
         phase = ChromeVisualShieldPhase.Protected
         protectionTransitions += 1
         return ChromeVisualShieldResult.Current
+    }
+
+    @Synchronized
+    fun beginRegionSetRelease(identity: ChromeVisualShieldIdentity): ChromeVisualShieldResult {
+        if (!isCurrent(identity) || phase != ChromeVisualShieldPhase.Processing) return stale()
+        phase = ChromeVisualShieldPhase.RegionSetReleasePending
+        return ChromeVisualShieldResult.Current
+    }
+
+    @Synchronized
+    fun isCurrentRegionSetRelease(identity: ChromeVisualShieldIdentity): Boolean =
+        phase == ChromeVisualShieldPhase.RegionSetReleasePending && isCurrent(identity)
+
+    @Synchronized
+    fun completeRegionSetRelease(identity: ChromeVisualShieldIdentity): ChromeVisualShieldResult {
+        if (!isCurrent(identity) || phase != ChromeVisualShieldPhase.RegionSetReleasePending) return stale()
+        phase = ChromeVisualShieldPhase.LabReleased
+        labReleaseCount += 1
+        return ChromeVisualShieldResult.Current
+    }
+
+    @Synchronized
+    fun abortRegionSetRelease(identity: ChromeVisualShieldIdentity) {
+        if (isCurrent(identity) && phase == ChromeVisualShieldPhase.RegionSetReleasePending) protect()
     }
 
     @Synchronized

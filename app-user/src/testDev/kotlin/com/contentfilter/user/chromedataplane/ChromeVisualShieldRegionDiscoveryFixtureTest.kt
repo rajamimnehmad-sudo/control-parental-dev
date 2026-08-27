@@ -34,6 +34,18 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
         assertEquals(1, centered.size)
         assertEquals(2, multi.size)
         assertFalse(multi[0].left + multi[0].width >= multi[1].left)
+
+        val multiAllSafe =
+            assertNotNull(
+                ChromeVisualShieldRegionDiscoveryLayoutContract.geometry(
+                    ChromeVisualShieldRegionDiscoveryScenario.MultiAllSafe,
+                    listOf(100 to 100, 100 to 100),
+                    1000,
+                    600,
+                ),
+            )
+        assertEquals(2, multiAllSafe.size)
+        assertFalse(multiAllSafe[0].left + multiAllSafe[0].width >= multiAllSafe[1].left)
     }
 
     @Test

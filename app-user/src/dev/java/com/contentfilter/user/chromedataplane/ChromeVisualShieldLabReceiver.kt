@@ -30,6 +30,7 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
                 ActionRenderProbe -> renderProbe(intent)
                 ActionExactDrawOracleProbe -> exactDrawOracleProbe(intent)
                 ActionRegionDiscoveryProbe -> regionDiscoveryProbe(intent)
+                ActionRegionSetAuthorityProbe -> regionSetAuthorityProbe(intent)
                 ActionFixtureReset -> fixtureReset(intent)
                 ActionFixtureAppend -> fixtureAppend(intent)
                 ActionFixtureCommit -> fixtureCommit(intent)
@@ -95,7 +96,21 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
         }
         return ChromeVisualShieldLabControl.regionDiscoveryProbe(
             scenarioId = scenario.wireName,
-            sourceSha256s = scenario.samples.map { it.expectedSha256 }.distinct(),
+            sourceSha256s = scenario.samples.map { it.expectedSha256 },
+            renderContract = ChromeVisualShieldRegionDiscoveryLayoutContract.Version,
+        )
+    }
+
+    private fun regionSetAuthorityProbe(intent: Intent): String {
+        val scenario =
+            ChromeVisualShieldRegionDiscoveryScenario.fromWireName(intent.getStringExtra(ExtraDiscoveryScenario))
+                ?: return "result=unknown_region_set_authority_scenario"
+        if (scenario.samples.any { !ChromeVisualShieldFixtureSampleStore.isReady(it) }) {
+            return "result=fixture_not_ready scenario=${scenario.wireName}"
+        }
+        return ChromeVisualShieldLabControl.regionSetAuthorityProbe(
+            scenarioId = scenario.wireName,
+            sourceSha256s = scenario.samples.map { it.expectedSha256 },
             renderContract = ChromeVisualShieldRegionDiscoveryLayoutContract.Version,
         )
     }
@@ -120,6 +135,8 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
             "com.contentfilter.user.chromevisualshield.command.EXACT_DRAW_ORACLE_PROBE"
         const val ActionRegionDiscoveryProbe =
             "com.contentfilter.user.chromevisualshield.command.REGION_DISCOVERY_PROBE"
+        const val ActionRegionSetAuthorityProbe =
+            "com.contentfilter.user.chromevisualshield.command.REGION_SET_AUTHORITY_PROBE"
         const val ActionFixtureReset =
             "com.contentfilter.user.chromevisualshield.command.FIXTURE_RESET"
         const val ActionFixtureAppend =

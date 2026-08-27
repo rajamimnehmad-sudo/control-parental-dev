@@ -41,7 +41,13 @@ object ChromeVisualShieldLabControl {
         scenarioId: String,
         sourceSha256s: List<String>,
         renderContract: String,
-    ): String = endpoint?.regionDiscoveryProbe(scenarioId, sourceSha256s, renderContract) ?: Unavailable
+    ): String = endpoint?.regionDiscoveryProbe(scenarioId, sourceSha256s, renderContract, false) ?: Unavailable
+
+    fun regionSetAuthorityProbe(
+        scenarioId: String,
+        sourceSha256s: List<String>,
+        renderContract: String,
+    ): String = endpoint?.regionDiscoveryProbe(scenarioId, sourceSha256s, renderContract, true) ?: Unavailable
 
     fun currentRenderIdentityToken(): String? = endpoint?.currentRenderIdentityToken()
 
@@ -114,6 +120,7 @@ object ChromeVisualShieldLabControl {
             scenarioId: String,
             sourceSha256s: List<String>,
             renderContract: String,
+            regionSetAuthority: Boolean,
         ): String
 
         fun currentRenderIdentityToken(): String?

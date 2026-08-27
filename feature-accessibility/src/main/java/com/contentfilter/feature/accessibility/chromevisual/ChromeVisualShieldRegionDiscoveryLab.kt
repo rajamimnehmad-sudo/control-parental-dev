@@ -5,7 +5,8 @@ import java.util.concurrent.TimeUnit
 
 /** Holds only DEV R2A probe state, its generation barrier, and post-discovery oracle comparison. */
 internal class ChromeVisualShieldRegionDiscoveryLab(
-    private val authority: ChromeVisualShieldRegionDiscoveryAuthority,
+    private val discoveryAuthority: ChromeVisualShieldRegionDiscoveryAuthority,
+    private val regionSetAuthority: ChromeVisualShieldRegionSetAuthority? = null,
 ) {
     private data class PendingRender(
         val request: ChromeVisualShieldRegionDiscoveryProbeRequest,
@@ -162,7 +163,25 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
             complete(mode.binding, ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated)
             return "phase=region_discovery_probe result=stale_binding neverRelease=true rawPresented=false"
         }
-        val authorityResult = authority.observe(delivery)
+        val authorityResult =
+            if (current.request.gateMode == ChromeVisualShieldRegionDiscoveryGateMode.NeverRelease) {
+                discoveryAuthority.observe(delivery)
+            } else {
+                null
+            }
+        val regionSetAuthorityOutcome =
+            if (current.request.gateMode == ChromeVisualShieldRegionDiscoveryGateMode.RegionSetAuthority) {
+                regionSetAuthority?.apply(delivery)
+                    ?: ChromeVisualShieldRegionSetAuthorityOutcome(
+                        result = ChromeVisualShieldRegionSetAuthorityResult.ErrorProtected,
+                        reason = "region_set_authority_unavailable",
+                        batchIdentity = null,
+                        allSafe = false,
+                        batchCurrent = false,
+                    )
+            } else {
+                null
+            }
         val oracleVerification =
             ChromeVisualShieldRegionDiscoveryOracleVerifier.verify(
                 identity = delivery.work.identity,
@@ -176,7 +195,9 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
         completed =
             oracleMatch &&
             authorityResult != ChromeVisualShieldRegionDiscoveryAuthorityResult.StaleDropped &&
-            authorityResult != ChromeVisualShieldRegionDiscoveryAuthorityResult.IdentityMismatchRejected
+            authorityResult != ChromeVisualShieldRegionDiscoveryAuthorityResult.IdentityMismatchRejected &&
+            regionSetAuthorityOutcome?.result != ChromeVisualShieldRegionSetAuthorityResult.StaleDropped &&
+            regionSetAuthorityOutcome?.result != ChromeVisualShieldRegionSetAuthorityResult.ErrorProtected
         observation =
             ChromeVisualShieldRegionDiscoveryObservation(
                 request = current.request,
@@ -186,6 +207,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
                 discovery = delivery.discovery,
                 decisions = delivery.decisions,
                 authorityResult = authorityResult,
+                regionSetAuthorityOutcome = regionSetAuthorityOutcome,
                 oracleMatch = oracleMatch,
                 oracleVerification = oracleVerification,
             )
@@ -209,11 +231,18 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
                 "none"
             }
         val binding = accepted?.binding ?: pending?.binding
+        val regionSet = regionSetAuthority?.snapshot()
         return "regionDiscoveryActive=${request != null} regionDiscoveryCompleted=$completed " +
             "regionDiscoveryResult=$result regionSetDigest=$digest regionOracleMatch=${current?.oracleMatch} " +
             "regionBindingContentEpoch=${binding?.contentEpoch} " +
             "regionBindingViewportEpoch=${binding?.viewportEpoch} " +
-            "regionBindingRegionSequence=${binding?.regionSequence}"
+            "regionBindingRegionSequence=${binding?.regionSequence} " +
+            "regionSetBatchesEvaluated=${regionSet?.batchesEvaluated ?: 0} " +
+            "allSafe=${regionSet?.allSafe ?: false} batchCurrent=${regionSet?.batchCurrent ?: false} " +
+            "releaseBatchDigest=${regionSet?.releaseBatchDigest ?: "none"} " +
+            "authorityAcceptedAtNanos=${regionSet?.authorityAcceptedAtNanos ?: 0} " +
+            "regionSetReleaseAtNanos=${regionSet?.releaseAtNanos ?: 0} " +
+            "retainedReplayKeys=${regionSet?.retainedReplayKeys ?: 0}"
     }
 
     @Synchronized
@@ -239,7 +268,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
             renderIdentityToken == identity.renderIdentityToken() &&
             scenarioId == expectedRequest.scenarioId &&
             renderContract == expectedRequest.renderContract &&
-            regions.map { it.sourceSha256 }.distinct().sorted() == expectedRequest.sourceSha256s.sorted() &&
+            regions.map { it.sourceSha256 }.sorted() == expectedRequest.sourceSha256s.sorted() &&
             ChromeVisualShieldBrowserViewportMapper.map(
                 source = carrierCss,
                 target = identity.viewport,
@@ -264,10 +293,18 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
                 "${it.region.id}:${it.decision.action}:${it.decision.reason}:${it.decision.filterProbability}"
             }
         return "phase=region_discovery_probe scenario=${value.request.scenarioId} " +
+            "gateMode=${value.request.gateMode} " +
             "sourceShas=${value.request.sourceSha256s.joinToString(",")} " +
             "crop=${value.crop.width}x${value.crop.height} cropSha=${value.crop.rgbaSha256} " +
             "result=$result decisions=$decisions authority=${value.authorityResult} " +
-            "oracleMatch=${value.oracleMatch} neverRelease=true rawPresented=false " +
+            "regionSetAuthority=${value.regionSetAuthorityOutcome?.result} " +
+            "regionSetAuthorityReason=${value.regionSetAuthorityOutcome?.reason} " +
+            "allSafe=${value.regionSetAuthorityOutcome?.allSafe ?: false} " +
+            "batchCurrent=${value.regionSetAuthorityOutcome?.batchCurrent ?: false} " +
+            "releaseBatchDigest=${value.regionSetAuthorityOutcome?.batchIdentity?.regionSetDigest ?: "none"} " +
+            "oracleMatch=${value.oracleMatch} " +
+            "neverRelease=${value.request.gateMode == ChromeVisualShieldRegionDiscoveryGateMode.NeverRelease} " +
+            "rawPresentedBeforeAuthority=false " +
             "oracleEvidence=${value.oracleVerification?.logValue() ?: "none"}"
     }
 }

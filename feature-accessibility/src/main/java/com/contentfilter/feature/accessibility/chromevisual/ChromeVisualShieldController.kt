@@ -54,7 +54,17 @@ internal class ChromeVisualShieldController(
         )
     private val renderProbeAuthority = ChromeVisualShieldRenderProbeAuthority(identityGate, r1Metrics)
     private val regionDiscoveryAuthority = ChromeVisualShieldRegionDiscoveryAuthority(identityGate, r1Metrics)
-    private val regionDiscoveryLab = ChromeVisualShieldRegionDiscoveryLab(regionDiscoveryAuthority)
+    private val regionSetMetrics = ChromeVisualShieldRegionSetMetrics()
+    private val regionSetAuthority =
+        ChromeVisualShieldRegionSetAuthority(
+            identityGate = identityGate,
+            metrics = regionSetMetrics,
+            r1Metrics = r1Metrics,
+            isSurfaceCurrent = ::isRegionSetSurfaceCurrent,
+            releaseSurface = ::releaseSafeSurface,
+            reprotectSurface = ::reprotectRegionSetSurface,
+        )
+    private val regionDiscoveryLab = ChromeVisualShieldRegionDiscoveryLab(regionDiscoveryAuthority, regionSetAuthority)
     private val rasterProvenanceObserver = ChromeVisualShieldRasterProvenanceObserver(::log)
     private val workProcessor =
         ChromeVisualShieldWorkProcessor(
@@ -176,11 +186,22 @@ internal class ChromeVisualShieldController(
         scenarioId: String,
         sourceSha256s: List<String>,
         renderContract: String,
+        regionSetAuthority: Boolean,
     ): String =
         commandOnMain {
-            val request = ChromeVisualShieldRegionDiscoveryProbeRequest(scenarioId, sourceSha256s, renderContract)
+            val request =
+                if (regionSetAuthority) {
+                    ChromeVisualShieldRegionDiscoveryProbeRequest.regionSetAuthority(
+                        scenarioId,
+                        sourceSha256s,
+                        renderContract,
+                    )
+                } else {
+                    ChromeVisualShieldRegionDiscoveryProbeRequest(scenarioId, sourceSha256s, renderContract)
+                }
             if (!request.isValid()) return@commandOnMain "result=invalid_region_discovery_probe_request"
-            startSession(null, request, "region_discovery_probe")
+            val trigger = if (regionSetAuthority) "region_set_authority_probe" else "region_discovery_probe"
+            startSession(null, request, trigger)
         }
 
     override fun currentRenderIdentityToken(): String? = identityGate.snapshot().context?.renderIdentityToken()
@@ -582,6 +603,22 @@ internal class ChromeVisualShieldController(
         surface.close()
         pendingCoverEpoch = null
         publishLabOwnership(false)
+    }
+
+    private fun isRegionSetSurfaceCurrent(identity: ChromeVisualShieldIdentity): Boolean {
+        val stats = surface.stats()
+        return stats.attached &&
+            !stats.transparent &&
+            stats.attachedWindowId == identity.windowId &&
+            stats.viewport == identity.viewport &&
+            stats.authorityEpoch == identity.contentEpoch
+    }
+
+    private fun reprotectRegionSetSurface() {
+        val current = identityGate.snapshot().context ?: return
+        surface.cover(current.windowId, current.viewport, current.contentEpoch)
+        pendingCoverEpoch = null
+        publishLabOwnership(true)
     }
 
     private fun cancelWorkAndJoin() {

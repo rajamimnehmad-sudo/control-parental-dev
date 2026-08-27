@@ -37,6 +37,11 @@ internal enum class ChromeVisualShieldRegionDiscoveryScenario(
         listOf(ChromeVisualShieldFixtureSample.Safe, ChromeVisualShieldFixtureSample.Block),
         ChromeVisualShieldRegionDiscoveryLayout.Multi,
     ),
+    MultiAllSafe(
+        "multi-all-safe",
+        listOf(ChromeVisualShieldFixtureSample.Safe, ChromeVisualShieldFixtureSample.Safe),
+        ChromeVisualShieldRegionDiscoveryLayout.Multi,
+    ),
     Ambiguous(
         "ambiguous",
         listOf(ChromeVisualShieldFixtureSample.Block),

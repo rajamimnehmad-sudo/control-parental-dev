@@ -288,6 +288,10 @@ class ChromeVisualShieldFixtureTest {
             "com.contentfilter.user.chromevisualshield.command.EXACT_DRAW_ORACLE_PROBE",
             ChromeVisualShieldLabReceiver.ActionExactDrawOracleProbe,
         )
+        assertEquals(
+            "com.contentfilter.user.chromevisualshield.command.REGION_SET_AUTHORITY_PROBE",
+            ChromeVisualShieldLabReceiver.ActionRegionSetAuthorityProbe,
+        )
     }
 
     @Test
