@@ -8,29 +8,30 @@ import kotlin.test.assertTrue
 
 class ChromeVisualShieldExactDrawOracleTest {
     @Test
-    fun `portrait oracle maps only the contained draw inside the signed carrier`() {
+    fun `portrait oracle maps browser draw inside taller signed native carrier`() {
         val identity = identity(ChromeVisualViewport(0, 0, 1080, 2408))
-        val request = request(identity, sourceWidth = 1064, sourceHeight = 1600)
+        val request = request(identity, sourceWidth = 1064, sourceHeight = 1600, canvasHeight = 703)
 
         val region = assertNotNull(ChromeVisualShieldExactDrawOracleMapper.resolve(identity, request))
 
         assertTrue(region.left > identity.region.left)
-        assertEquals(identity.region.top, region.top)
         assertTrue(region.right < identity.region.right)
-        assertEquals(identity.region.bottom, region.bottom)
+        assertTrue(region.top > identity.region.top)
+        assertTrue(region.bottom > identity.region.bottom)
+        assertEquals(1064.0 / 1600.0, region.width.toDouble() / region.height, 0.01)
         assertEquals("oracle-draw-block", region.id)
     }
 
     @Test
     fun `landscape oracle removes neutral side background without stretching the source`() {
         val identity = identity(ChromeVisualViewport(66, 0, 2408, 1080))
-        val request = request(identity, sourceWidth = 1064, sourceHeight = 1600)
+        val request = request(identity, sourceWidth = 1064, sourceHeight = 1600, canvasHeight = 304)
 
         val region = assertNotNull(ChromeVisualShieldExactDrawOracleMapper.resolve(identity, request))
 
         assertTrue(region.width * 5 < identity.region.width)
-        assertEquals(identity.region.top, region.top)
-        assertEquals(identity.region.bottom, region.bottom)
+        assertTrue(region.top > identity.region.top)
+        assertTrue(region.bottom > identity.region.bottom)
         assertEquals(1064.0 / 1600.0, region.width.toDouble() / region.height, 0.01)
     }
 
@@ -44,29 +45,33 @@ class ChromeVisualShieldExactDrawOracleTest {
     }
 
     @Test
-    fun `carrier geometry outside the signed current region is rejected`() {
+    fun `canvas backing inconsistent with attested browser carrier is rejected`() {
         val identity = identity(ChromeVisualViewport(0, 0, 1080, 2408))
         val request = request(identity, 1064, 1600)
-        val shifted =
+        val inconsistent =
             request.copy(
                 exactDrawOracle =
                     request.exactDrawOracle?.copy(
-                        carrierCss = request.exactDrawOracle.carrierCss.copy(left = 300.0),
+                        canvasWidth = request.exactDrawOracle.canvasWidth + 20,
                     ),
             )
 
-        assertNull(ChromeVisualShieldExactDrawOracleMapper.resolve(identity, shifted))
+        assertNull(ChromeVisualShieldExactDrawOracleMapper.resolve(identity, inconsistent))
     }
 
     private fun request(
         identity: ChromeVisualShieldIdentity,
         sourceWidth: Int,
         sourceHeight: Int,
+        canvasHeight: Int = identity.region.height,
     ): ChromeVisualShieldRenderProbeRequest {
         val carrier = identity.region
-        val scale = minOf(carrier.width.toDouble() / sourceWidth, carrier.height.toDouble() / sourceHeight)
+        val canvasWidth = carrier.width
+        val scale = minOf(canvasWidth.toDouble() / sourceWidth, canvasHeight.toDouble() / sourceHeight)
         val drawWidth = sourceWidth * scale
         val drawHeight = sourceHeight * scale
+        val visualViewportHeight = canvasHeight / 0.3
+        val visualViewportWidth = canvasWidth / 0.7
         val oracle =
             ChromeVisualShieldExactDrawOracle(
                 renderIdentityToken = identity.renderIdentityToken(),
@@ -74,28 +79,28 @@ class ChromeVisualShieldExactDrawOracleTest {
                 renderContract = RenderContract,
                 sourceWidth = sourceWidth,
                 sourceHeight = sourceHeight,
-                canvasWidth = carrier.width,
-                canvasHeight = carrier.height,
+                canvasWidth = canvasWidth,
+                canvasHeight = canvasHeight,
                 carrierCss =
                     ChromeVisualShieldLabRect(
-                        carrier.left - identity.viewport.left.toDouble(),
-                        carrier.top - identity.viewport.top.toDouble(),
-                        carrier.width.toDouble(),
-                        carrier.height.toDouble(),
+                        visualViewportWidth * 0.15,
+                        visualViewportHeight * 0.25,
+                        canvasWidth.toDouble(),
+                        canvasHeight.toDouble(),
                     ),
                 visualViewportCss =
                     ChromeVisualShieldLabRect(
                         0.0,
                         0.0,
-                        identity.viewport.width.toDouble(),
-                        identity.viewport.height.toDouble(),
+                        visualViewportWidth,
+                        visualViewportHeight,
                     ),
                 visualViewportScale = 1.0,
                 devicePixelRatio = 1.0,
                 drawCanvas =
                     ChromeVisualShieldLabRect(
-                        (carrier.width - drawWidth) / 2.0,
-                        (carrier.height - drawHeight) / 2.0,
+                        (canvasWidth - drawWidth) / 2.0,
+                        (canvasHeight - drawHeight) / 2.0,
                         drawWidth,
                         drawHeight,
                     ),

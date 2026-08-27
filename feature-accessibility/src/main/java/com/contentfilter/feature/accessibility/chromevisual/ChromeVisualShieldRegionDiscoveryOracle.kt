@@ -3,7 +3,6 @@ package com.contentfilter.feature.accessibility.chromevisual
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.max
 
 data class ChromeVisualShieldLabRect(
     val left: Double,
@@ -81,9 +80,12 @@ internal object ChromeVisualShieldExactDrawOracleMapper {
             return null
         }
         val mappedCarrier =
-            oracle.carrierCss.mapFromVisualViewport(identity.viewport, oracle.visualViewportCss)
-                ?: return null
-        if (!mappedCarrier.approximatelyMatches(identity.region, identity.viewport)) return null
+            oracle.carrierCss.mapFromBrowserViewport(
+                target = identity.viewport,
+                visualViewport = oracle.visualViewportCss,
+                devicePixelRatio = oracle.devicePixelRatio,
+                visualViewportScale = oracle.visualViewportScale,
+            ) ?: return null
 
         val left = mappedCarrier.left + mappedCarrier.width * oracle.drawCanvas.left / oracle.canvasWidth
         val top = mappedCarrier.top + mappedCarrier.height * oracle.drawCanvas.top / oracle.canvasHeight
@@ -98,36 +100,47 @@ internal object ChromeVisualShieldExactDrawOracleMapper {
         ).takeIf { it.width > 0 && it.height > 0 }
     }
 
-    private fun ChromeVisualShieldLabRect.mapFromVisualViewport(
+    /**
+     * Chrome's visual viewport excludes its top controls while the Accessibility window does
+     * not. CSS pixels remain isotropic, so the current browser viewport is projected at its
+     * attested device scale and bottom-aligned inside the captured Chrome window.
+     */
+    private fun ChromeVisualShieldLabRect.mapFromBrowserViewport(
         target: ChromeVisualViewport,
         visualViewport: ChromeVisualShieldLabRect,
+        devicePixelRatio: Double,
+        visualViewportScale: Double,
     ): ChromeVisualRegion? {
-        val leftRatio = (left - visualViewport.left) / visualViewport.width
-        val topRatio = (top - visualViewport.top) / visualViewport.height
-        val rightRatio = (right - visualViewport.left) / visualViewport.width
-        val bottomRatio = (bottom - visualViewport.top) / visualViewport.height
-        if (listOf(leftRatio, topRatio, rightRatio, bottomRatio).any { !it.isFinite() || it !in 0.0..1.0 }) {
+        val scale = devicePixelRatio * visualViewportScale
+        val projectedViewportWidth = visualViewport.width * scale
+        val projectedViewportHeight = visualViewport.height * scale
+        if (
+            projectedViewportWidth > target.width + PixelTolerance ||
+            projectedViewportHeight > target.height + PixelTolerance
+        ) {
             return null
         }
-        return ChromeVisualRegion(
-            id = "oracle-carrier",
-            left = floor(target.left + target.width * leftRatio).toInt(),
-            top = floor(target.top + target.height * topRatio).toInt(),
-            right = ceil(target.left + target.width * rightRatio).toInt(),
-            bottom = ceil(target.top + target.height * bottomRatio).toInt(),
-        ).takeIf { it.width > 0 && it.height > 0 }
+        val viewportLeft = target.left + (target.width - projectedViewportWidth) / 2.0
+        val viewportTop = target.bottom - projectedViewportHeight
+        val mapped =
+            ChromeVisualRegion(
+                id = "oracle-carrier",
+                left = floor(viewportLeft + (left - visualViewport.left) * scale).toInt(),
+                top = floor(viewportTop + (top - visualViewport.top) * scale).toInt(),
+                right = ceil(viewportLeft + (right - visualViewport.left) * scale).toInt(),
+                bottom = ceil(viewportTop + (bottom - visualViewport.top) * scale).toInt(),
+            )
+        return mapped.takeIf {
+            it.width > 0 &&
+                it.height > 0 &&
+                it.left >= target.left - PixelTolerance &&
+                it.top >= target.top - PixelTolerance &&
+                it.right <= target.right + PixelTolerance &&
+                it.bottom <= target.bottom + PixelTolerance
+        }
     }
 
-    private fun ChromeVisualRegion.approximatelyMatches(
-        expected: ChromeVisualRegion,
-        viewport: ChromeVisualViewport,
-    ): Boolean {
-        val tolerance = max(3, max(viewport.width, viewport.height) / 500)
-        return abs(left - expected.left) <= tolerance &&
-            abs(top - expected.top) <= tolerance &&
-            abs(right - expected.right) <= tolerance &&
-            abs(bottom - expected.bottom) <= tolerance
-    }
+    private const val PixelTolerance = 2
 }
 
 internal fun ChromeVisualShieldIdentity.renderIdentityToken(): String =
