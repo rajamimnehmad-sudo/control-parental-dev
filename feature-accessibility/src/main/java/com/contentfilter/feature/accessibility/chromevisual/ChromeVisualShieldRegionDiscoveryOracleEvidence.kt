@@ -170,7 +170,7 @@ internal object ChromeVisualShieldRegionDiscoveryOracleVerifier {
             "expected=${request.renderContract},actual=${oracle.renderContract}",
         )
         val sourceMatches =
-            oracle.regions.map { it.sourceSha256 }.distinct().sorted() == request.sourceSha256s.sorted()
+            oracle.regions.map { it.sourceSha256 }.sorted() == request.sourceSha256s.sorted()
         record("sources", sourceMatches, "match=$sourceMatches")
         val commonConditions = structural && identityMatches && scenarioMatches && renderContractMatches && sourceMatches
         if (!oracle.expectComplete) {

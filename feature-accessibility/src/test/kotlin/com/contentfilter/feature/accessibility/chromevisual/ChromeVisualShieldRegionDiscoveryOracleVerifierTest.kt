@@ -96,6 +96,61 @@ class ChromeVisualShieldRegionDiscoveryOracleVerifierTest {
     }
 
     @Test
+    fun `source verification preserves repeated sample multiplicity`() {
+        val identity = identity()
+        val sourceSha = "1".repeat(64)
+        val oracle =
+            oracle(identity, expectComplete = true).copy(
+                regions =
+                    listOf(
+                        ChromeVisualShieldRegionDiscoveryOracleRegion(
+                            oracleId = "oracle-safe-left",
+                            sourceSha256 = sourceSha,
+                            sourceWidth = 30,
+                            sourceHeight = 30,
+                            drawCanvas = ChromeVisualShieldLabRect(10.0, 20.0, 30.0, 30.0),
+                        ),
+                        ChromeVisualShieldRegionDiscoveryOracleRegion(
+                            oracleId = "oracle-safe-right",
+                            sourceSha256 = sourceSha,
+                            sourceWidth = 30,
+                            sourceHeight = 30,
+                            drawCanvas = ChromeVisualShieldLabRect(60.0, 20.0, 30.0, 30.0),
+                        ),
+                    ),
+            )
+        val discovery =
+            ChromeVisualShieldRegionDiscoveryResult.Complete(
+                regions =
+                    listOf(
+                        region("discovery-1", 10, 20, 40, 50),
+                        region("discovery-2", 60, 20, 90, 50),
+                    ),
+                discoverySequence = 1,
+                regionSetDigest = "2".repeat(64),
+                coverageEvidence = ChromeVisualShieldCoverageEvidence(12_000, 1_800, 0, 10_200, 0, 0, "test"),
+            )
+
+        val verification =
+            ChromeVisualShieldRegionDiscoveryOracleVerifier.verify(
+                identity = identity,
+                searchEnvelope = identity.region,
+                crop = crop(),
+                request =
+                    ChromeVisualShieldRegionDiscoveryProbeRequest(
+                        scenarioId = "centered-safe",
+                        sourceSha256s = listOf(sourceSha, sourceSha),
+                        renderContract = "canvas-content-islands-v1",
+                    ),
+                oracle = oracle,
+                discovery = discovery,
+            )
+
+        assertTrue(verification.conditions.single { it.name == "sources" }.passed)
+        assertTrue(verification.matches)
+    }
+
+    @Test
     fun `physical vertical offset exposes every failed oracle condition`() {
         val identity = identity()
         val result =
