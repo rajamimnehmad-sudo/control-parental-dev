@@ -34,8 +34,11 @@ superficie.
   `652727e20be61d8bff7919afdfbdf67dc7ff9d31` no son ancestros ni fueron
   incorporados. `652727e` se consultó únicamente como referencia del contrato
   diagnóstico revisado.
-- La rama review queda local hasta autorización de publicación porque el ticket
-  sólo preautorizó `review/...-final` ante PASS.
+- Review de preservación:
+  `review/chrome-visual-shield-13b-r1-norm-probe-02-triage`. Su HEAD remoto es
+  el commit evidence-only que contiene este documento y se verifica por
+  `git ls-remote` en el handoff. No se creó una rama `*-final` porque el
+  resultado es BLOCKED.
 
 ## IMPLEMENTATION / AUTHORITY
 
