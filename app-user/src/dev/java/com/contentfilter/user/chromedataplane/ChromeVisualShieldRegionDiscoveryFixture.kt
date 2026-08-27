@@ -169,7 +169,7 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                 "result=region_render_identity_request_invalid scenario=${scenario.wireName}"
             } else {
                 ChromeVisualShieldRegionDiscoveryHandshakeStore.request(nativeSession, key) {
-                    ChromeVisualShieldLabControl.beginFixtureRender()
+                    ChromeVisualShieldLabControl.beginFixtureRender(key.digest)
                 }.responseText(scenario)
             }
         Log.i(LogTag, "phase=render_identity $result")

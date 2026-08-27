@@ -55,6 +55,7 @@ internal class ChromeVisualShieldController(
     private val renderProbeAuthority = ChromeVisualShieldRenderProbeAuthority(identityGate, r1Metrics)
     private val regionDiscoveryAuthority = ChromeVisualShieldRegionDiscoveryAuthority(identityGate, r1Metrics)
     private val regionDiscoveryLab = ChromeVisualShieldRegionDiscoveryLab(regionDiscoveryAuthority)
+    private val rasterProvenanceObserver = ChromeVisualShieldRasterProvenanceObserver(::log)
     private val workProcessor =
         ChromeVisualShieldWorkProcessor(
             capture = capture,
@@ -81,6 +82,7 @@ internal class ChromeVisualShieldController(
             analyzer = regionAnalyzer,
             identityGate = identityGate,
             metrics = r1Metrics,
+            rasterProvenanceObserver = rasterProvenanceObserver,
             deliver = ::deliverRegionDiscovery,
             log = ::log,
             onCycleEnded = { logMetrics("region_discovery_cycle_end") },
@@ -183,7 +185,7 @@ internal class ChromeVisualShieldController(
 
     override fun currentRenderIdentityToken(): String? = identityGate.snapshot().context?.renderIdentityToken()
 
-    override fun beginFixtureRender(): String? =
+    override fun beginFixtureRender(renderGeometryKeyDigest: String?): String? =
         valueOnMain {
             val current = identityGate.snapshot().context ?: return@valueOnMain null
             invalidateProtectCapture(
@@ -192,7 +194,12 @@ internal class ChromeVisualShieldController(
                 reason = ChromeVisualShieldInvalidation.Navigation,
                 requireRenderAttestation = true,
             )
-            identityGate.snapshot().context?.renderIdentityToken()
+            identityGate.snapshot().context?.let { accepted ->
+                renderGeometryKeyDigest
+                    ?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
+                    ?.let { rasterProvenanceObserver.onRenderIdentityAccepted(accepted.toProbeIdentity(), it) }
+                accepted.renderIdentityToken()
+            }
         }
 
     override fun renderAttested(
@@ -222,6 +229,9 @@ internal class ChromeVisualShieldController(
         }
         if (!viewportRenderGate.recordAttestation(renderIdentityToken, context)) {
             return "result=render_identity_mismatch"
+        }
+        if (regionDiscoveryLab.isActive()) {
+            rasterProvenanceObserver.onAttestationAccepted(context.toProbeIdentity(), regionDiscoveryOracle)
         }
         runOnMain { scheduleCaptureWhenViewportReady("render_attested") }
         return "result=render_identity_attested"
@@ -394,6 +404,7 @@ internal class ChromeVisualShieldController(
             if (!labActive || current.contentEpoch != committedEpoch) return@runOnMain
             pendingCoverEpoch = null
             opaqueCommittedCount += 1
+            rasterProvenanceObserver.onOpaqueCommitted(committedEpoch, current.toProbeIdentity())
             publishLabOwnership(true)
             viewportRenderGate.recordOpaqueCommit(current)
             scheduleCaptureWhenViewportReady(trigger)
@@ -415,6 +426,7 @@ internal class ChromeVisualShieldController(
     private fun scheduleCapture(trigger: String) {
         if ((renderProbeRequest != null && renderProbeCompleted) || regionDiscoveryLab.isCompleted()) return
         val identity = identityGate.beginCapture() ?: return
+        rasterProvenanceObserver.onBeginCapture(identity)
         val mode =
             when {
                 renderProbeRequest != null -> ChromeVisualShieldWorkMode.RenderProbe(checkNotNull(renderProbeRequest))
@@ -513,6 +525,7 @@ internal class ChromeVisualShieldController(
         renderProbeRequest = null
         renderProbeCompleted = false
         regionDiscoveryLab.clear()
+        rasterProvenanceObserver.onSessionEnded()
         publishLabOwnership(false)
         ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
         log("phase=inactive reason=$reason rawPresented=false")
@@ -534,7 +547,7 @@ internal class ChromeVisualShieldController(
                 probeCompleted = renderProbeCompleted,
                 probe = renderProbeObservation,
             )
-        return "$base ${regionDiscoveryLab.statusValue()}"
+        return "$base ${regionDiscoveryLab.statusValue()} ${rasterProvenanceObserver.statusValue()}"
     }
 
     private fun startSession(
@@ -551,6 +564,7 @@ internal class ChromeVisualShieldController(
         renderProbeCompleted = false
         if (probe != null) renderProbeObservation = null
         regionDiscoveryLab.begin(discoveryProbe)
+        rasterProvenanceObserver.reset(discoveryProbe != null)
         labActive = true
         ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
         val started =

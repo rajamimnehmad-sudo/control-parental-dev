@@ -44,7 +44,10 @@ object ChromeVisualShieldLabControl {
 
     fun currentRenderIdentityToken(): String? = endpoint?.currentRenderIdentityToken()
 
-    fun beginFixtureRender(): String? = endpoint?.beginFixtureRender()
+    fun beginFixtureRender(): String? = endpoint?.beginFixtureRender(null)
+
+    fun beginFixtureRender(renderGeometryKeyDigest: String): String? =
+        endpoint?.beginFixtureRender(renderGeometryKeyDigest)
 
     fun renderAttested(
         renderIdentityToken: String,
@@ -95,7 +98,7 @@ object ChromeVisualShieldLabControl {
 
         fun currentRenderIdentityToken(): String?
 
-        fun beginFixtureRender(): String?
+        fun beginFixtureRender(renderGeometryKeyDigest: String?): String?
 
         fun renderAttested(
             renderIdentityToken: String,

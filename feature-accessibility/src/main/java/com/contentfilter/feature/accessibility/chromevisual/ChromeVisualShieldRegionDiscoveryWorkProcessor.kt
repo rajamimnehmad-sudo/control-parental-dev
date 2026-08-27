@@ -15,6 +15,7 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
     private val analyzer: ChromeVisualRegionAnalyzer,
     private val identityGate: ChromeVisualShieldIdentityGate,
     private val metrics: ChromeVisualShieldR1Metrics,
+    private val rasterProvenanceObserver: ChromeVisualShieldRasterProvenanceObserver,
     private val deliver: (ChromeVisualShieldRegionDiscoveryDelivery) -> Unit,
     private val log: (String) -> Unit,
     private val onCycleEnded: () -> Unit,
@@ -42,6 +43,7 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
                 ChromeVisualShieldCaptureResources<ChromeWindowFrame, ChromeVisualShieldCrop>()
                     .use { resources ->
                         resources.attachFullFrame(result.frame)
+                        rasterProvenanceObserver.observeFullFrame(result.frame.bitmap, work.identity)
                         val crop = resources.deriveCrop { frameProcessor.crop(it, work.identity) }
                         if (crop == null) {
                             identityGate.failClosed(work.identity)
@@ -61,6 +63,8 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
             metrics.onStaleInferenceDropped()
             return
         }
+        rasterProvenanceObserver.onPlannerEntry(work.identity, identityGate.snapshot().context)
+        rasterProvenanceObserver.observeCrop(crop.bitmap, work.identity)
         val pixels = crop.bitmap.copyPixels()
         val coroutineContext = currentCoroutineContext()
         val discovery =
