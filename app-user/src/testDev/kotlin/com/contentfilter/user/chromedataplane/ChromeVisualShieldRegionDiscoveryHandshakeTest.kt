@@ -1,5 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryNativeGeneration
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryRenderBinding
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -11,7 +13,7 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
     fun `one hundred equivalent geometry events begin one fixture render`() {
         val fixture = Fixture()
 
-        repeat(100) { fixture.request(SessionA, KeyA) }
+        repeat(100) { fixture.request(KeyA) }
 
         assertEquals(1, fixture.beginCount)
         assertEquals(1, fixture.policy.metrics().beginFixtureRenderCount)
@@ -19,172 +21,114 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
     }
 
     @Test
-    fun `duplicate key while in flight does not begin more work`() {
+    fun `same generation duplicates remain reuse after attestation`() {
         val fixture = Fixture()
+        val started = fixture.newRender(KeyA)
+        val claim = assertNotNull(fixture.policy.claimAttestation(fixture.current, started.binding))
 
-        assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired>(
-            fixture.request(SessionA, KeyA),
-        )
-        val duplicate =
-            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(
-                fixture.request(SessionA, KeyA),
-            )
+        assertEquals(true, fixture.policy.executeAttestation(claim, fixture.current) { true })
+        val repeated = assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(fixture.request(KeyA))
 
-        assertEquals(ChromeVisualShieldRegionDiscoveryHandshakePhase.InFlight, duplicate.phase)
+        assertEquals(ChromeVisualShieldRegionDiscoveryHandshakePhase.Attested, repeated.phase)
         assertEquals(1, fixture.beginCount)
     }
 
     @Test
-    fun `opaque publication with the same key remains a no-op`() {
+    fun `same geometry in a new native generation requires a new render`() {
         val fixture = Fixture()
-        fixture.request(SessionA, KeyA)
+        fixture.request(KeyA)
+        fixture.invalidateGeneration()
 
-        val afterOpaquePublication = fixture.request(SessionA, KeyA)
+        val second = fixture.newRender(KeyA)
 
-        assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(afterOpaquePublication)
-        assertEquals(1, fixture.beginCount)
-    }
-
-    @Test
-    fun `completed key does not begin again after equivalent resize`() {
-        val fixture = Fixture()
-        val started =
-            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired>(
-                fixture.request(SessionA, KeyA),
-            )
-        val claim =
-            assertNotNull(
-                fixture.policy.claimAttestation(SessionA, started.renderIdentityToken, started.renderKeyDigest),
-            )
-        assertEquals(true, fixture.policy.executeAttestation(claim) { true })
-
-        val afterResize =
-            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(
-                fixture.request(SessionA, KeyA),
-            )
-
-        assertEquals(ChromeVisualShieldRegionDiscoveryHandshakePhase.Attested, afterResize.phase)
-        assertEquals(1, fixture.beginCount)
-    }
-
-    @Test
-    fun `real geometry change from A to B begins exactly one new render`() {
-        val fixture = Fixture()
-
-        fixture.request(SessionA, KeyA)
-        fixture.request(SessionA, KeyB)
-
+        assertEquals(fixture.current, second.binding.generation())
         assertEquals(2, fixture.beginCount)
-        assertEquals(2, fixture.policy.metrics().beginFixtureRenderCount)
+        assertEquals(1, fixture.policy.metrics().generationReplacements)
     }
 
     @Test
-    fun `duplicate events for B do not add renders`() {
+    fun `real geometry and orientation changes each begin one generation`() {
         val fixture = Fixture()
 
-        fixture.request(SessionA, KeyA)
-        repeat(50) { fixture.request(SessionA, KeyB) }
-
-        assertEquals(2, fixture.beginCount)
-    }
-
-    @Test
-    fun `orientation and geometry change to C begins a third render`() {
-        val fixture = Fixture()
-
-        fixture.request(SessionA, KeyA)
-        fixture.request(SessionA, KeyB)
-        fixture.request(SessionA, KeyC)
+        fixture.request(KeyA)
+        fixture.request(KeyB)
+        fixture.request(KeyC)
+        repeat(50) { fixture.request(KeyC) }
 
         assertEquals(3, fixture.beginCount)
     }
 
     @Test
-    fun `attestation rejection never auto retries the same key`() {
+    fun `attestation rejection never auto retries same generation and key`() {
         val fixture = Fixture()
-        val started =
-            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired>(
-                fixture.request(SessionA, KeyA),
-            )
-        val claim =
-            assertNotNull(
-                fixture.policy.claimAttestation(SessionA, started.renderIdentityToken, started.renderKeyDigest),
-            )
-        assertEquals(false, fixture.policy.executeAttestation(claim) { false })
+        val started = fixture.newRender(KeyA)
+        val claim = assertNotNull(fixture.policy.claimAttestation(fixture.current, started.binding))
+        assertEquals(false, fixture.policy.executeAttestation(claim, fixture.current) { false })
 
-        val repeated =
-            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(
-                fixture.request(SessionA, KeyA),
-            )
+        val repeated = assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse>(fixture.request(KeyA))
 
         assertEquals(ChromeVisualShieldRegionDiscoveryHandshakePhase.Rejected, repeated.phase)
         assertEquals(1, fixture.beginCount)
-        assertEquals(1, fixture.policy.metrics().attestationRejected)
     }
 
     @Test
-    fun `new native session permits the same geometry once`() {
+    fun `stale generation cannot execute attestation callback`() {
         val fixture = Fixture()
+        val first = fixture.newRender(KeyA)
+        val staleClaim = assertNotNull(fixture.policy.claimAttestation(fixture.current, first.binding))
+        fixture.invalidateGeneration()
+        var actionCalls = 0
 
-        fixture.request(SessionA, KeyA)
-        fixture.request(SessionB, KeyA)
-        fixture.request(SessionB, KeyA)
-
-        assertEquals(2, fixture.beginCount)
-    }
-
-    @Test
-    fun `stale key cannot complete the newer identity`() {
-        val fixture = Fixture()
-        val first =
-            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired>(
-                fixture.request(SessionA, KeyA),
-            )
-        val staleClaim =
-            assertNotNull(
-                fixture.policy.claimAttestation(SessionA, first.renderIdentityToken, first.renderKeyDigest),
-            )
-        fixture.request(SessionA, KeyB)
-        var staleActionCalls = 0
-
-        val staleResult =
-            fixture.policy.executeAttestation(staleClaim) {
-                staleActionCalls += 1
+        val result =
+            fixture.policy.executeAttestation(staleClaim, fixture.current) {
+                actionCalls += 1
                 true
             }
 
-        assertNull(staleResult)
-        assertEquals(0, staleActionCalls)
+        assertNull(result)
+        assertEquals(0, actionCalls)
         assertEquals(1, fixture.policy.metrics().staleAttestationDropped)
-        assertEquals(2, fixture.beginCount)
     }
 
     @Test
-    fun `duplicate attestation cannot invoke native capture twice`() {
+    fun `stale binding cannot claim attestation for current generation`() {
         val fixture = Fixture()
-        val started =
-            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired>(
-                fixture.request(SessionA, KeyA),
-            )
-        val firstClaim =
-            assertNotNull(
-                fixture.policy.claimAttestation(SessionA, started.renderIdentityToken, started.renderKeyDigest),
-            )
+        val first = fixture.newRender(KeyA)
+        fixture.invalidateGeneration()
+
+        assertNull(fixture.policy.claimAttestation(fixture.current, first.binding))
+        assertEquals(1, fixture.policy.metrics().staleAttestationDropped)
+    }
+
+    @Test
+    fun `duplicate attestation never invokes native callback twice`() {
+        val fixture = Fixture()
+        val started = fixture.newRender(KeyA)
+        val firstClaim = assertNotNull(fixture.policy.claimAttestation(fixture.current, started.binding))
         var nativeCalls = 0
         assertEquals(
             true,
-            fixture.policy.executeAttestation(firstClaim) {
+            fixture.policy.executeAttestation(firstClaim, fixture.current) {
                 nativeCalls += 1
                 true
             },
         )
 
-        val duplicateClaim =
-            fixture.policy.claimAttestation(SessionA, started.renderIdentityToken, started.renderKeyDigest)
-
-        assertNull(duplicateClaim)
+        assertNull(fixture.policy.claimAttestation(fixture.current, started.binding))
         assertEquals(1, nativeCalls)
-        assertEquals(1, fixture.policy.metrics().attestationClaims)
+    }
+
+    @Test
+    fun `new session and window each require a fresh render`() {
+        val fixture = Fixture()
+        fixture.request(KeyA)
+
+        fixture.current = fixture.current.copy(protectionSessionId = 8, contentEpoch = 1, regionSequence = 1)
+        fixture.request(KeyA)
+        fixture.current = fixture.current.copy(windowId = 12, contentEpoch = 2, regionSequence = 2)
+        fixture.request(KeyA)
+
+        assertEquals(3, fixture.beginCount)
     }
 
     @Test
@@ -234,23 +178,59 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
     private class Fixture {
         val policy = ChromeVisualShieldRegionDiscoveryHandshakePolicy()
         var beginCount = 0
+        var current = GenerationA
 
-        fun request(
-            session: ChromeVisualShieldRegionDiscoveryNativeSession,
-            key: ChromeVisualShieldRegionDiscoveryRenderGeometryKey,
-        ): ChromeVisualShieldRegionDiscoveryHandshakeRequestResult =
-            policy.request(session, key) {
+        fun request(key: ChromeVisualShieldRegionDiscoveryRenderGeometryKey) =
+            policy.request(current, key) {
                 beginCount += 1
-                token(session)
+                current = current.nextGeneration()
+                binding(current, key)
             }
+
+        fun newRender(key: ChromeVisualShieldRegionDiscoveryRenderGeometryKey) =
+            assertIs<ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired>(request(key))
+
+        fun invalidateGeneration() {
+            current = current.nextGeneration()
+        }
     }
 
     private companion object {
-        val SessionA = ChromeVisualShieldRegionDiscoveryNativeSession(7, 11)
-        val SessionB = ChromeVisualShieldRegionDiscoveryNativeSession(8, 11)
+        val GenerationA = generation(session = 7, window = 11, content = 20, viewport = 13, region = 20)
         val KeyA = key(width = 412.0, orientation = "portrait-primary")
         val KeyB = key(width = 411.5, orientation = "portrait-primary")
         val KeyC = key(width = 772.0, orientation = "landscape-primary")
+
+        fun generation(
+            session: Long,
+            window: Int,
+            content: Long,
+            viewport: Long,
+            region: Long,
+        ) = ChromeVisualShieldRegionDiscoveryNativeGeneration(
+            protectionSessionId = session,
+            windowId = window,
+            contentEpoch = content,
+            viewportEpoch = viewport,
+            regionSequence = region,
+            renderIdentityToken = "$session:$window:$viewport:0:0:1080:2408:fixture:162:602:918:1324",
+        )
+
+        fun ChromeVisualShieldRegionDiscoveryNativeGeneration.nextGeneration() =
+            copy(contentEpoch = contentEpoch + 1, regionSequence = regionSequence + 1)
+
+        fun binding(
+            generation: ChromeVisualShieldRegionDiscoveryNativeGeneration,
+            key: ChromeVisualShieldRegionDiscoveryRenderGeometryKey,
+        ) = ChromeVisualShieldRegionDiscoveryRenderBinding(
+            protectionSessionId = generation.protectionSessionId,
+            windowId = generation.windowId,
+            contentEpoch = generation.contentEpoch,
+            viewportEpoch = generation.viewportEpoch,
+            regionSequence = generation.regionSequence,
+            renderIdentityToken = generation.renderIdentityToken,
+            renderGeometryKeyDigest = key.digest,
+        )
 
         fun key(
             width: Double,
@@ -273,8 +253,5 @@ class ChromeVisualShieldRegionDiscoveryHandshakeTest {
             canvasBackingWidth = (width * 0.70 * 2.625).toInt(),
             canvasBackingHeight = 630,
         )
-
-        fun token(session: ChromeVisualShieldRegionDiscoveryNativeSession): String =
-            "${session.protectionSessionId}:${session.windowId}:13:0:0:1080:2408:fixture:162:602:918:1324"
     }
 }

@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryRenderBinding
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -71,16 +72,17 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
     fun `attestation rejects geometry not produced by fixed contract`() {
         val scenario = ChromeVisualShieldRegionDiscoveryScenario.CenteredSafe
         val body =
-            "${scenario.wireName}|${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}|$Token|$RenderKey|700|660|" +
+            "${scenario.wireName}|${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}|$Token|$RenderKey|" +
+                "7|11|21|13|21|700|660|" +
                 "100|200|700|660|0|0|1080|2200|1|1|true|" +
                 "safe,${ChromeVisualShieldFixtureSample.Safe.expectedSha256},100,100,0,0,700,660"
 
         ChromeVisualShieldRegionDiscoveryAttestationStore.clear()
         assertContains(
-            ChromeVisualShieldRegionDiscoveryAttestationStore.record(scenario, body, Token, RenderKey),
+            ChromeVisualShieldRegionDiscoveryAttestationStore.record(scenario, body, Binding),
             "geometry_mismatch",
         )
-        assertNull(ChromeVisualShieldRegionDiscoveryAttestationStore.peek(scenario, Token))
+        assertNull(ChromeVisualShieldRegionDiscoveryAttestationStore.peek(scenario, Binding))
     }
 
     @Test
@@ -91,17 +93,18 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
                 ChromeVisualShieldRegionDiscoveryLayoutContract.geometry(scenario, listOf(100 to 100), 700, 660),
             ).single()
         val body =
-            "${scenario.wireName}|${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}|$Token|$RenderKey|700|660|" +
+            "${scenario.wireName}|${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}|$Token|$RenderKey|" +
+                "7|11|21|13|21|700|660|" +
                 "100|200|700|660|0|0|1080|2200|1|1|true|" +
                 "safe,${ChromeVisualShieldFixtureSample.Safe.expectedSha256},100,100," +
                 "${geometry.left},${geometry.top},${geometry.width},${geometry.height}"
 
         ChromeVisualShieldRegionDiscoveryAttestationStore.clear()
         assertContains(
-            ChromeVisualShieldRegionDiscoveryAttestationStore.record(scenario, body, Token, RenderKey),
+            ChromeVisualShieldRegionDiscoveryAttestationStore.record(scenario, body, Binding),
             "result=region_render_attested",
         )
-        val oracle = assertNotNull(ChromeVisualShieldRegionDiscoveryAttestationStore.peek(scenario, Token)).oracle()
+        val oracle = assertNotNull(ChromeVisualShieldRegionDiscoveryAttestationStore.peek(scenario, Binding)).oracle()
         assertEquals(Token, oracle.renderIdentityToken)
         assertEquals(
             listOf(ChromeVisualShieldFixtureSample.Safe.expectedSha256),
@@ -123,5 +126,15 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
     private companion object {
         const val Token = "7:11:13:0:0:1080:2408:fixture:162:602:918:1324"
         const val RenderKey = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        val Binding =
+            ChromeVisualShieldRegionDiscoveryRenderBinding(
+                protectionSessionId = 7,
+                windowId = 11,
+                contentEpoch = 21,
+                viewportEpoch = 13,
+                regionSequence = 21,
+                renderIdentityToken = Token,
+                renderGeometryKeyDigest = RenderKey,
+            )
     }
 }

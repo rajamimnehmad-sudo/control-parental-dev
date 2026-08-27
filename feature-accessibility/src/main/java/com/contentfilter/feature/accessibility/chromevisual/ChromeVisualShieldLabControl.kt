@@ -44,16 +44,35 @@ object ChromeVisualShieldLabControl {
 
     fun currentRenderIdentityToken(): String? = endpoint?.currentRenderIdentityToken()
 
-    fun beginFixtureRender(): String? = endpoint?.beginFixtureRender(null)
+    fun beginFixtureRender(): String? = endpoint?.beginFixtureRender()
 
-    fun beginFixtureRender(renderGeometryKeyDigest: String): String? =
-        endpoint?.beginFixtureRender(renderGeometryKeyDigest)
+    fun currentRegionDiscoveryGeneration(): ChromeVisualShieldRegionDiscoveryNativeGeneration? =
+        endpoint?.currentRegionDiscoveryGeneration()
+
+    fun beginRegionDiscoveryFixtureRender(
+        renderGeometryKeyDigest: String,
+    ): ChromeVisualShieldRegionDiscoveryRenderBinding? =
+        endpoint?.beginRegionDiscoveryFixtureRender(renderGeometryKeyDigest)
 
     fun renderAttested(
         renderIdentityToken: String,
         exactDrawOracle: ChromeVisualShieldExactDrawOracle? = null,
         regionDiscoveryOracle: ChromeVisualShieldRegionDiscoveryOracle? = null,
-    ): String = endpoint?.renderAttested(renderIdentityToken, exactDrawOracle, regionDiscoveryOracle) ?: Unavailable
+        regionDiscoveryBinding: ChromeVisualShieldRegionDiscoveryRenderBinding? = null,
+    ): String =
+        endpoint?.renderAttested(
+            renderIdentityToken,
+            exactDrawOracle,
+            regionDiscoveryOracle,
+            regionDiscoveryBinding,
+        ) ?: Unavailable
+
+    fun awaitRegionDiscoveryGeneration(
+        binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+        timeoutMillis: Long,
+    ): ChromeVisualShieldRegionDiscoveryGenerationOutcome =
+        endpoint?.awaitRegionDiscoveryGeneration(binding, timeoutMillis)
+            ?: ChromeVisualShieldRegionDiscoveryGenerationOutcome.Stopped
 
     fun status(): String = endpoint?.status() ?: Unavailable
 
@@ -98,13 +117,25 @@ object ChromeVisualShieldLabControl {
 
         fun currentRenderIdentityToken(): String?
 
-        fun beginFixtureRender(renderGeometryKeyDigest: String?): String?
+        fun beginFixtureRender(): String?
+
+        fun currentRegionDiscoveryGeneration(): ChromeVisualShieldRegionDiscoveryNativeGeneration?
+
+        fun beginRegionDiscoveryFixtureRender(
+            renderGeometryKeyDigest: String,
+        ): ChromeVisualShieldRegionDiscoveryRenderBinding?
 
         fun renderAttested(
             renderIdentityToken: String,
             exactDrawOracle: ChromeVisualShieldExactDrawOracle?,
             regionDiscoveryOracle: ChromeVisualShieldRegionDiscoveryOracle?,
+            regionDiscoveryBinding: ChromeVisualShieldRegionDiscoveryRenderBinding?,
         ): String
+
+        fun awaitRegionDiscoveryGeneration(
+            binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+            timeoutMillis: Long,
+        ): ChromeVisualShieldRegionDiscoveryGenerationOutcome
 
         fun status(): String
     }

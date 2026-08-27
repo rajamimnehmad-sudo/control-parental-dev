@@ -185,7 +185,7 @@ internal class ChromeVisualShieldController(
 
     override fun currentRenderIdentityToken(): String? = identityGate.snapshot().context?.renderIdentityToken()
 
-    override fun beginFixtureRender(renderGeometryKeyDigest: String?): String? =
+    override fun beginFixtureRender(): String? =
         valueOnMain {
             val current = identityGate.snapshot().context ?: return@valueOnMain null
             invalidateProtectCapture(
@@ -194,24 +194,44 @@ internal class ChromeVisualShieldController(
                 reason = ChromeVisualShieldInvalidation.Navigation,
                 requireRenderAttestation = true,
             )
-            identityGate.snapshot().context?.let { accepted ->
-                renderGeometryKeyDigest
-                    ?.takeIf { it.matches(Regex("[0-9a-f]{64}")) }
-                    ?.let { rasterProvenanceObserver.onRenderIdentityAccepted(accepted.toProbeIdentity(), it) }
-                accepted.renderIdentityToken()
+            identityGate.snapshot().context?.renderIdentityToken()
+        }
+
+    override fun currentRegionDiscoveryGeneration(): ChromeVisualShieldRegionDiscoveryNativeGeneration? =
+        identityGate.snapshot().context?.takeIf { regionDiscoveryLab.isActive() }?.toRegionDiscoveryGeneration()
+
+    override fun beginRegionDiscoveryFixtureRender(
+        renderGeometryKeyDigest: String,
+    ): ChromeVisualShieldRegionDiscoveryRenderBinding? =
+        valueOnMain {
+            if (!regionDiscoveryLab.isActive() || !renderGeometryKeyDigest.matches(Regex("[0-9a-f]{64}"))) {
+                return@valueOnMain null
             }
+            val current = identityGate.snapshot().context ?: return@valueOnMain null
+            invalidateProtectCapture(
+                windowId = current.windowId,
+                viewport = current.viewport,
+                reason = ChromeVisualShieldInvalidation.Navigation,
+                requireRenderAttestation = true,
+            )
+            val accepted = identityGate.snapshot().context ?: return@valueOnMain null
+            val binding = accepted.toRegionDiscoveryBinding(renderGeometryKeyDigest)
+            if (!regionDiscoveryLab.recordRenderBinding(binding, accepted)) return@valueOnMain null
+            rasterProvenanceObserver.onRenderIdentityAccepted(accepted.toProbeIdentity(), renderGeometryKeyDigest)
+            binding
         }
 
     override fun renderAttested(
         renderIdentityToken: String,
         exactDrawOracle: ChromeVisualShieldExactDrawOracle?,
         regionDiscoveryOracle: ChromeVisualShieldRegionDiscoveryOracle?,
+        regionDiscoveryBinding: ChromeVisualShieldRegionDiscoveryRenderBinding?,
     ): String {
         val context = identityGate.snapshot().context ?: return "result=render_identity_unavailable"
+        val currentIdentity = context.toProbeIdentity()
         val currentProbe = renderProbeRequest
         if (currentProbe?.exactDrawOracleRequired == true) {
             val oracle = exactDrawOracle ?: return "result=render_oracle_missing"
-            val currentIdentity = context.toProbeIdentity()
             val candidate = currentProbe.copy(exactDrawOracle = oracle)
             if (
                 !candidate.isValid() ||
@@ -223,7 +243,15 @@ internal class ChromeVisualShieldController(
         }
         if (
             regionDiscoveryLab.isActive() &&
-            !regionDiscoveryLab.recordOracle(renderIdentityToken, context.toProbeIdentity(), regionDiscoveryOracle)
+            (
+                regionDiscoveryBinding == null ||
+                    regionDiscoveryBinding.renderIdentityToken != renderIdentityToken ||
+                    !regionDiscoveryLab.acceptsAttestation(
+                        regionDiscoveryBinding,
+                        currentIdentity,
+                        regionDiscoveryOracle,
+                    )
+            )
         ) {
             return "result=region_discovery_oracle_mismatch"
         }
@@ -231,11 +259,26 @@ internal class ChromeVisualShieldController(
             return "result=render_identity_mismatch"
         }
         if (regionDiscoveryLab.isActive()) {
-            rasterProvenanceObserver.onAttestationAccepted(context.toProbeIdentity(), regionDiscoveryOracle)
+            if (
+                !regionDiscoveryLab.recordAttestation(
+                    checkNotNull(regionDiscoveryBinding),
+                    currentIdentity,
+                    regionDiscoveryOracle,
+                )
+            ) {
+                return "result=region_discovery_binding_invalidated"
+            }
+            rasterProvenanceObserver.onAttestationAccepted(currentIdentity, regionDiscoveryOracle)
         }
         runOnMain { scheduleCaptureWhenViewportReady("render_attested") }
         return "result=render_identity_attested"
     }
+
+    override fun awaitRegionDiscoveryGeneration(
+        binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+        timeoutMillis: Long,
+    ): ChromeVisualShieldRegionDiscoveryGenerationOutcome =
+        regionDiscoveryLab.awaitGeneration(binding, timeoutMillis)
 
     override fun stop(): String =
         commandOnMain {
@@ -341,7 +384,7 @@ internal class ChromeVisualShieldController(
         workCoordinator.invalidateAuthority()
         regionDiscoveryLab.invalidate()
         val context = protected.context ?: return
-        val waitForCurrentRender = hardViewportBoundary || requireRenderAttestation
+        val waitForCurrentRender = regionDiscoveryLab.isActive() || hardViewportBoundary || requireRenderAttestation
         if (waitForCurrentRender) viewportRenderGate.requireCurrentRender(context)
         protectThenCapture(protected, reason.name.lowercase())
         if (waitForCurrentRender) cancelWorkAndJoin()
@@ -425,14 +468,33 @@ internal class ChromeVisualShieldController(
 
     private fun scheduleCapture(trigger: String) {
         if ((renderProbeRequest != null && renderProbeCompleted) || regionDiscoveryLab.isCompleted()) return
+        val context = identityGate.snapshot().context ?: return
+        if (regionDiscoveryLab.isActive() && !regionDiscoveryLab.hasCurrentBinding(context)) {
+            log(
+                "phase=region_discovery_capture trigger=$trigger " +
+                    "result=waiting_for_current_attestation contentEpoch=${context.contentEpoch} " +
+                    "viewportEpoch=${context.viewportEpoch} regionSequence=${context.regionSequence}",
+            )
+            return
+        }
         val identity = identityGate.beginCapture() ?: return
-        rasterProvenanceObserver.onBeginCapture(identity)
         val mode =
             when {
                 renderProbeRequest != null -> ChromeVisualShieldWorkMode.RenderProbe(checkNotNull(renderProbeRequest))
-                regionDiscoveryLab.isActive() -> checkNotNull(regionDiscoveryLab.workModeOrNull())
+                regionDiscoveryLab.isActive() ->
+                    regionDiscoveryLab.workModeFor(identity) ?: run {
+                        identityGate.failClosed(identity)
+                        log(
+                            "phase=region_discovery_capture trigger=$trigger " +
+                                "result=waiting_for_current_attestation_after_begin " +
+                                "contentEpoch=${identity.contentEpoch} viewportEpoch=${identity.viewportEpoch} " +
+                                "regionSequence=${identity.regionSequence}",
+                        )
+                        return
+                    }
                 else -> ChromeVisualShieldWorkMode.Normal
             }
+        rasterProvenanceObserver.onBeginCapture(identity)
         if (!workCoordinator.request(ChromeVisualShieldWork(identity, trigger, mode))) {
             identityGate.failClosed(identity)
         }

@@ -22,6 +22,7 @@ internal sealed interface ChromeVisualShieldWorkMode {
 
     data class RegionDiscoveryProbe(
         val request: ChromeVisualShieldRegionDiscoveryProbeRequest,
+        val binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
     ) : ChromeVisualShieldWorkMode
 }
 

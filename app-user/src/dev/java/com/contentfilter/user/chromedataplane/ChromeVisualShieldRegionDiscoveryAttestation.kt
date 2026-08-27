@@ -3,12 +3,12 @@ package com.contentfilter.user.chromedataplane
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabRect
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryOracle
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryOracleRegion
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryRenderBinding
 import kotlin.math.abs
 
 internal data class ChromeVisualShieldRegionDiscoveryAttestation(
     val scenario: ChromeVisualShieldRegionDiscoveryScenario,
-    val renderIdentityToken: String,
-    val renderGeometryKeyDigest: String,
+    val binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
     val canvasWidth: Int,
     val canvasHeight: Int,
     val carrierCss: ChromeVisualShieldLabRect,
@@ -19,7 +19,7 @@ internal data class ChromeVisualShieldRegionDiscoveryAttestation(
 ) {
     fun oracle(): ChromeVisualShieldRegionDiscoveryOracle =
         ChromeVisualShieldRegionDiscoveryOracle(
-            renderIdentityToken = renderIdentityToken,
+            renderIdentityToken = binding.renderIdentityToken,
             scenarioId = scenario.wireName,
             renderContract = ChromeVisualShieldRegionDiscoveryLayoutContract.Version,
             canvasWidth = canvasWidth,
@@ -56,27 +56,31 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
     fun record(
         scenario: ChromeVisualShieldRegionDiscoveryScenario,
         body: String,
-        expectedRenderIdentityToken: String,
-        expectedRenderGeometryKeyDigest: String,
+        expectedBinding: ChromeVisualShieldRegionDiscoveryRenderBinding,
     ): String {
         val fields = body.split('|')
         if (fields.size != FieldCount) return invalid(scenario)
         if (
             fields[0] != scenario.wireName ||
             fields[1] != ChromeVisualShieldRegionDiscoveryLayoutContract.Version ||
-            fields[2] != expectedRenderIdentityToken ||
-            fields[3] != expectedRenderGeometryKeyDigest ||
-            fields[16].toBooleanStrictOrNull() != scenario.expectComplete
+            fields[2] != expectedBinding.renderIdentityToken ||
+            fields[3] != expectedBinding.renderGeometryKeyDigest ||
+            fields[4].toLongOrNull() != expectedBinding.protectionSessionId ||
+            fields[5].toIntOrNull() != expectedBinding.windowId ||
+            fields[6].toLongOrNull() != expectedBinding.contentEpoch ||
+            fields[7].toLongOrNull() != expectedBinding.viewportEpoch ||
+            fields[8].toLongOrNull() != expectedBinding.regionSequence ||
+            fields[21].toBooleanStrictOrNull() != scenario.expectComplete
         ) {
             return mismatch(scenario)
         }
-        val canvasWidth = fields[4].toIntOrNull() ?: return invalid(scenario)
-        val canvasHeight = fields[5].toIntOrNull() ?: return invalid(scenario)
-        val carrier = rect(fields, 6) ?: return invalid(scenario)
-        val viewport = rect(fields, 10) ?: return invalid(scenario)
-        val viewportScale = fields[14].toDoubleOrNull() ?: return invalid(scenario)
-        val dpr = fields[15].toDoubleOrNull() ?: return invalid(scenario)
-        val drawFields = fields[17].split(';')
+        val canvasWidth = fields[9].toIntOrNull() ?: return invalid(scenario)
+        val canvasHeight = fields[10].toIntOrNull() ?: return invalid(scenario)
+        val carrier = rect(fields, 11) ?: return invalid(scenario)
+        val viewport = rect(fields, 15) ?: return invalid(scenario)
+        val viewportScale = fields[19].toDoubleOrNull() ?: return invalid(scenario)
+        val dpr = fields[20].toDoubleOrNull() ?: return invalid(scenario)
+        val drawFields = fields[22].split(';')
         if (drawFields.size != scenario.samples.size) return mismatch(scenario)
         val observed =
             drawFields.mapIndexed { index, encoded ->
@@ -110,8 +114,7 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
         val attestation =
             ChromeVisualShieldRegionDiscoveryAttestation(
                 scenario,
-                expectedRenderIdentityToken,
-                expectedRenderGeometryKeyDigest,
+                expectedBinding,
                 canvasWidth,
                 canvasHeight,
                 carrier,
@@ -128,9 +131,8 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
     @Synchronized
     fun peek(
         scenario: ChromeVisualShieldRegionDiscoveryScenario,
-        expectedRenderIdentityToken: String,
-    ): ChromeVisualShieldRegionDiscoveryAttestation? =
-        ready[scenario]?.takeIf { it.renderIdentityToken == expectedRenderIdentityToken }
+        expectedBinding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+    ): ChromeVisualShieldRegionDiscoveryAttestation? = ready[scenario]?.takeIf { it.binding == expectedBinding }
 
     @Synchronized
     fun clear(scenario: ChromeVisualShieldRegionDiscoveryScenario) {
@@ -164,7 +166,7 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
     private fun mismatch(scenario: ChromeVisualShieldRegionDiscoveryScenario) =
         "result=region_attestation_identity_mismatch scenario=${scenario.wireName}"
 
-    private const val FieldCount = 18
+    private const val FieldCount = 23
     private const val DrawFieldCount = 8
     private const val GeometryTolerance = 0.02
 }
