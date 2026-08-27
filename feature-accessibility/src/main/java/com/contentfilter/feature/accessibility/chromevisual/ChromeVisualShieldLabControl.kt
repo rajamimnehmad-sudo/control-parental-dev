@@ -7,6 +7,7 @@ object ChromeVisualShieldLabControl {
     const val RegionTopBasisPoints = 2_500
     const val RegionRightBasisPoints = 8_500
     const val RegionBottomBasisPoints = 5_500
+    const val RegionDiscoverySearchEnvelopeInsetPixels = 4
     const val FixtureSignature = "compiled:chrome-visual-shield-13b-r:v1"
 
     @Volatile

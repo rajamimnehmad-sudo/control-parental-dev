@@ -659,7 +659,10 @@ internal class ChromeVisualShieldController(
 
     private fun activeRegionContract(): ChromeVisualShieldRegionContract =
         if (regionDiscoveryLab.isActive()) {
-            regionContract.copy(verticalOffsetPixels = -windowInspector.navigationInsets().bottom)
+            regionContract.copy(
+                verticalOffsetPixels = -windowInspector.navigationInsets().bottom,
+                edgeInsetPixels = ChromeVisualShieldLabControl.RegionDiscoverySearchEnvelopeInsetPixels,
+            )
         } else {
             regionContract
         }

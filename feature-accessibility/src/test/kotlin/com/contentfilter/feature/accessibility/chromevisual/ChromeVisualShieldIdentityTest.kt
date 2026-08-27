@@ -169,14 +169,20 @@ class ChromeVisualShieldIdentityTest {
     @Test
     fun `R2A search envelope excludes the measured bottom navigation inset`() {
         val unshifted = assertNotNull(contract.resolve(viewport))
-        val shifted = assertNotNull(contract.copy(verticalOffsetPixels = -42).resolve(viewport))
+        val shifted =
+            assertNotNull(
+                contract.copy(
+                    verticalOffsetPixels = -42,
+                    edgeInsetPixels = 4,
+                ).resolve(viewport),
+            )
 
-        assertEquals(unshifted.left, shifted.left)
-        assertEquals(unshifted.right, shifted.right)
-        assertEquals(unshifted.top - 42, shifted.top)
-        assertEquals(unshifted.bottom - 42, shifted.bottom)
-        assertEquals(unshifted.width, shifted.width)
-        assertEquals(unshifted.height, shifted.height)
+        assertEquals(unshifted.left + 4, shifted.left)
+        assertEquals(unshifted.right - 4, shifted.right)
+        assertEquals(unshifted.top - 42 + 4, shifted.top)
+        assertEquals(unshifted.bottom - 42 - 4, shifted.bottom)
+        assertEquals(unshifted.width - 8, shifted.width)
+        assertEquals(unshifted.height - 8, shifted.height)
     }
 
     private fun ChromeVisualShieldIdentity.toContext() =

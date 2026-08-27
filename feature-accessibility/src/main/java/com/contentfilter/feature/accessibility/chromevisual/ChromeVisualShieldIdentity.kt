@@ -27,6 +27,7 @@ internal data class ChromeVisualShieldRegionContract(
     val bottomBasisPoints: Int,
     val fixtureSignature: String,
     val verticalOffsetPixels: Int = 0,
+    val edgeInsetPixels: Int = 0,
 ) {
     fun resolve(viewport: ChromeVisualViewport): ChromeVisualRegion? {
         if (
@@ -40,10 +41,11 @@ internal data class ChromeVisualShieldRegionContract(
         }
         return ChromeVisualRegion(
             id = id,
-            left = viewport.left + scale(viewport.width, leftBasisPoints),
-            top = viewport.top + scale(viewport.height, topBasisPoints) + verticalOffsetPixels,
-            right = viewport.left + scale(viewport.width, rightBasisPoints),
-            bottom = viewport.top + scale(viewport.height, bottomBasisPoints) + verticalOffsetPixels,
+            left = viewport.left + scale(viewport.width, leftBasisPoints) + edgeInsetPixels,
+            top = viewport.top + scale(viewport.height, topBasisPoints) + verticalOffsetPixels + edgeInsetPixels,
+            right = viewport.left + scale(viewport.width, rightBasisPoints) - edgeInsetPixels,
+            bottom =
+                viewport.top + scale(viewport.height, bottomBasisPoints) + verticalOffsetPixels - edgeInsetPixels,
         ).takeIf { it.width > 0 && it.height > 0 }
     }
 
