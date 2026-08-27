@@ -50,7 +50,7 @@ permiso para descartarlo.
 
 ## 3. Preservacion Git
 
-Se crearon 58 refs bajo
+Se crearon 59 refs bajo
 `refs/preserve/mac-local-preservation-03/`:
 
 - 12 tips minimos para los componentes alcanzables locales;
@@ -59,7 +59,9 @@ Se crearon 58 refs bajo
 - 1 ref sintetico que retiene 1.586 trees/blobs que permanecian unreachable
   despues de cubrir los commits;
 - 1 ref sintetico de metadatos para respaldo remoto de los 12 componentes de
-  codigo publicables.
+  codigo publicables;
+- 1 ref `ticket-generated` que conserva el commit documental superseded creado
+  durante este mismo lote, para no dejar objetos nuevos sueltos.
 
 Tips importantes cubiertos explicitamente:
 
@@ -82,12 +84,12 @@ La historia Super Admin/Web antigua queda preservada sin declararla vigente.
 
 ### Bundle privado definitivo
 
-- Archivo: `content-filter-preservation-final-v2.bundle`
-- Bytes: `75,146,089`
+- Archivo: `content-filter-preservation-final-v3.bundle`
+- Bytes: `75,126,672`
 - SHA-256:
-  `bf104c848ee89831e54f6f83b43f6a6e6cebd66323c5ea0a1360849db9f61ec9`
+  `75d6cddb882ce1bf45fa81e13efd54feeaa8764a4fd0ab99f98c31e0af7c612a`
 - `git bundle verify`: PASS, historia completa.
-- Las 58 refs de preservacion resuelven y aparecen en `bundle list-heads`.
+- Las 59 refs de preservacion resuelven y aparecen en `bundle list-heads`.
 - `git fsck --no-reflogs --unreachable`: cero resultados al cierre.
 
 Existe ademas un clon COW privado de `.git` como segunda red local. El bundle
