@@ -34,6 +34,14 @@ internal class ChromeVisualShieldViewportRenderGate {
     }
 
     @Synchronized
+    fun requireOpaqueCommitAfterAttestation(context: ChromeVisualShieldContext): Boolean {
+        val current = context.renderIdentityToken()
+        if (requiredToken != current || attestedToken != current) return false
+        opaqueToken = null
+        return true
+    }
+
+    @Synchronized
     fun consumeCapturePermission(context: ChromeVisualShieldContext): Boolean {
         val required = requiredToken ?: return true
         val current = context.renderIdentityToken()

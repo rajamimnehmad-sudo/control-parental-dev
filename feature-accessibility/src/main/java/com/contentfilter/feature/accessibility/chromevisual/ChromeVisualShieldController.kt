@@ -270,9 +270,18 @@ internal class ChromeVisualShieldController(
             ) {
                 return "result=region_discovery_binding_invalidated"
             }
+            if (!viewportRenderGate.requireOpaqueCommitAfterAttestation(context)) {
+                return "result=region_discovery_presentation_barrier_rejected"
+            }
             rasterProvenanceObserver.onAttestationAccepted(currentIdentity, currentRegionDiscoveryOracle)
         }
-        runOnMain { scheduleCaptureWhenViewportReady("render_attested") }
+        runOnMain {
+            if (regionDiscoveryLab.isActive()) {
+                protectThenCapture(identityGate.snapshot(), "region_render_attested")
+            } else {
+                scheduleCaptureWhenViewportReady("render_attested")
+            }
+        }
         return "result=render_identity_attested"
     }
 

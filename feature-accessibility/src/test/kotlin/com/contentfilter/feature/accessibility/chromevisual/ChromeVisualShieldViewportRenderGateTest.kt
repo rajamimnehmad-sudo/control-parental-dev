@@ -63,6 +63,21 @@ class ChromeVisualShieldViewportRenderGateTest {
         assertTrue(gate.consumeCapturePermission(current))
     }
 
+    @Test
+    fun `R2A attestation requires a subsequent opaque compositor commit`() {
+        val gate = ChromeVisualShieldViewportRenderGate()
+        val current = context(viewportEpoch = 5, viewport = ChromeVisualViewport(0, 0, 1080, 2408))
+
+        gate.requireCurrentRender(current)
+        gate.recordOpaqueCommit(current)
+        assertTrue(gate.recordAttestation(current.renderIdentityToken(), current))
+        assertTrue(gate.requireOpaqueCommitAfterAttestation(current))
+        assertFalse(gate.consumeCapturePermission(current))
+
+        gate.recordOpaqueCommit(current)
+        assertTrue(gate.consumeCapturePermission(current))
+    }
+
     private fun context(
         viewportEpoch: Long,
         viewport: ChromeVisualViewport,
