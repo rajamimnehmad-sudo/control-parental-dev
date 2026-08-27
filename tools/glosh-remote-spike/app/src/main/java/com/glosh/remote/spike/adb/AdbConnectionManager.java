@@ -4,6 +4,7 @@ import android.content.Context;
 import android.os.Build;
 import android.os.SystemClock;
 
+import java.io.IOException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
@@ -31,6 +32,7 @@ import android.sun.security.x509.X500Name;
 import android.sun.security.x509.X509CertImpl;
 import android.sun.security.x509.X509CertInfo;
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
+import io.github.muntashirakon.adb.AdbPairingRequiredException;
 import io.github.muntashirakon.adb.android.AdbMdns;
 
 /** Persistent Wireless ADB identity plus a replaceable live connection. */
@@ -109,6 +111,28 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
     @Override
     protected String getDeviceName() {
         return "Glosh Remote";
+    }
+
+    /**
+     * Keep the simple pair -> connectTls -> whoami contract, but make connectTls same-device safe.
+     * libadb's default implementation connects to the mDNS-resolved host. On Samsung that path can
+     * fail after a successful pairing, while the ADB daemon is reachable on loopback. Reuse the
+     * already-tested discovery and retry path that connects to 127.0.0.1 instead.
+     */
+    @Override
+    public synchronized boolean connectTls(Context context, long timeoutMillis)
+            throws IOException, InterruptedException, AdbPairingRequiredException {
+        try {
+            return ensureConnected(context, timeoutMillis);
+        } catch (InterruptedException error) {
+            throw error;
+        } catch (AdbPairingRequiredException error) {
+            throw error;
+        } catch (IOException error) {
+            throw error;
+        } catch (Exception error) {
+            throw new IOException("Could not open loopback ADB TLS connection", error);
+        }
     }
 
     /**
