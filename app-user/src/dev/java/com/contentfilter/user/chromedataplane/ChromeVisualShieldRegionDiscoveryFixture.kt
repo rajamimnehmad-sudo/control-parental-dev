@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import android.util.Log
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabControl
 
 internal enum class ChromeVisualShieldRegionDiscoveryScenario(
@@ -121,6 +122,7 @@ internal object ChromeVisualShieldRegionDiscoveryLayoutContract {
 
 internal object ChromeVisualShieldRegionDiscoveryFixture {
     const val PagePrefix = "/web13br/discovery/"
+    const val RenderIdentityPrefix = "/web13br/discovery-render-identity/"
     const val RenderedPrefix = "/web13br/discovery-rendered/"
 
     fun responseFor(
@@ -130,61 +132,124 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
         val scenarioName =
             when {
                 path.startsWith(PagePrefix) -> path.removePrefix(PagePrefix)
+                path.startsWith(RenderIdentityPrefix) -> path.removePrefix(RenderIdentityPrefix)
                 path.startsWith(RenderedPrefix) -> path.removePrefix(RenderedPrefix)
                 else -> return null
             }
         val scenario = ChromeVisualShieldRegionDiscoveryScenario.fromWireName(scenarioName) ?: return null
-        return if (path.startsWith(PagePrefix)) {
-            response(path, "text/html; charset=utf-8", page(scenario))
-        } else {
-            renderedResponse(request, path, scenario)
+        return when {
+            path.startsWith(PagePrefix) -> response(path, "text/html; charset=utf-8", page(scenario))
+            path.startsWith(RenderIdentityPrefix) -> renderIdentityResponse(request, path, scenario)
+            else -> renderedResponse(request, path, scenario)
         }
     }
 
     fun pagePath(scenario: ChromeVisualShieldRegionDiscoveryScenario): String = PagePrefix + scenario.wireName
+
+    private fun renderIdentityResponse(
+        request: ChromePhotosProxyRequest,
+        path: String,
+        scenario: ChromeVisualShieldRegionDiscoveryScenario,
+    ): ChromePhotosFixtureResponse {
+        val currentToken = ChromeVisualShieldLabControl.currentRenderIdentityToken()
+        val nativeSession =
+            currentToken?.let(ChromeVisualShieldRegionDiscoveryNativeSession::fromRenderIdentityToken)
+        val key =
+            request.body
+                .takeIf { request.method == "POST" && it.size <= MaxRenderKeyBytes }
+                ?.toString(Charsets.UTF_8)
+                ?.let { ChromeVisualShieldRegionDiscoveryRenderGeometryKey.parse(scenario, it) }
+        val result =
+            if (
+                currentToken == null ||
+                nativeSession == null ||
+                key == null ||
+                scenario.samples.any { !ChromeVisualShieldFixtureSampleStore.isReady(it) }
+            ) {
+                "result=region_render_identity_request_invalid scenario=${scenario.wireName}"
+            } else {
+                ChromeVisualShieldRegionDiscoveryHandshakeStore.request(nativeSession, key) {
+                    ChromeVisualShieldLabControl.beginFixtureRender()
+                }.responseText(scenario)
+            }
+        Log.i(LogTag, "phase=render_identity $result")
+        return response(path, "text/plain; charset=utf-8", result)
+    }
 
     private fun renderedResponse(
         request: ChromePhotosProxyRequest,
         path: String,
         scenario: ChromeVisualShieldRegionDiscoveryScenario,
     ): ChromePhotosFixtureResponse {
-        val renderIdentityToken = ChromeVisualShieldLabControl.currentRenderIdentityToken()
+        val currentRenderIdentityToken = ChromeVisualShieldLabControl.currentRenderIdentityToken()
+        val nativeSession =
+            currentRenderIdentityToken?.let(
+                ChromeVisualShieldRegionDiscoveryNativeSession::fromRenderIdentityToken,
+            )
+        val fields = request.body.toString(Charsets.UTF_8).split('|')
+        val claimedRenderIdentityToken = fields.getOrNull(2)
+        val claimedRenderKeyDigest = fields.getOrNull(3)
+        val claim =
+            if (
+                request.method == "POST" &&
+                request.body.size <= MaxAttestationBytes &&
+                nativeSession != null &&
+                claimedRenderIdentityToken != null &&
+                claimedRenderKeyDigest != null
+            ) {
+                ChromeVisualShieldRegionDiscoveryHandshakeStore.claimAttestation(
+                    nativeSession = nativeSession,
+                    renderIdentityToken = claimedRenderIdentityToken,
+                    renderKeyDigest = claimedRenderKeyDigest,
+                )
+            } else {
+                null
+            }
         val result =
             if (
-                request.method != "POST" ||
-                request.body.size > MaxAttestationBytes ||
-                renderIdentityToken == null ||
+                currentRenderIdentityToken == null ||
+                claim == null ||
                 scenario.samples.any { !ChromeVisualShieldFixtureSampleStore.isReady(it) }
             ) {
-                "result=region_attestation_request_invalid scenario=${scenario.wireName}"
+                "result=region_attestation_stale_or_invalid scenario=${scenario.wireName}"
             } else {
-                ChromeVisualShieldRegionDiscoveryAttestationStore.record(
-                    scenario = scenario,
-                    body = request.body.toString(Charsets.UTF_8),
-                    expectedRenderIdentityToken = renderIdentityToken,
-                ).let { recorded ->
-                    val attestation =
-                        ChromeVisualShieldRegionDiscoveryAttestationStore.peek(
-                            scenario,
-                            renderIdentityToken,
-                        )
-                    if (!recorded.startsWith("result=region_render_attested") || attestation == null) {
-                        recorded
-                    } else {
-                        val native =
-                            ChromeVisualShieldLabControl.renderAttested(
-                                renderIdentityToken = renderIdentityToken,
-                                regionDiscoveryOracle = attestation.oracle(),
-                            )
-                        if (native == "result=render_identity_attested") {
-                            recorded
+                val recorded =
+                    ChromeVisualShieldRegionDiscoveryAttestationStore.record(
+                        scenario = scenario,
+                        body = request.body.toString(Charsets.UTF_8),
+                        expectedRenderIdentityToken = claim.renderIdentityToken,
+                        expectedRenderGeometryKeyDigest = claim.renderKeyDigest,
+                    )
+                val attestation =
+                    ChromeVisualShieldRegionDiscoveryAttestationStore.peek(
+                        scenario,
+                        claim.renderIdentityToken,
+                    )
+                val accepted =
+                    ChromeVisualShieldRegionDiscoveryHandshakeStore.executeAttestation(claim) {
+                        if (!recorded.startsWith("result=region_render_attested") || attestation == null) {
+                            false
                         } else {
-                            ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
-                            "result=region_attestation_native_rejected scenario=${scenario.wireName} native=$native"
+                            ChromeVisualShieldLabControl.renderAttested(
+                                renderIdentityToken = claim.renderIdentityToken,
+                                regionDiscoveryOracle = attestation.oracle(),
+                            ) == "result=render_identity_attested"
                         }
+                    }
+                when {
+                    accepted == null ->
+                        "result=region_attestation_stale scenario=${scenario.wireName}"
+                    accepted -> recorded
+                    else -> {
+                        ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
+                        "result=region_attestation_rejected scenario=${scenario.wireName} detail=$recorded"
                     }
                 }
             }
+        Log.i(
+            LogTag,
+            "phase=render_attestation $result ${ChromeVisualShieldRegionDiscoveryHandshakeStore.metrics().logText()}",
+        )
         return response(path, "text/plain; charset=utf-8", result)
     }
 
@@ -223,8 +288,9 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                   const sampleIds = [$samples];
                   const expectedShas = [$shas];
                   const payloadPaths = [$payloads];
-                  let revision = 0;
+                  let renderRequested = false;
                   let rendering = false;
+                  let lastSubmittedGeometryKey = null;
                   const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
                   const sha256 = async bytes => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
                     value => value.toString(16).padStart(2, '0')).join('');
@@ -245,17 +311,58 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                     if ('${scenario.layout.name}' === 'Right') x = width * 0.95 - size.width;
                     return [{ x, y: (height - size.height) / 2, ...size }];
                   };
+                  const geometrySnapshot = () => {
+                    const vv = window.visualViewport;
+                    const viewportWidth = vv ? vv.width : innerWidth;
+                    const viewportHeight = vv ? vv.height : innerHeight;
+                    const browserControlsHeight = Math.max(0, screen.height - viewportHeight);
+                    canvas.style.left = (viewportWidth * 0.15) + 'px';
+                    canvas.style.top = Math.max(0, screen.height * 0.25 - browserControlsHeight) + 'px';
+                    canvas.style.width = (viewportWidth * 0.70) + 'px';
+                    canvas.style.height = (screen.height * 0.30) + 'px';
+                    const rect = canvas.getBoundingClientRect();
+                    const dpr = window.devicePixelRatio || 1;
+                    const backingWidth = Math.max(1, Math.round(rect.width * dpr));
+                    const backingHeight = Math.max(1, Math.round(rect.height * dpr));
+                    const orientation = screen.orientation && screen.orientation.type
+                      ? screen.orientation.type
+                      : (viewportWidth >= viewportHeight ? 'landscape' : 'portrait');
+                    const viewport = {
+                      left: vv ? vv.offsetLeft : 0, top: vv ? vv.offsetTop : 0,
+                      width: vv ? vv.width : innerWidth, height: vv ? vv.height : innerHeight,
+                      scale: vv ? vv.scale : 1
+                    };
+                    const keyFields = ['${scenario.wireName}',
+                      '${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}', expectedShas.join(','), orientation,
+                      viewport.left, viewport.top, viewport.width, viewport.height, viewport.scale, dpr,
+                      rect.left, rect.top, rect.width, rect.height, backingWidth, backingHeight];
+                    return { vv, viewport, rect, dpr, backingWidth, backingHeight, keyBody:keyFields.join('|') };
+                  };
+                  const responseFields = text => Object.fromEntries(text.trim().split(/\s+/).map(field => {
+                    const separator = field.indexOf('=');
+                    return separator < 0 ? [field, ''] : [field.substring(0, separator), field.substring(separator + 1)];
+                  }));
                   const renderLatest = async () => {
                     if (rendering) return;
                     rendering = true;
                     try {
-                      while (revision > 0) {
-                        revision = 0;
+                      while (renderRequested) {
+                        renderRequested = false;
+                        const geometry = geometrySnapshot();
+                        if (geometry.keyBody === lastSubmittedGeometryKey) continue;
+                        lastSubmittedGeometryKey = geometry.keyBody;
                         document.documentElement.dataset.renderAttested = 'false';
-                        const identityResponse = await fetch('${ChromeVisualShieldFixture.RenderIdentityPath}', {cache:'no-store'});
+                        const identityResponse = await fetch('${RenderIdentityPrefix}${scenario.wireName}', {
+                          method:'POST', headers:{'Content-Type':'text/plain'}, cache:'no-store', body:geometry.keyBody
+                        });
                         const identityText = await identityResponse.text();
-                        if (!identityText.startsWith('result=render_identity token=')) throw new Error('identity unavailable');
-                        const token = identityText.substring('result=render_identity token='.length);
+                        const identity = responseFields(identityText);
+                        if (identity.result === 'region_render_reuse') continue;
+                        if (identity.result !== 'region_render_new' || !identity.token || !identity.renderKey) {
+                          throw new Error('identity unavailable');
+                        }
+                        const token = identity.token;
+                        const renderKey = identity.renderKey;
                         const payloads = await Promise.all(payloadPaths.map(path => fetch(path, {cache:'no-store'}).then(r => r.json())));
                         const sources = [];
                         try {
@@ -263,23 +370,17 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                             const payload = payloads[index];
                             if (!payload.ready || payload.sha256 !== expectedShas[index]) throw new Error('payload unavailable');
                             const bytes = Uint8Array.from(atob(payload.base64), value => value.charCodeAt(0));
-                            if (await sha256(bytes) !== expectedShas[index]) throw new Error('sha mismatch');
-                            const bitmap = await createImageBitmap(new Blob([bytes], {type:'application/octet-stream'}));
-                            bytes.fill(0);
-                            sources.push(bitmap);
+                            try {
+                              if (await sha256(bytes) !== expectedShas[index]) throw new Error('sha mismatch');
+                              sources.push(await createImageBitmap(new Blob([bytes], {type:'application/octet-stream'})));
+                            } finally { bytes.fill(0); }
                           }
-                          const vv = window.visualViewport;
-                          const viewportWidth = vv ? vv.width : innerWidth;
-                          const viewportHeight = vv ? vv.height : innerHeight;
-                          const browserControlsHeight = Math.max(0, screen.height - viewportHeight);
-                          canvas.style.left = (viewportWidth * 0.15) + 'px';
-                          canvas.style.top = Math.max(0, screen.height * 0.25 - browserControlsHeight) + 'px';
-                          canvas.style.width = (viewportWidth * 0.70) + 'px';
-                          canvas.style.height = (screen.height * 0.30) + 'px';
-                          const rect = canvas.getBoundingClientRect();
-                          const dpr = window.devicePixelRatio || 1;
-                          canvas.width = Math.max(1, Math.round(rect.width * dpr));
-                          canvas.height = Math.max(1, Math.round(rect.height * dpr));
+                          if (geometrySnapshot().keyBody !== geometry.keyBody) {
+                            renderRequested = true;
+                            continue;
+                          }
+                          canvas.width = geometry.backingWidth;
+                          canvas.height = geometry.backingHeight;
                           const context = canvas.getContext('2d', {alpha:false});
                           context.fillStyle = '${ChromeVisualShieldRegionDiscoveryLayoutContract.NeutralBackground}';
                           context.fillRect(0, 0, canvas.width, canvas.height);
@@ -296,17 +397,23 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                             context.drawImage(sources[index], draw.x, draw.y, draw.width, draw.height);
                           });
                           await frame();
-                          const fields = ['${scenario.wireName}', '${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}', token,
-                            canvas.width, canvas.height, rect.left, rect.top, rect.width, rect.height,
-                            vv ? vv.offsetLeft : 0, vv ? vv.offsetTop : 0, vv ? vv.width : innerWidth,
-                            vv ? vv.height : innerHeight, vv ? vv.scale : 1, dpr, ${scenario.expectComplete},
+                          if (geometrySnapshot().keyBody !== geometry.keyBody) {
+                            renderRequested = true;
+                            continue;
+                          }
+                          const fields = ['${scenario.wireName}', '${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}',
+                            token, renderKey, canvas.width, canvas.height, geometry.rect.left, geometry.rect.top,
+                            geometry.rect.width, geometry.rect.height, geometry.viewport.left, geometry.viewport.top,
+                            geometry.viewport.width, geometry.viewport.height, geometry.viewport.scale, geometry.dpr,
+                            ${scenario.expectComplete},
                             draws.map((draw, index) => [sampleIds[index], expectedShas[index], sources[index].width,
                               sources[index].height, draw.x, draw.y, draw.width, draw.height].join(',')).join(';')];
                           const attested = await fetch('${RenderedPrefix}${scenario.wireName}', {
                             method:'POST', headers:{'Content-Type':'text/plain'}, body:fields.join('|')
                           });
                           if (!attested.ok || !(await attested.text()).startsWith('result=region_render_attested')) {
-                            revision += 1; await frame(); continue;
+                            document.documentElement.dataset.fixtureError = 'attestation rejected';
+                            continue;
                           }
                           document.documentElement.dataset.renderAttested = 'true';
                           document.documentElement.dataset.renderIdentity = token;
@@ -314,9 +421,9 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                           sources.forEach(bitmap => bitmap.close());
                         }
                       }
-                    } finally { rendering = false; if (revision > 0) void renderLatest(); }
+                    } finally { rendering = false; if (renderRequested) void renderLatest(); }
                   };
-                  const requestRender = () => { revision += 1; void renderLatest(); };
+                  const requestRender = () => { renderRequested = true; void renderLatest(); };
                   addEventListener('resize', requestRender); addEventListener('orientationchange', requestRender);
                   if (visualViewport) visualViewport.addEventListener('resize', requestRender);
                   requestRender();
@@ -338,4 +445,26 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
     )
 
     private const val MaxAttestationBytes = 4_096
+    private const val MaxRenderKeyBytes = 2_048
+    private const val LogTag = "GloshR2AHandshake"
 }
+
+private fun ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.responseText(
+    scenario: ChromeVisualShieldRegionDiscoveryScenario,
+): String {
+    val prefix =
+        when (this) {
+            is ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired ->
+                "result=region_render_new scenario=${scenario.wireName} token=$renderIdentityToken renderKey=$renderKeyDigest"
+            is ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse ->
+                "result=region_render_reuse scenario=${scenario.wireName} renderKey=$renderKeyDigest phase=${phase.name.lowercase()}"
+            is ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Rejected ->
+                "result=region_render_rejected scenario=${scenario.wireName} renderKey=$renderKeyDigest reason=$reason"
+        }
+    return "$prefix ${metrics.logText()}"
+}
+
+private fun ChromeVisualShieldRegionDiscoveryHandshakeMetrics.logText(): String =
+    "identityRequests=$requests beginFixtureRenderCount=$beginFixtureRenderCount reused=$reused " +
+        "attestationClaims=$attestationClaims attestationAccepted=$attestationAccepted " +
+        "attestationRejected=$attestationRejected staleAttestationDropped=$staleAttestationDropped"

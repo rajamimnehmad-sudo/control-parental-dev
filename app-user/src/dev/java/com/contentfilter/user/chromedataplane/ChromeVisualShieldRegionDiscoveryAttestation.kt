@@ -8,6 +8,7 @@ import kotlin.math.abs
 internal data class ChromeVisualShieldRegionDiscoveryAttestation(
     val scenario: ChromeVisualShieldRegionDiscoveryScenario,
     val renderIdentityToken: String,
+    val renderGeometryKeyDigest: String,
     val canvasWidth: Int,
     val canvasHeight: Int,
     val carrierCss: ChromeVisualShieldLabRect,
@@ -56,6 +57,7 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
         scenario: ChromeVisualShieldRegionDiscoveryScenario,
         body: String,
         expectedRenderIdentityToken: String,
+        expectedRenderGeometryKeyDigest: String,
     ): String {
         val fields = body.split('|')
         if (fields.size != FieldCount) return invalid(scenario)
@@ -63,17 +65,18 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
             fields[0] != scenario.wireName ||
             fields[1] != ChromeVisualShieldRegionDiscoveryLayoutContract.Version ||
             fields[2] != expectedRenderIdentityToken ||
-            fields[15].toBooleanStrictOrNull() != scenario.expectComplete
+            fields[3] != expectedRenderGeometryKeyDigest ||
+            fields[16].toBooleanStrictOrNull() != scenario.expectComplete
         ) {
             return mismatch(scenario)
         }
-        val canvasWidth = fields[3].toIntOrNull() ?: return invalid(scenario)
-        val canvasHeight = fields[4].toIntOrNull() ?: return invalid(scenario)
-        val carrier = rect(fields, 5) ?: return invalid(scenario)
-        val viewport = rect(fields, 9) ?: return invalid(scenario)
-        val viewportScale = fields[13].toDoubleOrNull() ?: return invalid(scenario)
-        val dpr = fields[14].toDoubleOrNull() ?: return invalid(scenario)
-        val drawFields = fields[16].split(';')
+        val canvasWidth = fields[4].toIntOrNull() ?: return invalid(scenario)
+        val canvasHeight = fields[5].toIntOrNull() ?: return invalid(scenario)
+        val carrier = rect(fields, 6) ?: return invalid(scenario)
+        val viewport = rect(fields, 10) ?: return invalid(scenario)
+        val viewportScale = fields[14].toDoubleOrNull() ?: return invalid(scenario)
+        val dpr = fields[15].toDoubleOrNull() ?: return invalid(scenario)
+        val drawFields = fields[17].split(';')
         if (drawFields.size != scenario.samples.size) return mismatch(scenario)
         val observed =
             drawFields.mapIndexed { index, encoded ->
@@ -108,6 +111,7 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
             ChromeVisualShieldRegionDiscoveryAttestation(
                 scenario,
                 expectedRenderIdentityToken,
+                expectedRenderGeometryKeyDigest,
                 canvasWidth,
                 canvasHeight,
                 carrier,
@@ -136,6 +140,7 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
     @Synchronized
     fun clear() {
         ready.clear()
+        ChromeVisualShieldRegionDiscoveryHandshakeStore.clear()
     }
 
     private fun rect(
@@ -159,7 +164,7 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
     private fun mismatch(scenario: ChromeVisualShieldRegionDiscoveryScenario) =
         "result=region_attestation_identity_mismatch scenario=${scenario.wireName}"
 
-    private const val FieldCount = 17
+    private const val FieldCount = 18
     private const val DrawFieldCount = 8
     private const val GeometryTolerance = 0.02
 }
