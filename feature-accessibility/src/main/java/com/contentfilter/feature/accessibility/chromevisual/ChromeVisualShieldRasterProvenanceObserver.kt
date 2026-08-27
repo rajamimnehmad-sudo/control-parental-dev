@@ -197,12 +197,24 @@ internal class ChromeVisualShieldRasterProvenanceObserver(
                 val evidenceSha = ChromeVisualShieldCropEvidenceFactory.from(bitmap).rgbaSha256
                 val signals = buildSignals(fingerprint, geometry, drawForeign)
                 val result = ChromeVisualShieldRasterProvenanceClassifier.classify(signals)
+                val expectedCropDraw = geometry.cropDraws.firstOrNull()
+                val expectedFullDraw = geometry.fullDraws.firstOrNull()
+                val geometryEvidence =
+                    ChromeVisualShieldRasterGeometryEvidenceFactory.create(
+                        searchEnvelope = geometry.fullSearchEnvelope,
+                        carrier = geometry.fullCarrier,
+                        expectedDraw = expectedFullDraw,
+                        observedCard = fullFingerprint?.cardClusters?.bestSizeMatch(expectedFullDraw),
+                        cropExpectedDraw = expectedCropDraw,
+                        cropObservedCard = fingerprint.cardClusters.bestSizeMatch(expectedCropDraw),
+                    )
                 synchronized(this) {
                     if (!active || captureIdentity != identity) return
                     cropFingerprint = fingerprint
                     cropSha256 = evidenceSha
                     classification = result
                     log("phase=raster_provenance_crop cropSha=$evidenceSha ${fingerprint.logValue()}")
+                    log("phase=raster_provenance_geometry ${geometryEvidence.logValue()}")
                     log(
                         "phase=raster_provenance_classification rootCause=${result.cause} basis=${result.basis} " +
                             "mappingDelta=${result.mappingDelta?.logValue() ?: "none"}",

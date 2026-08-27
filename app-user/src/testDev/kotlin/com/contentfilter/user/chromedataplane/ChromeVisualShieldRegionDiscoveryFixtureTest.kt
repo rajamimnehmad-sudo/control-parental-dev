@@ -7,6 +7,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class ChromeVisualShieldRegionDiscoveryFixtureTest {
     @Test
@@ -55,9 +56,9 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
         assertContains(html, "context.drawImage(sources[index]")
         assertContains(html, ChromeVisualShieldRegionDiscoveryLayoutContract.Version)
         assertContains(html, "multi-safe-block")
-        assertContains(html, "screen.height - viewportHeight")
-        assertContains(html, "screen.height * 0.25 - browserControlsHeight")
-        assertContains(html, "screen.height * 0.30")
+        assertContains(html, "screen.height - innerHeight")
+        assertContains(html, "screen.height * 0.25 - browserTopControlsHeight")
+        assertContains(html, "screen.height * 0.3")
         assertContains(html, ChromeVisualShieldRegionDiscoveryFixture.RenderIdentityPrefix)
         assertContains(html, "lastSubmittedGeometryKey")
         assertContains(html, "geometrySnapshot().keyBody !== geometry.keyBody")
@@ -69,7 +70,33 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
         assertFalse(html.contains("revision += 1"))
         assertFalse(html.contains("expectedVerdict"))
         assertFalse(html.contains("release("))
+        assertFalse(html.contains("screen.height - viewportHeight"))
         assertFalse(response.contentType.startsWith("image/"))
+    }
+
+    @Test
+    fun `carrier top ignores dynamic bottom controls and stays at signed screen fraction`() {
+        val screenHeight = 803.0
+        val layoutViewportHeight = 738.0
+        val visualViewportHeight = 722.0
+
+        val carrierTop =
+            ChromeVisualShieldRegionDiscoveryLayoutContract.carrierTopCss(
+                screenHeight,
+                layoutViewportHeight,
+            )
+        val absoluteCarrierTop = (screenHeight - layoutViewportHeight) + carrierTop
+        val oldAbsoluteCarrierTop =
+            (screenHeight - layoutViewportHeight) +
+                maxOf(
+                    0.0,
+                    screenHeight * ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierTopFraction -
+                        (screenHeight - visualViewportHeight),
+                )
+
+        assertEquals(screenHeight * 0.25, absoluteCarrierTop)
+        assertTrue(oldAbsoluteCarrierTop < absoluteCarrierTop)
+        assertEquals(visualViewportHeight - layoutViewportHeight, oldAbsoluteCarrierTop - absoluteCarrierTop)
     }
 
     @Test

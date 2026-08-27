@@ -74,4 +74,5 @@ internal data class ChromeVisualShieldRegionDiscoveryObservation(
     val decisions: List<ChromeVisualShieldRegionDecision>,
     val authorityResult: ChromeVisualShieldRegionDiscoveryAuthorityResult,
     val oracleMatch: Boolean?,
+    val oracleVerification: ChromeVisualShieldRegionDiscoveryOracleVerifier.Verification?,
 )

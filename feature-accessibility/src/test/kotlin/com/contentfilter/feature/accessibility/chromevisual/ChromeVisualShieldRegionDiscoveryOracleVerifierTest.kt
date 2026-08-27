@@ -1,6 +1,7 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -62,6 +63,45 @@ class ChromeVisualShieldRegionDiscoveryOracleVerifierTest {
                 complete(region("discovery-1", 20, 30, 80, 90)),
             ),
         )
+    }
+
+    @Test
+    fun `physical vertical offset exposes every failed oracle condition`() {
+        val identity = identity()
+        val result =
+            ChromeVisualShieldRegionDiscoveryOracleVerifier.verify(
+                identity = identity,
+                searchEnvelope = identity.region,
+                crop = ChromeVisualShieldCropEvidence(756, 722, "4".repeat(64)),
+                request = request(),
+                oracle =
+                    oracle(identity, expectComplete = true).copy(
+                        canvasWidth = 756,
+                        canvasHeight = 722,
+                        carrierCss = ChromeVisualShieldLabRect(0.0, 0.0, 100.0, 120.0),
+                        regions =
+                            listOf(
+                                ChromeVisualShieldRegionDiscoveryOracleRegion(
+                                    oracleId = "oracle-safe",
+                                    sourceSha256 = "1".repeat(64),
+                                    sourceWidth = 546,
+                                    sourceHeight = 546,
+                                    drawCanvas = ChromeVisualShieldLabRect(105.0, 87.0, 546.0, 546.0),
+                                ),
+                            ),
+                    ),
+                discovery = complete(region("discovery-1", 103, 42, 653, 593)),
+            )
+
+        val comparison = result.comparisons.single()
+        assertFalse(result.matches)
+        assertEquals(0.9056148443843469, comparison.oracleCoverage)
+        assertEquals(-43.0, comparison.deltaY)
+        assertTrue(comparison.candidateAreaPass)
+        assertFalse(comparison.coveragePass)
+        assertTrue(result.conditions.single { it.name == "region1Area" }.passed)
+        assertFalse(result.conditions.single { it.name == "region1Coverage" }.passed)
+        assertTrue(result.logValue().contains("insideSearchFraction=1.000000"))
     }
 
     private fun oracle(

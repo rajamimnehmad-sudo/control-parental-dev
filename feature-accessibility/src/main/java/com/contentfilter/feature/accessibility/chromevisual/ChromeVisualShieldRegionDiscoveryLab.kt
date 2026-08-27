@@ -163,8 +163,8 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
             return "phase=region_discovery_probe result=stale_binding neverRelease=true rawPresented=false"
         }
         val authorityResult = authority.observe(delivery)
-        val oracleMatch =
-            ChromeVisualShieldRegionDiscoveryOracleVerifier.matches(
+        val oracleVerification =
+            ChromeVisualShieldRegionDiscoveryOracleVerifier.verify(
                 identity = delivery.work.identity,
                 searchEnvelope = delivery.searchEnvelope,
                 crop = delivery.cropEvidence,
@@ -172,6 +172,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
                 oracle = current.oracle,
                 discovery = delivery.discovery,
             )
+        val oracleMatch = oracleVerification.matches
         completed =
             oracleMatch &&
             authorityResult != ChromeVisualShieldRegionDiscoveryAuthorityResult.StaleDropped &&
@@ -186,6 +187,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
                 decisions = delivery.decisions,
                 authorityResult = authorityResult,
                 oracleMatch = oracleMatch,
+                oracleVerification = oracleVerification,
             )
         complete(mode.binding, ChromeVisualShieldRegionDiscoveryGenerationOutcome.Completed)
         return logValue(checkNotNull(observation))
@@ -264,6 +266,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
             "sourceShas=${value.request.sourceSha256s.joinToString(",")} " +
             "crop=${value.crop.width}x${value.crop.height} cropSha=${value.crop.rgbaSha256} " +
             "result=$result decisions=$decisions authority=${value.authorityResult} " +
-            "oracleMatch=${value.oracleMatch} neverRelease=true rawPresented=false"
+            "oracleMatch=${value.oracleMatch} neverRelease=true rawPresented=false " +
+            "oracleEvidence=${value.oracleVerification?.logValue() ?: "none"}"
     }
 }

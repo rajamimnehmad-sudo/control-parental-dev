@@ -60,14 +60,30 @@ class ChromeVisualShieldRegionDiscoveryPlannerTest {
     }
 
     @Test
-    fun `textured full bleed is a complete single region`() {
+    fun `textured full bleed is unknown without proof it is one semantic region`() {
         val raster = fullBleed(128, 96)
 
-        val complete = assertIs<ChromeVisualShieldRegionDiscoveryResult.Complete>(discover(raster))
+        val unknown = assertIs<ChromeVisualShieldRegionDiscoveryResult.Unknown>(discover(raster))
 
-        assertEquals(1, complete.regions.size)
-        assertEquals(128 * 96, complete.coverageEvidence.assignedPixels)
-        assertTrue(complete.coverageEvidence.basis.startsWith("full_bleed_texture"))
+        assertEquals(ChromeVisualShieldDiscoveryUnknownReason.BackgroundAmbiguous, unknown.reason)
+        assertTrue(unknown.residualEvidence.detail.contains("fullBleedAuthority=false"))
+    }
+
+    @Test
+    fun `edge dense safe and block regions never collapse into one full frame complete`() {
+        val raster = edgeDenseSeparated(160, 100)
+
+        val unknown = assertIs<ChromeVisualShieldRegionDiscoveryResult.Unknown>(discover(raster))
+
+        assertEquals(ChromeVisualShieldDiscoveryUnknownReason.BackgroundAmbiguous, unknown.reason)
+        assertTrue(unknown.residualEvidence.detail.contains("fullBleedAuthority=false"))
+    }
+
+    @Test
+    fun `edge touching content remains fail closed instead of full bleed complete`() {
+        val raster = fixture(160, 120, listOf(Rect(0, 0, 76, 120), Rect(84, 0, 160, 120)))
+
+        assertIs<ChromeVisualShieldRegionDiscoveryResult.Unknown>(discover(raster))
     }
 
     @Test
@@ -200,6 +216,22 @@ class ChromeVisualShieldRegionDiscoveryPlannerTest {
             argb(30 + x * 180 / width, 35 + x * 170 / width, 40 + x * 160 / width)
         },
     )
+
+    private fun edgeDenseSeparated(
+        width: Int,
+        height: Int,
+    ): ChromeVisualShieldDiscoveryRaster {
+        val pixels = IntArray(width * height) { Background }
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                if (x < width / 2 - 5 || x >= width / 2 + 5) {
+                    val seed = if (x < width / 2) 1 else 7
+                    pixels[y * width + x] = texturedPixel(x, y, seed)
+                }
+            }
+        }
+        return ChromeVisualShieldDiscoveryRaster(width, height, pixels)
+    }
 
     private fun texturedPixel(
         x: Int,

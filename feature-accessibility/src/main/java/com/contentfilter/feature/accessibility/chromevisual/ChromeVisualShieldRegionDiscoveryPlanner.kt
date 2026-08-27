@@ -49,25 +49,19 @@ internal class ChromeVisualShieldRegionDiscoveryPlanner(
     ): ChromeVisualShieldRegionDiscoveryResult {
         val background = estimateBackground(raster)
         if (background.ambiguous) {
-            return if (
-                background.edgeDensity >= FullBleedMinimumEdgeDensity &&
-                background.perimeterForeignFraction >= FullBleedMinimumPerimeterForeignFraction
-            ) {
-                fullBleed(raster, identity, discoverySequence, carrierHints, background)
-            } else {
-                unknown(
-                    raster,
-                    carrierHints,
-                    if (background.perimeterForeignFraction < FullBleedMinimumPerimeterForeignFraction) {
-                        ChromeVisualShieldDiscoveryUnknownReason.CutComponent
-                    } else {
-                        ChromeVisualShieldDiscoveryUnknownReason.BackgroundAmbiguous
-                    },
-                    detail =
-                        "perimeterSpread=${background.perimeterSpread}," +
-                            "foreignFraction=${background.perimeterForeignFraction}",
-                )
-            }
+            return unknown(
+                raster,
+                carrierHints,
+                if (background.perimeterForeignFraction < FullBleedMinimumPerimeterForeignFraction) {
+                    ChromeVisualShieldDiscoveryUnknownReason.CutComponent
+                } else {
+                    ChromeVisualShieldDiscoveryUnknownReason.BackgroundAmbiguous
+                },
+                detail =
+                    "perimeterSpread=${background.perimeterSpread}," +
+                        "foreignFraction=${background.perimeterForeignFraction}," +
+                        "edgeDensity=${background.edgeDensity},fullBleedAuthority=false",
+            )
         }
         val borderBackground = connectedBorderBackground(raster, background)
         if (isCancelled()) {
@@ -172,32 +166,6 @@ internal class ChromeVisualShieldRegionDiscoveryPlanner(
             discoverySequence = discoverySequence,
             regionSetDigest = digest(identity, discoverySequence, regions),
             coverageEvidence = evidence,
-        )
-    }
-
-    private fun fullBleed(
-        raster: ChromeVisualShieldDiscoveryRaster,
-        identity: ChromeVisualShieldIdentity,
-        discoverySequence: Long,
-        carrierHints: List<ChromeVisualShieldCarrierHint>,
-        background: BackgroundEstimate,
-    ): ChromeVisualShieldRegionDiscoveryResult {
-        val component = Component(0, 0, raster.width - 1, raster.height - 1, raster.size)
-        val region = component.toRegion(0, raster)
-        return ChromeVisualShieldRegionDiscoveryResult.Complete(
-            regions = listOf(region),
-            discoverySequence = discoverySequence,
-            regionSetDigest = digest(identity, discoverySequence, listOf(region)),
-            coverageEvidence =
-                ChromeVisualShieldCoverageEvidence(
-                    totalPixels = raster.size,
-                    certifiedBackgroundPixels = 0,
-                    certifiedNonContentPixels = 0,
-                    assignedPixels = raster.size,
-                    residualPixels = 0,
-                    carrierHintCount = carrierHints.count { it.visible },
-                    basis = "full_bleed_texture:${background.edgeDensity}",
-                ),
         )
     }
 
@@ -441,7 +409,6 @@ internal class ChromeVisualShieldRegionDiscoveryPlanner(
         const val PerimeterPercentile = 90
         const val BackgroundDistanceLimit = 70
         const val EdgeDistanceLimit = 120
-        const val FullBleedMinimumEdgeDensity = 0.08
         const val FullBleedMinimumPerimeterForeignFraction = 0.45
         const val SignatureGrid = 4
         const val SignatureBucket = 32

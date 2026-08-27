@@ -66,10 +66,23 @@ internal data class ChromeVisualShieldRegionDiscoveryDraw(
 )
 
 internal object ChromeVisualShieldRegionDiscoveryLayoutContract {
-    const val Version = "canvas-content-islands-v1"
+    const val Version = "canvas-content-islands-v2"
     const val NeutralBackground = "#202428"
     const val CardColor = "#f5f5f5"
     const val CardPaddingPx = 3.0
+    const val CarrierLeftFraction = 0.15
+    const val CarrierTopFraction = 0.25
+    const val CarrierWidthFraction = 0.70
+    const val CarrierHeightFraction = 0.30
+
+    fun carrierTopCss(
+        screenHeight: Double,
+        layoutViewportHeight: Double,
+    ): Double =
+        maxOf(
+            0.0,
+            screenHeight * CarrierTopFraction - maxOf(0.0, screenHeight - layoutViewportHeight),
+        )
 
     fun geometry(
         scenario: ChromeVisualShieldRegionDiscoveryScenario,
@@ -370,11 +383,11 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                     const vv = window.visualViewport;
                     const viewportWidth = vv ? vv.width : innerWidth;
                     const viewportHeight = vv ? vv.height : innerHeight;
-                    const browserControlsHeight = Math.max(0, screen.height - viewportHeight);
-                    canvas.style.left = (viewportWidth * 0.15) + 'px';
-                    canvas.style.top = Math.max(0, screen.height * 0.25 - browserControlsHeight) + 'px';
-                    canvas.style.width = (viewportWidth * 0.70) + 'px';
-                    canvas.style.height = (screen.height * 0.30) + 'px';
+                    const browserTopControlsHeight = Math.max(0, screen.height - innerHeight);
+                    canvas.style.left = (viewportWidth * ${ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierLeftFraction}) + 'px';
+                    canvas.style.top = Math.max(0, screen.height * ${ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierTopFraction} - browserTopControlsHeight) + 'px';
+                    canvas.style.width = (viewportWidth * ${ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierWidthFraction}) + 'px';
+                    canvas.style.height = (screen.height * ${ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierHeightFraction}) + 'px';
                     const rect = canvas.getBoundingClientRect();
                     const dpr = window.devicePixelRatio || 1;
                     const backingWidth = Math.max(1, Math.round(rect.width * dpr));
