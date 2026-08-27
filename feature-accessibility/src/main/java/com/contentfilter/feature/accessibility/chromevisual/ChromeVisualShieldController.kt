@@ -34,6 +34,7 @@ internal class ChromeVisualShieldController(
     private val frameProcessor = ChromeVisualShieldFrameProcessor(metrics)
     private val analyzerFault = ChromeVisualShieldAnalyzerFault()
     private val gloshiaAnalyzer = ChromeVisualShieldGloshiaAnalyzer(service, analyzerFault)
+    private val regionAnalyzer = ChromeVisualRegionAnalyzer(service)
     private val windowInspector = ChromeVisualWindowInspector(service)
     private val surface = ChromePhotosProtectedSurface(service, ::onHostPublicationChanged)
     private val regionContract =
@@ -52,6 +53,8 @@ internal class ChromeVisualShieldController(
             releaseSurface = ::releaseSafeSurface,
         )
     private val renderProbeAuthority = ChromeVisualShieldRenderProbeAuthority(identityGate, r1Metrics)
+    private val regionDiscoveryAuthority = ChromeVisualShieldRegionDiscoveryAuthority(identityGate, r1Metrics)
+    private val regionDiscoveryLab = ChromeVisualShieldRegionDiscoveryLab(regionDiscoveryAuthority)
     private val workProcessor =
         ChromeVisualShieldWorkProcessor(
             capture = capture,
@@ -68,7 +71,19 @@ internal class ChromeVisualShieldController(
             scope = scope,
             onWorkSuperseded = r1Metrics::onWorkSuperseded,
             onActiveWorkCancelled = metrics::onCaptureCancelled,
-            execute = workProcessor::execute,
+            execute = ::executeWork,
+        )
+    private val regionDiscoveryProcessor =
+        ChromeVisualShieldRegionDiscoveryWorkProcessor(
+            capture = capture,
+            frameProcessor = frameProcessor,
+            planner = ChromeVisualShieldRegionDiscoveryPlanner(),
+            analyzer = regionAnalyzer,
+            identityGate = identityGate,
+            metrics = r1Metrics,
+            deliver = ::deliverRegionDiscovery,
+            log = ::log,
+            onCycleEnded = { logMetrics("region_discovery_cycle_end") },
         )
     private var pendingCoverEpoch: Long? = null
     private var sentinelCropMatches = 0L
@@ -124,7 +139,7 @@ internal class ChromeVisualShieldController(
 
     override fun start(): String =
         commandOnMain {
-            startSession(null, "start")
+            startSession(null, null, "start")
         }
 
     override fun renderProbe(
@@ -135,7 +150,7 @@ internal class ChromeVisualShieldController(
         commandOnMain {
             val request = ChromeVisualShieldRenderProbeRequest(sampleId, sourceSha256, renderContract)
             if (!request.isValid()) return@commandOnMain "result=invalid_probe_request"
-            startSession(request, "render_probe")
+            startSession(request, null, "render_probe")
         }
 
     override fun exactDrawOracleProbe(
@@ -152,7 +167,18 @@ internal class ChromeVisualShieldController(
                     exactDrawOracleRequired = true,
                 )
             if (!request.isValid()) return@commandOnMain "result=invalid_oracle_probe_request"
-            startSession(request, "exact_draw_oracle_probe")
+            startSession(request, null, "exact_draw_oracle_probe")
+        }
+
+    override fun regionDiscoveryProbe(
+        scenarioId: String,
+        sourceSha256s: List<String>,
+        renderContract: String,
+    ): String =
+        commandOnMain {
+            val request = ChromeVisualShieldRegionDiscoveryProbeRequest(scenarioId, sourceSha256s, renderContract)
+            if (!request.isValid()) return@commandOnMain "result=invalid_region_discovery_probe_request"
+            startSession(null, request, "region_discovery_probe")
         }
 
     override fun currentRenderIdentityToken(): String? = identityGate.snapshot().context?.renderIdentityToken()
@@ -172,6 +198,7 @@ internal class ChromeVisualShieldController(
     override fun renderAttested(
         renderIdentityToken: String,
         exactDrawOracle: ChromeVisualShieldExactDrawOracle?,
+        regionDiscoveryOracle: ChromeVisualShieldRegionDiscoveryOracle?,
     ): String {
         val context = identityGate.snapshot().context ?: return "result=render_identity_unavailable"
         val currentProbe = renderProbeRequest
@@ -186,6 +213,12 @@ internal class ChromeVisualShieldController(
                 return "result=render_oracle_mismatch"
             }
             renderProbeRequest = candidate
+        }
+        if (
+            regionDiscoveryLab.isActive() &&
+            !regionDiscoveryLab.recordOracle(renderIdentityToken, context.toProbeIdentity(), regionDiscoveryOracle)
+        ) {
+            return "result=region_discovery_oracle_mismatch"
         }
         if (!viewportRenderGate.recordAttestation(renderIdentityToken, context)) {
             return "result=render_identity_mismatch"
@@ -202,7 +235,7 @@ internal class ChromeVisualShieldController(
 
     override fun release(): String =
         commandOnMain {
-            if (renderProbeRequest != null) {
+            if (renderProbeRequest != null || regionDiscoveryLab.isActive()) {
                 r1Metrics.onReleaseRejected()
                 return@commandOnMain "result=probe_never_release ${statusValue()}"
             }
@@ -276,6 +309,7 @@ internal class ChromeVisualShieldController(
             deactivate("service_closed")
             runBlocking { workCoordinator.shutdown() }
             gloshiaAnalyzer.close()
+            regionAnalyzer.close()
         }
     }
 
@@ -295,6 +329,7 @@ internal class ChromeVisualShieldController(
                 current.viewport != viewport
         val protected = identityGate.invalidate(windowId, viewport, regionContract, reason) ?: return
         workCoordinator.invalidateAuthority()
+        regionDiscoveryLab.invalidate()
         val context = protected.context ?: return
         val waitForCurrentRender = hardViewportBoundary || requireRenderAttestation
         if (waitForCurrentRender) viewportRenderGate.requireCurrentRender(context)
@@ -308,6 +343,7 @@ internal class ChromeVisualShieldController(
         val protected =
             identityGate.invalidate(current.windowId, current.viewport, regionContract, reason) ?: return
         workCoordinator.invalidateAuthority()
+        regionDiscoveryLab.invalidate()
         val context = protected.context ?: return
         surface.cover(context.windowId, context.viewport, context.contentEpoch)
         pendingCoverEpoch = null
@@ -377,11 +413,14 @@ internal class ChromeVisualShieldController(
     }
 
     private fun scheduleCapture(trigger: String) {
-        if (renderProbeRequest != null && renderProbeCompleted) return
+        if ((renderProbeRequest != null && renderProbeCompleted) || regionDiscoveryLab.isCompleted()) return
         val identity = identityGate.beginCapture() ?: return
         val mode =
-            renderProbeRequest?.let { ChromeVisualShieldWorkMode.RenderProbe(it) }
-                ?: ChromeVisualShieldWorkMode.Normal
+            when {
+                renderProbeRequest != null -> ChromeVisualShieldWorkMode.RenderProbe(checkNotNull(renderProbeRequest))
+                regionDiscoveryLab.isActive() -> checkNotNull(regionDiscoveryLab.workModeOrNull())
+                else -> ChromeVisualShieldWorkMode.Normal
+            }
         if (!workCoordinator.request(ChromeVisualShieldWork(identity, trigger, mode))) {
             identityGate.failClosed(identity)
         }
@@ -412,6 +451,12 @@ internal class ChromeVisualShieldController(
                     "decision=${delivery.decision.logValue()} reason=${delivery.decision.reason} " +
                     "result=${result.logValue()} rawPresented=false",
             )
+        }
+    }
+
+    private fun deliverRegionDiscovery(delivery: ChromeVisualShieldRegionDiscoveryDelivery) {
+        runOnMain {
+            log(regionDiscoveryLab.deliver(delivery))
         }
     }
 
@@ -467,6 +512,7 @@ internal class ChromeVisualShieldController(
         labActive = false
         renderProbeRequest = null
         renderProbeCompleted = false
+        regionDiscoveryLab.clear()
         publishLabOwnership(false)
         ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
         log("phase=inactive reason=$reason rawPresented=false")
@@ -474,23 +520,26 @@ internal class ChromeVisualShieldController(
     }
 
     private fun statusValue(): String {
-        return ChromeVisualShieldStatusFormatter.format(
-            active = labActive,
-            state = identityGate.snapshot(),
-            metrics = metrics.snapshot(),
-            r1 = r1Metrics.snapshot(),
-            captureCycles = captureCycles,
-            opaqueCommitted = opaqueCommittedCount,
-            sentinelCropMatches = sentinelCropMatches,
-            workIdle = workCoordinator.isIdle(),
-            probeActive = renderProbeRequest != null,
-            probeCompleted = renderProbeCompleted,
-            probe = renderProbeObservation,
-        )
+        val base =
+            ChromeVisualShieldStatusFormatter.format(
+                active = labActive,
+                state = identityGate.snapshot(),
+                metrics = metrics.snapshot(),
+                r1 = r1Metrics.snapshot(),
+                captureCycles = captureCycles,
+                opaqueCommitted = opaqueCommittedCount,
+                sentinelCropMatches = sentinelCropMatches,
+                workIdle = workCoordinator.isIdle(),
+                probeActive = renderProbeRequest != null,
+                probeCompleted = renderProbeCompleted,
+                probe = renderProbeObservation,
+            )
+        return "$base ${regionDiscoveryLab.statusValue()}"
     }
 
     private fun startSession(
         probe: ChromeVisualShieldRenderProbeRequest?,
+        discoveryProbe: ChromeVisualShieldRegionDiscoveryProbeRequest?,
         trigger: String,
     ): String {
         if (!enabled) return "result=disabled"
@@ -501,22 +550,31 @@ internal class ChromeVisualShieldController(
         renderProbeRequest = probe
         renderProbeCompleted = false
         if (probe != null) renderProbeObservation = null
+        regionDiscoveryLab.begin(discoveryProbe)
         labActive = true
         ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
         val started =
             identityGate.start(window.id, viewport, regionContract)
                 ?: return "result=invalid_fixture_contract"
-        if (probe?.exactDrawOracleRequired == true) {
+        if (probe?.exactDrawOracleRequired == true || discoveryProbe != null) {
             started.context?.let(viewportRenderGate::requireCurrentRender)
         }
         if (!protectThenCapture(started, trigger)) {
             labActive = false
             renderProbeRequest = null
+            regionDiscoveryLab.clear()
             identityGate.stop()
             ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
             return "result=surface_failed ${statusValue()}"
         }
-        return "result=${if (probe == null) "started" else "probe_started"} ${statusValue()}"
+        return "result=${if (probe == null && discoveryProbe == null) "started" else "probe_started"} ${statusValue()}"
+    }
+
+    private suspend fun executeWork(work: ChromeVisualShieldWork) {
+        when (work.mode) {
+            is ChromeVisualShieldWorkMode.RegionDiscoveryProbe -> regionDiscoveryProcessor.execute(work)
+            else -> workProcessor.execute(work)
+        }
     }
 
     private fun logMetrics(reason: String) {

@@ -80,11 +80,13 @@ internal object ChromeVisualShieldExactDrawOracleMapper {
             return null
         }
         val mappedCarrier =
-            oracle.carrierCss.mapFromBrowserViewport(
+            ChromeVisualShieldBrowserViewportMapper.map(
+                source = oracle.carrierCss,
                 target = identity.viewport,
                 visualViewport = oracle.visualViewportCss,
                 devicePixelRatio = oracle.devicePixelRatio,
                 visualViewportScale = oracle.visualViewportScale,
+                id = "oracle-carrier",
             ) ?: return null
 
         val left = mappedCarrier.left + mappedCarrier.width * oracle.drawCanvas.left / oracle.canvasWidth
@@ -99,48 +101,6 @@ internal object ChromeVisualShieldExactDrawOracleMapper {
             bottom = ceil(bottom).toInt().coerceAtMost(mappedCarrier.bottom),
         ).takeIf { it.width > 0 && it.height > 0 }
     }
-
-    /**
-     * Chrome's visual viewport excludes its top controls while the Accessibility window does
-     * not. CSS pixels remain isotropic, so the current browser viewport is projected at its
-     * attested device scale and bottom-aligned inside the captured Chrome window.
-     */
-    private fun ChromeVisualShieldLabRect.mapFromBrowserViewport(
-        target: ChromeVisualViewport,
-        visualViewport: ChromeVisualShieldLabRect,
-        devicePixelRatio: Double,
-        visualViewportScale: Double,
-    ): ChromeVisualRegion? {
-        val scale = devicePixelRatio * visualViewportScale
-        val projectedViewportWidth = visualViewport.width * scale
-        val projectedViewportHeight = visualViewport.height * scale
-        if (
-            projectedViewportWidth > target.width + PixelTolerance ||
-            projectedViewportHeight > target.height + PixelTolerance
-        ) {
-            return null
-        }
-        val viewportLeft = target.left + (target.width - projectedViewportWidth) / 2.0
-        val viewportTop = target.bottom - projectedViewportHeight
-        val mapped =
-            ChromeVisualRegion(
-                id = "oracle-carrier",
-                left = floor(viewportLeft + (left - visualViewport.left) * scale).toInt(),
-                top = floor(viewportTop + (top - visualViewport.top) * scale).toInt(),
-                right = ceil(viewportLeft + (right - visualViewport.left) * scale).toInt(),
-                bottom = ceil(viewportTop + (bottom - visualViewport.top) * scale).toInt(),
-            )
-        return mapped.takeIf {
-            it.width > 0 &&
-                it.height > 0 &&
-                it.left >= target.left - PixelTolerance &&
-                it.top >= target.top - PixelTolerance &&
-                it.right <= target.right + PixelTolerance &&
-                it.bottom <= target.bottom + PixelTolerance
-        }
-    }
-
-    private const val PixelTolerance = 2
 }
 
 internal fun ChromeVisualShieldIdentity.renderIdentityToken(): String =

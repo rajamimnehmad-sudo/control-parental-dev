@@ -20,6 +20,7 @@ internal object ChromeVisualShieldFixture {
 
     fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse? {
         val path = request.target.substringBefore('?').substringBefore('#')
+        ChromeVisualShieldRegionDiscoveryFixture.responseFor(request, path)?.let { return it }
         val response =
             when (path) {
                 ControlPath -> pageResponse(path, page("control", sentinel = false, delayed = false))

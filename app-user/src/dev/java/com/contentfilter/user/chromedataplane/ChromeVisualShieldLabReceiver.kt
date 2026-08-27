@@ -29,6 +29,7 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
                 ActionArmAnalyzerFailure -> ChromeVisualShieldLabControl.armAnalyzerFailure()
                 ActionRenderProbe -> renderProbe(intent)
                 ActionExactDrawOracleProbe -> exactDrawOracleProbe(intent)
+                ActionRegionDiscoveryProbe -> regionDiscoveryProbe(intent)
                 ActionFixtureReset -> fixtureReset(intent)
                 ActionFixtureAppend -> fixtureAppend(intent)
                 ActionFixtureCommit -> fixtureCommit(intent)
@@ -84,6 +85,21 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
         )
     }
 
+    private fun regionDiscoveryProbe(intent: Intent): String {
+        val scenario =
+            ChromeVisualShieldRegionDiscoveryScenario.fromWireName(
+                intent.getStringExtra(ExtraDiscoveryScenario),
+            ) ?: return "result=fixture_unknown_discovery_scenario"
+        if (scenario.samples.any { !ChromeVisualShieldFixtureSampleStore.isReady(it) }) {
+            return "result=fixture_not_ready scenario=${scenario.wireName}"
+        }
+        return ChromeVisualShieldLabControl.regionDiscoveryProbe(
+            scenarioId = scenario.wireName,
+            sourceSha256s = scenario.samples.map { it.expectedSha256 }.distinct(),
+            renderContract = ChromeVisualShieldRegionDiscoveryLayoutContract.Version,
+        )
+    }
+
     private fun fixtureSample(intent: Intent): ChromeVisualShieldFixtureSample? =
         ChromeVisualShieldFixtureSample.fromWireName(intent.getStringExtra(ExtraFixtureSample))
 
@@ -102,6 +118,8 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
             "com.contentfilter.user.chromevisualshield.command.RENDER_PROBE"
         const val ActionExactDrawOracleProbe =
             "com.contentfilter.user.chromevisualshield.command.EXACT_DRAW_ORACLE_PROBE"
+        const val ActionRegionDiscoveryProbe =
+            "com.contentfilter.user.chromevisualshield.command.REGION_DISCOVERY_PROBE"
         const val ActionFixtureReset =
             "com.contentfilter.user.chromevisualshield.command.FIXTURE_RESET"
         const val ActionFixtureAppend =
@@ -110,6 +128,7 @@ class ChromeVisualShieldLabReceiver : BroadcastReceiver() {
             "com.contentfilter.user.chromevisualshield.command.FIXTURE_COMMIT"
         const val ExtraFixtureSample = "fixture_sample"
         const val ExtraFixtureChunk = "fixture_chunk_base64"
+        const val ExtraDiscoveryScenario = "discovery_scenario"
         private const val LogTag = "GloshVisualShieldLab"
     }
 }
