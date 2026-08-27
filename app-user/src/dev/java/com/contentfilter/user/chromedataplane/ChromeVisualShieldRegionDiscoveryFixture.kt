@@ -66,7 +66,7 @@ internal data class ChromeVisualShieldRegionDiscoveryDraw(
 )
 
 internal object ChromeVisualShieldRegionDiscoveryLayoutContract {
-    const val Version = "canvas-content-islands-v2"
+    const val Version = "canvas-content-islands-v3"
     const val NeutralBackground = "#202428"
     const val CardColor = "#f5f5f5"
     const val CardPaddingPx = 3.0
@@ -77,11 +77,12 @@ internal object ChromeVisualShieldRegionDiscoveryLayoutContract {
 
     fun carrierTopCss(
         screenHeight: Double,
+        availableScreenHeight: Double,
         layoutViewportHeight: Double,
     ): Double =
         maxOf(
             0.0,
-            screenHeight * CarrierTopFraction - maxOf(0.0, screenHeight - layoutViewportHeight),
+            screenHeight * CarrierTopFraction - maxOf(0.0, availableScreenHeight - layoutViewportHeight),
         )
 
     fun geometry(
@@ -383,7 +384,8 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                     const vv = window.visualViewport;
                     const viewportWidth = vv ? vv.width : innerWidth;
                     const viewportHeight = vv ? vv.height : innerHeight;
-                    const browserTopControlsHeight = Math.max(0, screen.height - innerHeight);
+                    const screenAvailableHeight = screen.availHeight || screen.height;
+                    const browserTopControlsHeight = Math.max(0, screenAvailableHeight - innerHeight);
                     canvas.style.left = (viewportWidth * ${ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierLeftFraction}) + 'px';
                     canvas.style.top = Math.max(0, screen.height * ${ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierTopFraction} - browserTopControlsHeight) + 'px';
                     canvas.style.width = (viewportWidth * ${ChromeVisualShieldRegionDiscoveryLayoutContract.CarrierWidthFraction}) + 'px';
@@ -403,6 +405,7 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                     const keyFields = ['${scenario.wireName}',
                       '${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}', expectedShas.join(','), orientation,
                       viewport.left, viewport.top, viewport.width, viewport.height, viewport.scale, dpr,
+                      screen.height, screenAvailableHeight, innerHeight,
                       rect.left, rect.top, rect.width, rect.height, backingWidth, backingHeight];
                     return { vv, viewport, rect, dpr, backingWidth, backingHeight, keyBody:keyFields.join('|') };
                   };

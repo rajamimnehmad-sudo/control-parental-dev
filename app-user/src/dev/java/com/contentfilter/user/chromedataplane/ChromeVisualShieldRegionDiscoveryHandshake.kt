@@ -15,6 +15,9 @@ internal data class ChromeVisualShieldRegionDiscoveryRenderGeometryKey(
     val visualViewportHeight: Double,
     val visualViewportScale: Double,
     val devicePixelRatio: Double,
+    val screenHeight: Double,
+    val availableScreenHeight: Double,
+    val layoutViewportHeight: Double,
     val canvasCssLeft: Double,
     val canvasCssTop: Double,
     val canvasCssWidth: Double,
@@ -37,6 +40,9 @@ internal data class ChromeVisualShieldRegionDiscoveryRenderGeometryKey(
                 visualViewportHeight,
                 visualViewportScale,
                 devicePixelRatio,
+                screenHeight,
+                availableScreenHeight,
+                layoutViewportHeight,
                 canvasCssLeft,
                 canvasCssTop,
                 canvasCssWidth,
@@ -46,6 +52,10 @@ internal data class ChromeVisualShieldRegionDiscoveryRenderGeometryKey(
             visualViewportHeight > 0.0 &&
             visualViewportScale > 0.0 &&
             devicePixelRatio > 0.0 &&
+            screenHeight > 0.0 &&
+            availableScreenHeight > 0.0 &&
+            availableScreenHeight <= screenHeight &&
+            layoutViewportHeight > 0.0 &&
             canvasCssWidth > 0.0 &&
             canvasCssHeight > 0.0 &&
             canvasBackingWidth in 1..MaximumBackingDimension &&
@@ -63,6 +73,9 @@ internal data class ChromeVisualShieldRegionDiscoveryRenderGeometryKey(
             visualViewportHeight.hex(),
             visualViewportScale.hex(),
             devicePixelRatio.hex(),
+            screenHeight.hex(),
+            availableScreenHeight.hex(),
+            layoutViewportHeight.hex(),
             canvasCssLeft.hex(),
             canvasCssTop.hex(),
             canvasCssWidth.hex(),
@@ -90,18 +103,21 @@ internal data class ChromeVisualShieldRegionDiscoveryRenderGeometryKey(
                     visualViewportHeight = fields[7].toDoubleOrNull() ?: return null,
                     visualViewportScale = fields[8].toDoubleOrNull() ?: return null,
                     devicePixelRatio = fields[9].toDoubleOrNull() ?: return null,
-                    canvasCssLeft = fields[10].toDoubleOrNull() ?: return null,
-                    canvasCssTop = fields[11].toDoubleOrNull() ?: return null,
-                    canvasCssWidth = fields[12].toDoubleOrNull() ?: return null,
-                    canvasCssHeight = fields[13].toDoubleOrNull() ?: return null,
-                    canvasBackingWidth = fields[14].toIntOrNull() ?: return null,
-                    canvasBackingHeight = fields[15].toIntOrNull() ?: return null,
+                    screenHeight = fields[10].toDoubleOrNull() ?: return null,
+                    availableScreenHeight = fields[11].toDoubleOrNull() ?: return null,
+                    layoutViewportHeight = fields[12].toDoubleOrNull() ?: return null,
+                    canvasCssLeft = fields[13].toDoubleOrNull() ?: return null,
+                    canvasCssTop = fields[14].toDoubleOrNull() ?: return null,
+                    canvasCssWidth = fields[15].toDoubleOrNull() ?: return null,
+                    canvasCssHeight = fields[16].toDoubleOrNull() ?: return null,
+                    canvasBackingWidth = fields[17].toIntOrNull() ?: return null,
+                    canvasBackingHeight = fields[18].toIntOrNull() ?: return null,
                 )
             return value.takeIf { it.isValidFor(scenario) }
         }
 
         private val OrientationPattern = Regex("(?:portrait|landscape)(?:-(?:primary|secondary))?")
-        private const val FieldCount = 16
+        private const val FieldCount = 19
         private const val MaximumBackingDimension = 16_384
     }
 }
