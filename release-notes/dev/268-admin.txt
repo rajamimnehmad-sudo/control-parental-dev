@@ -1,3 +1,0 @@
-Usuarios, Solicitudes y Avisos ahora usan listas más simples, compactas y modernas.
-Los estados y accesos quedan visibles sin etiquetas ni tarjetas repetidas.
-Se mantiene toda la información y el funcionamiento actual.

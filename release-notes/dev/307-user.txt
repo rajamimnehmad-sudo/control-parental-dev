@@ -1,2 +1,0 @@
-App Usuario incorpora una ayuda más clara y segura, mejoras de estabilidad para GloshIA local y una organización renovada de Ajustes.
-También mejora el envío de opiniones y contactos, actualiza los iconos de la interfaz y permite comprobar, descargar e instalar oficialmente el Navegador DAG.

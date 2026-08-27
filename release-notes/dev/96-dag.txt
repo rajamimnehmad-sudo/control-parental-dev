@@ -1,1 +1,0 @@
-GloshIA Visual R3 Canary reduce filtros innecesarios manteniendo el criterio de seguridad de R1. DAG conserva R1 como respaldo si el nuevo modelo no puede iniciar. También incorpora Actualizaciones en su propio menú, con descarga HTTPS y verificación de hash, paquete y firma antes de abrir el instalador de Android.

@@ -1,2 +1,0 @@
-Glosh retira los navegadores experimentales anteriores y agrega un acceso controlado al nuevo Navegador protegido DEV.
-El navegador funciona como una app separada: si no está instalado, Glosh continúa funcionando normalmente.

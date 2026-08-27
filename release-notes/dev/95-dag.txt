@@ -1,2 +1,0 @@
-DAG revierte el cambio de procesamiento de imágenes de la versión 94 y restaura el comportamiento comprobado de DAG 92.
-GloshIA Visual, sus criterios y el filtrado previo permanecen sin cambios.

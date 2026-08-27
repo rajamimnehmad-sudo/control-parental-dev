@@ -1,2 +1,0 @@
-DAG 87 mejora la fluidez y estabilidad de las páginas dinámicas, muestra correctamente iconos pequeños y seguros, y mantiene las imágenes protegidas por GloshIA antes de hacerlas visibles.
-También conserva el navegador, las pestañas y la navegación rápida sin agregar excepciones específicas por sitio.

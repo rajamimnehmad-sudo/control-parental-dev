@@ -1,2 +1,0 @@
-Esta actualización acompaña las correcciones de CAPTCHA y reintentos de Calibración DAG de App Usuario.
-No cambia reglas, usuarios ni configuraciones administradas.

@@ -1,2 +1,0 @@
-DAG muestra imágenes AVIF estáticas después de analizarlas localmente.
-Los errores técnicos ya no se presentan como contenido filtrado y el blur usa un escudo discreto.

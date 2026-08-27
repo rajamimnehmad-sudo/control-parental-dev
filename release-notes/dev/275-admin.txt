@@ -1,2 +1,0 @@
-Esta actualización acompaña la corrección visual de carga de fotos de DAG en App Usuario.
-No cambia reglas, usuarios ni configuraciones administradas.

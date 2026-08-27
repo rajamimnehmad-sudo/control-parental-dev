@@ -1,2 +1,0 @@
-DAG 92 mejora la interfaz del navegador con un boton de nueva pagina mas claro, miniaturas visibles en pestañas e historial, menu con iconos y Descargas en pantalla completa.
-La barra superior permanece fija al desplazarse para evitar saltos en las paginas. GloshIA Visual y sus criterios de filtrado no cambian.

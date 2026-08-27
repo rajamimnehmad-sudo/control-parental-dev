@@ -1,2 +1,0 @@
-Esta actualización acompaña las mejoras de búsqueda, compatibilidad Web, CAPTCHA y entrega de Calibración DAG de App Usuario.
-No cambia reglas, usuarios ni configuraciones administradas.
