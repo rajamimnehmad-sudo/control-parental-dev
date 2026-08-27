@@ -14,15 +14,14 @@ import android.os.IBinder;
 import android.util.Log;
 
 import com.glosh.remote.spike.adb.AdbConnectionManager;
-import com.glosh.remote.spike.adb.LocalAdbSession;
+import com.glosh.remote.spike.adb.AdbShell;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.protocol.PairingPin;
-import com.glosh.remote.spike.relay.RelaySessionSupervisor;
+import com.glosh.remote.spike.relay.RelayClient;
 import com.glosh.remote.spike.session.PairingAuthorityPolicy;
 import com.glosh.remote.spike.session.PairingEndpointTracker;
 import com.glosh.remote.spike.session.PairingFailureClassifier;
 import com.glosh.remote.spike.session.PairingFailureKind;
-import com.glosh.remote.spike.session.PairingReusePolicy;
 import com.glosh.remote.spike.session.PairingSubmissionGuard;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.SessionState;
@@ -35,7 +34,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.github.muntashirakon.adb.android.AdbMdns;
 
-/** Foreground owner of Wireless ADB bootstrap and the recoverable secure support session. */
+/**
+ * PIN-only Wireless ADB bootstrap.
+ *
+ * Keep the physically proven core deliberately short: discover pairing -> pair -> connectTls ->
+ * whoami -> relay. Reconnect supervisors and screen-awake policy stay out until this core passes
+ * again on the physical Samsung.
+ */
 public final class RemotePairingService extends Service {
     public static final String ACTION_START = "com.glosh.remote.spike.START";
     public static final String ACTION_ATTACH_DESCRIPTOR = "com.glosh.remote.spike.ATTACH_DESCRIPTOR";
@@ -54,7 +59,6 @@ public final class RemotePairingService extends Service {
     private static final int REQUEST_STOP = 7412;
     private static final int TOTAL_STEPS = SamsungGuideStep.TOTAL_STEPS;
     private static final long CONNECT_TIMEOUT_MS = 15_000L;
-    private static final long REUSE_IDENTITY_TIMEOUT_MS = 2_500L;
 
     private static volatile SessionState sessionState = SessionState.IDLE;
     private static volatile PairingUiState pairingUiState = PairingUiState.INACTIVE;
@@ -68,11 +72,10 @@ public final class RemotePairingService extends Service {
     private NotificationManager notifications;
     private AdbMdns pairingDiscovery;
     private WifiManager.MulticastLock multicastLock;
-    private volatile LocalAdbSession localAdbSession;
-    private volatile RelaySessionSupervisor relaySession;
+    private volatile RelayClient relayClient;
+    private volatile AdbShell adbShell;
     private volatile String joinUri;
     private volatile String pendingPairingCode;
-    private volatile boolean reusedAdbIdentity;
 
     public static SessionState getSessionState() {
         return sessionState;
@@ -124,7 +127,7 @@ public final class RemotePairingService extends Service {
                         initialStep,
                         "Glosh · Paso " + initialStep + " de " + TOTAL_STEPS,
                         initialStep == 6
-                                ? "Preparando ADB local. Glosh abrirá Depuración inalámbrica si hace falta."
+                                ? "Preparando ADB local. Glosh abrirá Depuración inalámbrica."
                                 : "Glosh está completando la conexión segura."));
 
         if (ACTION_STOP.equals(action)) {
@@ -176,29 +179,27 @@ public final class RemotePairingService extends Service {
         ending.set(false);
         pairingGuard.finish();
         pairingFailureKind = PairingFailureKind.NONE;
-        reusedAdbIdentity = false;
 
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             finishWithError("Glosh Remote requiere Android 11 o superior.");
             return;
         }
 
-        final AdbConnectionManager manager;
         try {
             joinUri = validateOptionalDescriptor(rawJoin);
-            sessionState = SessionState.PREPARING;
-            pairingUiState = PairingUiState.CHECKING_SAVED_IDENTITY;
-            manager = AdbConnectionManager.getInstance(getApplicationContext());
+            AdbConnectionManager.getInstance(getApplicationContext());
         } catch (Throwable error) {
-            finishWithError("La sesión de soporte no es válida. Intentá nuevamente.");
+            finishWithError("No pudimos preparar ADB. Intentá nuevamente.");
             return;
         }
 
+        sessionState = SessionState.PREPARING;
+        pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
         updateForeground(
                 6,
-                "Preparando ADB",
-                "Glosh está comprobando si este teléfono ya quedó vinculado.");
-        executor.execute(() -> reuseIdentityOrStartPairing(manager));
+                "Abrí Vincular dispositivo con código",
+                "Glosh está esperando el código de 6 dígitos de Android.");
+        startPairingDiscovery();
     }
 
     private String validateOptionalDescriptor(String rawJoin) {
@@ -230,35 +231,14 @@ public final class RemotePairingService extends Service {
             return;
         }
         joinUri = validated;
-        LocalAdbSession local = localAdbSession;
-        if (local != null && local.isConnected()) {
-            sessionState = SessionState.PREPARING;
-            pairingUiState = PairingUiState.CONNECTING;
-            startRelayRuntime(local);
+        AdbShell shell = adbShell;
+        if (shell != null && sessionState == SessionState.ADB_READY) {
+            startRelayRuntime(shell);
         } else {
             updateForeground(
                     7,
-                    "Sesión segura lista",
-                    "Glosh completará primero ADB y después abrirá la sesión automáticamente.");
-        }
-    }
-
-    private void reuseIdentityOrStartPairing(AdbConnectionManager manager) {
-        try {
-            if (manager.ensureConnected(this, REUSE_IDENTITY_TIMEOUT_MS)) {
-                reusedAdbIdentity = true;
-                startLocalRuntime(manager);
-                return;
-            }
-        } catch (Throwable expectedWhenNotPaired) {
-            Log.d(TAG, "Stored ADB identity is not currently reusable.");
-        }
-        try {
-            manager.disconnect();
-        } catch (Throwable ignored) {
-        }
-        if (!ending.get()) {
-            startPairingDiscovery();
+                    "Sesión segura preparada",
+                    "Glosh termina primero ADB y después conecta con soporte automáticamente.");
         }
     }
 
@@ -268,10 +248,6 @@ public final class RemotePairingService extends Service {
             return;
         }
         pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
-        updateForeground(
-                6,
-                "Abrí Vincular dispositivo con código",
-                "Glosh está esperando la vinculación local de Android.");
         acquireMulticastLock();
         pairingDiscovery = new AdbMdns(
                 this,
@@ -285,10 +261,6 @@ public final class RemotePairingService extends Service {
                         pairingEndpoints.lost(host);
                         if (!pairingGuard.isActive() && sessionState == SessionState.PREPARING) {
                             pairingUiState = PairingUiState.DISCOVERING_ENDPOINT;
-                            updateForeground(
-                                    6,
-                                    "Esperando vinculación",
-                                    "Abrí Vincular dispositivo con código. Glosh detectará la vinculación nueva automáticamente.");
                         }
                         return;
                     }
@@ -364,10 +336,6 @@ public final class RemotePairingService extends Service {
     }
 
     private void handlePairingCode(String rawCode) {
-        if (PairingReusePolicy.shouldIgnoreSubmittedCode(reusedAdbIdentity, pairingUiState)) {
-            pendingPairingCode = null;
-            return;
-        }
         String code = rawCode == null ? "" : rawCode.trim();
         if (!PairingPin.isValid(code)) {
             showPairingFailure(
@@ -384,7 +352,7 @@ public final class RemotePairingService extends Service {
             updateForeground(
                     7,
                     "Código recibido",
-                    "Esperando la vinculación local de Android para usar el código automáticamente…");
+                    "Esperando el endpoint de vinculación de Android…");
             return;
         }
         if (!PairingAuthorityPolicy.canSubmit(
@@ -396,7 +364,7 @@ public final class RemotePairingService extends Service {
             return;
         }
         pairingUiState = PairingUiState.CONNECTING;
-        updateForeground(7, "Conectando ADB", "Código recibido. Completando la vinculación segura…");
+        updateForeground(7, "Conectando ADB", "Código recibido. Completando ADB local…");
         executor.execute(() -> pairAndConnect(endpoint, code));
     }
 
@@ -418,15 +386,9 @@ public final class RemotePairingService extends Service {
                     null);
             return;
         }
+
         try {
-            boolean paired = manager.pair(endpoint.host(), endpoint.port(), code);
-            if (!paired) {
-                showPairingFailure(
-                        PairingFailureKind.ADB_ERROR,
-                        "Android no completó el emparejamiento. Generá un código nuevo.",
-                        null);
-                return;
-            }
+            manager.pair(endpoint.host(), endpoint.port(), code);
         } catch (Throwable error) {
             PairingFailureKind failure = PairingFailureClassifier.classify(
                     error,
@@ -439,157 +401,84 @@ public final class RemotePairingService extends Service {
             stopPairingDiscovery();
             pairingEndpoints.clear();
             pairingFailureKind = PairingFailureKind.NONE;
-            if (!manager.ensureConnected(this, CONNECT_TIMEOUT_MS)) {
+            updateForeground(7, "Pairing correcto", "Abriendo el canal TLS local de ADB…");
+
+            boolean connected = manager.connectTls(this, CONNECT_TIMEOUT_MS);
+            if (!connected && !manager.isConnected()) {
                 throw new IllegalStateException("No se pudo abrir el canal TLS local de ADB.");
             }
-            startLocalRuntime(manager);
-        } catch (Throwable error) {
-            Log.w(TAG, "ADB paired but local connection failed", error);
-            if (!ending.get()) {
-                finishWithError("ADB se vinculó, pero no pudimos abrir la conexión local. Intentá nuevamente.");
-            }
-        }
-    }
 
-    private void startLocalRuntime(AdbConnectionManager manager) throws Exception {
-        stopPairingDiscovery();
-        pairingEndpoints.clear();
-        LocalAdbSession local = new LocalAdbSession(this, manager);
-        local.activate(new LocalAdbSession.Listener() {
-            @Override
-            public void onConnectionLost() {
-                if (ending.get()) {
-                    return;
-                }
-                if (sessionState == SessionState.CONNECTED
-                        || sessionState == SessionState.ADB_READY
-                        || sessionState == SessionState.PREPARING) {
-                    sessionState = SessionState.RECONNECTING;
-                    pairingUiState = PairingUiState.INACTIVE;
-                }
-                updateForeground(7, "Reconectando ADB", "Glosh está recuperando ADB automáticamente…");
+            AdbShell shell = new AdbShell(manager);
+            String canary = shell.execute("whoami").trim();
+            if (canary.isEmpty()) {
+                throw new IllegalStateException("ADB respondió sin identidad shell.");
             }
 
-            @Override
-            public void onConnectionRestored() {
-                if (ending.get()) {
-                    return;
-                }
-                RelaySessionSupervisor relay = relaySession;
-                if (relay != null) {
-                    if (relay.isAuthenticated()) {
-                        sessionState = SessionState.CONNECTED;
-                        pairingUiState = PairingUiState.INACTIVE;
-                        updateForeground(7, "Conectado con soporte", "La sesión temporal y segura ya está activa.");
-                    } else {
-                        sessionState = SessionState.RECONNECTING;
-                        pairingUiState = PairingUiState.INACTIVE;
-                    }
-                    return;
-                }
-                LocalAdbSession currentLocal = localAdbSession;
-                if (joinUri != null && currentLocal != null && currentLocal.isConnected()) {
-                    sessionState = SessionState.PREPARING;
-                    pairingUiState = PairingUiState.CONNECTING;
-                    startRelayRuntime(currentLocal);
-                } else {
-                    sessionState = SessionState.ADB_READY;
-                    pairingUiState = PairingUiState.INACTIVE;
-                    updateForeground(
-                            7,
-                            "ADB vinculado",
-                            "ADB ya está listo. Glosh espera la sesión segura sin pedir otro código.");
-                }
-            }
-
-            @Override
-            public void onReconnectError(Throwable error) {
-                Log.w(TAG, "Wireless ADB reconnect still pending", error);
-            }
-        });
-        localAdbSession = local;
-        pairingFailureKind = PairingFailureKind.NONE;
-
-        if (joinUri == null) {
-            sessionState = SessionState.ADB_READY;
+            adbShell = shell;
+            pairingGuard.finish();
             pairingUiState = PairingUiState.INACTIVE;
-            updateForeground(
-                    7,
-                    "ADB vinculado",
-                    "ADB ya está listo. Glosh espera la sesión segura sin pedir otro código.");
-            return;
-        }
-        sessionState = SessionState.PREPARING;
-        pairingUiState = PairingUiState.CONNECTING;
-        startRelayRuntime(local);
-    }
 
-    private synchronized void startRelayRuntime(LocalAdbSession local) {
-        if (ending.get() || relaySession != null || joinUri == null || local == null || !local.isConnected()) {
-            return;
-        }
-        sessionState = SessionState.PREPARING;
-        pairingUiState = PairingUiState.CONNECTING;
-        RelaySessionSupervisor relay = new RelaySessionSupervisor();
-        relaySession = relay;
-        relay.start(joinUri, local.shell(), new RelaySessionSupervisor.Listener() {
-            @Override
-            public void onState(String state, boolean recovery) {
-                Log.d(TAG, "Relay state: " + state);
-                if (ending.get()) {
-                    return;
-                }
-                if (recovery) {
-                    sessionState = SessionState.RECONNECTING;
-                    pairingUiState = PairingUiState.INACTIVE;
-                }
-                updateForeground(7, recovery ? "Reconectando…" : "Conectando con soporte", state);
-            }
-
-            @Override
-            public void onAuthenticated(boolean recovery) {
-                if (ending.get()) {
-                    return;
-                }
-                if (!recovery) {
-                    boolean validPairedBootstrap = PairingAuthorityPolicy.canBecomeConnected(
-                            sessionState,
-                            pairingUiState,
-                            pairingGuard.isActive(),
-                            joinUri != null);
-                    boolean validReusedBootstrap = reusedAdbIdentity
-                            && sessionState == SessionState.PREPARING
-                            && pairingUiState == PairingUiState.CONNECTING
-                            && joinUri != null;
-                    if (!validPairedBootstrap && !validReusedBootstrap) {
-                        finishWithError("La conexión no pudo validarse. Intentá nuevamente.");
-                        return;
-                    }
-                    pairingGuard.finish();
-                    reusedAdbIdentity = false;
-                } else if (sessionState != SessionState.RECONNECTING
-                        && sessionState != SessionState.CONNECTED) {
-                    finishWithError("La reconexión no pudo validarse. Intentá nuevamente.");
-                    return;
-                }
-                pairingUiState = PairingUiState.INACTIVE;
-                LocalAdbSession currentLocal = localAdbSession;
-                sessionState = currentLocal != null && currentLocal.isConnected()
-                        ? SessionState.CONNECTED
-                        : SessionState.RECONNECTING;
+            if (joinUri == null) {
+                sessionState = SessionState.ADB_READY;
                 updateForeground(
                         7,
-                        sessionState == SessionState.CONNECTED ? "Conectado con soporte" : "Reconectando ADB",
-                        sessionState == SessionState.CONNECTED
-                                ? "La conexión temporal y segura ya está activa."
-                                : "Relay listo; Glosh está recuperando ADB automáticamente…");
+                        "ADB local listo",
+                        "ADB respondió correctamente. Glosh espera la sesión segura de soporte.");
+                return;
+            }
+            startRelayRuntime(shell);
+        } catch (Throwable error) {
+            Log.w(TAG, "ADB paired but direct local core failed", error);
+            if (!ending.get()) {
+                finishWithError("ADB se vinculó, pero no pudimos completar el canal local. Intentá nuevamente.");
+            }
+        }
+    }
+
+    private synchronized void startRelayRuntime(AdbShell shell) {
+        if (ending.get() || relayClient != null || joinUri == null || shell == null) {
+            return;
+        }
+        sessionState = SessionState.PREPARING;
+        pairingUiState = PairingUiState.CONNECTING;
+        updateForeground(7, "Conectando con soporte", "ADB local listo. Abriendo la sesión segura…");
+
+        RelayClient client = new RelayClient(shell);
+        relayClient = client;
+        client.connect(joinUri, new RelayClient.Listener() {
+            @Override
+            public void onState(String state) {
+                Log.d(TAG, "Relay state: " + state);
+                if (!ending.get()) {
+                    updateForeground(7, "Conectando con soporte", state);
+                }
             }
 
             @Override
-            public void onPermanentFailure(String message, Throwable error) {
-                Log.w(TAG, "Relay recovery exhausted", error);
+            public void onAuthenticated() {
+                if (ending.get()) {
+                    return;
+                }
+                sessionState = SessionState.CONNECTED;
+                pairingUiState = PairingUiState.INACTIVE;
+                updateForeground(
+                        7,
+                        "Conectado con soporte",
+                        "La conexión temporal y segura ya está activa.");
+            }
+
+            @Override
+            public void onError(String message, Throwable error) {
+                Log.w(TAG, "Relay connection failed: " + message, error);
                 if (!ending.get()) {
-                    finishWithError(message);
+                    finishWithError("La conexión con soporte se interrumpió. Intentá nuevamente.");
+                }
+            }
+
+            @Override
+            public void onClosed() {
+                if (!ending.get()) {
+                    finishSession("Conexión cerrada", "El acceso temporal terminó correctamente.");
                 }
             }
         });
@@ -657,22 +546,16 @@ public final class RemotePairingService extends Service {
 
     private void cleanupRuntime() {
         stopPairingDiscovery();
-        RelaySessionSupervisor currentRelay = relaySession;
-        relaySession = null;
+        RelayClient currentRelay = relayClient;
+        relayClient = null;
         if (currentRelay != null) {
             currentRelay.close();
         }
-        LocalAdbSession currentLocal = localAdbSession;
-        localAdbSession = null;
-        if (currentLocal != null) {
-            currentLocal.close();
-        } else {
-            AdbConnectionManager.releaseConnection();
-        }
+        adbShell = null;
+        AdbConnectionManager.releaseConnection();
         pairingEndpoints.clear();
         joinUri = null;
         pendingPairingCode = null;
-        reusedAdbIdentity = false;
     }
 
     private void stopPairingDiscovery() {
