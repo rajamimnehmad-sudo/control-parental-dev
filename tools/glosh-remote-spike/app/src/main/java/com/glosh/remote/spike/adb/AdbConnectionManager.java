@@ -2,6 +2,7 @@ package com.glosh.remote.spike.adb;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.SystemClock;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -10,7 +11,9 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.cert.Certificate;
 import java.util.Date;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import android.sun.security.x509.AlgorithmId;
 import android.sun.security.x509.CertificateAlgorithmId;
@@ -28,10 +31,12 @@ import android.sun.security.x509.X500Name;
 import android.sun.security.x509.X509CertImpl;
 import android.sun.security.x509.X509CertInfo;
 import io.github.muntashirakon.adb.AbsAdbConnectionManager;
+import io.github.muntashirakon.adb.android.AdbMdns;
 
 /** Persistent Wireless ADB identity plus a replaceable live connection. */
 public final class AdbConnectionManager extends AbsAdbConnectionManager {
     private static final long CERT_LIFETIME_MS = TimeUnit.DAYS.toMillis(3650);
+    private static final long CONNECT_RETRY_DELAY_MS = 150L;
     private static AdbConnectionManager instance;
 
     public static synchronized AdbConnectionManager getInstance(Context context) throws Exception {
@@ -106,18 +111,100 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         return "Glosh Remote";
     }
 
-    /** Reopens the current Wireless ADB TLS endpoint without changing the paired identity. */
+    /**
+     * Reopens the current Wireless ADB TLS endpoint without changing the paired identity.
+     *
+     * libadb 3.1.1's connectTls() wakes its one-shot latch for both a resolved service and a
+     * service-lost callback (port=-1). Immediately after pairing that can fail before Android's
+     * adb-tls-connect service stabilizes. Keep discovery alive until a valid endpoint is resolved,
+     * then retry connect within one bounded budget.
+     */
     public synchronized boolean ensureConnected(Context context, long timeoutMillis) throws Exception {
         if (isConnected()) {
             return true;
         }
-        try {
-            disconnect();
-        } catch (Exception ignored) {
-            // The previous transport is already unusable. Continue with fresh mDNS discovery.
+        Context appContext = context.getApplicationContext();
+        long deadline = SystemClock.elapsedRealtime() + Math.max(1L, timeoutMillis);
+        Exception lastError = null;
+
+        while (SystemClock.elapsedRealtime() < deadline) {
+            try {
+                disconnect();
+            } catch (Exception ignored) {
+                // The previous transport is already unusable. Continue with fresh discovery.
+            }
+
+            long remaining = deadline - SystemClock.elapsedRealtime();
+            if (remaining <= 0L) {
+                break;
+            }
+            TlsEndpoint endpoint = discoverTlsEndpoint(
+                    appContext,
+                    AdbConnectEndpointPolicy.discoverySliceMillis(remaining));
+            if (endpoint == null) {
+                continue;
+            }
+
+            try {
+                boolean connected = connect(endpoint.host(), endpoint.port());
+                if (connected || isConnected()) {
+                    return true;
+                }
+                lastError = new IllegalStateException(
+                        "ADB TLS endpoint resolved but the connection was not established.");
+            } catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw error;
+            } catch (Exception error) {
+                lastError = error;
+            }
+
+            remaining = deadline - SystemClock.elapsedRealtime();
+            if (remaining > 0L) {
+                try {
+                    Thread.sleep(Math.min(CONNECT_RETRY_DELAY_MS, remaining));
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw error;
+                }
+            }
         }
-        boolean connected = connectTls(context.getApplicationContext(), timeoutMillis);
-        return connected || isConnected();
+
+        if (lastError != null) {
+            throw lastError;
+        }
+        return false;
+    }
+
+    private TlsEndpoint discoverTlsEndpoint(Context context, long timeoutMillis)
+            throws InterruptedException {
+        CountDownLatch resolved = new CountDownLatch(1);
+        AtomicReference<TlsEndpoint> endpointRef = new AtomicReference<>();
+        AdbMdns discovery = new AdbMdns(
+                context,
+                AdbMdns.SERVICE_TYPE_TLS_CONNECT,
+                (address, port) -> {
+                    String host = address == null ? null : address.getHostAddress();
+                    if (!AdbConnectEndpointPolicy.isUsable(host, port)) {
+                        return;
+                    }
+                    if (endpointRef.compareAndSet(null, new TlsEndpoint(host, port))) {
+                        resolved.countDown();
+                    }
+                });
+        discovery.start();
+        try {
+            if (!resolved.await(Math.max(1L, timeoutMillis), TimeUnit.MILLISECONDS)) {
+                return null;
+            }
+            return endpointRef.get();
+        } finally {
+            try {
+                discovery.stop();
+            } catch (Throwable ignored) {
+                // The bounded caller will either reconnect or tear down the session.
+            }
+        }
     }
 
     private static GeneratedIdentity generateIdentity() throws Exception {
@@ -152,6 +239,9 @@ public final class AdbConnectionManager extends AbsAdbConnectionManager {
         X509CertImpl certificate = new X509CertImpl(info);
         certificate.sign(privateKey, algorithmName);
         return new GeneratedIdentity(privateKey, certificate);
+    }
+
+    private record TlsEndpoint(String host, int port) {
     }
 
     private static final class GeneratedIdentity {
