@@ -57,9 +57,20 @@ Regla transversal permanente del proyecto:
 - Preferir lotes coherentes que cierren un problema completo. No fragmentar artificialmente en microtickets ni microcommits y no agrupar temas no relacionados.
 - Los cambios de gobernanza/documentación que forman una misma decisión deben agruparse en un lote y, cuando sea posible, en un commit cohesivo.
 
+### Lotes Codex grandes y autónomos
+
+- **Ticket DELTA significa prompt corto, no tarea pequeña.** El ticket describe sólo el delta específico, pero por defecto debe perseguir un objetivo terminal amplio y coherente.
+- Dentro del mismo objetivo, root cause y scope autorizado, Codex continúa autónomamente los ciclos necesarios: diagnóstico → fix → tests → gate físico cuando corresponda → fix, sin handoffs intermedios por cada bug localizado.
+- Codex puede corregir autónomamente bugs descubiertos durante el lote si siguen dentro del mismo frente/objetivo/root cause/scope, no requieren decisión funcional o de producto, no cambian materialmente arquitectura o base, no tocan rutas expresamente fuera de scope, no chocan con otro writer y no implican una acción sensible.
+- No hacer handoff intermedio mientras se mantengan esas condiciones. El lote termina en PASS técnico completo o en BLOCKED/FAILED cuando aparece una causa realmente distinta, cambio material de arquitectura/scope/base/owner/rutas, colisión de writer, decisión funcional o acción sensible.
+- STOP obligatorio antes de modificar modelo/thresholds/release authority u otra ruta expresamente fuera del scope; antes de PR/merge/main/Production/deploy/borrado/gasto; y ante cualquier cambio sensible no autorizado.
+- Si una modificación tardía puede afectar escenarios ya validados, revalidar de forma focalizada esos escenarios sobre el HEAD/APK definitivo. No repetir gates que el cambio final no pueda afectar.
+- Al cierre se aplican las reglas normales de PASS/review: commits cohesivos, tests/evidencia proporcionales, validación física cuando corresponda, `review/*-final` si PASS y un único handoff compacto. En BLOCKED/FAILED sólo crear rama de preservación/review si existe código o evidencia que realmente deba quedar disponible.
+- ChatGPT interviene principalmente en decisiones funcionales, cambios arquitectónicos/materiales, acciones sensibles, bloqueos reales y cierres finales; no debe interrumpir el lote para revisar cada microarreglo técnico reversible contenido dentro del scope autorizado.
+
 ### Ticket delta por defecto
 
-- Todo ticket Codex hereda automáticamente `AGENTS.md`, `START_HERE.md`, `docs/CODEX_RULES.md` y las reglas generales del proyecto. No repetir prohibiciones o contexto global.
+- Todo ticket Codex hereda automáticamente `AGENTS.md`, `START_HERE.md`, `docs/CODEX_RULES.md` y las reglas generales del proyecto. No repetir prohibiciones o contexto global, incluida la política de continuación autónoma.
 - Un ticket debe contener sólo lo material: Task ID/objetivo; owner/base/worktree/rutas cuando hagan falta; restricciones específicas; gates particulares y criterio de cierre.
 - No repetir historia que Codex puede obtener de Central/GitHub.
 - Si una tarea es de alto riesgo —seguridad, navegador, dispositivo, datos o release— el ticket puede ampliarse lo necesario; la compacidad nunca reemplaza controles reales.
