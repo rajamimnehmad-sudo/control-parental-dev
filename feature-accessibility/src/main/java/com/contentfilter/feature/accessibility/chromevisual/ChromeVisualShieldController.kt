@@ -391,7 +391,7 @@ internal class ChromeVisualShieldController(
                 reason == ChromeVisualShieldInvalidation.Rotation ||
                 current.windowId != windowId ||
                 current.viewport != viewport
-        val protected = identityGate.invalidate(windowId, viewport, regionContract, reason) ?: return
+        val protected = identityGate.invalidate(windowId, viewport, activeRegionContract(), reason) ?: return
         workCoordinator.invalidateAuthority()
         regionDiscoveryLab.invalidate()
         val context = protected.context ?: return
@@ -405,7 +405,7 @@ internal class ChromeVisualShieldController(
         val current = identityGate.snapshot().context ?: return
         r1Metrics.onContentInvalidation()
         val protected =
-            identityGate.invalidate(current.windowId, current.viewport, regionContract, reason) ?: return
+            identityGate.invalidate(current.windowId, current.viewport, activeRegionContract(), reason) ?: return
         workCoordinator.invalidateAuthority()
         regionDiscoveryLab.invalidate()
         val context = protected.context ?: return
@@ -641,7 +641,7 @@ internal class ChromeVisualShieldController(
         labActive = true
         ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
         val started =
-            identityGate.start(window.id, viewport, regionContract)
+            identityGate.start(window.id, viewport, activeRegionContract())
                 ?: return "result=invalid_fixture_contract"
         if (probe?.exactDrawOracleRequired == true || discoveryProbe != null) {
             started.context?.let(viewportRenderGate::requireCurrentRender)
@@ -656,6 +656,13 @@ internal class ChromeVisualShieldController(
         }
         return "result=${if (probe == null && discoveryProbe == null) "started" else "probe_started"} ${statusValue()}"
     }
+
+    private fun activeRegionContract(): ChromeVisualShieldRegionContract =
+        if (regionDiscoveryLab.isActive()) {
+            regionContract.copy(verticalOffsetPixels = -windowInspector.navigationInsets().bottom)
+        } else {
+            regionContract
+        }
 
     private suspend fun executeWork(work: ChromeVisualShieldWork) {
         when (work.mode) {

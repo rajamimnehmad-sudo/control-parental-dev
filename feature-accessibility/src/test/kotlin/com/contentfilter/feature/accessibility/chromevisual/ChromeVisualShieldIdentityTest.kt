@@ -166,6 +166,19 @@ class ChromeVisualShieldIdentityTest {
         assertEquals("fixture-sentinel-v1", mapped.id)
     }
 
+    @Test
+    fun `R2A search envelope excludes the measured bottom navigation inset`() {
+        val unshifted = assertNotNull(contract.resolve(viewport))
+        val shifted = assertNotNull(contract.copy(verticalOffsetPixels = -42).resolve(viewport))
+
+        assertEquals(unshifted.left, shifted.left)
+        assertEquals(unshifted.right, shifted.right)
+        assertEquals(unshifted.top - 42, shifted.top)
+        assertEquals(unshifted.bottom - 42, shifted.bottom)
+        assertEquals(unshifted.width, shifted.width)
+        assertEquals(unshifted.height, shifted.height)
+    }
+
     private fun ChromeVisualShieldIdentity.toContext() =
         ChromeVisualShieldContext(
             protectionSessionId = protectionSessionId,
