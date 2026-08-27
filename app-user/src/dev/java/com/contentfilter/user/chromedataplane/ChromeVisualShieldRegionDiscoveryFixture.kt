@@ -361,6 +361,7 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                   let rendering = false;
                   let lastSubmittedGeometryKey = null;
                   const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+                  const awaitPresentedFrame = async () => { await frame(); await frame(); };
                   const sha256 = async bytes => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
                     value => value.toString(16).padStart(2, '0')).join('');
                   const contain = (sw, sh, mw, mh) => {
@@ -468,7 +469,7 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                             context.fillRect(draw.x - pad, draw.y - pad, draw.width + pad * 2, draw.height + pad * 2);
                             context.drawImage(sources[index], draw.x, draw.y, draw.width, draw.height);
                           });
-                          await frame();
+                          await awaitPresentedFrame();
                           if (geometrySnapshot().keyBody !== geometry.keyBody) {
                             renderRequested = true;
                             continue;
