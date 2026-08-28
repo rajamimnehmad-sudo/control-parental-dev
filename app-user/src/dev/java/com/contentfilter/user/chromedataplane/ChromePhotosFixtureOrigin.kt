@@ -29,6 +29,8 @@ internal interface ChromePhotosFixtureSource {
     fun webSemanticsReport(): String = "not_run"
 
     fun imageAuthorityReport(): String = "not_run"
+
+    fun preRenderShieldReport(): String = "not_run"
 }
 
 /** In-memory controlled origin. No intercepted bytes are written to disk. */
@@ -36,19 +38,31 @@ internal class ChromePhotosFixtureOrigin(
     safeImageOverride: ByteArray? = null,
     sentinelImageOverride: ByteArray? = null,
     placeholderImageOverride: ByteArray? = null,
+    auditPlaceholderOverride: ByteArray? = null,
 ) : ChromePhotosFixtureSource {
     override val safeImageBytes: ByteArray = safeImageOverride ?: createImage(VisualKind.Safe)
     override val sentinelImageBytes: ByteArray = sentinelImageOverride ?: createImage(VisualKind.Sentinel)
     override val placeholderImageBytes: ByteArray = placeholderImageOverride ?: createImage(VisualKind.Placeholder)
+    val auditPlaceholderImageBytes: ByteArray =
+        auditPlaceholderOverride ?: placeholderImageOverride?.let { "audit-placeholder".toByteArray() }
+            ?: createImage(VisualKind.AuditPlaceholder)
     private val report = AtomicReference("not_run")
     private val imageAuthorityFixture = ChromeImageAuthorityFixture(safeImageBytes, placeholderImageBytes)
+    private val preRenderShieldFixture =
+        ChromeStockPreRenderShieldFixture(
+            networkSentinelBytes = sentinelImageBytes,
+            auditPlaceholderBytes = auditPlaceholderImageBytes,
+        )
 
     override fun webSemanticsReport(): String = report.get()
 
     override fun imageAuthorityReport(): String = imageAuthorityFixture.report()
 
+    override fun preRenderShieldReport(): String = preRenderShieldFixture.state()
+
     override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse {
         ChromeVisualShieldFixture.responseFor(request)?.let { return it }
+        preRenderShieldFixture.responseFor(request)?.let { return it }
         imageAuthorityFixture.responseFor(request)?.let { return it }
         val requestTarget = request.target
         val path = requestTarget.substringBefore('?').substringBefore('#')
@@ -421,6 +435,13 @@ internal class ChromePhotosFixtureOrigin(
                 }
             }
             VisualKind.Placeholder -> canvas.drawColor(Color.rgb(92, 100, 108))
+            VisualKind.AuditPlaceholder -> {
+                canvas.drawColor(Color.rgb(55, 65, 81))
+                paint.color = Color.rgb(0, 200, 255)
+                repeat(8) { index ->
+                    if (index % 2 == 0) canvas.drawRect(index * 40f, 0f, (index + 1) * 40f, 180f, paint)
+                }
+            }
         }
         paint.color = Color.WHITE
         paint.textAlign = Paint.Align.CENTER
@@ -440,6 +461,7 @@ internal class ChromePhotosFixtureOrigin(
         Safe("SAFE-A ORIGINAL"),
         Sentinel("SENTINEL ORIGINAL"),
         Placeholder("BLOQUEADA POR GLOSH"),
+        AuditPlaceholder("REPLACE ALL AUDIT"),
     }
 
     private companion object {

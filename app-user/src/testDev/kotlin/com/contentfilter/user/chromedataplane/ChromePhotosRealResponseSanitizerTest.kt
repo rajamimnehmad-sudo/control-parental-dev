@@ -45,6 +45,32 @@ class ChromePhotosRealResponseSanitizerTest {
     }
 
     @Test
+    fun `replace all audit mode bypasses model verdict without delivering candidate bytes`() {
+        val audit = "h18-audit-placeholder".toByteArray()
+        val gate =
+            ChromeNetworkVisualDeliveryGate(
+                mode = ChromeNetworkVisualDeliveryMode.ReplaceAll,
+                auditPlaceholderBytes = audit,
+            )
+        val replaceAllSanitizer =
+            ChromePhotosRealResponseSanitizer(
+                transformer = transformer,
+                destinationAuthority = authority,
+                placeholderBytes = placeholder,
+                maximumImageBytes = 64,
+                visualDeliveryGate = gate,
+            )
+
+        val result = replaceAllSanitizer.sanitize("GET", upstream("image/png", safe))
+        gate.recordCandidateDelivery(result.bytes)
+
+        assertEquals(ChromePhotosResourceDecision.AuditReplaced, result.decision)
+        assertContentEquals(audit, result.bytes)
+        assertFalse(result.bytes.contentEquals(safe))
+        assertEquals(ChromeNetworkVisualDeliverySnapshot(1, 1, 0), gate.snapshot())
+    }
+
+    @Test
     fun `BLOCK and UNKNOWN images become placeholder without original bytes`() {
         val blockedResult = sanitizer.sanitize("GET", upstream("image/webp", blocked))
         val unknownResult = sanitizer.sanitize("GET", upstream("image/jpeg", jpeg("unknown")))

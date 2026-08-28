@@ -105,6 +105,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                             ChromePhotosDataPlaneLabReceiver.ExtraFullTunnelDevGateEnabled,
                             false,
                         ) == true
+                    val replaceAllNetworkVisuals =
+                        intent?.getBooleanExtra(
+                            ChromePhotosDataPlaneLabReceiver.ExtraReplaceAllNetworkVisuals,
+                            false,
+                        ) == true
                     if (udpFixtureGate.enabled) {
                         require(
                             packageManager.getApplicationInfo(ChromePhotosDataPlaneLabContract.UdpFixturePackage, 0).enabled,
@@ -179,6 +184,16 @@ class ChromePhotosDataPlaneLabService : Service() {
                             },
                         )
                     val transformer = chromePhotosGloshiaTransformer(decisionSession, origin)
+                    val visualDeliveryGate =
+                        ChromeNetworkVisualDeliveryGate(
+                            mode =
+                                if (replaceAllNetworkVisuals) {
+                                    ChromeNetworkVisualDeliveryMode.ReplaceAll
+                                } else {
+                                    ChromeNetworkVisualDeliveryMode.Selective
+                                },
+                            auditPlaceholderBytes = origin.auditPlaceholderImageBytes,
+                        )
                     startedProxy =
                         ChromePhotosHttpsProxy(
                             tls = tls,
@@ -186,6 +201,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             onFixtureHeartbeat = ::markFixtureHeartbeat,
                             onFatalFailure = ::markFailClosed,
                             transformer = transformer,
+                            visualDeliveryGate = visualDeliveryGate,
                             coverageLedger = coverageLedger,
                         )
                     proxy = startedProxy
@@ -222,6 +238,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             "routes=${routeAddresses.size} udpFixture=${udpFixtureGate.enabled} " +
                             "udpTarget=${udpFixtureGate.address}:${udpFixtureGate.port} " +
                             "transport=${if (fullTunnelDevGateEnabled) "full_tunnel_dev" else "controlled"} " +
+                            "networkVisualMode=${if (replaceAllNetworkVisuals) "replace_all" else "selective"} " +
                             "privacy=public_only_memory_only",
                     )
                 } catch (error: Throwable) {
@@ -449,6 +466,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics()
         val decisions = metrics.decisionSession
         val images = metrics.imageAuthority
+        val networkVisuals = metrics.networkVisualDelivery
         val bootstrap = bootstrapController.state()
         val coverage = proxy?.coverageSnapshot()
         Log.i(
@@ -482,6 +500,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "imageCandidates=${images.candidates} imagePrefixPeeks=${images.prefixPeeks} " +
                 "imageMagicCandidates=${images.magicCandidates} imageBodyAdmissionPeak=${images.bodyAdmissionPeak} " +
                 "imageBodyAdmissionRejects=${images.bodyAdmissionRejects} " +
+                "networkVisualCandidates=${networkVisuals.candidates} " +
+                "networkVisualReplaced=${networkVisuals.replaced} " +
+                "networkVisualRawDelivered=${networkVisuals.rawDelivered} " +
+                "h18=${metrics.preRenderShieldReport} " +
                 "quicAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyQuicAttempts, 0L)} " +
                 "directTcpAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts, 0L)} " +
                 "bootstrapResetGeneration=${bootstrap.resetGeneration} " +

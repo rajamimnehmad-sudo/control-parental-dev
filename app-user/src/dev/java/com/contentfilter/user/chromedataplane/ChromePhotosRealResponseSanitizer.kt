@@ -28,6 +28,7 @@ internal class ChromePhotosRealResponseSanitizer(
     private val placeholderBytes: ByteArray,
     private val maximumImageBytes: Int = DefaultMaximumImageBytes,
     private val imageAuthority: ChromeImageContentAuthority = ChromeImageContentAuthority(),
+    private val visualDeliveryGate: ChromeNetworkVisualDeliveryGate = ChromeNetworkVisualDeliveryGate(),
 ) {
     fun sanitize(
         requestMethod: String,
@@ -57,6 +58,7 @@ internal class ChromePhotosRealResponseSanitizer(
         ) {
             return passthroughWithoutBody(upstream)
         }
+        visualDeliveryGate.replaceAllResponse(upstream)?.let { return it }
         if (upstream.statusCode == 304) return placeholderUnknown(upstream, ImageNotModifiedReason)
         if (upstream.statusCode == 206) return placeholderUnknown(upstream, PartialImageReason)
         if (!upstream.headers.hasIdentityContentEncoding()) {

@@ -8,6 +8,7 @@ internal enum class ChromePhotosResourceDecision {
     Block,
     Unknown,
     Passthrough,
+    AuditReplaced,
 }
 
 internal data class ChromePhotosTransformResult(

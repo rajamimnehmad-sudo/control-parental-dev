@@ -36,8 +36,10 @@ internal data class ChromePhotosProxyMetrics(
     val upstream: ChromePhotosUpstreamMetrics = ChromePhotosUpstreamMetrics(0, 0, 0),
     val webSemanticsReport: String = "not_run",
     val imageAuthorityReport: String = "not_run",
+    val preRenderShieldReport: String = "not_run",
     val decisionSession: ChromePhotoDecisionSessionMetrics = ChromePhotoDecisionSessionMetrics(),
     val imageAuthority: ChromeImageAuthorityMetrics = ChromeImageAuthorityMetrics(),
+    val networkVisualDelivery: ChromeNetworkVisualDeliverySnapshot = ChromeNetworkVisualDeliverySnapshot(),
 )
 
 internal enum class ChromeHttpConnectionDisposition {
@@ -54,6 +56,7 @@ internal class ChromePhotosHttpsProxy(
     private val upstream: ChromePhotosUpstream = ChromePhotosRealUpstream(destinationAuthority = destinationAuthority),
     private val transformer: ChromePhotosResourceTransformer = chromePhotosDeterministicTransformer(origin),
     private val imageAuthority: ChromeImageContentAuthority = ChromeImageContentAuthority(),
+    private val visualDeliveryGate: ChromeNetworkVisualDeliveryGate = ChromeNetworkVisualDeliveryGate(),
     private val coverageLedger: ChromeRealWebProvenanceLedger? = null,
     private val lifecycleLog: (String, Throwable?) -> Unit = ::logProxyLifecycle,
     private val infoLog: (String) -> Unit = { message -> Log.i(LogTag, message) },
@@ -65,6 +68,7 @@ internal class ChromePhotosHttpsProxy(
             destinationAuthority = destinationAuthority,
             placeholderBytes = origin.placeholderImageBytes,
             imageAuthority = imageAuthority,
+            visualDeliveryGate = visualDeliveryGate,
         )
     private val requestReader = ChromeHttp1RequestReader()
     private val responseWriter = ChromeHttp1ResponseWriter()
@@ -146,8 +150,10 @@ internal class ChromePhotosHttpsProxy(
             upstream = upstream.metrics(),
             webSemanticsReport = origin.webSemanticsReport(),
             imageAuthorityReport = origin.imageAuthorityReport(),
+            preRenderShieldReport = origin.preRenderShieldReport(),
             decisionSession = transformer.decisionMetrics(),
             imageAuthority = imageAuthority.metrics(),
+            networkVisualDelivery = visualDeliveryGate.snapshot(),
         )
     }
 
@@ -381,8 +387,9 @@ internal class ChromePhotosHttpsProxy(
             val started = System.nanoTime()
             val response = origin.responseFor(imageAuthority.normalizeUpstreamRequest(request))
             val fixtureUpstream = response.asUpstreamResponse()
+            val inspection = imageAuthority.inspectBuffered(request, fixtureUpstream, response.originalBytes)
             val sanitized =
-                when (val inspection = imageAuthority.inspectBuffered(request, fixtureUpstream, response.originalBytes)) {
+                when (inspection) {
                     is ChromeImageContentInspection.Candidate ->
                         responseSanitizer.sanitizeCandidate(request.method, inspection)
                     is ChromeImageContentInspection.Passthrough ->
@@ -393,6 +400,9 @@ internal class ChromePhotosHttpsProxy(
             responseStarted = true
             val result = responseWriter.writeBuffered(output, request, sanitized, forceChunked = response.chunked)
             deliveredBytes.addAndGet(result.bytesWritten)
+            if (inspection is ChromeImageContentInspection.Candidate) {
+                visualDeliveryGate.recordCandidateDelivery(sanitized.bytes)
+            }
             recordDecision(sanitized)
             if (coverageToken != null) {
                 if (response.statusCode in RedirectCodes) {
@@ -470,6 +480,9 @@ internal class ChromePhotosHttpsProxy(
                     val result = responseWriter.writeBuffered(output, request, sanitized)
                     originalBytes.addAndGet(sanitized.inputBytes.toLong())
                     deliveredBytes.addAndGet(result.bytesWritten)
+                    if (inspection is ChromeImageContentInspection.Candidate) {
+                        visualDeliveryGate.recordCandidateDelivery(sanitized.bytes)
+                    }
                     recordDecision(sanitized)
                     if (coverageToken != null) {
                         if (response.statusCode in RedirectCodes) {
@@ -565,6 +578,7 @@ internal class ChromePhotosHttpsProxy(
             ChromePhotosResourceDecision.Block -> blockedDecisions.incrementAndGet()
             ChromePhotosResourceDecision.Unknown -> unknownDecisions.incrementAndGet()
             ChromePhotosResourceDecision.Passthrough -> passthroughResponses.incrementAndGet()
+            ChromePhotosResourceDecision.AuditReplaced -> Unit
         }
         if (result.contentHash != null) {
             if (result.cacheHit) cacheHits.incrementAndGet() else cacheMisses.incrementAndGet()
