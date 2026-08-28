@@ -2,11 +2,17 @@ package com.glosh.remote.spike.adb;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.Test;
 
@@ -44,6 +50,41 @@ public final class AdbShellTest {
                 () -> AdbShell.readCommandOutput(new PayloadThenFailureInput(
                         "partial",
                         new IOException("socket reset"))));
+    }
+
+    @Test
+    public void gatesEverySequentialPreflightStreamAndRecoversStaleTransport() throws Exception {
+        AtomicBoolean connected = new AtomicBoolean(true);
+        AtomicInteger gateCount = new AtomicInteger();
+        AtomicInteger recoveryCount = new AtomicInteger();
+        List<String> events = new ArrayList<>();
+
+        AdbShell.CheckedOperation gate = () -> {
+            int invocation = gateCount.incrementAndGet();
+            events.add("gate-" + invocation);
+            if (!connected.get()) {
+                recoveryCount.incrementAndGet();
+                connected.set(true);
+            }
+        };
+
+        for (int command = 1; command <= 3; command++) {
+            int invocation = command;
+            assertEquals(
+                    "stream-" + invocation,
+                    AdbShell.openAfterConnectionGate(gate, () -> {
+                        events.add("open-" + invocation);
+                        assertTrue(connected.get());
+                        connected.set(false);
+                        return "stream-" + invocation;
+                    }));
+        }
+
+        assertEquals(3, gateCount.get());
+        assertEquals(2, recoveryCount.get());
+        assertEquals(
+                Arrays.asList("gate-1", "open-1", "gate-2", "open-2", "gate-3", "open-3"),
+                events);
     }
 
     private static final class PayloadThenFailureInput extends InputStream {

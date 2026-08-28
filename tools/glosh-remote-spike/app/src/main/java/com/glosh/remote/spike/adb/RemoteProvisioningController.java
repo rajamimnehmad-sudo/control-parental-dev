@@ -35,7 +35,7 @@ public final class RemoteProvisioningController implements Closeable {
 
     public RemoteProvisioningController(Context context, AdbShell shell) {
         this.context = context.getApplicationContext();
-        this.shell = shell;
+        this.shell = shell.withContext(this.context);
         this.stagingDirectory = new File(this.context.getCacheDir(), "owner-provisioning");
     }
 

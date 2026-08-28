@@ -31,6 +31,10 @@ public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
         this.manager = manager;
     }
 
+    AdbShell withContext(Context context) {
+        return this.context == null ? new AdbShell(context, manager) : this;
+    }
+
     public String execute(String action) throws Exception {
         ensureConnected();
         switch (action) {
@@ -129,7 +133,9 @@ public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
     }
 
     String runService(String service) throws Exception {
-        AdbStream stream = manager.openStream(service);
+        AdbStream stream = openAfterConnectionGate(
+                this::ensureConnected,
+                () -> manager.openStream(service));
         try {
             try (InputStream input = stream.openInputStream()) {
                 return readCommandOutput(input);
@@ -140,6 +146,23 @@ public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
             } catch (IOException ignored) {
             }
         }
+    }
+
+    static <T> T openAfterConnectionGate(
+            CheckedOperation connectionGate,
+            CheckedSupplier<T> streamOpener) throws Exception {
+        connectionGate.run();
+        return streamOpener.get();
+    }
+
+    @FunctionalInterface
+    interface CheckedOperation {
+        void run() throws Exception;
+    }
+
+    @FunctionalInterface
+    interface CheckedSupplier<T> {
+        T get() throws Exception;
     }
 
     String installPackage(File apk) throws Exception {
