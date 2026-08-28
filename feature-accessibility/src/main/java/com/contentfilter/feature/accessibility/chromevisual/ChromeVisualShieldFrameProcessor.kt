@@ -24,13 +24,15 @@ internal class ChromeVisualShieldFrameProcessor(
         frame: ChromeWindowFrame,
         identity: ChromeVisualShieldIdentity,
         region: ChromeVisualRegion = identity.region,
+        navigationInsets: ChromeVisualShieldNavigationInsets = ChromeVisualShieldNavigationInsets.Zero,
     ): ChromeVisualShieldCrop? {
         val frameRegion =
-            ChromeVisualGeometryMapper.toFrame(
+            ChromeVisualShieldScreenshotGeometryMapper.toFrame(
                 region,
                 identity.viewport,
                 frame.width,
                 frame.height,
+                navigationInsets,
             ) ?: return null
         val bitmap =
             Bitmap.createBitmap(

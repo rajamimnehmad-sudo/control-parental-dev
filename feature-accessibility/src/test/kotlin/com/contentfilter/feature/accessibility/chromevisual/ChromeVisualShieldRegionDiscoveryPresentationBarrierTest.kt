@@ -121,6 +121,112 @@ class ChromeVisualShieldRegionDiscoveryPresentationBarrierTest {
         assertContentEquals(original, fixture.pixels)
     }
 
+    @Test
+    fun `window screenshot navigation inset maps current marker without entering search crop`() {
+        val viewport = ChromeVisualViewport(0, 0, 2408, 1080)
+        val insets = ChromeVisualShieldNavigationInsets(left = 66, right = 0, bottom = 0)
+        val frameWidth = 2342
+        val frameHeight = 1080
+        val identity =
+            Fixture().identity.copy(
+                viewport = viewport,
+                region = ChromeVisualRegion("fixture", 421, 232, 2052, 548),
+            )
+        val binding =
+            ChromeVisualShieldRegionDiscoveryRenderBinding(
+                protectionSessionId = identity.protectionSessionId,
+                windowId = identity.windowId,
+                contentEpoch = identity.contentEpoch,
+                viewportEpoch = identity.viewportEpoch,
+                regionSequence = identity.regionSequence,
+                renderIdentityToken = identity.renderIdentityToken(),
+                renderGeometryKeyDigest = "a".repeat(64),
+            )
+        val canvasWidth = 1631
+        val canvasHeight = 316
+        val proof =
+            assertNotNull(
+                ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(
+                    binding,
+                    canvasWidth,
+                    canvasHeight,
+                ),
+            )
+        val oracle =
+            Fixture().oracle.copy(
+                renderIdentityToken = binding.renderIdentityToken,
+                canvasWidth = canvasWidth,
+                canvasHeight = canvasHeight,
+                carrierCss = ChromeVisualShieldLabRect(417.0, 224.0, 1639.0, 324.0),
+                visualViewportCss = ChromeVisualShieldLabRect(0.0, 0.0, 2342.0, 1080.0),
+                navigationInsets = insets,
+                presentationProof = proof,
+            )
+        val pixels = IntArray(frameWidth * frameHeight) { 0xff202428.toInt() }
+        val carrier =
+            assertNotNull(
+                ChromeVisualShieldBrowserViewportMapper.map(
+                    oracle.carrierCss,
+                    viewport,
+                    oracle.visualViewportCss,
+                    oracle.devicePixelRatio,
+                    oracle.visualViewportScale,
+                    insets,
+                    "carrier",
+                ),
+            )
+        proof.pattern.forEachIndexed { index, bit ->
+            val canvasCell =
+                ChromeVisualShieldLabRect(
+                    proof.markerCanvas.left + index * proof.cellWidth,
+                    0.0,
+                    proof.cellWidth.toDouble(),
+                    proof.markerCanvas.height,
+                )
+            val globalLeft = carrier.left + carrier.width * canvasCell.left / canvasWidth
+            val globalRight = carrier.left + carrier.width * canvasCell.right / canvasWidth
+            val globalBottom = carrier.top + carrier.height * canvasCell.bottom / canvasHeight
+            val mapped =
+                assertNotNull(
+                    ChromeVisualShieldScreenshotGeometryMapper.toFrame(
+                        ChromeVisualRegion(
+                            "cell",
+                            kotlin.math.floor(globalLeft).toInt(),
+                            carrier.top,
+                            kotlin.math.ceil(globalRight).toInt(),
+                            kotlin.math.ceil(globalBottom).toInt(),
+                        ),
+                        viewport,
+                        frameWidth,
+                        frameHeight,
+                        insets,
+                    ),
+                )
+            val color =
+                0xff000000.toInt() or
+                    if (bit == '0') {
+                        ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.ZeroRgb
+                    } else {
+                        ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.OneRgb
+                    }
+            repeat(mapped.height) { y ->
+                repeat(mapped.width) { x -> pixels[(mapped.top + y) * frameWidth + mapped.left + x] = color }
+            }
+        }
+
+        val result =
+            ChromeVisualShieldRegionDiscoveryPresentationBarrier().verify(
+                frameWidth,
+                frameHeight,
+                { x, y -> pixels[y * frameWidth + x] },
+                identity,
+                binding,
+                oracle,
+            )
+
+        assertIs<ChromeVisualShieldRegionDiscoveryPresentationResult.Proven>(result)
+    }
+
     private class Fixture {
         val barrier = ChromeVisualShieldRegionDiscoveryPresentationBarrier()
         val pixels = IntArray(FrameWidth * FrameHeight) { 0xff202428.toInt() }

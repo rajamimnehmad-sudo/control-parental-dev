@@ -72,6 +72,7 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
                                 log(
                                     "phase=presentation_proof result=rejected reason=${presentation.reason} " +
                                         "matched=${presentation.matchedSamples} palette=${presentation.paletteSamples} " +
+                                        "observedPaletteBounds=${presentation.observedPaletteBounds} " +
                                         "planner=0 inference=0 release=0",
                                 )
                                 onPresentationRejected(work, presentation)
@@ -79,7 +80,14 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
                             }
                         }
                         rasterProvenanceObserver.observeFullFrame(result.frame.bitmap, work.identity)
-                        val crop = resources.deriveCrop { frameProcessor.crop(it, work.identity) }
+                        val crop =
+                            resources.deriveCrop {
+                                frameProcessor.crop(
+                                    it,
+                                    work.identity,
+                                    navigationInsets = mode.oracle?.navigationInsets ?: ChromeVisualShieldNavigationInsets.Zero,
+                                )
+                            }
                         if (crop == null) {
                             identityGate.failClosed(work.identity)
                             log("phase=region_discovery_crop result=fail_close")

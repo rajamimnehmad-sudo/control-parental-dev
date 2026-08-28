@@ -101,6 +101,7 @@ internal sealed interface ChromeVisualShieldRegionDiscoveryPresentationResult {
         val reason: ChromeVisualShieldRegionDiscoveryPresentationRejectReason,
         val matchedSamples: Int,
         val paletteSamples: Int,
+        val observedPaletteBounds: ChromeVisualRegion? = null,
     ) : ChromeVisualShieldRegionDiscoveryPresentationResult
 }
 
@@ -175,10 +176,22 @@ internal class ChromeVisualShieldRegionDiscoveryPresentationBarrier {
             ) ?: return reject(ChromeVisualShieldRegionDiscoveryPresentationRejectReason.GeometryMismatch)
         val markerGlobal = proof.markerCanvas.mapInside(mappedCarrier, value.canvasWidth, value.canvasHeight)
         val markerFrame =
-            ChromeVisualGeometryMapper.toFrame(markerGlobal, identity.viewport, frameWidth, frameHeight)
+            ChromeVisualShieldScreenshotGeometryMapper.toFrame(
+                markerGlobal,
+                identity.viewport,
+                frameWidth,
+                frameHeight,
+                value.navigationInsets,
+            )
                 ?: return reject(ChromeVisualShieldRegionDiscoveryPresentationRejectReason.GeometryMismatch)
         val searchFrame =
-            ChromeVisualGeometryMapper.toFrame(identity.region, identity.viewport, frameWidth, frameHeight)
+            ChromeVisualShieldScreenshotGeometryMapper.toFrame(
+                identity.region,
+                identity.viewport,
+                frameWidth,
+                frameHeight,
+                value.navigationInsets,
+            )
                 ?: return reject(ChromeVisualShieldRegionDiscoveryPresentationRejectReason.GeometryMismatch)
         if (markerFrame.intersects(searchFrame)) {
             return reject(ChromeVisualShieldRegionDiscoveryPresentationRejectReason.GeometryMismatch)
@@ -196,7 +209,13 @@ internal class ChromeVisualShieldRegionDiscoveryPresentationBarrier {
                 )
             val cellGlobal = cellCanvas.mapInside(mappedCarrier, value.canvasWidth, value.canvasHeight)
             val cellFrame =
-                ChromeVisualGeometryMapper.toFrame(cellGlobal, identity.viewport, frameWidth, frameHeight)
+                ChromeVisualShieldScreenshotGeometryMapper.toFrame(
+                    cellGlobal,
+                    identity.viewport,
+                    frameWidth,
+                    frameHeight,
+                    value.navigationInsets,
+                )
                     ?: return reject(ChromeVisualShieldRegionDiscoveryPresentationRejectReason.GeometryMismatch)
             val x = ((cellFrame.left + cellFrame.right - 1) / 2).coerceIn(0, frameWidth - 1)
             val y = ((cellFrame.top + cellFrame.bottom - 1) / 2).coerceIn(0, frameHeight - 1)
@@ -215,12 +234,14 @@ internal class ChromeVisualShieldRegionDiscoveryPresentationBarrier {
                 palette += 1
             }
         }
+        val observedPaletteBounds =
+            if (matched == proof.pattern.length) null else paletteBounds(frameWidth, frameHeight, pixelAt)
         return when {
             matched == proof.pattern.length -> {
                 observed.incrementAndGet()
                 ChromeVisualShieldRegionDiscoveryPresentationResult.Proven(markerFrame, matched)
             }
-            palette == 0 ->
+            palette == 0 && observedPaletteBounds == null ->
                 reject(
                     ChromeVisualShieldRegionDiscoveryPresentationRejectReason.MarkerAbsent,
                     matched,
@@ -231,6 +252,7 @@ internal class ChromeVisualShieldRegionDiscoveryPresentationBarrier {
                     ChromeVisualShieldRegionDiscoveryPresentationRejectReason.MarkerStaleOrCorrupt,
                     matched,
                     palette,
+                    observedPaletteBounds,
                 )
         }
     }
@@ -254,13 +276,50 @@ internal class ChromeVisualShieldRegionDiscoveryPresentationBarrier {
         reason: ChromeVisualShieldRegionDiscoveryPresentationRejectReason,
         matched: Int = 0,
         palette: Int = 0,
+        observedPaletteBounds: ChromeVisualRegion? = null,
     ): ChromeVisualShieldRegionDiscoveryPresentationResult.Rejected {
         rejected.incrementAndGet()
         if (reason == ChromeVisualShieldRegionDiscoveryPresentationRejectReason.MarkerAbsent) absent.incrementAndGet()
         if (reason == ChromeVisualShieldRegionDiscoveryPresentationRejectReason.MarkerStaleOrCorrupt) {
             staleOrCorrupt.incrementAndGet()
         }
-        return ChromeVisualShieldRegionDiscoveryPresentationResult.Rejected(reason, matched, palette)
+        return ChromeVisualShieldRegionDiscoveryPresentationResult.Rejected(
+            reason,
+            matched,
+            palette,
+            observedPaletteBounds,
+        )
+    }
+
+    private fun paletteBounds(
+        frameWidth: Int,
+        frameHeight: Int,
+        pixelAt: (Int, Int) -> Int,
+    ): ChromeVisualRegion? {
+        var left = frameWidth
+        var top = frameHeight
+        var right = -1
+        var bottom = -1
+        for (y in 0 until frameHeight) {
+            for (x in 0 until frameWidth) {
+                val pixel = pixelAt(x, y)
+                if (
+                    !pixel.nearRgb(ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.ZeroRgb) &&
+                    !pixel.nearRgb(ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.OneRgb)
+                ) {
+                    continue
+                }
+                left = minOf(left, x)
+                top = minOf(top, y)
+                right = maxOf(right, x + 1)
+                bottom = maxOf(bottom, y + 1)
+            }
+        }
+        return if (right > left && bottom > top) {
+            ChromeVisualRegion("observed-presentation-palette", left, top, right, bottom)
+        } else {
+            null
+        }
     }
 
     private fun ChromeVisualShieldLabRect.mapInside(
