@@ -178,8 +178,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
         if (PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 session,
                 pairing,
-                wirelessSettingsOpened,
-                descriptorAttached)) {
+                wirelessSettingsOpened)) {
             wirelessSettingsOpened = true;
             settingsNavigator.openWirelessDebugging(this);
             return;

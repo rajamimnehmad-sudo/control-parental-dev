@@ -17,26 +17,18 @@ public class PinOnlyBootstrapPolicyTest {
     }
 
     @Test
-    public void wirelessSettingsWaitForAttachedDescriptorAndLaunchOnce() {
+    public void wirelessSettingsLaunchWithoutBrokerAndOnlyOnce() {
         assertFalse(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 SessionState.PREPARING,
                 PairingUiState.CHECKING_SAVED_IDENTITY,
-                false,
-                false));
-        assertFalse(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
-                SessionState.PREPARING,
-                PairingUiState.DISCOVERING_ENDPOINT,
-                false,
                 false));
         assertTrue(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 SessionState.PREPARING,
                 PairingUiState.DISCOVERING_ENDPOINT,
-                false,
-                true));
+                false));
         assertFalse(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 SessionState.PREPARING,
                 PairingUiState.DISCOVERING_ENDPOINT,
-                true,
                 true));
     }
 
