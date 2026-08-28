@@ -1,0 +1,249 @@
+name: One-shot Glosh governance reconciliation
+
+on:
+  push:
+    branches:
+      - review/glosh-governance-reconcile-20260828-final
+
+permissions:
+  contents: write
+
+concurrency:
+  group: glosh-governance-reconcile-20260828-final
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact review branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verify base and reconcile governed files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test "$(git rev-parse HEAD^)" = "e99df0aefb9f66be386449ed169a2fb5b183a17b"
+          test "$(git hash-object docs/AI_TASK_TRACKER.json)" = "3588d9ab2c299176694a824a61905535a67908a3"
+          test "$(git hash-object START_HERE.md)" = "1670204b03e45f103712a74279a5e82e3fa8db1e"
+
+          python <<'PY'
+          from __future__ import annotations
+
+          import json
+          import subprocess
+          import textwrap
+          from datetime import datetime
+          from pathlib import Path
+          from zoneinfo import ZoneInfo
+
+          TRACKER = Path("docs/AI_TASK_TRACKER.json")
+          START_HERE = Path("START_HERE.md")
+          BOUNDARIES = Path("docs/GLOSH_CANON_BRANCH_BOUNDARIES.md")
+
+          baseline_detail = (
+              "PASS FINAL / CHATGPT REVIEWED / CANONICAL. Base origin/main "
+              "7269636f3c916bf92cd93947bf2595db330836dd; functional "
+              "de6f105d87d94144c5ab6b438f832b6210047c8d; ancla canónica inmutable "
+              "c2900bc5a2f28fa9d291862197f70a2e2c8e2f6c. Fue publicada originalmente "
+              "desde review/glosh-convergence-baseline-01, cuyo head es un puntero mutable "
+              "y no sustituye ese SHA congelado. Contiene Chrome passing hasta 13B-R, "
+              "GloshIA R3.1 y P0 exact-hosts/atomic-sync/device-token-scope; las rutas "
+              "bloqueadas/pausadas permanecen excluidas."
+          )
+          remote_context = (
+              "Glosh Remote vigente en REMOTE-PIN-ONLY-19J. La candidata estática es "
+              "DEV29 / versionCode 29 / versionName 0.1.0-dev29 en "
+              "review/remote-pin-only-19j-codex-final @ "
+              "7d7d837ddd243001f173110e219a37e4479fe12c. Sobre 19I agrega recepción del "
+              "descriptor y apertura guiada de Ajustes, conexión Wi-Fi, adb pair/connect "
+              "e instalación de APK; DEV29 conserva el callback del broker mientras "
+              "Ajustes está al frente. La rama, el SHA y la configuración Gradle quedaron "
+              "reconciliados; no existe evidencia física final ni un APK DEV29 versionado "
+              "en GitHub. El cierre PIN-only permanece BLOCKED PHYSICAL. Reconexión larga "
+              "y keep-awake siguen fuera de este gate."
+          )
+          remote_detail = (
+              "BLOCKED PHYSICAL / DEV29 CANDIDATE / STATIC RECONCILED. Fuente exacta: "
+              "review/remote-pin-only-19j-codex-final @ "
+              "7d7d837ddd243001f173110e219a37e4479fe12c; Gradle declara versionCode 29 y "
+              "versionName 0.1.0-dev29. 19J agrega receiver/open-settings, conexión Wi-Fi, "
+              "adb pair/connect e instalación de APK; DEV29 mantiene el callback del broker "
+              "mientras Settings está en foreground. Esta reconciliación verificó rama, SHA "
+              "y configuración fuente, pero no ejecutó un build, tests ni sesión física nuevos "
+              "y no declara hash de APK ni PASS físico. Pendiente: construir/instalar exactamente "
+              "ese SHA, ingresar sólo el PIN de 6 dígitos y preservar evidencia de pairing, "
+              "ADB local, handoff del broker e instalación one-shot sin campos técnicos. "
+              "Mantener blocked hasta esa evidencia; no agregar reconnect largo/keep-awake "
+              "antes del PASS del core."
+          )
+          connection_detail = (
+              "PAUSADO detrás del gate físico ADB local de 19J. Same-Wi-Fi quedó PASS y el "
+              "usuario reporta una prueba histórica exitosa con teléfono/Mac en redes Wi-Fi "
+              "distintas sobre el core inicial; revalidar cross-network sólo después de cerrar "
+              "el core PIN-only exacto de 7d7d837ddd243001f173110e219a37e4479fe12c."
+          )
+
+          text = TRACKER.read_text(encoding="utf-8")
+          lines = text.splitlines()
+
+          months = (
+              "", "ene", "feb", "mar", "abr", "may", "jun",
+              "jul", "ago", "sept", "oct", "nov", "dic",
+          )
+          now = datetime.now(ZoneInfo("America/Argentina/Buenos_Aires"))
+          updated = f'{now.day:02d} de {months[now.month]} de {now.year} · {now:%H:%M}'
+
+          updated_count = 0
+          context_count = 0
+          in_device_operations = False
+          task_counts = {
+              "glosh-convergence-baseline-01": 0,
+              "remote-pin-only-19": 0,
+              "remote-install-connection-00": 0,
+          }
+          task_details = {
+              "glosh-convergence-baseline-01": baseline_detail,
+              "remote-pin-only-19": remote_detail,
+              "remote-install-connection-00": connection_detail,
+          }
+
+          for index, line in enumerate(lines):
+              stripped = line.strip()
+
+              if line.startswith('  "updatedAt": '):
+                  lines[index] = f'  "updatedAt": {json.dumps(updated, ensure_ascii=False)},'
+                  updated_count += 1
+                  continue
+
+              if stripped == '"id": "device-operations",':
+                  in_device_operations = True
+                  continue
+
+              if in_device_operations and stripped.startswith('"context": '):
+                  lines[index] = (
+                      '      "context": '
+                      + json.dumps(remote_context, ensure_ascii=False)
+                      + ","
+                  )
+                  context_count += 1
+                  in_device_operations = False
+                  continue
+
+              if not stripped.startswith('{"id":"'):
+                  continue
+
+              payload = stripped[:-1] if stripped.endswith(",") else stripped
+              record = json.loads(payload)
+              task_id = record.get("id")
+              if task_id not in task_details:
+                  continue
+
+              record["detail"] = task_details[task_id]
+              comma = "," if stripped.endswith(",") else ""
+              indent = line[: len(line) - len(line.lstrip())]
+              lines[index] = (
+                  indent
+                  + json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+                  + comma
+              )
+              task_counts[task_id] += 1
+
+          assert updated_count == 1, updated_count
+          assert context_count == 1, context_count
+          assert task_counts == {
+              "glosh-convergence-baseline-01": 1,
+              "remote-pin-only-19": 1,
+              "remote-install-connection-00": 1,
+          }, task_counts
+
+          reconciled = "\n".join(lines) + "\n"
+          parsed = json.loads(reconciled)
+          assert parsed["updatedAt"] == updated
+          assert "59e93b5048a3973ef7d7d0e88e231d0d0d8685d5" not in reconciled
+          assert "v25 CANDIDATE" not in reconciled
+          assert reconciled.count("7d7d837ddd243001f173110e219a37e4479fe12c") == 3
+          TRACKER.write_text(reconciled, encoding="utf-8")
+
+          start = START_HERE.read_text(encoding="utf-8")
+          anchor = (
+              "Si Central y GitHub/evidencia parecen discrepar, no elegir una fuente por reflejo: "
+              "determinar qué dato quedó atrasado, reconciliar Central y recién después continuar "
+              "con escritura.\n"
+          )
+          addition = (
+              "\nLas ramas son punteros mutables. Toda identidad canónica o congelada debe registrar "
+              "el SHA completo; ver `docs/GLOSH_CANON_BRANCH_BOUNDARIES.md` para las anclas "
+              "reconciliadas y sus límites de evidencia.\n"
+          )
+          assert start.count(anchor) == 1
+          assert "GLOSH_CANON_BRANCH_BOUNDARIES.md" not in start
+          START_HERE.write_text(start.replace(anchor, anchor + addition, 1), encoding="utf-8")
+
+          boundaries = textwrap.dedent("""\
+          # Anclas canónicas y límites de ramas de Glosh
+
+          Fecha de reconciliación: 2026-08-28.
+
+          Este documento separa identidad inmutable, puntero de navegación y evidencia de ejecución. Una rama puede moverse; un SHA completo no.
+
+          ## Anclas verificadas
+
+          | Superficie | Puntero | SHA inmutable u observado | Significado |
+          |---|---|---|---|
+          | Baseline convergente canónica | `review/glosh-convergence-baseline-01` | `c2900bc5a2f28fa9d291862197f70a2e2c8e2f6c` | Identidad canónica congelada. El nombre de rama indica su origen, no su estado actual. |
+          | Head mutable observado de la baseline | `review/glosh-convergence-baseline-01` | `9c3fffa36cefc3a0bab01c549d4a7c53b05f80d1` | Observación del 2026-08-28. No reemplaza ni redefine el SHA canónico congelado. |
+          | Glosh Remote 19J / DEV29 | `review/remote-pin-only-19j-codex-final` | `7d7d837ddd243001f173110e219a37e4479fe12c` | Candidata estática con `versionCode 29` y `versionName 0.1.0-dev29`. El gate físico continúa pendiente. |
+          | Fuente de Glosh Central reconciliada | `build/glosh-control-center-v2` | `e99df0aefb9f66be386449ed169a2fb5b183a17b` | Snapshot utilizado como base de esta reconciliación documental. |
+
+          ## Reglas de interpretación
+
+          1. Toda referencia marcada como canónica, congelada o exacta debe conservar el SHA completo de 40 caracteres.
+          2. El nombre de una rama sirve para navegar y colaborar, pero nunca sustituye una identidad inmutable.
+          3. Verificar código, historial o configuración de Gradle no equivale a ejecutar build, tests ni validación física.
+          4. Un PASS físico exige evidencia preservada del mismo SHA y del flujo declarado. La reconciliación de 19J no aporta esa evidencia.
+          5. Los cambios de `docs/AI_TASK_TRACKER.json` en una rama `review/*` no alteran el Glosh Central en uso hasta una promoción separada y autorizada hacia su rama fuente.
+          6. Esta rama de revisión no autoriza PR, merge, integración, deploy, release, Production, mutaciones de Supabase, borrados ni gastos.
+
+          ## Estado remoto reconciliado
+
+          `REMOTE-PIN-ONLY-19J` sustituye la referencia operativa obsoleta a 19I/v25 como candidata estática. DEV29 incorpora el flujo de recepción del descriptor, apertura guiada de Ajustes, conexión Wi-Fi, `adb pair/connect` e instalación de APK, y conserva el callback del broker mientras Ajustes está al frente.
+
+          El estado correcto sigue siendo `BLOCKED PHYSICAL`: falta construir e instalar exactamente `7d7d837ddd243001f173110e219a37e4479fe12c`, introducir únicamente el PIN de seis dígitos y preservar evidencia de pairing, ADB local, handoff del broker e instalación one-shot sin campos técnicos.
+          """)
+          assert not BOUNDARIES.exists()
+          BOUNDARIES.write_text(boundaries, encoding="utf-8")
+
+          print("tracker_blob", subprocess.check_output(
+              ["git", "hash-object", str(TRACKER)], text=True
+          ).strip())
+          print("start_here_blob", subprocess.check_output(
+              ["git", "hash-object", str(START_HERE)], text=True
+          ).strip())
+          print("boundaries_blob", subprocess.check_output(
+              ["git", "hash-object", str(BOUNDARIES)], text=True
+          ).strip())
+          PY
+
+          rm .github/workflows/glosh-governance-reconcile.yml
+
+          git config user.name "glosh-governance-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add START_HERE.md docs/AI_TASK_TRACKER.json docs/GLOSH_CANON_BRANCH_BOUNDARIES.md
+          git add -u .github/workflows/glosh-governance-reconcile.yml
+          git diff --cached --check
+
+          actual="$(git diff --cached --name-only | sort)"
+          expected="$(printf '%s\n' \
+            '.github/workflows/glosh-governance-reconcile.yml' \
+            'START_HERE.md' \
+            'docs/AI_TASK_TRACKER.json' \
+            'docs/GLOSH_CANON_BRANCH_BOUNDARIES.md' | sort)"
+          test "$actual" = "$expected"
+
+          git commit -m "docs(governance): reconcile canonical anchors and remote 19J [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
