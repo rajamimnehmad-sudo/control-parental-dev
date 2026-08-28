@@ -15,12 +15,11 @@ import com.glosh.remote.spike.session.PairingFailureKind;
 import com.glosh.remote.spike.session.PairingUiState;
 import com.glosh.remote.spike.session.PinOnlyBootstrapPolicy;
 import com.glosh.remote.spike.session.SessionState;
-import com.glosh.remote.spike.wizard.OemFamily;
 import com.glosh.remote.spike.wizard.OnboardingState;
 import com.glosh.remote.spike.wizard.SettingsNavigator;
 import com.glosh.remote.spike.wizard.WizardLayout;
 
-/** PIN-only Samsung entry point: six digits in, recoverable local ADB + secure relay out. */
+/** Android 11+ PIN-only entry point: six digits in, local ADB + secure relay out. */
 public final class MainActivity extends Activity implements SupportSessionCoordinator.Listener {
     public static final String ACTION_GUIDE_OPEN = "com.glosh.remote.spike.GUIDE_OPEN";
     public static final String ACTION_GUIDE_BACK = "com.glosh.remote.spike.GUIDE_BACK";
@@ -237,10 +236,6 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     }
 
     private void render() {
-        if (coordinator.profile().family() != OemFamily.SAMSUNG) {
-            renderMode("unsupported", () -> ui.showUnsupported(coordinator.profile().manufacturer()));
-            return;
-        }
         SessionState session = RemotePairingService.getSessionState();
         PairingUiState pairing = RemotePairingService.getPairingUiState();
         if (session == SessionState.CONNECTED) {

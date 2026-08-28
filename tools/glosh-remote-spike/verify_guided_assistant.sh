@@ -53,6 +53,7 @@ if grep -q 'android.permission.SYSTEM_ALERT_WINDOW' "$MANIFEST"; then echo "ERRO
 if grep -q 'supportsPictureInPicture' "$MANIFEST"; then echo "ERROR: PiP volvió al manifiesto." >&2; exit 3; fi
 if grep -Eq 'GuideBubbleActivity|APP_NOTIFICATION_BUBBLE_SETTINGS' "$MANIFEST"; then echo "ERROR: la ruta PIN-only no debe exponer Bubble/guide en el manifiesto." >&2; exit 3; fi
 if ! grep -q 'SettingsNavigator' "$MAIN" || ! grep -q 'openWirelessDebugging' "$MAIN" || ! grep -q 'PinOnlyBootstrapPolicy' "$MAIN"; then echo "ERROR: falta handoff directo a Depuración inalámbrica." >&2; exit 3; fi
+if grep -q 'resolveActivity' "$SETTINGS_NAVIGATOR" || grep -q 'family() != OemFamily.SAMSUNG' "$MAIN"; then echo "ERROR: la ruta Android 11+ conserva un bloqueo de package visibility/OEM." >&2; exit 3; fi
 if ! grep -q 'showPairingInput' "$MAIN" || ! grep -q 'ACTION_SUBMIT_CODE' "$MAIN" || ! grep -q 'ACTION_ATTACH_DESCRIPTOR' "$MAIN" || ! grep -q 'renderAdbReady' "$MAIN"; then echo "ERROR: falta contrato PIN-only/ADB-ready." >&2; exit 3; fi
 if ! grep -q 'requestDirectSession' "$COORDINATOR" || ! grep -q 'requestDirectSupport' "$ONBOARDING" || ! grep -q 'broker.request' "$COORDINATOR"; then echo "ERROR: broker directo roto." >&2; exit 3; fi
 if ! grep -q 'ACTION_ATTACH_DESCRIPTOR' "$SERVICE" || ! grep -q 'SessionState.ADB_READY' "$SERVICE" || ! grep -q 'validateOptionalDescriptor' "$SERVICE"; then echo "ERROR: ADB local no puede desacoplarse del descriptor del relay." >&2; exit 3; fi
@@ -84,7 +85,7 @@ printf 'PASS: PIN notification + pair -> connectTls -> whoami -> relay, sin supe
 printf '\n[2/5] Python protocol/broker/standby tests\n'
 "$PYTHON_BIN" -m venv "$VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install --disable-pip-version-check -q -r "$MAC_DIR/requirements.txt"
-( cd "$MAC_DIR"; "$VENV_DIR/bin/python" -m unittest test_protocol.py test_broker.py test_one_tap_standby.py test_provisioning.py )
+( cd "$MAC_DIR"; "$VENV_DIR/bin/python" -m unittest test_protocol.py test_broker.py test_one_tap_standby.py test_provisioning.py test_operator_credentials.py )
 
 printf '\n[3/5] Android JVM unit tests\n'
 "$REPO_ROOT/gradlew" -p "$SCRIPT_DIR" :app:testDebugUnitTest

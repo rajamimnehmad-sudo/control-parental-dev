@@ -32,10 +32,12 @@ from broker_console import (
     print_pending_requests,
 )
 from provisioning_console import CONTROL_ACTIONS, maintenance_shell, owner_preflight, provision_apk
+from operator_credentials import load_operator_key
 PROTOCOL_VERSION = 1
 MAX_MESSAGE_BYTES = 256 * 1024
 DEFAULT_PORT = 8765
 DEFAULT_SESSION_MINUTES = 30
+DEFAULT_BROKER_URL = "https://syeycayasyufedwoprea.supabase.co/functions/v1/glosh-remote-broker"
 TUNNEL_PATTERN = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
 
 ACTIONS = {
@@ -532,10 +534,10 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--broker-url",
-        default=os.environ.get("BROKER_BASE_URL", ""),
+        default=os.environ.get("BROKER_BASE_URL", DEFAULT_BROKER_URL),
         help="Endpoint estable HTTPS del Support Session Broker.",
     )
-    parser.set_defaults(operator_key=os.environ.get("GLOSH_REMOTE_OPERATOR_KEY", ""))
+    parser.set_defaults(operator_key=load_operator_key(os.environ.get("GLOSH_REMOTE_OPERATOR_KEY", "")))
     args = parser.parse_args()
     if not (1 <= args.port <= 65535):
         parser.error("--port fuera de rango")

@@ -43,14 +43,12 @@ public final class SettingsNavigator {
 
     private void open(Activity activity, Intent... intents) {
         for (Intent intent : intents) {
-            if (intent.resolveActivity(activity.getPackageManager()) == null) {
-                continue;
-            }
             try {
                 activity.startActivity(intent);
                 return;
             } catch (Throwable ignored) {
-                // Continue with the next safe Samsung Settings destination.
+                // Package visibility can hide a valid system destination. Try each official
+                // Settings action directly and fall back only when Android actually rejects it.
             }
         }
         activity.startActivity(new Intent(Settings.ACTION_SETTINGS));
