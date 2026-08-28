@@ -69,7 +69,7 @@ if [[ ! -s "$ENDPOINT_TRACKER" || ! -s "$FAILURE_CLASSIFIER" ]]; then echo "ERRO
 if ! grep -q 'len(requests) == 1' "$MAC_CONSOLE" || ! grep -q 'broker.accept' "$MAC_CONSOLE"; then echo "ERROR: autoaceptación Mac rota." >&2; exit 3; fi
 if [[ ! -s "$DEV_SIGNER_SOURCE" ]]; then echo "ERROR: falta identidad DEV estable." >&2; exit 3; fi
 if ! grep -q 'maintenance-shell' "$PROVISIONING" || ! grep -q 'owner-commit' "$PROVISIONING" || ! grep -q 'EXPECTED_COMPONENT' "$PROVISIONING"; then echo "ERROR: canal de mantenimiento/aprovisionamiento incompleto." >&2; exit 3; fi
-if ! grep -Fq 'type=([^}\r\n]+)\}' "$PREFLIGHT"; then echo "ERROR: regex de cuentas no escapa el cierre de llave requerido por Android ICU." >&2; exit 3; fi
+if grep -Fq '+)}");' "$PREFLIGHT"; then echo "ERROR: regex de cuentas conserva el cierre de llave literal incompatible con Android ICU." >&2; exit 3; fi
 if ! grep -q 'DEVICE OWNER' "$PROVISIONING_CONSOLE" || ! grep -q 'artifactSha256' "$PROVISIONING_CONSOLE" || ! grep -q 'signerSha256' "$PROVISIONING_CONSOLE"; then echo "ERROR: confirmación Mac no quedó ligada al artefacto firmado." >&2; exit 3; fi
 if ! grep -q 'SCREEN_BRIGHT_WAKE_LOCK' "$AWAKE_LEASE" || ! grep -q 'WIFI_MODE_FULL_HIGH_PERF' "$AWAKE_LEASE" || ! grep -q 'awakeLease.release' "$SERVICE"; then echo "ERROR: el lease de pantalla/Wi-Fi no cubre conexión y cleanup." >&2; exit 3; fi
 
