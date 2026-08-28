@@ -22,6 +22,7 @@ import com.glosh.remote.spike.relay.RelayClient;
 import com.glosh.remote.spike.session.PairingAuthorityPolicy;
 import com.glosh.remote.spike.session.PairingEndpointTracker;
 import com.glosh.remote.spike.session.PairingFailureClassifier;
+import com.glosh.remote.spike.session.ConnectionAwakeLease;
 import com.glosh.remote.spike.session.PairingFailureKind;
 import com.glosh.remote.spike.session.PairingSubmissionGuard;
 import com.glosh.remote.spike.session.PairingUiState;
@@ -71,6 +72,7 @@ public final class RemotePairingService extends Service {
     private final AtomicBoolean ending = new AtomicBoolean(false);
 
     private NotificationManager notifications;
+    private ConnectionAwakeLease awakeLease;
     private AdbMdns pairingDiscovery;
     private WifiManager.MulticastLock multicastLock;
     private volatile RelayClient relayClient;
@@ -94,6 +96,7 @@ public final class RemotePairingService extends Service {
     public void onCreate() {
         super.onCreate();
         notifications = getSystemService(NotificationManager.class);
+        awakeLease = new ConnectionAwakeLease(getApplicationContext());
         NotificationChannel channel = new NotificationChannel(
                 CHANNEL_ID,
                 "Conexión de soporte Glosh",
@@ -462,12 +465,13 @@ public final class RemotePairingService extends Service {
                 if (ending.get()) {
                     return;
                 }
+                awakeLease.acquire();
                 sessionState = SessionState.CONNECTED;
                 pairingUiState = PairingUiState.INACTIVE;
                 updateForeground(
                         7,
                         "Conectado con soporte",
-                        "La conexión temporal y segura ya está activa.");
+                        "Sesión segura activa. La pantalla permanecerá encendida hasta desconectar.");
             }
 
             @Override
@@ -549,6 +553,9 @@ public final class RemotePairingService extends Service {
 
     private void cleanupRuntime() {
         stopPairingDiscovery();
+        if (awakeLease != null) {
+            awakeLease.release();
+        }
         RelayClient currentRelay = relayClient;
         relayClient = null;
         if (currentRelay != null) {

@@ -44,6 +44,7 @@ ONBOARDING="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/wizard/Onboardi
 MAC_CONSOLE="$SCRIPT_DIR/mac/broker_console.py"
 PROVISIONING="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/adb/RemoteProvisioningController.java"
 PROVISIONING_CONSOLE="$SCRIPT_DIR/mac/provisioning_console.py"
+AWAKE_LEASE="$SCRIPT_DIR/app/src/main/java/com/glosh/remote/spike/session/ConnectionAwakeLease.java"
 BUILD_GRADLE="$SCRIPT_DIR/app/build.gradle.kts"
 DEV_SIGNER_SOURCE="$SCRIPT_DIR/dev-signing/glosh-remote-dev.p12.b64"
 
@@ -67,6 +68,7 @@ if ! grep -q 'len(requests) == 1' "$MAC_CONSOLE" || ! grep -q 'broker.accept' "$
 if [[ ! -s "$DEV_SIGNER_SOURCE" ]]; then echo "ERROR: falta identidad DEV estable." >&2; exit 3; fi
 if ! grep -q 'maintenance-shell' "$PROVISIONING" || ! grep -q 'owner-commit' "$PROVISIONING" || ! grep -q 'EXPECTED_COMPONENT' "$PROVISIONING"; then echo "ERROR: canal de mantenimiento/aprovisionamiento incompleto." >&2; exit 3; fi
 if ! grep -q 'DEVICE OWNER' "$PROVISIONING_CONSOLE" || ! grep -q 'artifactSha256' "$PROVISIONING_CONSOLE" || ! grep -q 'signerSha256' "$PROVISIONING_CONSOLE"; then echo "ERROR: confirmación Mac no quedó ligada al artefacto firmado." >&2; exit 3; fi
+if ! grep -q 'SCREEN_BRIGHT_WAKE_LOCK' "$AWAKE_LEASE" || ! grep -q 'WIFI_MODE_FULL_HIGH_PERF' "$AWAKE_LEASE" || ! grep -q 'awakeLease.release' "$SERVICE"; then echo "ERROR: el lease de pantalla/Wi-Fi no cubre conexión y cleanup." >&2; exit 3; fi
 
 PAIR_LINE="$(grep -n 'manager.pair(endpoint.host(), endpoint.port(), code)' "$SERVICE" | head -n1 | cut -d: -f1 || true)"
 TLS_LINE="$(grep -n 'manager.connectTls(this, CONNECT_TIMEOUT_MS)' "$SERVICE" | head -n1 | cut -d: -f1 || true)"
@@ -104,7 +106,7 @@ if [[ -z "$APK_CERT_SHA256" || "$APK_CERT_SHA256" != "$KEYSTORE_CERT_SHA256" ]];
 cp -f "$SOURCE_APK" "$FINAL_APK"
 APK_SHA="$(sha256_file "$FINAL_APK")"; APK_SIZE="$(file_size "$FINAL_APK")"; HEAD_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"; STATUS="$(git -C "$REPO_ROOT" -c core.fileMode=false status --short)"
 {
-  echo "TASK=REMOTE-MAINTENANCE-DEVICE-OWNER-20"; echo "RESULT=PASS_AUTOMATED"; echo "HEAD=$HEAD_SHA"; echo "ARCHITECTURE_GUARD=PASS"; echo "PYTHON_TESTS=PASS"; echo "ANDROID_UNIT_TESTS=PASS"; echo "LINT=PASS"; echo "ASSEMBLE=PASS"; echo "NOTIFICATION_PIN_INPUT=PASS"; echo "WIRELESS_SETTINGS_HANDOFF=PASS"; echo "PAIRING_STABILITY=PASS"; echo "SIMPLE_CORE_PAIR_CONNECTTLS_WHOAMI_RELAY=PASS"; echo "ENCRYPTED_MAINTENANCE_SHELL=PASS"; echo "ARTIFACT_BOUND_PROVISIONING=PASS"; echo "PERSISTENT_ADB_IDENTITY=PASS"; echo "VERSION_CODE=$VERSION_CODE"; echo "DEV_SIGNER_SHA256=$APK_CERT_SHA256"; echo "APK=$FINAL_APK"; echo "APK_SIZE_BYTES=$APK_SIZE"; echo "APK_SHA256=$APK_SHA";
+  echo "TASK=REMOTE-MAINTENANCE-DEVICE-OWNER-20"; echo "RESULT=PASS_AUTOMATED"; echo "HEAD=$HEAD_SHA"; echo "ARCHITECTURE_GUARD=PASS"; echo "PYTHON_TESTS=PASS"; echo "ANDROID_UNIT_TESTS=PASS"; echo "LINT=PASS"; echo "ASSEMBLE=PASS"; echo "NOTIFICATION_PIN_INPUT=PASS"; echo "WIRELESS_SETTINGS_HANDOFF=PASS"; echo "PAIRING_STABILITY=PASS"; echo "SIMPLE_CORE_PAIR_CONNECTTLS_WHOAMI_RELAY=PASS"; echo "ENCRYPTED_MAINTENANCE_SHELL=PASS"; echo "ARTIFACT_BOUND_PROVISIONING=PASS"; echo "SESSION_SCREEN_CPU_WIFI_LEASE=PASS"; echo "PERSISTENT_ADB_IDENTITY=PASS"; echo "VERSION_CODE=$VERSION_CODE"; echo "DEV_SIGNER_SHA256=$APK_CERT_SHA256"; echo "APK=$FINAL_APK"; echo "APK_SIZE_BYTES=$APK_SIZE"; echo "APK_SHA256=$APK_SHA";
   if [[ -z "$STATUS" ]]; then echo "GIT_STATUS=clean"; else echo "GIT_STATUS_BEGIN"; printf '%s\n' "$STATUS"; echo "GIT_STATUS_END"; fi
 } > "$REPORT"
 printf '\nPASS_AUTOMATED\nHEAD: %s\nVERSION_CODE: %s\nDEV_SIGNER_SHA256: %s\nAPK: %s\nAPK_SIZE_BYTES: %s\nAPK_SHA256: %s\nREPORT: %s\n' "$HEAD_SHA" "$VERSION_CODE" "$APK_CERT_SHA256" "$FINAL_APK" "$APK_SIZE" "$APK_SHA" "$REPORT"
