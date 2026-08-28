@@ -117,6 +117,10 @@ tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-Guided-DEV.apk
 
 Requires Python 3.9+, dependencies from `mac/requirements.txt`, and `cloudflared` for the temporary DEV tunnel.
 
+Codex operator procedure, failure diagnosis and safe cleanup:
+
+`OPERATOR_RUNBOOK.md`
+
 ```bash
 cd tools/glosh-remote-spike/mac
 python3 -m venv .venv
