@@ -9,8 +9,8 @@ public final class PinOnlyBootstrapPolicy {
             SessionState session,
             PairingUiState pairing,
             boolean alreadyLaunched,
-            boolean supportSessionReady) {
-        return supportSessionReady
+            boolean supportDescriptorAttached) {
+        return supportDescriptorAttached
                 && !alreadyLaunched
                 && session == SessionState.PREPARING
                 && pairing == PairingUiState.DISCOVERING_ENDPOINT;

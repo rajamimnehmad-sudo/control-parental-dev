@@ -17,7 +17,7 @@ public class PinOnlyBootstrapPolicyTest {
     }
 
     @Test
-    public void wirelessSettingsWaitForSupportSessionAndLaunchOnce() {
+    public void wirelessSettingsWaitForAttachedDescriptorAndLaunchOnce() {
         assertFalse(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 SessionState.PREPARING,
                 PairingUiState.CHECKING_SAVED_IDENTITY,

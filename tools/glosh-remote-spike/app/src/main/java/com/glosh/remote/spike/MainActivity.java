@@ -179,7 +179,7 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
                 session,
                 pairing,
                 wirelessSettingsOpened,
-                step == OnboardingState.Step.WIRELESS_DEBUGGING)) {
+                descriptorAttached)) {
             wirelessSettingsOpened = true;
             settingsNavigator.openWirelessDebugging(this);
             return;
