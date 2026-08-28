@@ -6,6 +6,7 @@ import android.view.accessibility.AccessibilityEvent
 internal class ChromeVisualShieldRegionDiscoveryPresentationRecovery(
     private val lab: ChromeVisualShieldRegionDiscoveryLab,
     private val identityGate: ChromeVisualShieldIdentityGate,
+    private val recaptureCurrent: () -> Unit,
     private val replaceGeneration: (ChromeVisualShieldContext) -> Unit,
     private val log: (String) -> Unit,
 ) {
@@ -15,6 +16,15 @@ internal class ChromeVisualShieldRegionDiscoveryPresentationRecovery(
     ) {
         val mode = work.mode as? ChromeVisualShieldWorkMode.RegionDiscoveryProbe ?: return
         when (lab.presentationRejected(mode.binding, work.identity, rejection.reason)) {
+            ChromeVisualShieldRegionDiscoveryLab.PresentationRecovery.RecaptureCurrent -> {
+                val current = identityGate.snapshot().context
+                if (current == null || !mode.binding.matches(current)) {
+                    log("phase=presentation_recovery result=stale_drop reason=${rejection.reason}")
+                    return
+                }
+                log("phase=presentation_recovery result=recapture_current reason=${rejection.reason}")
+                recaptureCurrent()
+            }
             ChromeVisualShieldRegionDiscoveryLab.PresentationRecovery.ReplaceGeneration -> {
                 val current = identityGate.snapshot().context
                 if (current == null || !mode.binding.matches(current)) {

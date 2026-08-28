@@ -9,6 +9,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
     private val regionSetAuthority: ChromeVisualShieldRegionSetAuthority? = null,
 ) {
     internal enum class PresentationRecovery {
+        RecaptureCurrent,
         ReplaceGeneration,
         ExhaustedFailClosed,
         StaleDropped,
@@ -44,9 +45,11 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
     private var completed = false
     private var observation: ChromeVisualShieldRegionDiscoveryObservation? = null
     private var presentationRejected = 0L
+    private var presentationRecaptures = 0L
     private var presentationReplacements = 0L
     private var presentationExhausted = 0L
     private var lastPresentationReason: String? = null
+    private var recapturedBinding: ChromeVisualShieldRegionDiscoveryRenderBinding? = null
     private val signals = mutableMapOf<ChromeVisualShieldRegionDiscoveryRenderBinding, GenerationSignal>()
 
     @Synchronized
@@ -58,9 +61,11 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
         completed = false
         observation = null
         presentationRejected = 0
+        presentationRecaptures = 0
         presentationReplacements = 0
         presentationExhausted = 0
         lastPresentationReason = null
+        recapturedBinding = null
         signals.clear()
     }
 
@@ -105,6 +110,7 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
         signals[binding] = GenerationSignal()
         pending = PendingRender(currentRequest, binding)
         accepted = null
+        recapturedBinding = null
         completed = false
         observation = null
         return true
@@ -161,7 +167,11 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
         lastPresentationReason = reason.name
         completed = false
         observation = null
-        return if (presentationReplacements < MaximumPresentationReplacements) {
+        return if (recapturedBinding != binding) {
+            recapturedBinding = binding
+            presentationRecaptures += 1
+            PresentationRecovery.RecaptureCurrent
+        } else if (presentationReplacements < MaximumPresentationReplacements) {
             presentationReplacements += 1
             PresentationRecovery.ReplaceGeneration
         } else {
@@ -286,7 +296,8 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
             "authorityAcceptedAtNanos=${regionSet?.authorityAcceptedAtNanos ?: 0} " +
             "regionSetReleaseAtNanos=${regionSet?.releaseAtNanos ?: 0} " +
             "retainedReplayKeys=${regionSet?.retainedReplayKeys ?: 0} " +
-            "presentationRejected=$presentationRejected presentationReplacements=$presentationReplacements " +
+            "presentationRejected=$presentationRejected presentationRecaptures=$presentationRecaptures " +
+            "presentationReplacements=$presentationReplacements " +
             "presentationExhausted=$presentationExhausted " +
             "lastPresentationReason=${lastPresentationReason ?: "none"}"
     }

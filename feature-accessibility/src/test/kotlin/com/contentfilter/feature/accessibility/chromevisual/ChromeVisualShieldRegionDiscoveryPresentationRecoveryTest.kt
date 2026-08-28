@@ -7,14 +7,52 @@ import kotlin.test.assertTrue
 
 class ChromeVisualShieldRegionDiscoveryPresentationRecoveryTest {
     @Test
-    fun `pre draw produces one state driven replacement and fresh binding may proceed`() {
+    fun `recovery recaptures current binding once before replacing generation`() {
+        val fixture = Fixture()
+        fixture.attestCurrent()
+        var recaptures = 0
+        var replacements = 0
+        val recovery =
+            ChromeVisualShieldRegionDiscoveryPresentationRecovery(
+                fixture.lab,
+                fixture.gate,
+                recaptureCurrent = { recaptures += 1 },
+                replaceGeneration = { replacements += 1 },
+                log = {},
+            )
+        val firstIdentity = assertNotNull(fixture.gate.beginCapture())
+        val firstWork =
+            ChromeVisualShieldWork(firstIdentity, "test", assertNotNull(fixture.lab.workModeFor(firstIdentity)))
+        fixture.gate.failClosed(firstIdentity)
+        recovery.onRejected(firstWork, rejection())
+        assertEquals(1, recaptures)
+        assertEquals(0, replacements)
+
+        val secondIdentity = assertNotNull(fixture.gate.beginCapture())
+        val secondWork =
+            ChromeVisualShieldWork(secondIdentity, "test", assertNotNull(fixture.lab.workModeFor(secondIdentity)))
+        fixture.gate.failClosed(secondIdentity)
+        recovery.onRejected(secondWork, rejection())
+        assertEquals(1, recaptures)
+        assertEquals(1, replacements)
+    }
+
+    @Test
+    fun `pre draw first recaptures current generation then replaces it statefully`() {
         val fixture = Fixture()
         val stale = fixture.attestCurrent()
-        val staleIdentity = assertNotNull(fixture.gate.beginCapture())
+        val firstIdentity = assertNotNull(fixture.gate.beginCapture())
 
         assertEquals(
+            ChromeVisualShieldRegionDiscoveryLab.PresentationRecovery.RecaptureCurrent,
+            fixture.lab.presentationRejected(stale, firstIdentity, RejectReason),
+        )
+        fixture.gate.failClosed(firstIdentity)
+        val secondIdentity = assertNotNull(fixture.gate.beginCapture())
+        assertTrue(stale.matches(secondIdentity))
+        assertEquals(
             ChromeVisualShieldRegionDiscoveryLab.PresentationRecovery.ReplaceGeneration,
-            fixture.lab.presentationRejected(stale, staleIdentity, RejectReason),
+            fixture.lab.presentationRejected(stale, secondIdentity, RejectReason),
         )
         fixture.invalidatePresentation()
         assertEquals(
@@ -33,14 +71,26 @@ class ChromeVisualShieldRegionDiscoveryPresentationRecoveryTest {
         val fixture = Fixture()
         repeat(2) {
             val binding = fixture.attestCurrent()
-            val identity = assertNotNull(fixture.gate.beginCapture())
+            val firstIdentity = assertNotNull(fixture.gate.beginCapture())
+            assertEquals(
+                ChromeVisualShieldRegionDiscoveryLab.PresentationRecovery.RecaptureCurrent,
+                fixture.lab.presentationRejected(binding, firstIdentity, RejectReason),
+            )
+            fixture.gate.failClosed(firstIdentity)
+            val secondIdentity = assertNotNull(fixture.gate.beginCapture())
             assertEquals(
                 ChromeVisualShieldRegionDiscoveryLab.PresentationRecovery.ReplaceGeneration,
-                fixture.lab.presentationRejected(binding, identity, RejectReason),
+                fixture.lab.presentationRejected(binding, secondIdentity, RejectReason),
             )
             fixture.invalidatePresentation()
         }
         val terminal = fixture.attestCurrent()
+        val firstTerminalIdentity = assertNotNull(fixture.gate.beginCapture())
+        assertEquals(
+            ChromeVisualShieldRegionDiscoveryLab.PresentationRecovery.RecaptureCurrent,
+            fixture.lab.presentationRejected(terminal, firstTerminalIdentity, RejectReason),
+        )
+        fixture.gate.failClosed(firstTerminalIdentity)
         val terminalIdentity = assertNotNull(fixture.gate.beginCapture())
 
         assertEquals(
@@ -52,6 +102,7 @@ class ChromeVisualShieldRegionDiscoveryPresentationRecoveryTest {
             fixture.lab.awaitGeneration(terminal, 0),
         )
         assertTrue(fixture.lab.statusValue().contains("presentationExhausted=1"))
+        assertTrue(fixture.lab.statusValue().contains("presentationRecaptures=3"))
     }
 
     @Test
@@ -149,6 +200,14 @@ class ChromeVisualShieldRegionDiscoveryPresentationRecoveryTest {
     }
 
     private companion object {
+        fun rejection() =
+            ChromeVisualShieldRegionDiscoveryPresentationResult.Rejected(
+                reason = RejectReason,
+                matchedSamples = 0,
+                paletteSamples = 0,
+                observedPaletteBounds = null,
+            )
+
         val RejectReason = ChromeVisualShieldRegionDiscoveryPresentationRejectReason.MarkerAbsent
         const val Scenario = "centered-safe"
         const val RenderContract = "canvas-content-islands-v3"

@@ -10,10 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * DEV-only R1 gate. It protects Chrome first, captures underneath that protection, keeps only a
- * bounded crop, and allows release only after a current GloshIA SAFE decision.
- */
+/** DEV gate: protect first, capture underneath, retain a bounded crop, then apply current authority. */
 internal class ChromeVisualShieldController(
     private val service: AccessibilityService,
     private val scope: CoroutineScope,
@@ -71,6 +68,7 @@ internal class ChromeVisualShieldController(
         ChromeVisualShieldRegionDiscoveryPresentationRecovery(
             regionDiscoveryLab,
             identityGate,
+            recaptureCurrent = { scheduleCapture("presentation_recapture") },
             replaceGeneration = { current -> replacePresentationGeneration(current) },
             log = ::log,
         )
