@@ -127,7 +127,7 @@ internal class ChromePreRenderDocumentTransformer(
             if(navigator.serviceWorker&&navigator.serviceWorker.register)define(navigator.serviceWorker,'register',deny);
             const originalAttach=Element.prototype.attachShadow;
             define(Element.prototype,'attachShadow',function(init){const root=originalAttach.call(this,init);
-            const style=document.createElement('style');style.textContent='$ShadowShieldCss';root.prepend(style);return root});
+            const style=document.createElement('style');style.textContent="$ShadowShieldCss";root.prepend(style);return root});
             const shield=document.getElementById('glosh-h18-shield-style');
             new MutationObserver(()=>{if(!document.getElementById('glosh-h18-shield-style'))document.head.prepend(shield)})
               .observe(document.documentElement,{childList:true,subtree:true});

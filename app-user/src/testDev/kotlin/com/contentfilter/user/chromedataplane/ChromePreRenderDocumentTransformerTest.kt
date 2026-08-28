@@ -50,6 +50,7 @@ class ChromePreRenderDocumentTransformerTest {
         assertFalse(csp.contains("script-src 'self'"))
         assertFalse(csp.contains("style-src 'self'"))
         assertTrue(result.bytes.toString(Charsets.UTF_8).contains("BOOT_READY:STRICT"))
+        assertTrue(result.bytes.toString(Charsets.UTF_8).contains("style.textContent=\"canvas,svg,video"))
     }
 
     @Test
