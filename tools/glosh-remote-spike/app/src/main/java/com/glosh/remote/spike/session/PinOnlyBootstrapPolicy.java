@@ -8,8 +8,10 @@ public final class PinOnlyBootstrapPolicy {
     public static boolean shouldLaunchWirelessSettings(
             SessionState session,
             PairingUiState pairing,
-            boolean alreadyLaunched) {
-        return !alreadyLaunched
+            boolean alreadyLaunched,
+            boolean supportSessionReady) {
+        return supportSessionReady
+                && !alreadyLaunched
                 && session == SessionState.PREPARING
                 && pairing == PairingUiState.DISCOVERING_ENDPOINT;
     }

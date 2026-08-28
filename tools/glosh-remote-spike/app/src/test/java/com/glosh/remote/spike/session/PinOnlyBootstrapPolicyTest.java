@@ -17,18 +17,26 @@ public class PinOnlyBootstrapPolicyTest {
     }
 
     @Test
-    public void wirelessSettingsLaunchOnceWhenEndpointDiscoveryActuallyStarts() {
+    public void wirelessSettingsWaitForSupportSessionAndLaunchOnce() {
         assertFalse(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 SessionState.PREPARING,
                 PairingUiState.CHECKING_SAVED_IDENTITY,
+                false,
+                false));
+        assertFalse(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
+                SessionState.PREPARING,
+                PairingUiState.DISCOVERING_ENDPOINT,
+                false,
                 false));
         assertTrue(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 SessionState.PREPARING,
                 PairingUiState.DISCOVERING_ENDPOINT,
-                false));
+                false,
+                true));
         assertFalse(PinOnlyBootstrapPolicy.shouldLaunchWirelessSettings(
                 SessionState.PREPARING,
                 PairingUiState.DISCOVERING_ENDPOINT,
+                true,
                 true));
     }
 
