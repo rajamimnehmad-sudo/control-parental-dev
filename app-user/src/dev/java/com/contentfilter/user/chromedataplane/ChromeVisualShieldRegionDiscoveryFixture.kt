@@ -4,6 +4,7 @@ import android.util.Log
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabControl
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryGenerationOutcome
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryNativeGeneration
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryPresentationMarkerContract
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryRenderBinding
 
 internal enum class ChromeVisualShieldRegionDiscoveryScenario(
@@ -189,7 +190,7 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
             } else {
                 ChromeVisualShieldRegionDiscoveryHandshakeStore.request(nativeGeneration, key) {
                     ChromeVisualShieldLabControl.beginRegionDiscoveryFixtureRender(key.digest)
-                }.responseText(scenario)
+                }.responseText(scenario, key)
             }
         Log.i(LogTag, "phase=render_identity $result")
         return response(path, "text/plain; charset=utf-8", result)
@@ -321,6 +322,16 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                 "result=region_generation_invalidated scenario=${scenario.wireName} " +
                     "contentEpoch=${binding.contentEpoch} regionSequence=${binding.regionSequence}"
             }
+            ChromeVisualShieldRegionDiscoveryGenerationOutcome.PresentationNotReady -> {
+                ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
+                "result=region_presentation_not_ready scenario=${scenario.wireName} " +
+                    "contentEpoch=${binding.contentEpoch} regionSequence=${binding.regionSequence}"
+            }
+            ChromeVisualShieldRegionDiscoveryGenerationOutcome.PresentationFailedClosed -> {
+                ChromeVisualShieldRegionDiscoveryAttestationStore.clear(scenario)
+                "result=region_presentation_failed_closed scenario=${scenario.wireName} " +
+                    "contentEpoch=${binding.contentEpoch} regionSequence=${binding.regionSequence}"
+            }
             ChromeVisualShieldRegionDiscoveryGenerationOutcome.Stopped ->
                 "result=region_generation_stopped scenario=${scenario.wireName}"
             ChromeVisualShieldRegionDiscoveryGenerationOutcome.TimedOut ->
@@ -366,7 +377,6 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                   let rendering = false;
                   let lastSubmittedGeometryKey = null;
                   const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
-                  const awaitPresentedFrame = async () => { await frame(); await frame(); };
                   const sha256 = async bytes => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)),
                     value => value.toString(16).padStart(2, '0')).join('');
                   const contain = (sw, sh, mw, mh) => {
@@ -441,6 +451,14 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                         }
                         const token = identity.token;
                         const renderKey = identity.renderKey;
+                        const markerPattern = identity.markerPattern;
+                        const markerLeft = Number(identity.markerLeft);
+                        const markerTop = Number(identity.markerTop);
+                        const markerCellWidth = Number(identity.markerCellWidth);
+                        const markerHeight = Number(identity.markerHeight);
+                        if (!/^[01]{130}$/.test(markerPattern) || !Number.isFinite(markerLeft) ||
+                            !Number.isFinite(markerTop) || !Number.isFinite(markerCellWidth) ||
+                            !Number.isFinite(markerHeight)) throw new Error('presentation marker unavailable');
                         const payloads = await Promise.all(payloadPaths.map(path => fetch(path, {cache:'no-store'}).then(r => r.json())));
                         const sources = [];
                         try {
@@ -460,6 +478,7 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                           canvas.width = geometry.backingWidth;
                           canvas.height = geometry.backingHeight;
                           const context = canvas.getContext('2d', {alpha:false});
+                          const renderTimeline = ['draw_started'];
                           context.fillStyle = '${ChromeVisualShieldRegionDiscoveryLayoutContract.NeutralBackground}';
                           context.fillRect(0, 0, canvas.width, canvas.height);
                           if (${scenario == ChromeVisualShieldRegionDiscoveryScenario.Ambiguous}) {
@@ -474,7 +493,17 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                             context.fillRect(draw.x - pad, draw.y - pad, draw.width + pad * 2, draw.height + pad * 2);
                             context.drawImage(sources[index], draw.x, draw.y, draw.width, draw.height);
                           });
-                          await awaitPresentedFrame();
+                          renderTimeline.push('draw_completed');
+                          for (let markerIndex = 0; markerIndex < markerPattern.length; markerIndex += 1) {
+                            context.fillStyle = markerPattern[markerIndex] === '0'
+                              ? '${ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.ZeroCss}'
+                              : '${ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.OneCss}';
+                            context.fillRect(markerLeft + markerIndex * markerCellWidth, markerTop,
+                              markerCellWidth, markerHeight);
+                          }
+                          renderTimeline.push('presentation_marker_drawn');
+                          await frame(); renderTimeline.push('raf_boundary_1');
+                          await frame(); renderTimeline.push('raf_boundary_2');
                           if (geometrySnapshot().keyBody !== geometry.keyBody) {
                             renderRequested = true;
                             continue;
@@ -486,13 +515,16 @@ internal object ChromeVisualShieldRegionDiscoveryFixture {
                             geometry.rect.width, geometry.rect.height, geometry.viewport.left, geometry.viewport.top,
                             geometry.viewport.width, geometry.viewport.height, geometry.viewport.scale, geometry.dpr,
                             ${scenario.expectComplete},
+                            markerPattern, markerLeft, markerTop, markerCellWidth, markerHeight,
+                            renderTimeline.concat('attestation_submitted').join(','),
                             draws.map((draw, index) => [sampleIds[index], expectedShas[index], sources[index].width,
                               sources[index].height, draw.x, draw.y, draw.width, draw.height].join(',')).join(';')];
                           const attested = await fetch('${RenderedPrefix}${scenario.wireName}', {
                             method:'POST', headers:{'Content-Type':'text/plain'}, body:fields.join('|')
                           });
                           const attestationResult = await attested.text();
-                          if (attestationResult.startsWith('result=region_generation_invalidated')) {
+                          if (attestationResult.startsWith('result=region_generation_invalidated') ||
+                              attestationResult.startsWith('result=region_presentation_not_ready')) {
                             lastSubmittedGeometryKey = null;
                             renderRequested = true;
                             continue;
@@ -549,15 +581,27 @@ private fun List<String>.toRegionDiscoveryBinding(): ChromeVisualShieldRegionDis
 
 private fun ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.responseText(
     scenario: ChromeVisualShieldRegionDiscoveryScenario,
+    key: ChromeVisualShieldRegionDiscoveryRenderGeometryKey,
 ): String {
     val prefix =
         when (this) {
-            is ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired ->
+            is ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.NewRenderRequired -> {
+                val marker =
+                    checkNotNull(
+                        ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(
+                            binding,
+                            key.canvasBackingWidth,
+                            key.canvasBackingHeight,
+                        ),
+                    )
                 "result=region_render_new scenario=${scenario.wireName} " +
                     "token=${binding.renderIdentityToken} renderKey=$renderKeyDigest " +
                     "protectionSessionId=${binding.protectionSessionId} windowId=${binding.windowId} " +
                     "contentEpoch=${binding.contentEpoch} viewportEpoch=${binding.viewportEpoch} " +
-                    "regionSequence=${binding.regionSequence}"
+                    "regionSequence=${binding.regionSequence} markerPattern=${marker.pattern} " +
+                    "markerLeft=${marker.markerCanvas.left.toInt()} markerTop=${marker.markerCanvas.top.toInt()} " +
+                    "markerCellWidth=${marker.cellWidth} markerHeight=${marker.markerCanvas.height.toInt()}"
+            }
             is ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Reuse ->
                 "result=region_render_reuse scenario=${scenario.wireName} renderKey=$renderKeyDigest phase=${phase.name.lowercase()}"
             is ChromeVisualShieldRegionDiscoveryHandshakeRequestResult.Rejected ->

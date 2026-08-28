@@ -68,6 +68,8 @@ data class ChromeVisualShieldRegionDiscoveryRenderBinding(
 enum class ChromeVisualShieldRegionDiscoveryGenerationOutcome {
     Completed,
     Invalidated,
+    PresentationNotReady,
+    PresentationFailedClosed,
     Stopped,
     TimedOut,
 }

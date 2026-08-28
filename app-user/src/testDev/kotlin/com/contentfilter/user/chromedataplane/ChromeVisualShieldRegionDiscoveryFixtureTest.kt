@@ -1,5 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryPresentationMarkerContract
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryPresentationProof
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryRenderBinding
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -66,8 +68,10 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
         assertContains(html, "data-never-release=\"true\"")
         assertContains(html, "createImageBitmap(new Blob([bytes]")
         assertContains(html, "context.drawImage(sources[index]")
-        assertContains(html, "const awaitPresentedFrame = async () => { await frame(); await frame(); };")
-        assertContains(html, "await awaitPresentedFrame();")
+        assertContains(html, "presentation_marker_drawn")
+        assertContains(html, "markerPattern[markerIndex]")
+        assertContains(html, ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.ZeroCss)
+        assertContains(html, ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.OneCss)
         assertEquals(2, Regex(Regex.escape("await frame();")).findAll(html).count())
         assertContains(html, ChromeVisualShieldRegionDiscoveryLayoutContract.Version)
         assertContains(html, "multi-safe-block")
@@ -79,6 +83,7 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
         assertContains(html, "lastSubmittedGeometryKey")
         assertContains(html, "geometrySnapshot().keyBody !== geometry.keyBody")
         assertContains(html, "attestationResult.startsWith('result=region_generation_invalidated')")
+        assertContains(html, "attestationResult.startsWith('result=region_presentation_not_ready')")
         assertEquals(1, "region_generation_invalidated".toRegex().findAll(html).count())
         assertEquals(2, "lastSubmittedGeometryKey = null;".toRegex().findAll(html).count())
         assertFalse(html.contains("attestationResult.startsWith('result=region_attestation"))
@@ -120,10 +125,12 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
     @Test
     fun `attestation rejects geometry not produced by fixed contract`() {
         val scenario = ChromeVisualShieldRegionDiscoveryScenario.CenteredSafe
+        val proof =
+            assertNotNull(ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(Binding, 700, 660))
         val body =
             "${scenario.wireName}|${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}|$Token|$RenderKey|" +
                 "7|11|21|13|21|700|660|" +
-                "100|200|700|660|0|0|1080|2200|1|1|true|" +
+                "100|200|700|660|0|0|1080|2200|1|1|true|${proof.encoded()}|$Timeline|" +
                 "safe,${ChromeVisualShieldFixtureSample.Safe.expectedSha256},100,100,0,0,700,660"
 
         ChromeVisualShieldRegionDiscoveryAttestationStore.clear()
@@ -137,6 +144,8 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
     @Test
     fun `attestation pins identity sources and complete expectation`() {
         val scenario = ChromeVisualShieldRegionDiscoveryScenario.CenteredSafe
+        val proof =
+            assertNotNull(ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(Binding, 700, 660))
         val geometry =
             assertNotNull(
                 ChromeVisualShieldRegionDiscoveryLayoutContract.geometry(scenario, listOf(100 to 100), 700, 660),
@@ -144,7 +153,7 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
         val body =
             "${scenario.wireName}|${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}|$Token|$RenderKey|" +
                 "7|11|21|13|21|700|660|" +
-                "100|200|700|660|0|0|1080|2200|1|1|true|" +
+                "100|200|700|660|0|0|1080|2200|1|1|true|${proof.encoded()}|$Timeline|" +
                 "safe,${ChromeVisualShieldFixtureSample.Safe.expectedSha256},100,100," +
                 "${geometry.left},${geometry.top},${geometry.width},${geometry.height}"
 
@@ -163,6 +172,44 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
         ChromeVisualShieldRegionDiscoveryAttestationStore.clear()
     }
 
+    @Test
+    fun `attestation rejects a stale presentation marker and invalid timeline`() {
+        val scenario = ChromeVisualShieldRegionDiscoveryScenario.CenteredSafe
+        val geometry =
+            assertNotNull(
+                ChromeVisualShieldRegionDiscoveryLayoutContract.geometry(scenario, listOf(100 to 100), 700, 660),
+            ).single()
+        val proof =
+            assertNotNull(ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(Binding, 700, 660))
+        val draw =
+            "safe,${ChromeVisualShieldFixtureSample.Safe.expectedSha256},100,100," +
+                "${geometry.left},${geometry.top},${geometry.width},${geometry.height}"
+        val prefix =
+            "${scenario.wireName}|${ChromeVisualShieldRegionDiscoveryLayoutContract.Version}|$Token|$RenderKey|" +
+                "7|11|21|13|21|700|660|100|200|700|660|0|0|1080|2200|1|1|true|"
+        val stalePattern = proof.pattern.reversed()
+
+        ChromeVisualShieldRegionDiscoveryAttestationStore.clear()
+        assertContains(
+            ChromeVisualShieldRegionDiscoveryAttestationStore.record(
+                scenario,
+                "$prefix$stalePattern|${proof.markerCanvas.left}|${proof.markerCanvas.top}|${proof.cellWidth}|" +
+                    "${proof.markerCanvas.height}|$Timeline|$draw",
+                Binding,
+            ),
+            "presentation_mismatch",
+        )
+        assertContains(
+            ChromeVisualShieldRegionDiscoveryAttestationStore.record(
+                scenario,
+                "$prefix${proof.encoded()}|draw_started,attestation_submitted|$draw",
+                Binding,
+            ),
+            "attestation_invalid",
+        )
+        assertNull(ChromeVisualShieldRegionDiscoveryAttestationStore.peek(scenario, Binding))
+    }
+
     private fun request(path: String) =
         ChromePhotosProxyRequest(
             target = path,
@@ -172,9 +219,14 @@ class ChromeVisualShieldRegionDiscoveryFixtureTest {
             body = ByteArray(0),
         )
 
+    private fun ChromeVisualShieldRegionDiscoveryPresentationProof.encoded(): String =
+        "$pattern|${markerCanvas.left}|${markerCanvas.top}|$cellWidth|${markerCanvas.height}"
+
     private companion object {
         const val Token = "7:11:13:0:0:1080:2408:fixture:162:602:918:1324"
         const val RenderKey = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        const val Timeline =
+            "draw_started,draw_completed,presentation_marker_drawn,raf_boundary_1,raf_boundary_2,attestation_submitted"
         val Binding =
             ChromeVisualShieldRegionDiscoveryRenderBinding(
                 protectionSessionId = 7,

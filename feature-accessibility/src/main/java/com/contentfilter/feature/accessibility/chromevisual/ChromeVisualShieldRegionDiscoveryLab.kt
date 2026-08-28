@@ -8,6 +8,12 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
     private val discoveryAuthority: ChromeVisualShieldRegionDiscoveryAuthority,
     private val regionSetAuthority: ChromeVisualShieldRegionSetAuthority? = null,
 ) {
+    internal enum class PresentationRecovery {
+        ReplaceGeneration,
+        ExhaustedFailClosed,
+        StaleDropped,
+    }
+
     private data class PendingRender(
         val request: ChromeVisualShieldRegionDiscoveryProbeRequest,
         val binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
@@ -37,6 +43,10 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
     private var accepted: AcceptedRender? = null
     private var completed = false
     private var observation: ChromeVisualShieldRegionDiscoveryObservation? = null
+    private var presentationRejected = 0L
+    private var presentationReplacements = 0L
+    private var presentationExhausted = 0L
+    private var lastPresentationReason: String? = null
     private val signals = mutableMapOf<ChromeVisualShieldRegionDiscoveryRenderBinding, GenerationSignal>()
 
     @Synchronized
@@ -47,6 +57,10 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
         accepted = null
         completed = false
         observation = null
+        presentationRejected = 0
+        presentationReplacements = 0
+        presentationExhausted = 0
+        lastPresentationReason = null
         signals.clear()
     }
 
@@ -61,9 +75,12 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
     }
 
     @Synchronized
-    fun invalidate() {
-        pending?.binding?.let { complete(it, ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated) }
-        accepted?.binding?.let { complete(it, ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated) }
+    fun invalidate(
+        outcome: ChromeVisualShieldRegionDiscoveryGenerationOutcome =
+            ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated,
+    ) {
+        pending?.binding?.let { complete(it, outcome) }
+        accepted?.binding?.let { complete(it, outcome) }
         pending = null
         accepted = null
         completed = false
@@ -121,22 +138,47 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
     }
 
     @Synchronized
-    fun hasCurrentBinding(context: ChromeVisualShieldContext): Boolean =
-        accepted?.binding?.matches(context) == true
+    fun hasCurrentBinding(context: ChromeVisualShieldContext): Boolean = accepted?.binding?.matches(context) == true
 
     @Synchronized
     fun workModeFor(identity: ChromeVisualShieldIdentity): ChromeVisualShieldWorkMode.RegionDiscoveryProbe? {
         val current = accepted ?: return null
         if (!current.binding.matches(identity)) return null
-        return ChromeVisualShieldWorkMode.RegionDiscoveryProbe(current.request, current.binding)
+        return ChromeVisualShieldWorkMode.RegionDiscoveryProbe(current.request, current.binding, current.oracle)
+    }
+
+    @Synchronized
+    fun presentationRejected(
+        binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
+        identity: ChromeVisualShieldIdentity,
+        reason: ChromeVisualShieldRegionDiscoveryPresentationRejectReason,
+    ): PresentationRecovery {
+        val current = accepted
+        if (current == null || current.binding != binding || !binding.matches(identity)) {
+            return PresentationRecovery.StaleDropped
+        }
+        presentationRejected += 1
+        lastPresentationReason = reason.name
+        completed = false
+        observation = null
+        return if (presentationReplacements < MaximumPresentationReplacements) {
+            presentationReplacements += 1
+            PresentationRecovery.ReplaceGeneration
+        } else {
+            accepted = null
+            presentationExhausted += 1
+            complete(binding, ChromeVisualShieldRegionDiscoveryGenerationOutcome.PresentationFailedClosed)
+            PresentationRecovery.ExhaustedFailClosed
+        }
     }
 
     fun awaitGeneration(
         binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
         timeoutMillis: Long,
     ): ChromeVisualShieldRegionDiscoveryGenerationOutcome {
-        val signal = synchronized(this) { signals[binding] }
-            ?: return ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated
+        val signal =
+            synchronized(this) { signals[binding] }
+                ?: return ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated
         val completedInTime = signal.latch.await(timeoutMillis, TimeUnit.MILLISECONDS)
         return synchronized(this) {
             if (completedInTime) {
@@ -156,8 +198,9 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
 
     @Synchronized
     fun deliver(delivery: ChromeVisualShieldRegionDiscoveryDelivery): String {
-        val mode = delivery.work.mode as? ChromeVisualShieldWorkMode.RegionDiscoveryProbe
-            ?: return "phase=region_discovery_probe result=unexpected_mode"
+        val mode =
+            delivery.work.mode as? ChromeVisualShieldWorkMode.RegionDiscoveryProbe
+                ?: return "phase=region_discovery_probe result=unexpected_mode"
         val current = accepted
         if (current == null || current.binding != mode.binding || !mode.binding.matches(delivery.work.identity)) {
             complete(mode.binding, ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated)
@@ -242,7 +285,10 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
             "releaseBatchDigest=${regionSet?.releaseBatchDigest ?: "none"} " +
             "authorityAcceptedAtNanos=${regionSet?.authorityAcceptedAtNanos ?: 0} " +
             "regionSetReleaseAtNanos=${regionSet?.releaseAtNanos ?: 0} " +
-            "retainedReplayKeys=${regionSet?.retainedReplayKeys ?: 0}"
+            "retainedReplayKeys=${regionSet?.retainedReplayKeys ?: 0} " +
+            "presentationRejected=$presentationRejected presentationReplacements=$presentationReplacements " +
+            "presentationExhausted=$presentationExhausted " +
+            "lastPresentationReason=${lastPresentationReason ?: "none"}"
     }
 
     @Synchronized
@@ -266,6 +312,13 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
         isStructurallyValid() &&
             renderIdentityToken == expectedBinding.renderIdentityToken &&
             renderIdentityToken == identity.renderIdentityToken() &&
+            presentationProof != null &&
+            presentationProof ==
+            ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(
+                expectedBinding,
+                canvasWidth,
+                canvasHeight,
+            ) &&
             scenarioId == expectedRequest.scenarioId &&
             renderContract == expectedRequest.renderContract &&
             regions.map { it.sourceSha256 }.sorted() == expectedRequest.sourceSha256s.sorted() &&
@@ -306,5 +359,9 @@ internal class ChromeVisualShieldRegionDiscoveryLab(
             "neverRelease=${value.request.gateMode == ChromeVisualShieldRegionDiscoveryGateMode.NeverRelease} " +
             "rawPresentedBeforeAuthority=false " +
             "oracleEvidence=${value.oracleVerification?.logValue() ?: "none"}"
+    }
+
+    private companion object {
+        const val MaximumPresentationReplacements = 2L
     }
 }

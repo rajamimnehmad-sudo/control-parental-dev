@@ -66,6 +66,14 @@ internal class ChromeVisualShieldController(
         )
     private val regionDiscoveryLab = ChromeVisualShieldRegionDiscoveryLab(regionDiscoveryAuthority, regionSetAuthority)
     private val rasterProvenanceObserver = ChromeVisualShieldRasterProvenanceObserver(::log)
+    private val presentationBarrier = ChromeVisualShieldRegionDiscoveryPresentationBarrier()
+    private val presentationRecovery =
+        ChromeVisualShieldRegionDiscoveryPresentationRecovery(
+            regionDiscoveryLab,
+            identityGate,
+            replaceGeneration = { current -> replacePresentationGeneration(current) },
+            log = ::log,
+        )
     private val workProcessor =
         ChromeVisualShieldWorkProcessor(
             capture = capture,
@@ -93,6 +101,10 @@ internal class ChromeVisualShieldController(
             identityGate = identityGate,
             metrics = r1Metrics,
             rasterProvenanceObserver = rasterProvenanceObserver,
+            presentationBarrier = presentationBarrier,
+            onPresentationRejected = { work, rejection ->
+                runOnMain { presentationRecovery.onRejected(work, rejection) }
+            },
             deliver = ::deliverRegionDiscovery,
             log = ::log,
             onCycleEnded = { logMetrics("region_discovery_cycle_end") },
@@ -134,7 +146,11 @@ internal class ChromeVisualShieldController(
                 invalidateWithoutNewWindow(ChromeVisualShieldInvalidation.Viewport)
                 return@runOnMain
             }
-            invalidateProtectCapture(window.id, viewport, reasonFor(event, current, window.id, viewport))
+            invalidateProtectCapture(
+                window.id,
+                viewport,
+                ChromeVisualShieldEventInvalidationResolver.resolve(event, current, window.id, viewport),
+            )
         }
     }
 
@@ -238,7 +254,10 @@ internal class ChromeVisualShieldController(
             val accepted = identityGate.snapshot().context ?: return@valueOnMain null
             val binding = accepted.toRegionDiscoveryBinding(renderGeometryKeyDigest)
             if (!regionDiscoveryLab.recordRenderBinding(binding, accepted)) return@valueOnMain null
-            rasterProvenanceObserver.onRenderIdentityAccepted(accepted.toProbeIdentity(), renderGeometryKeyDigest)
+            rasterProvenanceObserver.onRenderIdentityAccepted(
+                accepted.toProbeIdentity(identityGate.snapshot().nextCaptureSequence),
+                renderGeometryKeyDigest,
+            )
             binding
         }
 
@@ -249,7 +268,7 @@ internal class ChromeVisualShieldController(
         regionDiscoveryBinding: ChromeVisualShieldRegionDiscoveryRenderBinding?,
     ): String {
         val context = identityGate.snapshot().context ?: return "result=render_identity_unavailable"
-        val currentIdentity = context.toProbeIdentity()
+        val currentIdentity = context.toProbeIdentity(identityGate.snapshot().nextCaptureSequence)
         val currentRegionDiscoveryOracle =
             regionDiscoveryOracle?.copy(navigationInsets = windowInspector.navigationInsets())
         val currentProbe = renderProbeRequest
@@ -309,8 +328,7 @@ internal class ChromeVisualShieldController(
     override fun awaitRegionDiscoveryGeneration(
         binding: ChromeVisualShieldRegionDiscoveryRenderBinding,
         timeoutMillis: Long,
-    ): ChromeVisualShieldRegionDiscoveryGenerationOutcome =
-        regionDiscoveryLab.awaitGeneration(binding, timeoutMillis)
+    ): ChromeVisualShieldRegionDiscoveryGenerationOutcome = regionDiscoveryLab.awaitGeneration(binding, timeoutMillis)
 
     override fun stop(): String =
         commandOnMain {
@@ -403,6 +421,8 @@ internal class ChromeVisualShieldController(
         viewport: ChromeVisualViewport,
         reason: ChromeVisualShieldInvalidation,
         requireRenderAttestation: Boolean = false,
+        regionGenerationOutcome: ChromeVisualShieldRegionDiscoveryGenerationOutcome =
+            ChromeVisualShieldRegionDiscoveryGenerationOutcome.Invalidated,
     ) {
         if (!labActive) return
         r1Metrics.onContentInvalidation()
@@ -414,7 +434,7 @@ internal class ChromeVisualShieldController(
                 current.viewport != viewport
         val protected = identityGate.invalidate(windowId, viewport, activeRegionContract(), reason) ?: return
         workCoordinator.invalidateAuthority()
-        regionDiscoveryLab.invalidate()
+        regionDiscoveryLab.invalidate(regionGenerationOutcome)
         val context = protected.context ?: return
         val waitForCurrentRender = regionDiscoveryLab.isActive() || hardViewportBoundary || requireRenderAttestation
         if (waitForCurrentRender) viewportRenderGate.requireCurrentRender(context)
@@ -479,7 +499,10 @@ internal class ChromeVisualShieldController(
             if (!labActive || current.contentEpoch != committedEpoch) return@runOnMain
             pendingCoverEpoch = null
             opaqueCommittedCount += 1
-            rasterProvenanceObserver.onOpaqueCommitted(committedEpoch, current.toProbeIdentity())
+            rasterProvenanceObserver.onOpaqueCommitted(
+                committedEpoch,
+                current.toProbeIdentity(identityGate.snapshot().nextCaptureSequence),
+            )
             publishLabOwnership(true)
             viewportRenderGate.recordOpaqueCommit(current)
             scheduleCaptureWhenViewportReady(trigger)
@@ -564,6 +587,16 @@ internal class ChromeVisualShieldController(
         runOnMain {
             log(regionDiscoveryLab.deliver(delivery))
         }
+    }
+
+    private fun replacePresentationGeneration(current: ChromeVisualShieldContext) {
+        invalidateProtectCapture(
+            current.windowId,
+            current.viewport,
+            ChromeVisualShieldInvalidation.Navigation,
+            requireRenderAttestation = true,
+            regionGenerationOutcome = ChromeVisualShieldRegionDiscoveryGenerationOutcome.PresentationNotReady,
+        )
     }
 
     private fun deliverRenderProbe(
@@ -657,7 +690,10 @@ internal class ChromeVisualShieldController(
                 probeCompleted = renderProbeCompleted,
                 probe = renderProbeObservation,
             )
-        return "$base ${regionDiscoveryLab.statusValue()} ${rasterProvenanceObserver.statusValue()}"
+        val presentation = presentationBarrier.snapshot()
+        return "$base ${regionDiscoveryLab.statusValue()} ${rasterProvenanceObserver.statusValue()} " +
+            "presentationObserved=${presentation.observed} presentationBarrierRejected=${presentation.rejected} " +
+            "presentationAbsent=${presentation.absent} presentationStaleOrCorrupt=${presentation.staleOrCorrupt}"
     }
 
     private fun startSession(
@@ -675,6 +711,7 @@ internal class ChromeVisualShieldController(
         if (probe != null) renderProbeObservation = null
         regionDiscoveryLab.begin(discoveryProbe)
         rasterProvenanceObserver.reset(discoveryProbe != null)
+        presentationBarrier.reset()
         labActive = true
         ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(true)
         val started =
@@ -695,14 +732,7 @@ internal class ChromeVisualShieldController(
     }
 
     private fun activeRegionContract(): ChromeVisualShieldRegionContract =
-        if (regionDiscoveryLab.isActive()) {
-            regionContract.copy(
-                verticalOffsetPixels = -windowInspector.navigationInsets().bottom,
-                edgeInsetPixels = ChromeVisualShieldLabControl.RegionDiscoverySearchEnvelopeInsetPixels,
-            )
-        } else {
-            regionContract
-        }
+        regionContract.forRegionDiscovery(regionDiscoveryLab.isActive(), windowInspector.navigationInsets())
 
     private suspend fun executeWork(work: ChromeVisualShieldWork) {
         when (work.mode) {
@@ -720,22 +750,6 @@ internal class ChromeVisualShieldController(
         labOwnershipPublished = active
         onLabOwnershipChanged(active)
     }
-
-    private fun reasonFor(
-        event: AccessibilityEvent,
-        current: ChromeVisualShieldContext,
-        windowId: Int,
-        viewport: ChromeVisualViewport,
-    ): ChromeVisualShieldInvalidation =
-        when {
-            windowId != current.windowId -> ChromeVisualShieldInvalidation.WindowReplaced
-            viewport != current.viewport -> ChromeVisualShieldInvalidation.Viewport
-            event.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED ->
-                ChromeVisualShieldInvalidation.Scroll
-            event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED ->
-                ChromeVisualShieldInvalidation.WindowReplaced
-            else -> ChromeVisualShieldInvalidation.Navigation
-        }
 
     private fun commandOnMain(block: () -> String): String =
         if (Looper.myLooper() == Looper.getMainLooper()) {
@@ -772,19 +786,6 @@ internal class ChromeVisualShieldController(
             is ChromeVisualShieldGloshiaDecision.Block -> "block"
             is ChromeVisualShieldGloshiaDecision.FailClosed -> "fail_closed"
         }
-
-    private fun ChromeVisualShieldContext.toProbeIdentity(): ChromeVisualShieldIdentity =
-        ChromeVisualShieldIdentity(
-            protectionSessionId = protectionSessionId,
-            windowId = windowId,
-            contentEpoch = contentEpoch,
-            viewport = viewport,
-            viewportEpoch = viewportEpoch,
-            captureSequence = identityGate.snapshot().nextCaptureSequence,
-            regionId = regionId,
-            regionSequence = regionSequence,
-            region = region,
-        )
 
     private fun log(message: String) {
         Log.i(LogTag, "$message gloshIAConnected=true")

@@ -168,12 +168,14 @@ class ChromeVisualShieldRegionDiscoveryEpochBindingTest {
                 renderIdentityToken = binding.renderIdentityToken,
                 scenarioId = Scenario,
                 renderContract = RenderContract,
-                canvasWidth = 80,
+                canvasWidth = 700,
                 canvasHeight = 100,
                 carrierCss = ChromeVisualShieldLabRect(10.0, 20.0, 80.0, 100.0),
                 visualViewportCss = ChromeVisualShieldLabRect(0.0, 0.0, 100.0, 200.0),
                 visualViewportScale = 1.0,
                 devicePixelRatio = 1.0,
+                presentationProof =
+                    ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(binding, 700, 100),
                 expectComplete = true,
                 regions =
                     listOf(
@@ -182,7 +184,7 @@ class ChromeVisualShieldRegionDiscoveryEpochBindingTest {
                             sourceSha256 = SourceSha,
                             sourceWidth = 80,
                             sourceHeight = 100,
-                            drawCanvas = ChromeVisualShieldLabRect(0.0, 0.0, 80.0, 100.0),
+                            drawCanvas = ChromeVisualShieldLabRect(0.0, 0.0, 700.0, 100.0),
                         ),
                     ),
             )

@@ -16,6 +16,7 @@ data class ChromeVisualShieldRegionDiscoveryOracle(
     val visualViewportScale: Double,
     val devicePixelRatio: Double,
     val navigationInsets: ChromeVisualShieldNavigationInsets = ChromeVisualShieldNavigationInsets.Zero,
+    val presentationProof: ChromeVisualShieldRegionDiscoveryPresentationProof? = null,
     val expectComplete: Boolean,
     val regions: List<ChromeVisualShieldRegionDiscoveryOracleRegion>,
 ) {
@@ -32,6 +33,7 @@ data class ChromeVisualShieldRegionDiscoveryOracle(
             devicePixelRatio.isFinite() &&
             devicePixelRatio > 0.0 &&
             navigationInsets.isValid() &&
+            presentationProof?.isStructurallyValid(canvasWidth, canvasHeight) != false &&
             regions.isNotEmpty() &&
             regions.size <= MaximumRegions &&
             regions.all { it.isStructurallyValid(canvasWidth, canvasHeight) }

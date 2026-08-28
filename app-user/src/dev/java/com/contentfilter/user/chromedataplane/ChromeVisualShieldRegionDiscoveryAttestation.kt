@@ -3,6 +3,8 @@ package com.contentfilter.user.chromedataplane
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldLabRect
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryOracle
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryOracleRegion
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryPresentationMarkerContract
+import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryPresentationProof
 import com.contentfilter.feature.accessibility.chromevisual.ChromeVisualShieldRegionDiscoveryRenderBinding
 import kotlin.math.abs
 
@@ -15,6 +17,8 @@ internal data class ChromeVisualShieldRegionDiscoveryAttestation(
     val visualViewportCss: ChromeVisualShieldLabRect,
     val visualViewportScale: Double,
     val devicePixelRatio: Double,
+    val presentationProof: ChromeVisualShieldRegionDiscoveryPresentationProof,
+    val renderTimeline: String,
     val draws: List<ChromeVisualShieldRegionDiscoveryDraw>,
 ) {
     fun oracle(): ChromeVisualShieldRegionDiscoveryOracle =
@@ -28,6 +32,7 @@ internal data class ChromeVisualShieldRegionDiscoveryAttestation(
             visualViewportCss = visualViewportCss,
             visualViewportScale = visualViewportScale,
             devicePixelRatio = devicePixelRatio,
+            presentationProof = presentationProof,
             expectComplete = scenario.expectComplete,
             regions =
                 draws.mapIndexed { index, draw ->
@@ -80,7 +85,30 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
         val viewport = rect(fields, 15) ?: return invalid(scenario)
         val viewportScale = fields[19].toDoubleOrNull() ?: return invalid(scenario)
         val dpr = fields[20].toDoubleOrNull() ?: return invalid(scenario)
-        val drawFields = fields[22].split(';')
+        val suppliedProof =
+            ChromeVisualShieldRegionDiscoveryPresentationProof(
+                pattern = fields[22],
+                markerCanvas =
+                    ChromeVisualShieldLabRect(
+                        fields[23].toDoubleOrNull() ?: return invalid(scenario),
+                        fields[24].toDoubleOrNull() ?: return invalid(scenario),
+                        fields[22].length * (fields[25].toIntOrNull() ?: return invalid(scenario)).toDouble(),
+                        fields[26].toDoubleOrNull() ?: return invalid(scenario),
+                    ),
+                cellWidth = fields[25].toIntOrNull() ?: return invalid(scenario),
+            )
+        val expectedProof =
+            ChromeVisualShieldRegionDiscoveryPresentationMarkerContract.expected(
+                expectedBinding,
+                canvasWidth,
+                canvasHeight,
+            ) ?: return invalid(scenario)
+        if (suppliedProof != expectedProof) {
+            return "result=region_attestation_presentation_mismatch scenario=${scenario.wireName}"
+        }
+        val renderTimeline = fields[27]
+        if (renderTimeline != ExpectedRenderTimeline) return invalid(scenario)
+        val drawFields = fields[28].split(';')
         if (drawFields.size != scenario.samples.size) return mismatch(scenario)
         val observed =
             drawFields.mapIndexed { index, encoded ->
@@ -121,11 +149,14 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
                 viewport,
                 viewportScale,
                 dpr,
+                suppliedProof,
+                renderTimeline,
                 observed,
             )
         if (!attestation.oracle().isStructurallyValid()) return invalid(scenario)
         ready[scenario] = attestation
-        return "result=region_render_attested scenario=${scenario.wireName} draws=${observed.size}"
+        return "result=region_render_attested scenario=${scenario.wireName} draws=${observed.size} " +
+            "timeline=$renderTimeline presentationProofDeclared=true"
     }
 
     @Synchronized
@@ -166,7 +197,9 @@ internal object ChromeVisualShieldRegionDiscoveryAttestationStore {
     private fun mismatch(scenario: ChromeVisualShieldRegionDiscoveryScenario) =
         "result=region_attestation_identity_mismatch scenario=${scenario.wireName}"
 
-    private const val FieldCount = 23
+    private const val FieldCount = 29
     private const val DrawFieldCount = 8
     private const val GeometryTolerance = 0.02
+    private const val ExpectedRenderTimeline =
+        "draw_started,draw_completed,presentation_marker_drawn,raf_boundary_1,raf_boundary_2,attestation_submitted"
 }

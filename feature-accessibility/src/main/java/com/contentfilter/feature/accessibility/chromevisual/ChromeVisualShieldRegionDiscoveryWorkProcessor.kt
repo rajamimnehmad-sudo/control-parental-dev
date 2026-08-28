@@ -16,6 +16,11 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
     private val identityGate: ChromeVisualShieldIdentityGate,
     private val metrics: ChromeVisualShieldR1Metrics,
     private val rasterProvenanceObserver: ChromeVisualShieldRasterProvenanceObserver,
+    private val presentationBarrier: ChromeVisualShieldRegionDiscoveryPresentationBarrier,
+    private val onPresentationRejected: (
+        ChromeVisualShieldWork,
+        ChromeVisualShieldRegionDiscoveryPresentationResult.Rejected,
+    ) -> Unit,
     private val deliver: (ChromeVisualShieldRegionDiscoveryDelivery) -> Unit,
     private val log: (String) -> Unit,
     private val onCycleEnded: () -> Unit,
@@ -43,6 +48,36 @@ internal class ChromeVisualShieldRegionDiscoveryWorkProcessor(
                 ChromeVisualShieldCaptureResources<ChromeWindowFrame, ChromeVisualShieldCrop>()
                     .use { resources ->
                         resources.attachFullFrame(result.frame)
+                        log(
+                            "phase=region_discovery_screenshot_callback result=success " +
+                                "frame=${result.frame.width}x${result.frame.height} " +
+                                "latencyMs=${result.frame.latencyMillis}",
+                        )
+                        val mode = work.mode as? ChromeVisualShieldWorkMode.RegionDiscoveryProbe
+                        val presentation =
+                            presentationBarrier.verify(
+                                bitmap = result.frame.bitmap,
+                                identity = work.identity,
+                                binding = checkNotNull(mode).binding,
+                                oracle = mode.oracle,
+                            )
+                        when (presentation) {
+                            is ChromeVisualShieldRegionDiscoveryPresentationResult.Proven ->
+                                log(
+                                    "phase=presentation_proof result=current markerBounds=${presentation.markerBounds} " +
+                                        "matched=${presentation.matchedSamples}",
+                                )
+                            is ChromeVisualShieldRegionDiscoveryPresentationResult.Rejected -> {
+                                identityGate.failClosed(work.identity)
+                                log(
+                                    "phase=presentation_proof result=rejected reason=${presentation.reason} " +
+                                        "matched=${presentation.matchedSamples} palette=${presentation.paletteSamples} " +
+                                        "planner=0 inference=0 release=0",
+                                )
+                                onPresentationRejected(work, presentation)
+                                return
+                            }
+                        }
                         rasterProvenanceObserver.observeFullFrame(result.frame.bitmap, work.identity)
                         val crop = resources.deriveCrop { frameProcessor.crop(it, work.identity) }
                         if (crop == null) {
