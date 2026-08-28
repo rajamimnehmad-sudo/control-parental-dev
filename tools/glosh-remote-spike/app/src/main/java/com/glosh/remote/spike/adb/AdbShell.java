@@ -116,21 +116,7 @@ public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
         AdbStream stream = manager.openStream(service);
         try {
             try (InputStream input = stream.openInputStream()) {
-                ByteArrayOutputStream output = new ByteArrayOutputStream();
-                byte[] buffer = new byte[4096];
-                int total = 0;
-                int read;
-                while ((read = input.read(buffer)) != -1) {
-                    int remaining = MAX_OUTPUT_BYTES - total;
-                    if (remaining <= 0) {
-                        output.write("\n[output truncated]\n".getBytes(StandardCharsets.UTF_8));
-                        break;
-                    }
-                    int accepted = Math.min(read, remaining);
-                    output.write(buffer, 0, accepted);
-                    total += accepted;
-                }
-                return new String(output.toByteArray(), StandardCharsets.UTF_8);
+                return readCommandOutput(input);
             }
         } finally {
             try {
@@ -138,5 +124,41 @@ public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
             } catch (IOException ignored) {
             }
         }
+    }
+
+    static String readCommandOutput(InputStream input) throws IOException {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        byte[] buffer = new byte[4096];
+        int total = 0;
+        while (true) {
+            final int read;
+            try {
+                read = input.read(buffer);
+            } catch (IOException error) {
+                // libadb 3.1.1 can report Android's normal CLSE as an exception when the reader
+                // already drained the final WRTE payload. Preserve that completed command output.
+                if (total > 0 && isPeerClose(error)) {
+                    break;
+                }
+                throw error;
+            }
+            if (read == -1) {
+                break;
+            }
+            int remaining = MAX_OUTPUT_BYTES - total;
+            if (remaining <= 0) {
+                output.write("\n[output truncated]\n".getBytes(StandardCharsets.UTF_8));
+                break;
+            }
+            int accepted = Math.min(read, remaining);
+            output.write(buffer, 0, accepted);
+            total += accepted;
+        }
+        return new String(output.toByteArray(), StandardCharsets.UTF_8);
+    }
+
+    private static boolean isPeerClose(IOException error) {
+        String message = error.getMessage();
+        return "Stream closed".equals(message) || "Stream closed.".equals(message);
     }
 }
