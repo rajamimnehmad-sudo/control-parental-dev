@@ -3,6 +3,7 @@ package com.glosh.remote.spike.relay;
 import android.os.Build;
 
 import com.glosh.remote.spike.adb.AdbShell;
+import com.glosh.remote.spike.adb.RemoteProvisioningController;
 import com.glosh.remote.spike.crypto.SessionCrypto;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 
@@ -31,6 +32,7 @@ public final class RelayClient implements Closeable {
     }
 
     private final AdbShell shell;
+    private final RemoteProvisioningController provisioning;
     private final OkHttpClient client;
     private final ExecutorService commandExecutor = Executors.newSingleThreadExecutor();
 
@@ -44,7 +46,12 @@ public final class RelayClient implements Closeable {
     private long generation;
 
     public RelayClient(AdbShell shell) {
+        this(shell, null);
+    }
+
+    public RelayClient(AdbShell shell, RemoteProvisioningController provisioning) {
         this.shell = shell;
+        this.provisioning = provisioning;
         this.client = new OkHttpClient.Builder()
                 .connectTimeout(20, TimeUnit.SECONDS)
                 .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -101,6 +108,9 @@ public final class RelayClient implements Closeable {
     @Override
     public void close() {
         disconnect();
+        if (provisioning != null) {
+            provisioning.close();
+        }
         commandExecutor.shutdownNow();
         client.dispatcher().executorService().shutdown();
         client.connectionPool().evictAll();
@@ -275,14 +285,19 @@ public final class RelayClient implements Closeable {
 
         String requestId = payload.getString("requestId");
         String action = payload.getString("action");
+        JSONObject params = payload.optJSONObject("params");
         if (requestId.length() == 0 || requestId.length() > 80 || action.length() == 0 || action.length() > 40) {
             throw new SecurityException("Comando fuera de límites.");
         }
 
-        commandExecutor.execute(() -> executeAndReply(expectedGeneration, requestId, action));
+        commandExecutor.execute(() -> executeAndReply(expectedGeneration, requestId, action, params));
     }
 
-    private void executeAndReply(long expectedGeneration, String requestId, String action) {
+    private void executeAndReply(
+            long expectedGeneration,
+            String requestId,
+            String action,
+            JSONObject params) {
         if (!isCurrentGeneration(expectedGeneration)) {
             return;
         }
@@ -291,6 +306,11 @@ public final class RelayClient implements Closeable {
         try {
             if ("ping".equals(action)) {
                 output = "pong";
+            } else if (RemoteProvisioningController.supports(action)) {
+                if (provisioning == null) {
+                    throw new SecurityException("Aprovisionamiento no disponible en esta sesión.");
+                }
+                output = provisioning.execute(action, params);
             } else {
                 output = shell.execute(action);
             }

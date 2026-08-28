@@ -3,8 +3,11 @@ package com.glosh.remote.spike.adb;
 import android.content.Context;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
 import io.github.muntashirakon.adb.AdbStream;
@@ -12,6 +15,7 @@ import io.github.muntashirakon.adb.AdbStream;
 /** Deliberately small remote allowlist plus fixed internal session-maintenance operations. */
 public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
     private static final int MAX_OUTPUT_BYTES = 64 * 1024;
+    private static final int MAX_REMOTE_COMMAND_BYTES = 8 * 1024;
     private static final long RECONNECT_TIMEOUT_MS = 10_000L;
     private static final String NULL_SETTING = "null";
 
@@ -43,6 +47,18 @@ public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
             default:
                 throw new SecurityException("Acción remota no permitida: " + action);
         }
+    }
+
+    /** Executes an operator command with the same shell identity as local ADB. */
+    String executeRemoteCommand(String command) throws Exception {
+        String value = command == null ? "" : command.trim();
+        int byteCount = value.getBytes(StandardCharsets.UTF_8).length;
+        if (value.isEmpty() || byteCount > MAX_REMOTE_COMMAND_BYTES
+                || value.indexOf('\0') >= 0 || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0) {
+            throw new IllegalArgumentException("Comando remoto vacío o fuera de límites.");
+        }
+        ensureConnected();
+        return runService("shell:" + value);
     }
 
     @Override
@@ -112,11 +128,39 @@ public final class AdbShell implements ScreenAwakeLease.SettingsAccess {
         return runService(service).trim();
     }
 
-    private String runService(String service) throws Exception {
+    String runService(String service) throws Exception {
         AdbStream stream = manager.openStream(service);
         try {
             try (InputStream input = stream.openInputStream()) {
                 return readCommandOutput(input);
+            }
+        } finally {
+            try {
+                stream.close();
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    String installPackage(File apk) throws Exception {
+        ensureConnected();
+        long size = apk == null ? 0L : apk.length();
+        if (apk == null || !apk.isFile() || size <= 0L) {
+            throw new IllegalArgumentException("APK staged inválida.");
+        }
+        AdbStream stream = manager.openStream("shell:pm install -r -S " + size);
+        try {
+            try (InputStream fileInput = new FileInputStream(apk);
+                    OutputStream adbInput = stream.openOutputStream()) {
+                byte[] buffer = new byte[64 * 1024];
+                int read;
+                while ((read = fileInput.read(buffer)) != -1) {
+                    adbInput.write(buffer, 0, read);
+                }
+                adbInput.flush();
+            }
+            try (InputStream commandOutput = stream.openInputStream()) {
+                return readCommandOutput(commandOutput);
             }
         } finally {
             try {

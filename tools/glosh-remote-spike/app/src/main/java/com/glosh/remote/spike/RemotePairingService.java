@@ -15,6 +15,7 @@ import android.util.Log;
 
 import com.glosh.remote.spike.adb.AdbConnectionManager;
 import com.glosh.remote.spike.adb.AdbShell;
+import com.glosh.remote.spike.adb.RemoteProvisioningController;
 import com.glosh.remote.spike.protocol.JoinDescriptor;
 import com.glosh.remote.spike.protocol.PairingPin;
 import com.glosh.remote.spike.relay.RelayClient;
@@ -443,7 +444,9 @@ public final class RemotePairingService extends Service {
         pairingUiState = PairingUiState.CONNECTING;
         updateForeground(7, "Conectando con soporte", "ADB local listo. Abriendo la sesión segura…");
 
-        RelayClient client = new RelayClient(shell);
+        RelayClient client = new RelayClient(
+                shell,
+                new RemoteProvisioningController(getApplicationContext(), shell));
         relayClient = client;
         client.connect(joinUri, new RelayClient.Listener() {
             @Override

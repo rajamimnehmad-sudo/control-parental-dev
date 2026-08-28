@@ -31,6 +31,7 @@ from broker_console import (
     maintain_operator_presence,
     print_pending_requests,
 )
+from provisioning_console import CONTROL_ACTIONS, maintenance_shell, owner_preflight, provision_apk
 PROTOCOL_VERSION = 1
 MAX_MESSAGE_BYTES = 256 * 1024
 DEFAULT_PORT = 8765
@@ -213,8 +214,8 @@ class RemoteSession:
         if future is not None and not future.done():
             future.set_result(payload)
 
-    async def command(self, action: str, timeout: float = 20.0) -> dict:
-        if action not in ACTIONS:
+    async def command(self, action: str, params: Optional[dict] = None, timeout: float = 20.0) -> dict:
+        if action not in ACTIONS and action not in CONTROL_ACTIONS:
             raise ValueError(f"action not allowlisted: {action}")
         websocket = self.agent
         if websocket is None:
@@ -231,6 +232,8 @@ class RemoteSession:
             "requestId": request_id,
             "action": action,
         }
+        if params is not None:
+            payload["params"] = params
 
         async with self.send_lock:
             self.server_seq += 1
@@ -333,7 +336,7 @@ async def interactive_cli(
     broker: Optional[BrokerOperatorClient],
 ) -> None:
     print("\nEsperando al Android…")
-    print("Comandos: " + ", ".join(ACTIONS) + ", status, requests, accept <request-id>, help, quit")
+    print("Comandos: " + ", ".join(ACTIONS) + ", shell <comando>, logcat, preflight-owner, provision <apk>, status, requests, accept <request-id>, help, quit")
     while not session.stop_event.is_set():
         try:
             raw = (await async_input("glosh-remote> ")).strip()
@@ -349,6 +352,10 @@ async def interactive_cli(
         if command == "help":
             for name, description in ACTIONS.items():
                 print(f"  {name:8} {description}")
+            print("  preflight-owner         Verifica usuarios, cuentas y owner sin modificarlos")
+            print("  provision <apk>         Transfiere, valida, instala y configura Glosh DEV")
+            print("  shell <comando>         Consola remota con identidad ADB shell")
+            print("  logcat                  Últimas 1000 líneas del log Android")
             print("  status                 Muestra el agente actual")
             print("  requests               Muestra solicitudes pendientes del broker")
             print("  accept <request-id>     Acepta explícitamente un teléfono")
@@ -372,6 +379,35 @@ async def interactive_cli(
                 print(await accept_request(broker, request_id, descriptor, session))
             except Exception as exc:
                 print(f"[broker] no se pudo aceptar la solicitud: {exc}")
+            continue
+        if command == "preflight-owner":
+            try:
+                print(json.dumps(await owner_preflight(session), ensure_ascii=False, indent=2))
+            except Exception as exc:
+                print(f"[ERROR] {exc}")
+            continue
+        if command == "logcat":
+            try:
+                print(await maintenance_shell(session, "logcat -d -v threadtime -t 1000"))
+            except Exception as exc:
+                print(f"[ERROR] {exc}")
+            continue
+        if command.startswith("shell "):
+            try:
+                print(await maintenance_shell(session, raw.split(maxsplit=1)[1]))
+            except Exception as exc:
+                print(f"[ERROR] {exc}")
+            continue
+        if command.startswith("provision "):
+            apk_path = raw.split(maxsplit=1)[1].strip()
+            try:
+                def progress(done: int, total: int) -> None:
+                    print(f"\r[transfer] {done * 100 // total:3d}%", end="", flush=True)
+
+                result = await provision_apk(session, apk_path, async_input, progress)
+                print("\n[PASS] " + json.dumps(result, ensure_ascii=False))
+            except Exception as exc:
+                print(f"\n[ERROR] {exc}")
             continue
         if command not in ACTIONS:
             print("Comando no permitido. Usá help.")
