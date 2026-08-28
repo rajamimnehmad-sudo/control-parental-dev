@@ -17,8 +17,9 @@ public final class ProvisioningPreflight {
     private static final Pattern USER_PATTERN = Pattern.compile("UserInfo\\{(\\d+):");
     private static final Pattern ACCOUNT_COUNT_PATTERN =
             Pattern.compile("(?m)^\\s*Accounts:\\s*(\\d+)\\s*$");
+    // Android's ICU regex engine requires a literal closing brace to be escaped explicitly.
     private static final Pattern ACCOUNT_TYPE_PATTERN =
-            Pattern.compile("Account \\{[^\\r\\n}]*type=([^}\\r\\n]+)}");
+            Pattern.compile("Account \\{[^\\r\\n}]*type=([^}\\r\\n]+)\\}");
 
     public enum OwnerState {
         NONE,
