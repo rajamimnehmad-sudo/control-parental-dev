@@ -41,6 +41,7 @@
                 <action android:name="com.contentfilter.user.chromedataplane.command.START" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.STOP" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.STATUS" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.AUDIT_MARK" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.TRANSPORT_STATUS" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.TRANSPORT_STRESS" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.FULL_TUNNEL_START" />
