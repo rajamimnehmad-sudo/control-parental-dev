@@ -95,7 +95,8 @@ public final class MainActivity extends Activity implements SupportSessionCoordi
     protected void onPause() {
         ui.onHostPause();
         handler.removeCallbacks(refreshState);
-        coordinator.detach(this);
+        // Keep the one-shot broker callback while Settings is in front. The activity remains alive
+        // and must still attach the accepted descriptor to the foreground pairing service.
         super.onPause();
     }
 
