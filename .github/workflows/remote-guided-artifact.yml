@@ -53,7 +53,7 @@ jobs:
         with:
           name: GloshRemote-PIN-ONLY-19-${{ github.sha }}
           path: |
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-MAINTENANCE-20-DEV.apk
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-MAINTENANCE-20-report.txt
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-MAINTENANCE-20-DEV35.apk
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-DEVICE-OWNER-PREFLIGHT-20B-report.txt
           if-no-files-found: error
           retention-days: 14
