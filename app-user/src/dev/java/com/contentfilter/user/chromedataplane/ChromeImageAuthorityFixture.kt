@@ -13,10 +13,12 @@ internal class ChromeImageAuthorityFixture(
     private val report = AtomicReference(NotRun)
     private val normalizedImageRequestObserved = AtomicBoolean(false)
     private val provenanceFixture = ChromePixelProvenanceFixture()
+    private val coverageFixture = ChromeProvenanceCoverageFixture(safeBytes)
 
     fun report(): String = report.get()
 
     fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse? {
+        coverageFixture.responseFor(request)?.let { return it }
         provenanceFixture.responseFor(request)?.let { return it }
         val path = request.target.substringBefore('?').substringBefore('#')
         return when (path) {

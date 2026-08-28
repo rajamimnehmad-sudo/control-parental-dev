@@ -54,6 +54,7 @@ internal class ChromePhotosHttpsProxy(
     private val upstream: ChromePhotosUpstream = ChromePhotosRealUpstream(destinationAuthority = destinationAuthority),
     private val transformer: ChromePhotosResourceTransformer = chromePhotosDeterministicTransformer(origin),
     private val imageAuthority: ChromeImageContentAuthority = ChromeImageContentAuthority(),
+    private val coverageLedger: ChromeRealWebProvenanceLedger? = null,
     private val lifecycleLog: (String, Throwable?) -> Unit = ::logProxyLifecycle,
     private val infoLog: (String) -> Unit = { message -> Log.i(LogTag, message) },
     private val warningLog: (String) -> Unit = { message -> Log.w(LogTag, message) },
@@ -152,6 +153,13 @@ internal class ChromePhotosHttpsProxy(
 
     fun isHealthy(): Boolean = running.get() && serverSocket?.isClosed == false && !admission.isShutdown()
 
+    fun markCoverageState(
+        label: String,
+        newNavigation: Boolean,
+    ): Long? = coverageLedger?.markState(label, newNavigation)
+
+    fun coverageSnapshot(): ChromeCoverageLedgerSnapshot? = coverageLedger?.snapshot()
+
     override fun close() {
         val resources =
             synchronized(lifecycleLock) {
@@ -170,6 +178,7 @@ internal class ChromePhotosHttpsProxy(
         val cleanupFailure =
             listOf(
                 runCatching { transformer.close() },
+                runCatching { coverageLedger?.close() },
                 runCatching { upstream.close() },
                 runCatching { tls.close() },
             ).firstNotNullOfOrNull { result -> result.exceptionOrNull() }
@@ -341,7 +350,7 @@ internal class ChromePhotosHttpsProxy(
             }
             val disposition =
                 if (connectTargetHost == ChromePhotosDataPlaneLabContract.FixtureHost) {
-                    serveFixtureRequest(request, protocol, output)
+                    serveFixtureRequest(request, protocol, output, requestCorrelationId)
                 } else {
                     serveRealRequest(
                         host = connectTargetHost,
@@ -359,8 +368,15 @@ internal class ChromePhotosHttpsProxy(
         request: ChromePhotosProxyRequest,
         protocol: String,
         output: OutputStream,
+        correlationId: String,
     ): ChromeHttpConnectionDisposition {
         var responseStarted = false
+        val coverageToken =
+            coverageLedger?.beginRequest(
+                host = ChromePhotosDataPlaneLabContract.FixtureHost,
+                request = request,
+                correlationId = correlationId,
+            )
         return try {
             val started = System.nanoTime()
             val response = origin.responseFor(imageAuthority.normalizeUpstreamRequest(request))
@@ -378,6 +394,21 @@ internal class ChromePhotosHttpsProxy(
             val result = responseWriter.writeBuffered(output, request, sanitized, forceChunked = response.chunked)
             deliveredBytes.addAndGet(result.bytesWritten)
             recordDecision(sanitized)
+            if (coverageToken != null) {
+                if (response.statusCode in RedirectCodes) {
+                    coverageLedger.recordRedirect(coverageToken, response.statusCode, sanitized.location)
+                } else if (
+                    sanitized.decision != ChromePhotosResourceDecision.Passthrough ||
+                    sanitized.observedBodyDigest != null
+                ) {
+                    coverageLedger.recordInspected(
+                        token = coverageToken,
+                        statusCode = response.statusCode,
+                        declaredContentType = response.contentType,
+                        response = sanitized,
+                    )
+                }
+            }
             latencies.add(System.nanoTime() - started)
             if (response.resourceId in FixturePresenceResourceIds) onFixtureHeartbeat()
             if (response.resourceId != FixtureHeartbeatId) {
@@ -391,6 +422,7 @@ internal class ChromePhotosHttpsProxy(
             request.successDisposition()
         } catch (error: Throwable) {
             failures.incrementAndGet()
+            if (coverageToken != null) coverageLedger.recordFailure(coverageToken, error.javaClass.simpleName)
             warningLog(
                 "phase=fixture_failed responseStarted=$responseStarted error=${error.javaClass.simpleName}",
             )
@@ -408,6 +440,7 @@ internal class ChromePhotosHttpsProxy(
         val started = System.nanoTime()
         var responseStarted = false
         var upstreamExchangeReady = false
+        val coverageToken = coverageLedger?.beginRequest(host, request, correlationId)
         return try {
             val upstreamRequest = imageAuthority.normalizeUpstreamRequest(request)
             upstream.execute(host, upstreamRequest).use { exchange ->
@@ -438,6 +471,18 @@ internal class ChromePhotosHttpsProxy(
                     originalBytes.addAndGet(sanitized.inputBytes.toLong())
                     deliveredBytes.addAndGet(result.bytesWritten)
                     recordDecision(sanitized)
+                    if (coverageToken != null) {
+                        if (response.statusCode in RedirectCodes) {
+                            coverageLedger.recordRedirect(coverageToken, response.statusCode, sanitized.location)
+                        } else {
+                            coverageLedger.recordInspected(
+                                token = coverageToken,
+                                statusCode = response.statusCode,
+                                declaredContentType = response.headers.firstValue("Content-Type"),
+                                response = sanitized,
+                            )
+                        }
+                    }
                     logRealResponse(host, request, clientProtocol, response, sanitized, result, started)
                 } else {
                     val streamingResponse =
@@ -460,6 +505,7 @@ internal class ChromePhotosHttpsProxy(
             request.successDisposition()
         } catch (error: Throwable) {
             failures.incrementAndGet()
+            if (coverageToken != null) coverageLedger.recordFailure(coverageToken, error.javaClass.simpleName)
             val errorResponseWritten =
                 !responseStarted &&
                     runCatching { writePlainError(output, 502, "Upstream unavailable") }.isSuccess

@@ -120,6 +120,8 @@ class ChromePhotosRealResponseSanitizerTest {
             assertContentEquals(placeholder, result.bytes)
             assertEquals(200, result.statusCode)
         }
+        assertEquals(sha256(html), declared.observedBodyDigest)
+        assertNull(partial.observedBodyDigest)
     }
 
     @Test

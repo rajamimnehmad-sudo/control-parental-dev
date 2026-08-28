@@ -64,6 +64,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         when (intent?.action) {
             ActionStop -> stopLab()
             ActionStatus -> logStatus()
+            ActionAuditMark -> markCoverageState(intent)
             else -> startLab(intent)
         }
         return START_NOT_STICKY
@@ -117,6 +118,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                     bootstrapController.ensureInitialReset()
                     val sessionId = UUID.randomUUID().toString()
                     currentSessionId = sessionId
+                    val coverageLedger =
+                        ChromeRealWebProvenanceLedger { message -> Log.i(CoverageLogTag, message) }
+                            .also { ledger -> ledger.beginSession(sessionId) }
                     ChromePhotosDataPlaneRuntimeAttestation.beginSession(sessionId)
                     guardSession =
                         guardClient.openSession(
@@ -182,6 +186,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             onFixtureHeartbeat = ::markFixtureHeartbeat,
                             onFatalFailure = ::markFailClosed,
                             transformer = transformer,
+                            coverageLedger = coverageLedger,
                         )
                     proxy = startedProxy
                     startedProxy.start()
@@ -273,6 +278,17 @@ class ChromePhotosDataPlaneLabService : Service() {
                 .commit()
             Log.i(LogTag, "phase=presentation_ready fixture=visible heartbeat=fresh failSafe=armed")
         }
+    }
+
+    private fun markCoverageState(intent: Intent) {
+        val label = intent.getStringExtra(ExtraAuditStateLabel).orEmpty()
+        val newNavigation = intent.getBooleanExtra(ExtraAuditNewNavigation, false)
+        val state = runCatching { proxy?.markCoverageState(label, newNavigation) }.getOrNull()
+        Log.i(
+            CoverageLogTag,
+            "audit17 event=mark_result accepted=${state != null} state=${state ?: 0} " +
+                "newNavigation=$newNavigation",
+        )
     }
 
     private fun markFailClosed(reason: String) {
@@ -434,6 +450,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         val decisions = metrics.decisionSession
         val images = metrics.imageAuthority
         val bootstrap = bootstrapController.state()
+        val coverage = proxy?.coverageSnapshot()
         Log.i(
             LogTag,
             "phase=status lifecycle=${lifecycle.current()} active=${preferences.getBoolean(
@@ -472,7 +489,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "bootstrapResetCount=${bootstrap.resetCount} " +
                 "chromeSuspended=${bootstrapController.isChromeSuspended()} " +
                 "guardSession=${guardSession?.protectionGeneration ?: 0L} " +
-                "guardHeartbeatSequence=${guardSession?.heartbeatSequence ?: 0L}",
+                "guardHeartbeatSequence=${guardSession?.heartbeatSequence ?: 0L} " +
+                "audit17State=${coverage?.stateSequence ?: 0L} " +
+                "audit17Navigation=${coverage?.navigationSequence ?: 0L} " +
+                "audit17Events=${coverage?.events?.size ?: 0} " +
+                "audit17Dropped=${coverage?.droppedEvents ?: 0L}",
         )
     }
 
@@ -520,10 +541,14 @@ class ChromePhotosDataPlaneLabService : Service() {
         const val ActionStart = "com.contentfilter.user.chromedataplane.START"
         const val ActionStop = "com.contentfilter.user.chromedataplane.STOP"
         const val ActionStatus = "com.contentfilter.user.chromedataplane.STATUS"
+        const val ActionAuditMark = "com.contentfilter.user.chromedataplane.AUDIT_MARK"
+        const val ExtraAuditStateLabel = "chrome_coverage_audit_state_label"
+        const val ExtraAuditNewNavigation = "chrome_coverage_audit_new_navigation"
         const val LogTag = "ChromePhotosDataPlane"
 
         private const val NotificationChannelId = "chrome_photos_data_plane_dev"
         private const val NotificationId = 18_742
+        private const val CoverageLogTag = "ChromeCoverageAudit17"
         private const val FingerprintLogLength = 16
         private const val SessionLogLength = 8
         private const val MaxFailureLength = 80

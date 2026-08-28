@@ -91,6 +91,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                 -> ChromePhotosDataPlaneLabService.ActionStart
                 ActionStop -> ChromePhotosDataPlaneLabService.ActionStop
                 ActionStatus -> ChromePhotosDataPlaneLabService.ActionStatus
+                ActionAuditMark -> ChromePhotosDataPlaneLabService.ActionAuditMark
                 else -> return
             }
         val serviceIntent = Intent(context, ChromePhotosDataPlaneLabService::class.java).setAction(serviceAction)
@@ -111,6 +112,17 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                     intent.getBooleanExtra(ExtraFullTunnelDevGateEnabled, false),
                 )
         }
+        if (intent.action == ActionAuditMark) {
+            serviceIntent
+                .putExtra(
+                    ChromePhotosDataPlaneLabService.ExtraAuditStateLabel,
+                    intent.getStringExtra(ExtraAuditStateLabel),
+                )
+                .putExtra(
+                    ChromePhotosDataPlaneLabService.ExtraAuditNewNavigation,
+                    intent.getBooleanExtra(ExtraAuditNewNavigation, false),
+                )
+        }
         ContextCompat.startForegroundService(context, serviceIntent)
     }
 
@@ -118,6 +130,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ActionStart = "com.contentfilter.user.chromedataplane.command.START"
         const val ActionStop = "com.contentfilter.user.chromedataplane.command.STOP"
         const val ActionStatus = "com.contentfilter.user.chromedataplane.command.STATUS"
+        const val ActionAuditMark = "com.contentfilter.user.chromedataplane.command.AUDIT_MARK"
         const val ActionTransportStatus = "com.contentfilter.user.chromedataplane.command.TRANSPORT_STATUS"
         const val ActionTransportStress = "com.contentfilter.user.chromedataplane.command.TRANSPORT_STRESS"
         const val ActionFullTunnelStart = "com.contentfilter.user.chromedataplane.command.FULL_TUNNEL_START"
@@ -128,6 +141,8 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ActionGuardStatus = "com.contentfilter.user.chromedataplane.command.GUARD_STATUS"
         const val ActionPrepareUpdate = "com.contentfilter.user.chromedataplane.command.PREPARE_UPDATE"
         const val ExtraSurfaceMarkerEnabled = "chrome_photos_surface_marker_enabled"
+        const val ExtraAuditStateLabel = "chrome_coverage_audit_state_label"
+        const val ExtraAuditNewNavigation = "chrome_coverage_audit_new_navigation"
         const val ExtraTransportStressCycles = "transport_stress_cycles"
         const val ExtraUdpFixtureGateEnabled = ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled
         const val ExtraUdpFixtureAddress = ChromePhotosDataPlaneLabContract.KeyUdpFixtureAddress

@@ -12,6 +12,7 @@ internal data class ChromePhotosSanitizedResponse(
     val cacheHit: Boolean,
     val contentHash: String?,
     val inputBytes: Int,
+    val observedBodyDigest: String? = null,
     val decisionResult: ChromePhotoDecisionResult? = null,
 ) {
     val contentType: String?
@@ -68,7 +69,12 @@ internal class ChromePhotosRealResponseSanitizer(
             if (bounded.exceeded) return@withBodyAdmission placeholderUnknown(upstream, ImageByteLimitReason)
             when (val resolution = imageAuthority.resolve(candidate, bounded.bytes)) {
                 is ChromeImageContentResolution.Reject ->
-                    placeholderUnknown(upstream, resolution.reason, bounded.bytes.size)
+                    placeholderUnknown(
+                        upstream = upstream,
+                        reason = resolution.reason,
+                        inputBytes = bounded.bytes.size,
+                        observedBodyDigest = sha256(bounded.bytes),
+                    )
                 is ChromeImageContentResolution.Inspect -> {
                     val transformed =
                         transformer.transform(
@@ -163,6 +169,7 @@ internal class ChromePhotosRealResponseSanitizer(
             cacheHit = transformed.cacheHit,
             contentHash = transformed.contentHash,
             inputBytes = inputBytes,
+            observedBodyDigest = transformed.contentHash,
             decisionResult = transformed.decisionResult,
         )
     }
@@ -171,6 +178,7 @@ internal class ChromePhotosRealResponseSanitizer(
         upstream: ChromePhotosUpstreamResponse,
         reason: String,
         inputBytes: Int = 0,
+        observedBodyDigest: String? = null,
     ) =
         ChromePhotosSanitizedResponse(
             statusCode = 200,
@@ -181,6 +189,7 @@ internal class ChromePhotosRealResponseSanitizer(
             cacheHit = false,
             contentHash = null,
             inputBytes = inputBytes,
+            observedBodyDigest = observedBodyDigest,
             decisionResult =
                 ChromePhotoDecisionResult(
                     decision = ChromePhotoDecision.Unknown,
