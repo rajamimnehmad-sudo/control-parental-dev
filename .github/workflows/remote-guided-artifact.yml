@@ -7,6 +7,8 @@ on:
       - work/remote-samsung-bubble-stable-signing-13-chatgpt
       - work/remote-pin-only-19-chatgpt
       - review/remote-pin-only-19-final
+      - work/remote-device-owner-provision-20-chatgpt-fix
+      - review/remote-device-owner-provision-20-final
     paths:
       - "tools/glosh-remote-spike/**"
       - ".github/workflows/remote-guided-artifact.yml"
@@ -51,7 +53,7 @@ jobs:
         with:
           name: GloshRemote-PIN-ONLY-19-${{ github.sha }}
           path: |
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-PIN-ONLY-19-DEV.apk
-            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-PIN-ONLY-19-report.txt
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/GloshRemote-MAINTENANCE-20-DEV.apk
+            tools/glosh-remote-spike/app/build/outputs/apk/debug/REMOTE-MAINTENANCE-20-report.txt
           if-no-files-found: error
           retention-days: 14
