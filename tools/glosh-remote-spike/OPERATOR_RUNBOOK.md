@@ -211,12 +211,17 @@ Quick Tunnel nuevos.
 4. guarda el staging en cache privada y sincroniza el archivo;
 5. exige tamaño completo y SHA-256 exacto;
 6. valida package `com.contentfilter.user.dev`, el
-   `ProtectionDeviceAdminReceiver`, un único firmante actual, SHA del certificado
-   y `versionCode`;
+   `ProtectionDeviceAdminReceiver` y que exista un único firmante actual;
+   registra el SHA de ese certificado y el `versionCode` como evidencia staged;
 7. exige confirmación del operador ligada al SHA staged;
-8. `owner-commit` vuelve a validar elegibilidad, instala con
-   `pm install -r -S`, verifica receiver y firmante instalados y recién después
-   puede emitir `dpm set-device-owner`.
+8. `owner-commit` vuelve a validar elegibilidad, exige que el firmante confirmado
+   coincida con el staged, instala con `pm install -r -S`, verifica receiver y
+   continuidad del firmante instalado y recién después puede emitir
+   `dpm set-device-owner`.
+
+DEV35 no fija todavía una allowlist de SHA del firmante ni una versión mínima/
+exacta en el provisioning. Antes de `provision`, el operador debe verificar por
+una fuente confiable el origen, versión y SHA del APK que pretende instalar.
 
 Al cerrar o cancelar, el staging activo se descarta.
 

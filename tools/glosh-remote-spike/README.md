@@ -93,14 +93,20 @@ mínimo para demostrar que ADB realmente sigue operativo.
 1. ejecuta `owner-preflight` y aborta si no es elegible;
 2. transfiere la APK en chunks con offset y tamaño acotados;
 3. verifica tamaño total y SHA-256;
-4. valida package de Glosh DEV, DeviceAdminReceiver, firmante único y SHA del
-   certificado;
+4. valida package de Glosh DEV y DeviceAdminReceiver, exige un único firmante y
+   registra el SHA de ese certificado junto con el `versionCode` del artefacto
+   staged;
 5. exige confirmación humana ligada al SHA y comprueba que el firmante enviado
    coincida con el firmante staged;
 6. `owner-commit` vuelve a ejecutar el preflight, instala con ADB streaming,
    verifica la app instalada y sólo entonces puede emitir
    `dpm set-device-owner`;
 7. confirma que Glosh quedó efectivamente como Device Owner.
+
+DEV35 garantiza continuidad del firmante entre el artefacto staged y la app
+instalada, pero todavía no compara el SHA del firmante ni el `versionCode`
+contra una allowlist/version fija de confianza. Por eso el operador debe
+verificar origen, versión y SHA del APK concreto antes de `provision`.
 
 `owner-preflight` y `owner-commit` son operaciones distintas. Nunca debe
 ejecutarse el commit con un preflight no elegible ni borrarse cuentas
