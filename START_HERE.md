@@ -12,6 +12,8 @@ Los documentos históricos no pueden contradecir estas fuentes.
 
 Si Central y GitHub/evidencia parecen discrepar, no elegir una fuente por reflejo: determinar qué dato quedó atrasado, reconciliar Central y recién después continuar con escritura.
 
+Las ramas son punteros mutables. Toda identidad canónica o congelada debe registrar el SHA completo; ver `docs/GLOSH_CANON_BRANCH_BOUNDARIES.md` para las anclas reconciliadas y sus límites de evidencia.
+
 ## Preflight obligatorio de código
 
 Antes de modificar código o preparar un ticket Codex que implique escritura:
