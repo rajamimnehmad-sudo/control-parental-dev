@@ -1,0 +1,186 @@
+{
+  "schemaVersion": 1,
+  "captureResolution": [1080, 2408],
+  "measurement": "Manual tight media rectangles on A23 screenshots; browser/site chrome and non-media skeletons excluded. Screenshots were RAM/temporary lab artifacts and are identified only by SHA-256.",
+  "classificationPolicy": "No stock-Chrome browser-side request/body-to-visible-instance identity exists. Temporal/order/count similarity is insufficient, so every real-web media instance remains ATTRIBUTION_UNKNOWN.",
+  "states": [
+    {
+      "id": "fravega_listing_warm",
+      "screenshotSha256": "403d34a434960ee4dcd7aed9cf7e9fc09c91e187d567d1d9a235e5fb5cfe1641",
+      "visible": [
+        {"id":"product-left","bounds":[70,860,370,360],"visibleAreaPx":133200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"visible product/placeholder instance lacks exact request/body/correlation binding"},
+        {"id":"product-center","bounds":[580,880,220,340],"visibleAreaPx":74800,"coverage":"ATTRIBUTION_UNKNOWN","reason":"visible product instance lacks exact request/body/correlation binding"},
+        {"id":"product-right-partial","bounds":[945,860,135,360],"visibleAreaPx":48600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"visible product/placeholder instance lacks exact request/body/correlation binding"}
+      ]
+    },
+    {
+      "id": "fravega_scroll_lazy",
+      "screenshotSha256": "c7e2bf0b734bdaed9fb5eba2eee58125b9fa7d47372db1d2b68110156718d768",
+      "visible": [
+        {"id":"product-1","bounds":[45,1020,335,350],"visibleAreaPx":117250,"coverage":"ATTRIBUTION_UNKNOWN","reason":"visible lazy-loaded product/placeholder instance lacks exact binding"},
+        {"id":"product-2","bounds":[45,1770,335,330],"visibleAreaPx":110550,"coverage":"ATTRIBUTION_UNKNOWN","reason":"visible lazy-loaded product/placeholder instance lacks exact binding"}
+      ]
+    },
+    {
+      "id": "fravega_product_detail",
+      "screenshotSha256": "3773804162d5306982f88bc1c0ab0c66c5f4b2c668b79f3aea326fb530e413b1",
+      "visible": [
+        {"id":"hero-product","bounds":[285,580,505,760],"visibleAreaPx":383800,"coverage":"ATTRIBUTION_UNKNOWN","reason":"visible detail image lacks exact binding to inspected body"}
+      ]
+    },
+    {
+      "id": "fravega_back",
+      "screenshotSha256": "d0da0ff59b303b58c9c093e3c3afead2c218d780cc25ee1b53abcfecb6b0256c",
+      "visible": [
+        {"id":"product-1","bounds":[45,1020,335,350],"visibleAreaPx":117250,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation visible instance lacks exact binding"},
+        {"id":"product-2","bounds":[45,1770,335,330],"visibleAreaPx":110550,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation visible instance lacks exact binding"}
+      ]
+    },
+    {
+      "id": "fravega_second_visit",
+      "screenshotSha256": "e34f705b9a3d1add19ef6bcfdba0db7ed5af9c839f3a825bb33c6b638f89cd29",
+      "visible": [
+        {"id":"product-left","bounds":[70,860,370,360],"visibleAreaPx":133200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"warm visible instance lacks exact binding to ledger"},
+        {"id":"product-center","bounds":[580,880,220,340],"visibleAreaPx":74800,"coverage":"ATTRIBUTION_UNKNOWN","reason":"warm visible instance lacks exact binding to ledger"},
+        {"id":"product-right-partial","bounds":[945,860,135,360],"visibleAreaPx":48600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"warm visible instance lacks exact binding to ledger"}
+      ]
+    },
+    {
+      "id": "google_images_grid_cold",
+      "screenshotSha256": "d3991cd60b5448cacb0812a386d0c295bd2da5fa9b5fd275f3bd5941c43eac43",
+      "visible": [
+        {"id":"tile-1","bounds":[12,820,520,280],"visibleAreaPx":145600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"grid tile lacks browser-side visible-instance binding"},
+        {"id":"tile-2","bounds":[545,820,520,290],"visibleAreaPx":150800,"coverage":"ATTRIBUTION_UNKNOWN","reason":"grid tile lacks browser-side visible-instance binding"},
+        {"id":"tile-3","bounds":[12,1240,520,710],"visibleAreaPx":369200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"grid tile lacks browser-side visible-instance binding"},
+        {"id":"tile-4","bounds":[545,1255,520,315],"visibleAreaPx":163800,"coverage":"ATTRIBUTION_UNKNOWN","reason":"grid tile lacks browser-side visible-instance binding"},
+        {"id":"tile-5","bounds":[545,1725,520,260],"visibleAreaPx":135200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"grid tile lacks browser-side visible-instance binding"},
+        {"id":"tile-6-partial","bounds":[12,2080,520,260],"visibleAreaPx":135200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"grid tile lacks browser-side visible-instance binding"}
+      ]
+    },
+    {
+      "id": "google_images_reload_warm",
+      "screenshotSha256": "98e712e6924bc863a49181c22aa08ff6c4a3dee100a3cae5e72f6666301fbc11",
+      "visible": [
+        {"id":"tile-rendered","bounds":[545,1725,520,250],"visibleAreaPx":130000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"warm-cache visible tile lacks exact ledger binding"},
+        {"id":"tile-bottom-partial","bounds":[12,2080,520,260],"visibleAreaPx":135200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"warm-cache visible tile lacks exact ledger binding"}
+      ]
+    },
+    {
+      "id": "google_images_scroll",
+      "screenshotSha256": "4118e079635775fbfab6bb7707fabaecbdeae672267a2df687bb4fb5fdc9e1d5",
+      "visible": [
+        {"id":"tile-1","bounds":[12,505,520,270],"visibleAreaPx":140400,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled grid tile lacks exact binding"},
+        {"id":"tile-2","bounds":[12,925,520,275],"visibleAreaPx":143000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled grid tile lacks exact binding"},
+        {"id":"tile-3","bounds":[12,1345,520,300],"visibleAreaPx":156000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled grid tile lacks exact binding"},
+        {"id":"tile-4","bounds":[545,1450,520,380],"visibleAreaPx":197600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled grid tile lacks exact binding"},
+        {"id":"tile-5","bounds":[12,1775,520,285],"visibleAreaPx":148200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled grid tile lacks exact binding"},
+        {"id":"related-1","bounds":[560,640,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-2","bounds":[560,840,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-3","bounds":[560,1040,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-4","bounds":[560,1240,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"}
+      ]
+    },
+    {
+      "id": "google_images_preview",
+      "screenshotSha256": "06963bb9fb7b64b963677b4bad626b766134c982c35b55c7e6b9f2f7a4d3eecf",
+      "visible": [
+        {"id":"preview","bounds":[0,365,1080,600],"visibleAreaPx":648000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"preview has no exact body/request-to-visible binding"}
+      ]
+    },
+    {
+      "id": "google_images_back",
+      "screenshotSha256": "cb14b1e6f969c67701127ad0f6aa3e74a14737866d50c15e52d2299442ef39b7",
+      "visible": [
+        {"id":"tile-1","bounds":[12,925,520,280],"visibleAreaPx":145600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation tile lacks exact binding"},
+        {"id":"tile-2","bounds":[12,1345,520,290],"visibleAreaPx":150800,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation tile lacks exact binding"},
+        {"id":"tile-3","bounds":[12,1770,520,300],"visibleAreaPx":156000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation tile lacks exact binding"},
+        {"id":"tile-4-partial","bounds":[12,2250,520,158],"visibleAreaPx":82160,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation tile lacks exact binding"},
+        {"id":"tile-5","bounds":[545,1450,520,370],"visibleAreaPx":192400,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation tile lacks exact binding"},
+        {"id":"tile-6","bounds":[545,1980,520,330],"visibleAreaPx":171600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"back-navigation tile lacks exact binding"},
+        {"id":"related-1","bounds":[560,640,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-2","bounds":[560,840,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-3","bounds":[560,1040,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-4","bounds":[560,1240,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"}
+      ]
+    },
+    {
+      "id": "google_images_second_visit",
+      "screenshotSha256": "59e7c2f94c80ed84b74cbb28161f77a1eedfe743d6354a061db9796a7306a240",
+      "visible": [
+        {"id":"sponsored-1","bounds":[110,970,390,500],"visibleAreaPx":195000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"sponsored product image lacks exact binding"},
+        {"id":"sponsored-2","bounds":[575,970,390,500],"visibleAreaPx":195000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"sponsored product image lacks exact binding"},
+        {"id":"tile-1-partial","bounds":[12,2040,520,350],"visibleAreaPx":182000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"second-visit tile lacks exact binding"},
+        {"id":"tile-2-partial","bounds":[545,2040,520,350],"visibleAreaPx":182000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"second-visit tile lacks exact binding"}
+      ]
+    },
+    {
+      "id": "google_images_woman_query",
+      "screenshotSha256": "68fdcbecb35a217f4921c58eeffc88def80b37da4d35de065d2057fc0cace632",
+      "visible": [
+        {"id":"result-1-placeholder","bounds":[12,825,520,515],"visibleAreaPx":267800,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but not exactly bound 1:1 to a blocked request"},
+        {"id":"result-2-placeholder","bounds":[545,825,520,800],"visibleAreaPx":416000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but not exactly bound 1:1 to a blocked request"},
+        {"id":"result-3-placeholder","bounds":[12,1475,520,300],"visibleAreaPx":156000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but not exactly bound 1:1 to a blocked request"},
+        {"id":"result-4-placeholder","bounds":[545,1750,520,400],"visibleAreaPx":208000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but not exactly bound 1:1 to a blocked request"},
+        {"id":"result-5-placeholder-partial","bounds":[12,1900,520,430],"visibleAreaPx":223600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but not exactly bound 1:1 to a blocked request"}
+      ]
+    },
+    {
+      "id": "google_images_woman_scroll",
+      "screenshotSha256": "d69ad81888c2f5a42c490dbf87e28f132b99e5cf13887ea43df70a7580a97402",
+      "visible": [
+        {"id":"result-1-placeholder","bounds":[12,210,520,760],"visibleAreaPx":395200,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but lacks exact blocked-request binding"},
+        {"id":"result-2-placeholder","bounds":[545,210,520,300],"visibleAreaPx":156000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but lacks exact blocked-request binding"},
+        {"id":"result-3-placeholder","bounds":[545,650,520,600],"visibleAreaPx":312000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but lacks exact blocked-request binding"},
+        {"id":"result-4-placeholder","bounds":[545,1500,520,350],"visibleAreaPx":182000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but lacks exact blocked-request binding"},
+        {"id":"result-5-placeholder-partial","bounds":[545,2060,520,300],"visibleAreaPx":156000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"placeholder is observable but lacks exact blocked-request binding"},
+        {"id":"result-6-original-partial","bounds":[12,2030,520,378],"visibleAreaPx":196560,"coverage":"ATTRIBUTION_UNKNOWN","reason":"visible original woman photo lacks exact inspected-body binding and is an observed residual"},
+        {"id":"related-1","bounds":[32,1260,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-2","bounds":[32,1460,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-3","bounds":[32,1660,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"},
+        {"id":"related-4","bounds":[32,1860,150,150],"visibleAreaPx":22500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"related-search thumbnail lacks exact binding"}
+      ]
+    },
+    {
+      "id": "cetrogar_listing_cold",
+      "screenshotSha256": "1e3513125d5bf45b198d3f885e3eb0362a0db1cb39415ad13e3bec4879a94927",
+      "visible": []
+    },
+    {
+      "id": "cetrogar_second_visit",
+      "screenshotSha256": "7c6464cb5c011b1c1a336df3df987a5137c0bafd9f087ee966db60607ce63bd8",
+      "visible": [
+        {"id":"hero-banner","bounds":[0,750,1080,650],"visibleAreaPx":702000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"warm hero media lacks exact inspected-body binding"},
+        {"id":"category-1","bounds":[50,1740,240,240],"visibleAreaPx":57600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"category image lacks exact binding"},
+        {"id":"category-2","bounds":[365,1740,240,240],"visibleAreaPx":57600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"category image lacks exact binding"},
+        {"id":"category-3","bounds":[680,1740,240,240],"visibleAreaPx":57600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"category image lacks exact binding"},
+        {"id":"category-4-partial","bounds":[990,1740,90,240],"visibleAreaPx":21600,"coverage":"ATTRIBUTION_UNKNOWN","reason":"category image lacks exact binding"}
+      ]
+    },
+    {
+      "id": "cetrogar_scroll_lazy",
+      "screenshotSha256": "39f8fdd85cf0e9370485836d834a15ed2a8c916994447b0474f85d341443404d",
+      "visible": [
+        {"id":"category-1-partial","bounds":[50,220,230,200],"visibleAreaPx":46000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled category image lacks exact binding"},
+        {"id":"category-2-partial","bounds":[365,220,230,200],"visibleAreaPx":46000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled category image lacks exact binding"},
+        {"id":"category-3-partial","bounds":[680,220,230,200],"visibleAreaPx":46000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled category image lacks exact binding"},
+        {"id":"category-4-partial","bounds":[990,220,90,200],"visibleAreaPx":18000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"scrolled category image lacks exact binding"},
+        {"id":"product-1","bounds":[90,890,420,450],"visibleAreaPx":189000,"coverage":"ATTRIBUTION_UNKNOWN","reason":"lazy-loaded product image lacks exact binding"},
+        {"id":"product-2-partial","bounds":[760,900,320,420],"visibleAreaPx":134400,"coverage":"ATTRIBUTION_UNKNOWN","reason":"lazy-loaded product image lacks exact binding"}
+      ]
+    },
+    {
+      "id": "cetrogar_product_detail",
+      "screenshotSha256": "b22d75ca271ce6a4b423bfac46af92d930568e0a1f217601579c4bbc2dea636f",
+      "visible": [
+        {"id":"hero-product","bounds":[205,930,670,850],"visibleAreaPx":569500,"coverage":"ATTRIBUTION_UNKNOWN","reason":"detail image lacks exact inspected-body binding"}
+      ]
+    },
+    {
+      "id": "clarin_home_editorial",
+      "screenshotSha256": "92b9bc6bcab04e0fb8eef7daf52a10b2ac42888588182761c04ec08a8bbcfb72",
+      "visible": [
+        {"id":"lead-photo","bounds":[37,917,1005,1015],"visibleAreaPx":1020075,"coverage":"ATTRIBUTION_UNKNOWN","reason":"editorial photo lacks exact request/body-to-visible binding"}
+      ]
+    }
+  ]
+}
