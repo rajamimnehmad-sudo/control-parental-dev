@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from h19_plan import HarnessError
+from h19_device import ce_data_inode_from_package_dump
 from run_a23_gate import (
     enforce_counter_gate,
     exit_info_delta,
@@ -48,6 +49,17 @@ class FakeProcessRestartAdb:
 
 
 class H19RunnerTest(unittest.TestCase):
+    def test_ce_data_inode_uses_package_manager_for_non_debuggable_dev(self):
+        package_dump = (
+            "Packages:\n"
+            "  Package [com.contentfilter.user.dev]\n"
+            "    User 0: ceDataInode=1239519 installed=true hidden=false\n"
+        )
+
+        self.assertEqual("1239519", ce_data_inode_from_package_dump(package_dump))
+        with self.assertRaises(HarnessError):
+            ce_data_inode_from_package_dump("User 0: installed=true")
+
     def test_only_aggregate_logcat_summary_is_persisted(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

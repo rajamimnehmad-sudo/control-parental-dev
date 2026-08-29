@@ -36,6 +36,7 @@ from h19_device import (
     CONTROLLED_URL,
     Adb,
     collect_preflight,
+    ce_data_inode,
     exit_info,
     exit_info_delta,
     filtered_device_policy,
@@ -713,7 +714,7 @@ def main() -> int:
             package: exit_info_delta(preflight["exitInfo"][package], post_exit[package])
             for package in ("app", "chrome")
         }
-        post_inode = adb.shell("run-as", APP_PACKAGE, "stat", "-c", "%i", ".", check=False).strip()
+        post_inode = ce_data_inode(adb)
         post_policy_summary = filtered_device_policy(post_policy)
         rollback_invariants = {
             "ceDataInodePreserved": post_inode == preflight["ceDataInode"],

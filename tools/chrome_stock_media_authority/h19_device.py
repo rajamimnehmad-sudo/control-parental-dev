@@ -96,6 +96,17 @@ def package_info(adb: Adb, package_name: str) -> dict[str, str]:
     }
 
 
+def ce_data_inode_from_package_dump(value: str) -> str:
+    match = re.search(r"\bUser\s+0:\s+ceDataInode=(\d+)\b", value)
+    if not match:
+        raise HarnessError("cannot establish the app ceDataInode from PackageManager")
+    return match.group(1)
+
+
+def ce_data_inode(adb: Adb) -> str:
+    return ce_data_inode_from_package_dump(adb.shell("dumpsys", "package", APP_PACKAGE))
+
+
 def filtered_device_policy(value: str) -> dict[str, Any]:
     selected = []
     for line in value.splitlines():
@@ -135,7 +146,7 @@ def collect_preflight(adb: Adb, expected_model: str, expected_sdk: int) -> dict[
     accessibility = adb.shell("settings", "get", "secure", "enabled_accessibility_services", check=False).strip()
     accessibility_dump = adb.shell("dumpsys", "accessibility", check=False, timeout=60)
     policy = adb.shell("dumpsys", "device_policy", check=False, timeout=90)
-    inode = adb.shell("run-as", APP_PACKAGE, "stat", "-c", "%i", ".", check=False).strip()
+    inode = ce_data_inode(adb)
     service_dump = adb.shell("dumpsys", "activity", "services", APP_PACKAGE, check=False)
     if "ChromePhotosDataPlaneLabService" in service_dump:
         raise HarnessError("H19 service is already active; refuse to overwrite an existing lab session")
