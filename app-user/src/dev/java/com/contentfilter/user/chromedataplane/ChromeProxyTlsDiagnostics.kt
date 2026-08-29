@@ -1,7 +1,10 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
+import java.security.MessageDigest
 import java.util.Collections
 import java.util.IdentityHashMap
+import java.util.Locale
 import javax.net.ssl.SSLException
 import javax.net.ssl.SSLHandshakeException
 
@@ -33,9 +36,13 @@ internal data class ChromeProxyTlsFailure(
             append(" side=${context.side.logValue}")
             append(" stage=${context.stage}")
             append(" correlationId=${context.correlationId}")
-            append(" host=${context.host}")
-            append(" authority=${context.authority}")
-            append(" sni=${context.sni ?: SniNotObserved}")
+            append(" hostClass=${ChromeProxyLogPrivacy.hostClass(context.host)}")
+            append(" hostHash=${ChromeProxyLogPrivacy.digest(context.host)}")
+            append(" authorityHash=${ChromeProxyLogPrivacy.digest(context.authority)}")
+            append(
+                " sniHash=" +
+                    (context.sni?.let(ChromeProxyLogPrivacy::digest) ?: SniNotObserved),
+            )
             append(" error=$errorClass")
             append(" rootCause=$rootCauseClass")
             append(" causeChain=$causeChain")
@@ -44,6 +51,21 @@ internal data class ChromeProxyTlsFailure(
     private companion object {
         const val SniNotObserved = "not_observed"
     }
+}
+
+/** Keeps request destinations out of DEV logs while retaining stable correlation evidence. */
+internal object ChromeProxyLogPrivacy {
+    fun digest(value: String): String =
+        MessageDigest
+            .getInstance("SHA-256")
+            .digest(value.lowercase(Locale.US).toByteArray(Charsets.UTF_8))
+            .joinToString("") { byte -> "%02x".format(byte) }
+            .take(DigestLogLength)
+
+    fun hostClass(host: String): String =
+        if (host == ChromePhotosDataPlaneLabContract.FixtureHost) "fixture" else "network"
+
+    private const val DigestLogLength = 16
 }
 
 /**

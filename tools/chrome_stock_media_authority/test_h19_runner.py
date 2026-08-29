@@ -1,0 +1,167 @@
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from h19_plan import HarnessError
+from run_a23_gate import (
+    enforce_counter_gate,
+    exit_info_delta,
+    restart_glosh_phase,
+    set_and_verify_orientation,
+    wait_for_fixture_report,
+    wait_for_ready,
+    write_logcat_summary,
+)
+
+
+class FakeRotationAdb:
+    def __init__(self) -> None:
+        self.rotation = 0
+        self.calls: list[tuple[str, ...]] = []
+
+    def shell(self, *args, **_kwargs):
+        self.calls.append(tuple(args))
+        if args[:4] == ("settings", "put", "system", "user_rotation"):
+            self.rotation = int(args[4])
+        if args[:2] == ("dumpsys", "input"):
+            return f"SurfaceOrientation: {self.rotation}\n"
+        return ""
+
+
+class FakeProcessRestartAdb:
+    def __init__(self) -> None:
+        self.pid_calls = 0
+        self.broadcasts: list[str] = []
+
+    def shell(self, *args, **_kwargs):
+        if args[:2] == ("pidof", "com.contentfilter.user.dev"):
+            self.pid_calls += 1
+            return "101" if self.pid_calls == 1 else "202"
+        if args[:3] == ("dumpsys", "activity", "services"):
+            return ""
+        return ""
+
+    def broadcast(self, action, _extras=None):
+        self.broadcasts.append(action)
+        return ""
+
+
+class H19RunnerTest(unittest.TestCase):
+    def test_only_aggregate_logcat_summary_is_persisted(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "logcat-summary.json"
+            write_logcat_summary(output, {"lineCount": 1, "sha256": "a" * 64})
+
+            self.assertTrue(output.is_file())
+            self.assertFalse((root / "logcat.txt").exists())
+            self.assertNotIn("http", output.read_text())
+
+            with self.assertRaises(HarnessError):
+                write_logcat_summary(
+                    output,
+                    {"unsafe": "ActivityTaskManager START dat=https://shop.example/private"},
+                )
+
+    def test_glosh_restart_uses_exact_kill_and_requires_fresh_session(self):
+        adb = FakeProcessRestartAdb()
+        before = {"activeMode": {"session": "old-session"}}
+        after = {"activeMode": {"session": "new-session"}}
+        with (
+            patch("run_a23_gate.request_status", return_value=("", before)),
+            patch("run_a23_gate.start_phase", return_value=after) as start,
+        ):
+            evidence, active = restart_glosh_phase(adb, "replace-all", "since", timeout_seconds=5)
+
+        self.assertEqual(after, active)
+        self.assertTrue(evidence["performed"])
+        self.assertEqual(
+            ["com.contentfilter.user.chromedataplane.command.MAIN_PROCESS_KILL"],
+            adb.broadcasts,
+        )
+        self.assertEqual("old-session", start.call_args.kwargs["previous_session"])
+
+    def test_orientation_is_verified_before_state_recording(self):
+        adb = FakeRotationAdb()
+
+        result = set_and_verify_orientation(adb, "landscape", timeout_seconds=1)
+
+        self.assertTrue(result["verified"])
+        self.assertEqual(1, result["observedRotation"])
+
+    def test_exit_info_is_gated_as_pre_post_delta(self):
+        before = {"reasons": {"crash": 4, "anr": 2, "lowMemory": 1}}
+        after = {"reasons": {"crash": 4, "anr": 3, "lowMemory": 1}}
+
+        self.assertEqual(
+            {"crash": 0, "anr": 1, "lowMemory": 0},
+            exit_info_delta(before, after),
+        )
+
+    def test_counter_gate_rejects_raw_replace_all_and_security_failures(self):
+        healthy = {
+            "networkVisualRawBlockedDelivered": 0,
+            "networkVisualRawUnknownDelivered": 0,
+            "proxyQueueRejects": 0,
+            "protectFailure": 0,
+            "quicAttempts": 0,
+            "directTcpAttempts": 0,
+            "networkVisualRawDelivered": 0,
+        }
+        enforce_counter_gate("replace-all", healthy, {key: 0 for key in healthy})
+
+        with self.assertRaises(HarnessError):
+            enforce_counter_gate("replace-all", {**healthy, "networkVisualRawDelivered": 1}, {})
+        with self.assertRaises(HarnessError):
+            enforce_counter_gate("selective", {**healthy, "protectFailure": 1}, {})
+
+    def test_post_gesture_ready_requires_new_marker_not_prior_release(self):
+        previous = {
+            "package": "com.android.chrome",
+            "lifecycle": "7",
+            "tokenSha256": "old",
+        }
+        stale_ui = {"readyMarkers": [previous]}
+        fresh = {**previous, "lifecycle": "8", "tokenSha256": "fresh"}
+        status = {
+            "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
+            "readyPhases": {"ready_foreground_released": 1},
+        }
+        with (
+            patch("run_a23_gate.accessibility_summary", side_effect=[stale_ui, {"readyMarkers": [fresh]}]),
+            patch("run_a23_gate.request_status", side_effect=[("", status), ("", status)]),
+            patch("run_a23_gate.time.sleep"),
+        ):
+            result = wait_for_ready(
+                object(),
+                "since",
+                timeout_seconds=1,
+                minimum_release_count=1,
+                previous_marker=previous,
+            )
+
+        self.assertEqual("fresh", result["marker"]["tokenSha256"])
+        self.assertEqual(2, result["attempts"])
+
+    def test_controlled_gate_requires_report_counts_to_advance(self):
+        stale = {"fixtureReport": {"pass": True, "counts": {"reports": 1, "frame_reports": 1}}}
+        fresh = {"fixtureReport": {"pass": True, "counts": {"reports": 2, "frame_reports": 2}}}
+        with (
+            patch("run_a23_gate.request_status", side_effect=[("stale", stale), ("fresh", fresh)]),
+            patch("run_a23_gate.time.sleep"),
+        ):
+            log, summary = wait_for_fixture_report(
+                object(),
+                "since",
+                timeout_seconds=1,
+                minimum_reports=1,
+                minimum_frame_reports=1,
+            )
+
+        self.assertEqual("fresh", log)
+        self.assertEqual(2, summary["fixtureReport"]["counts"]["reports"])
+
+
+if __name__ == "__main__":
+    unittest.main()

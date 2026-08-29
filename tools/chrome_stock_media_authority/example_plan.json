@@ -1,0 +1,48 @@
+{
+  "schema": "glosh-h19-a23-plan-v1",
+  "expectedModel": "SM-A235M",
+  "expectedSdk": 34,
+  "expectedAppVersionCode": 382,
+  "minimumChromeMajor": 146,
+  "samplingFps": 4,
+  "startupTimeoutSeconds": 90,
+  "keepExtractedFrames": false,
+  "phases": [
+    {
+      "id": "replace-all-controlled",
+      "mode": "replace-all",
+      "states": [
+        {
+          "id": "replace-controlled-portrait",
+          "navigation": "controlled",
+          "newNavigation": true,
+          "orientation": "portrait",
+          "recordSeconds": 24,
+          "swipes": 2
+        },
+        {
+          "id": "replace-controlled-landscape",
+          "navigation": "controlled",
+          "newNavigation": true,
+          "orientation": "landscape",
+          "recordSeconds": 22,
+          "swipes": 1
+        }
+      ]
+    },
+    {
+      "id": "selective-controlled",
+      "mode": "selective",
+      "states": [
+        {
+          "id": "selective-controlled-portrait",
+          "navigation": "controlled",
+          "newNavigation": true,
+          "orientation": "portrait",
+          "recordSeconds": 24,
+          "swipes": 2
+        }
+      ]
+    }
+  ]
+}

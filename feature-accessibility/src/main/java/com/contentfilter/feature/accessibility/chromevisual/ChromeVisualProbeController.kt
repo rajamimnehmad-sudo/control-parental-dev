@@ -49,6 +49,20 @@ internal class ChromeVisualProbeController(
     private var lastArmedEpoch = 0L
     private var activeLease: ChromePhotosDataPlaneLease? = null
     private val leaseWatchdog = Runnable(::verifyLeaseOnMain)
+    private val mediaReadyCoordinator =
+        if (enabled) {
+            ChromeMediaShieldReadyPresentationCoordinator(
+                service = service,
+                state = state,
+                surface = surface,
+                windowInspector = windowInspector,
+                tokenScanner = ChromeMediaShieldAccessibilityTokenScanner(),
+                attestationReader = attestationReader,
+                onLegacyWorkCancelled = ::cancelLegacyWorkForReady,
+            )
+        } else {
+            null
+        }
 
     @Volatile
     private var lastUnderlaySignature: Long? = null
@@ -74,15 +88,32 @@ internal class ChromeVisualProbeController(
         }
     }
 
+    fun onAccessibilityUnavailable() {
+        if (!enabled) return
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            mediaReadyCoordinator?.revokePresentation("accessibility_unavailable", forgetClaim = true)
+            deactivateOnMain("accessibility_unavailable")
+        } else {
+            service.mainExecutor.execute {
+                mediaReadyCoordinator?.revokePresentation("accessibility_unavailable", forgetClaim = true)
+                deactivateOnMain("accessibility_unavailable")
+            }
+        }
+    }
+
     override fun close() {
         synchronized(jobLock) {
             activeJob?.cancel()
             activeJob = null
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
+            mediaReadyCoordinator?.close()
             deactivateOnMain("service_closed")
         } else {
-            service.mainExecutor.execute { deactivateOnMain("service_closed") }
+            service.mainExecutor.execute {
+                mediaReadyCoordinator?.close()
+                deactivateOnMain("service_closed")
+            }
         }
     }
 
@@ -124,14 +155,35 @@ internal class ChromeVisualProbeController(
             !current.isActive ||
                 current.windowId != window.id ||
                 current.viewport != viewport
+        if (!contextChanged && chromeEvent) {
+            mediaReadyCoordinator?.onAccessibilityEvent()
+        }
+        val verifiedDataPlanePresentation =
+            !contextChanged && hasVerifiedDataPlanePresentation(current, viewport, window)
+        if (
+            !verifiedDataPlanePresentation &&
+            !contextChanged &&
+            chromeEvent &&
+            signal.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+        ) {
+            if (
+                mediaReadyCoordinator?.isAwaitingCurrentMarker(
+                    snapshot = current,
+                    viewport = viewport,
+                    windowId = window.id,
+                ) == true
+            ) {
+                logPresentation("awaiting_foreground_marker", current, "TYPE_WINDOW_CONTENT_CHANGED")
+                return
+            }
+        }
         val presentationAction =
             ChromePhotosPresentationIndependencePolicy.decide(
                 contextChanged = contextChanged,
                 chromeEvent = chromeEvent,
                 eventType = signal.eventType,
                 contentChangeTypes = signal.contentChangeTypes,
-                verifiedDataPlanePresentation =
-                    !contextChanged && hasVerifiedDataPlanePresentation(current, viewport),
+                verifiedDataPlanePresentation = verifiedDataPlanePresentation,
             )
         if (presentationAction == ChromePhotosPresentationAction.Ignore) return
         val trigger = ChromePhotosProtectedSurfaceEventPolicy.label(signal.eventType)
@@ -149,6 +201,13 @@ internal class ChromeVisualProbeController(
             } else {
                 state.invalidate(window.id, viewport, motion)
             }
+        val retainCurrentDocument =
+            current.isActive &&
+                current.windowId == window.id &&
+                current.viewport != viewport
+        mediaReadyCoordinator
+            ?.takeIf { attestationReader.read().mediaAuthorityEnabled && it.hasCurrentClaim() }
+            ?.prepareCoveredSnapshot(snapshot, retainCurrentDocument)
         when (
             surface.cover(window.id, viewport, snapshot.epoch) {
                 onOpaqueCommitted(snapshot, trigger, motion)
@@ -174,6 +233,7 @@ internal class ChromeVisualProbeController(
             service.mainExecutor.execute(::onHostPublicationChanged)
             return
         }
+        if (mediaReadyCoordinator?.onHostPublicationChanged() == true) return
         val snapshot = state.snapshot()
         val viewport = snapshot.viewport ?: return
         if (!snapshot.isActive) return
@@ -322,6 +382,7 @@ internal class ChromeVisualProbeController(
             activeJob = null
         }
         val wasActive = state.snapshot().isActive || surface.stats().attached
+        mediaReadyCoordinator?.revokePresentation(reason, forgetClaim = true)
         revokeLeaseOnMain(reason)
         state.disarm()
         surface.close()
@@ -330,6 +391,18 @@ internal class ChromeVisualProbeController(
         pendingMotion = false
         lastArmedEpoch = 0L
         if (wasActive) Log.i(LogTag, "phase=disarm reason=$reason rawPresented=false result=success")
+    }
+
+    private fun cancelLegacyWorkForReady() {
+        synchronized(jobLock) {
+            activeJob?.cancel()
+            activeJob = null
+        }
+        mainHandler.removeCallbacks(leaseWatchdog)
+        activeLease = null
+        leaseAuthority.revoke()
+        pendingTrigger = null
+        pendingMotion = false
     }
 
     private fun onOpaqueCommitted(
@@ -351,8 +424,13 @@ internal class ChromeVisualProbeController(
         ) {
             return
         }
-        val leaseContext = snapshot.toLeaseContext(viewport)
         val attestation = attestationReader.read()
+        if (attestation.mediaAuthorityEnabled) {
+            mediaReadyCoordinator?.onOpaqueCommitted(snapshot)
+            finishArming(snapshot, trigger)
+            return
+        }
+        val leaseContext = snapshot.toLeaseContext(viewport, foregroundDocument = null)
         val lease = leaseAuthority.mint(attestation, leaseContext)
         if (lease == null || !leaseAuthority.isValid(lease, attestationReader.read(), leaseContext)) {
             mainHandler.removeCallbacks(leaseWatchdog)
@@ -360,7 +438,39 @@ internal class ChromeVisualProbeController(
             leaseAuthority.revoke()
             surface.revokeTransparency()
             logLease("denied", snapshot, "attestation_invalid")
-            completeOpaqueCommit(snapshot, trigger, motion, verifiedDataPlanePresentation = false)
+            completeOpaqueCommit(
+                snapshot,
+                trigger,
+                motion,
+                verifiedDataPlanePresentation = false,
+                dataPlaneOnly = attestation.mediaAuthorityEnabled,
+            )
+            return
+        }
+        val releaseSnapshot = state.snapshot()
+        val releaseAttestation = attestationReader.read()
+        val releaseContext =
+            snapshot.toLeaseContext(
+                viewport,
+                foregroundDocument = null,
+            )
+        if (
+            releaseSnapshot != snapshot ||
+            releaseContext != leaseContext ||
+            !leaseAuthority.isValid(lease, releaseAttestation, releaseContext)
+        ) {
+            mainHandler.removeCallbacks(leaseWatchdog)
+            activeLease = null
+            leaseAuthority.revoke()
+            surface.revokeTransparency()
+            logLease("denied", snapshot, "release_boundary_changed")
+            completeOpaqueCommit(
+                snapshot,
+                trigger,
+                motion,
+                verifiedDataPlanePresentation = false,
+                dataPlaneOnly = releaseAttestation.mediaAuthorityEnabled,
+            )
             return
         }
         if (!surface.presentTransparent(lease)) {
@@ -369,11 +479,23 @@ internal class ChromeVisualProbeController(
             leaseAuthority.revoke()
             surface.revokeTransparency()
             logLease("denied", snapshot, "surface_rejected")
-            completeOpaqueCommit(snapshot, trigger, motion, verifiedDataPlanePresentation = false)
+            completeOpaqueCommit(
+                snapshot,
+                trigger,
+                motion,
+                verifiedDataPlanePresentation = false,
+                dataPlaneOnly = attestation.mediaAuthorityEnabled,
+            )
             return
         }
         activeLease = lease
-        completeOpaqueCommit(snapshot, trigger, motion, verifiedDataPlanePresentation = true)
+        completeOpaqueCommit(
+            snapshot,
+            trigger,
+            motion,
+            verifiedDataPlanePresentation = true,
+            dataPlaneOnly = attestation.mediaAuthorityEnabled,
+        )
     }
 
     private fun completeOpaqueCommit(
@@ -381,8 +503,18 @@ internal class ChromeVisualProbeController(
         trigger: String,
         motion: Boolean,
         verifiedDataPlanePresentation: Boolean,
+        dataPlaneOnly: Boolean,
     ) {
+        if (dataPlaneOnly && !verifiedDataPlanePresentation) {
+            synchronized(jobLock) {
+                activeJob?.cancel()
+                activeJob = null
+            }
+            logLease("waiting", snapshot, "foreground_ready_absent")
+            return
+        }
         if (
+            !dataPlaneOnly &&
             ChromePhotosPresentationIndependencePolicy.captureRequiredAfterOpaqueCommit(
                 verifiedDataPlanePresentation,
             )
@@ -401,6 +533,7 @@ internal class ChromeVisualProbeController(
     }
 
     private fun verifyLeaseOnMain() {
+        if (attestationReader.read().mediaAuthorityEnabled) return
         val lease = activeLease ?: return
         val snapshot = state.snapshot()
         val viewport = snapshot.viewport
@@ -408,8 +541,8 @@ internal class ChromeVisualProbeController(
             revokeLeaseOnMain("context_absent")
             return
         }
-        val context = snapshot.toLeaseContext(viewport)
         val attestation = attestationReader.read()
+        val context = snapshot.toLeaseContext(viewport, foregroundDocument = null)
         if (!leaseAuthority.isValid(lease, attestation, context)) {
             revokeLeaseOnMain("expired_or_unhealthy")
             return
@@ -433,17 +566,30 @@ internal class ChromeVisualProbeController(
     private fun hasVerifiedDataPlanePresentation(
         snapshot: ChromePhotosProtectedSurfaceSnapshot,
         viewport: ChromeVisualViewport,
+        window: android.view.accessibility.AccessibilityWindowInfo,
     ): Boolean {
+        val attestation = attestationReader.read()
+        if (attestation.mediaAuthorityEnabled) {
+            return mediaReadyCoordinator?.hasVerifiedPresentation(
+                snapshot = snapshot,
+                viewport = viewport,
+                windowId = window.id,
+            ) == true
+        }
         val lease = activeLease ?: return false
         if (!surface.stats().transparent) return false
         return leaseAuthority.isValid(
             lease,
-            attestationReader.read(),
-            snapshot.toLeaseContext(viewport),
+            attestation,
+            snapshot.toLeaseContext(
+                viewport,
+                foregroundDocument = null,
+            ),
         )
     }
 
     private fun revokeLeaseOnMain(reason: String) {
+        mediaReadyCoordinator?.revokePresentation(reason)
         mainHandler.removeCallbacks(leaseWatchdog)
         val lease = activeLease
         val wasTransparent = surface.stats().transparent
@@ -456,13 +602,18 @@ internal class ChromeVisualProbeController(
         }
     }
 
-    private fun ChromePhotosProtectedSurfaceSnapshot.toLeaseContext(currentViewport: ChromeVisualViewport) =
-        ChromePhotosDataPlaneLeaseContext(
+    private fun ChromePhotosProtectedSurfaceSnapshot.toLeaseContext(
+        currentViewport: ChromeVisualViewport,
+        foregroundDocument: ChromeMediaShieldForegroundDocument?,
+    ): ChromePhotosDataPlaneLeaseContext {
+        return ChromePhotosDataPlaneLeaseContext(
             packageName = ChromePackageName,
             windowId = windowId,
             epoch = epoch,
             viewport = currentViewport,
+            foregroundDocument = foregroundDocument,
         )
+    }
 
     private fun logLease(
         action: String,

@@ -24,7 +24,9 @@ internal class VpnTransportPolicy(
         owner: VpnConnectionOwnerResult,
     ): VpnTransportAction {
         if (flow.remoteAddress.port == DnsPort) return VpnTransportAction.ExistingDnsPath
-        if (owner !is VpnConnectionOwnerResult.Resolved) return VpnTransportAction.DropUnknownOwner
+        if (owner !is VpnConnectionOwnerResult.Resolved || owner.packages.isEmpty()) {
+            return VpnTransportAction.DropUnknownOwner
+        }
         if (chromePackage in owner.packages) {
             val normalized = flow.remoteAddress.address.hostAddress.orEmpty().substringBefore('%')
             if (

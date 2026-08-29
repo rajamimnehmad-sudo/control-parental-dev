@@ -171,15 +171,63 @@ class ChromePhotosRealResponseSanitizerTest {
 
     @Test
     fun `redirect preserves real status and permits dynamic HTTPS cross host only`() {
-        val allowed = sanitizer.sanitizeRedirect(redirect("https://new-public.example/path", 308))
+        val allowed =
+            sanitizer.sanitizeRedirect(
+                redirect(
+                    "https://new-public.example/path",
+                    308,
+                    extraHeaders =
+                        listOf(
+                            ChromeHttpHeader("Alt-Svc", "h3=\":443\""),
+                            ChromeHttpHeader("X-Content-Type-Options", "sniff"),
+                            ChromeHttpHeader("x-content-type-options", "hostile"),
+                        ),
+                ),
+            )
         val relative = sanitizer.sanitizeRedirect(redirect("/next", 307))
         val downgrade = sanitizer.sanitizeRedirect(redirect("http://example.com/", 302))
+        val duplicate =
+            sanitizer.sanitizeRedirect(
+                redirect(
+                    "/first",
+                    302,
+                    extraHeaders = listOf(ChromeHttpHeader("LOCATION", "https://example.com/second")),
+                ),
+            )
+        val injected = sanitizer.sanitizeRedirect(redirect("/next\r\nLocation: https://evil.example", 302))
+        val connectionNamed =
+            sanitizer.sanitizeRedirect(
+                redirect(
+                    "/next",
+                    302,
+                    extraHeaders = listOf(ChromeHttpHeader("Connection", "Location")),
+                ),
+            )
 
         assertEquals(308, allowed.statusCode)
         assertEquals("https://new-public.example/path", allowed.location)
+        assertEquals(1, allowed.headers.count { it.name.equals("Location", ignoreCase = true) })
+        assertEquals("no-store", allowed.headers.firstValue("Cache-Control"))
+        assertEquals("nosniff", allowed.headers.firstValue("X-Content-Type-Options"))
+        assertEquals(1, allowed.headers.count { it.name.equals("X-Content-Type-Options", ignoreCase = true) })
+        assertFalse(allowed.headers.any { it.name.equals("Alt-Svc", ignoreCase = true) })
         assertEquals("/next", relative.location)
         assertEquals(502, downgrade.statusCode)
         assertNull(downgrade.location)
+        assertEquals(502, duplicate.statusCode)
+        assertNull(duplicate.location)
+        assertEquals(502, injected.statusCode)
+        assertNull(injected.location)
+        assertEquals(502, connectionNamed.statusCode)
+        assertNull(connectionNamed.location)
+        listOf(downgrade, duplicate, injected, connectionNamed).forEach { blockedRedirect ->
+            assertEquals(
+                listOf("nosniff"),
+                blockedRedirect.headers
+                    .filter { it.name.equals("X-Content-Type-Options", true) }
+                    .map(ChromeHttpHeader::value),
+            )
+        }
     }
 
     @Test
@@ -193,6 +241,9 @@ class ChromePhotosRealResponseSanitizerTest {
                 ChromeHttpHeader("Set-Cookie", "b=2; SameSite=Lax"),
                 ChromeHttpHeader("Content-Security-Policy", "default-src 'self'"),
                 ChromeHttpHeader("Access-Control-Allow-Origin", "https://example.com"),
+                ChromeHttpHeader("Alt-Svc", "h3=\":443\"; ma=86400"),
+                ChromeHttpHeader("X-Content-Type-Options", "sniff"),
+                ChromeHttpHeader("x-content-type-options", "nosniff, hostile"),
             )
         val filtered = ChromeHttpHeaderPolicy.downstreamResponseHeaders(headers)
 
@@ -200,6 +251,11 @@ class ChromePhotosRealResponseSanitizerTest {
         assertTrue(filtered.any { it.name == "Content-Security-Policy" })
         assertTrue(filtered.any { it.name == "Access-Control-Allow-Origin" })
         assertFalse(filtered.any { it.name.equals("Connection", true) || it.name == "X-Private-Hop" })
+        assertFalse(filtered.any { it.name.equals("Alt-Svc", true) })
+        assertEquals(
+            listOf("nosniff"),
+            filtered.filter { it.name.equals("X-Content-Type-Options", true) }.map(ChromeHttpHeader::value),
+        )
     }
 
     private fun upstream(
@@ -225,6 +281,7 @@ class ChromePhotosRealResponseSanitizerTest {
     private fun redirect(
         location: String,
         statusCode: Int,
+        extraHeaders: List<ChromeHttpHeader> = emptyList(),
     ) = ChromePhotosUpstreamResponse(
         host = "source.example",
         statusCode = statusCode,
@@ -233,7 +290,7 @@ class ChromePhotosRealResponseSanitizerTest {
             listOf(
                 ChromeHttpHeader("Location", location),
                 ChromeHttpHeader("Cache-Control", "max-age=10"),
-            ),
+            ) + extraHeaders,
         body = ByteArray(0).inputStream(),
         bodyLength = 0,
         protocol = "h2",

@@ -1,5 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentAuthorityRegistry
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,8 +34,30 @@ class ChromePhotosDataPlaneLifecycleTest {
     @Test
     fun `Chrome policy is scoped to fixed loopback proxy`() {
         assertEquals(
-            """{"ProxyMode":"fixed_servers","ProxyServer":"127.0.0.1:8877","ProxyBypassList":""}""",
+            """{"ProxyMode":"fixed_servers","ProxyServer":"127.0.0.1:8877","ProxyBypassList":"<-loopback>"}""",
             ChromePhotosChromePolicy.proxySettingsJson(),
         )
+    }
+
+    @Test
+    fun `terminal startup cleanup removes document and runtime authority`() {
+        ChromePhotosDataPlaneRuntimeAttestation.beginSession(
+            sessionId = "h19-cleanup-session",
+            mediaAuthorityEnabled = true,
+            mediaPolicyEpoch = 19L,
+        )
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession("h19-cleanup-session", 19L)
+        ChromeMediaShieldDocumentAuthorityRegistry.issue(
+            sessionId = "h19-cleanup-session",
+            epoch = 19L,
+            readyToken = "abcdefghijklmnopqrstuv",
+            topLevel = true,
+        )
+
+        clearChromePhotosDataPlaneAuthorityState()
+
+        assertEquals("", ChromePhotosDataPlaneRuntimeAttestation.snapshot().sessionId)
+        assertEquals(0, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().issuedDocuments)
+        assertEquals("", ChromeMediaShieldDocumentAuthorityRegistry.snapshot().protectionSessionId)
     }
 }

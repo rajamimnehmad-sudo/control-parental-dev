@@ -151,19 +151,48 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
         context: Context,
         enabled: Boolean,
     ): Boolean {
-        if (!context.packageName.endsWith(".dev")) return false
-        val sessionId =
+        val preferences =
             context.getSharedPreferences(
                 ChromePhotosDataPlaneLabContract.PreferencesName,
                 Context.MODE_PRIVATE,
-            ).getString(ChromePhotosDataPlaneLabContract.KeySessionId, "").orEmpty()
-        if (enabled && (!isActive(context) || sessionId.isBlank())) return false
+            )
+        val sessionId =
+            preferences.getString(ChromePhotosDataPlaneLabContract.KeySessionId, "").orEmpty()
+        if (
+            !canSetFullTunnelDevGate(
+                devBuild = context.packageName.endsWith(".dev"),
+                active = isActive(context),
+                stockMediaAuthorityEnabled =
+                    preferences.getBoolean(
+                        ChromePhotosDataPlaneLabContract.KeyStockMediaAuthorityEnabled,
+                        false,
+                    ),
+                sessionId = sessionId,
+                enabled = enabled,
+            )
+        ) {
+            return false
+        }
         return context.getSharedPreferences(FullTunnelPreferencesName, Context.MODE_PRIVATE)
             .edit()
             .putBoolean(FullTunnelEnabledKey, enabled)
             .putString(FullTunnelSessionKey, if (enabled) sessionId else "")
             .commit()
     }
+
+    fun canSetFullTunnelDevGate(
+        devBuild: Boolean,
+        active: Boolean,
+        stockMediaAuthorityEnabled: Boolean,
+        sessionId: String,
+        enabled: Boolean,
+    ): Boolean =
+        devBuild &&
+            if (enabled) {
+                active && sessionId.isNotBlank()
+            } else {
+                !active || !stockMediaAuthorityEnabled
+            }
 
     fun fullTunnelRoutes(enabled: Boolean): List<ChromePhotosLabVpnRoute> =
         if (enabled) {
@@ -194,11 +223,20 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
         active: Boolean,
         sessionId: String,
         established: Boolean,
-    ): Boolean = active && sessionId.isNotBlank() && established
+        requiresFullTunnel: Boolean = false,
+        fullTunnelApplied: Boolean = false,
+        chromePackageAdmitted: Boolean = false,
+    ): Boolean =
+        active &&
+            sessionId.isNotBlank() &&
+            established &&
+            (!requiresFullTunnel || (fullTunnelApplied && chromePackageAdmitted))
 
     fun markTunnelState(
         context: Context,
         established: Boolean,
+        fullTunnelApplied: Boolean = false,
+        chromePackageAdmitted: Boolean = false,
     ) {
         val preferences =
             context.getSharedPreferences(
@@ -206,7 +244,19 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
                 Context.MODE_PRIVATE,
             )
         val sessionId = preferences.getString(ChromePhotosDataPlaneLabContract.KeySessionId, null).orEmpty()
-        val confirmed = isTunnelConfirmed(isActive(context), sessionId, established)
+        val confirmed =
+            isTunnelConfirmed(
+                active = isActive(context),
+                sessionId = sessionId,
+                established = established,
+                requiresFullTunnel =
+                    preferences.getBoolean(
+                        ChromePhotosDataPlaneLabContract.KeyStockMediaAuthorityEnabled,
+                        false,
+                    ),
+                fullTunnelApplied = fullTunnelApplied,
+                chromePackageAdmitted = chromePackageAdmitted,
+            )
         preferences.edit()
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyVpnConfirmed, confirmed)
             .putString(
@@ -219,7 +269,8 @@ internal object ChromePhotosDataPlaneLabVpnPolicy {
             Log.i(
                 LogTag,
                 "vpnAttestation=${if (confirmed) "confirmed" else "revoked"} " +
-                    "session=${sessionId.take(SessionLogLength)}",
+                    "session=${sessionId.take(SessionLogLength)} fullTunnelApplied=$fullTunnelApplied " +
+                    "chromePackageAdmitted=$chromePackageAdmitted",
             )
         }
     }

@@ -13,7 +13,10 @@ class ChromeProxyTlsDiagnosticsTest {
     @Test
     fun `handshake failure is classifiable without logging exception messages`() {
         val rootCause = CertificateException("sensitive-certificate-detail")
-        val handshake = SSLHandshakeException("private-user-url=https://secret.example/path").apply { initCause(rootCause) }
+        val handshake =
+            SSLHandshakeException(
+                "private-user-url=https://secret.example/path",
+            ).apply { initCause(rootCause) }
         val wrapper = IOException("request metadata must not be logged").apply { initCause(handshake) }
         val context =
             ChromeProxyTlsContext(
@@ -34,9 +37,11 @@ class ChromeProxyTlsDiagnosticsTest {
         assertTrue(line.contains("side=upstream"))
         assertTrue(line.contains("stage=handshake"))
         assertTrue(line.contains("correlationId=c42-r7"))
-        assertTrue(line.contains("host=example.com"))
-        assertTrue(line.contains("authority=example.com:443"))
-        assertTrue(line.contains("sni=example.com"))
+        assertTrue(line.contains("hostClass=network"))
+        assertTrue(line.contains("hostHash=${ChromeProxyLogPrivacy.digest("example.com")}"))
+        assertTrue(line.contains("authorityHash=${ChromeProxyLogPrivacy.digest("example.com:443")}"))
+        assertTrue(line.contains("sniHash=${ChromeProxyLogPrivacy.digest("example.com")}"))
+        assertFalse(line.contains("example.com"))
         assertTrue(line.contains("causeChain=IOException>SSLHandshakeException>CertificateException"))
         assertFalse(line.contains("sensitive-certificate-detail"))
         assertFalse(line.contains("secret.example"))
@@ -62,7 +67,7 @@ class ChromeProxyTlsDiagnosticsTest {
 
         assertTrue(line.contains("side=client"))
         assertTrue(line.contains("correlationId=c8"))
-        assertTrue(line.contains("sni=not_observed"))
+        assertTrue(line.contains("sniHash=not_observed"))
         assertFalse(line.contains("do not log this"))
     }
 

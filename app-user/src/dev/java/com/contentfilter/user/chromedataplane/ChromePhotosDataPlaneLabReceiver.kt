@@ -115,6 +115,10 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                     ExtraReplaceAllNetworkVisuals,
                     intent.getBooleanExtra(ExtraReplaceAllNetworkVisuals, false),
                 )
+                .putExtra(
+                    ExtraStockMediaAuthorityEnabled,
+                    intent.getBooleanExtra(ExtraStockMediaAuthorityEnabled, false),
+                )
         }
         if (intent.action == ActionAuditMark) {
             serviceIntent
@@ -155,6 +159,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
             ChromePhotosDataPlaneLabContract.KeyUdpFixtureMalformedProbeEnabled
         const val ExtraFullTunnelDevGateEnabled = "full_tunnel_dev_gate_enabled"
         const val ExtraReplaceAllNetworkVisuals = "replace_all_network_visuals"
+        const val ExtraStockMediaAuthorityEnabled = ChromePhotosDataPlaneLabContract.KeyStockMediaAuthorityEnabled
         private const val DefaultTransportStressCycles = 100
     }
 }

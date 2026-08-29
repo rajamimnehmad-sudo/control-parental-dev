@@ -36,6 +36,17 @@ internal class ChromeVisualWindowInspector(
             ?: candidates.firstOrNull().takeIf { allowBehindInputMethod }
     }
 
+    /** Fail-closed foreground selection for H19 READY authority; no arbitrary first-window fallback. */
+    fun findUniqueForeground(): AccessibilityWindowInfo? {
+        val candidates =
+            service.windows.filter { window ->
+                window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                    window.root?.packageName?.toString() == ChromePackageName &&
+                    (window.isActive || window.isFocused)
+            }
+        return candidates.singleOrNull()
+    }
+
     fun inputMethodTop(): Int? =
         service.windows
             .asSequence()

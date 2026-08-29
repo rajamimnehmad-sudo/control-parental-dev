@@ -50,6 +50,66 @@ class VpnConnectionOwnerResolverTest {
     }
 
     @Test
+    fun `null package lookup remains unknown and is not cached`() {
+        var packageLookups = 0
+        val resolver =
+            VpnConnectionOwnerResolver(
+                ownerLookup = ConnectionOwnerLookup { 10_321 },
+                packageLookup =
+                    UidPackageLookup {
+                        packageLookups += 1
+                        null
+                    },
+            )
+
+        repeat(2) {
+            assertEquals(VpnConnectionOwnerResult.Unknown, resolver.resolve(flow(VpnTransportProtocol.Tcp)))
+        }
+        assertEquals(2, packageLookups)
+        assertEquals(0, resolver.cachedUidCount())
+    }
+
+    @Test
+    fun `package lookup exception remains unknown and is not cached`() {
+        var packageLookups = 0
+        val resolver =
+            VpnConnectionOwnerResolver(
+                ownerLookup = ConnectionOwnerLookup { 10_322 },
+                packageLookup =
+                    UidPackageLookup {
+                        packageLookups += 1
+                        throw IllegalStateException("package manager unavailable")
+                    },
+            )
+
+        repeat(2) {
+            assertEquals(VpnConnectionOwnerResult.Unknown, resolver.resolve(flow(VpnTransportProtocol.Tcp)))
+        }
+        assertEquals(2, packageLookups)
+        assertEquals(0, resolver.cachedUidCount())
+    }
+
+    @Test
+    fun `empty package lookup remains unknown and is not cached`() {
+        var packageLookups = 0
+        val resolver =
+            VpnConnectionOwnerResolver(
+                ownerLookup = ConnectionOwnerLookup { 10_323 },
+                packageLookup =
+                    UidPackageLookup {
+                        packageLookups += 1
+                        emptyList()
+                    },
+            )
+
+        repeat(2) {
+            assertEquals(VpnConnectionOwnerResult.Unknown, resolver.resolve(flow(VpnTransportProtocol.Tcp)))
+        }
+        assertEquals(2, packageLookups)
+        assertEquals(0, resolver.cachedUidCount())
+    }
+
+    @Test
     fun `package cache is bounded and avoids duplicate package resolution`() {
         var packageLookups = 0
         var owner = 1

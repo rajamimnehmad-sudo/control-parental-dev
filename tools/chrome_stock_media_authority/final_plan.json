@@ -1,0 +1,72 @@
+{
+  "schema": "glosh-h19-a23-plan-v1",
+  "expectedModel": "SM-A235M",
+  "expectedSdk": 34,
+  "expectedAppVersionCode": 382,
+  "minimumChromeMajor": 146,
+  "samplingFps": 4,
+  "startupTimeoutSeconds": 120,
+  "keepExtractedFrames": false,
+  "phases": [
+    {
+      "id": "replace-all-final",
+      "mode": "replace-all",
+      "states": [
+        {"id": "ra-controlled-portrait", "navigation": "controlled", "newNavigation": true, "orientation": "portrait", "recordSeconds": 30, "readyTimeoutSeconds": 8, "fixtureTimeoutSeconds": 12, "swipes": 3},
+        {"id": "ra-controlled-landscape", "navigation": "controlled", "newNavigation": true, "orientation": "landscape", "recordSeconds": 28, "readyTimeoutSeconds": 8, "fixtureTimeoutSeconds": 12, "swipes": 2},
+        {"id": "ra-google-mujer-cold", "url": "https://www.google.com/search?udm=2&q=mujer&safe=active", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
+        {"id": "ra-google-preview", "navigation": "foreground", "newNavigation": false, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8, "taps": [{"xPermille": 500, "yPermille": 520}]},
+        {"id": "ra-google-back", "navigation": "back", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "ra-google-forward", "navigation": "forward", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "ra-google-reload", "navigation": "reload", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "ra-google-landscape", "navigation": "foreground", "newNavigation": false, "orientation": "landscape", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "ra-google-background-foreground", "navigation": "background-foreground", "newNavigation": false, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "ra-fravega-list", "url": "https://www.fravega.com/l/?keyword=heladera", "newNavigation": true, "orientation": "portrait", "recordSeconds": 13, "readyTimeoutSeconds": 8, "swipes": 2},
+        {"id": "ra-fravega-detail", "navigation": "foreground", "newNavigation": true, "postGestureReadyRequired": true, "orientation": "portrait", "recordSeconds": 20, "readyTimeoutSeconds": 8, "taps": [{"xPermille": 500, "yPermille": 590}]},
+        {"id": "ra-fravega-back", "navigation": "back", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "ra-fravega-reload", "navigation": "reload", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "ra-fravega-landscape", "navigation": "foreground", "newNavigation": false, "orientation": "landscape", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "ra-mimo-list", "url": "https://www.mimo.com.ar/", "newNavigation": true, "orientation": "portrait", "recordSeconds": 13, "readyTimeoutSeconds": 8, "swipes": 2},
+        {"id": "ra-mimo-detail", "navigation": "foreground", "newNavigation": true, "postGestureReadyRequired": true, "orientation": "portrait", "recordSeconds": 20, "readyTimeoutSeconds": 8, "taps": [{"xPermille": 500, "yPermille": 600}]},
+        {"id": "ra-mimo-back", "navigation": "back", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "ra-mimo-reload", "navigation": "reload", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "ra-mimo-landscape", "navigation": "foreground", "newNavigation": false, "orientation": "landscape", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "ra-mercadolibre", "url": "https://listado.mercadolibre.com.ar/zapatillas-mujer", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
+        {"id": "ra-infobae", "url": "https://www.infobae.com/", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
+        {"id": "ra-glosh-process-restart", "navigation": "restart-glosh", "newNavigation": true, "orientation": "portrait", "recordSeconds": 45, "readyTimeoutSeconds": 18, "processRestartTimeoutSeconds": 25},
+        {"id": "ra-chrome-process-restart", "navigation": "restart-chrome", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8},
+        {"id": "ra-chrome-policy", "navigation": "chrome-policy", "newNavigation": true, "readyRequired": false, "readyTimeoutSeconds": 0, "visualReviewRequired": true, "orientation": "portrait", "recordSeconds": 10, "swipes": 3}
+      ]
+    },
+    {
+      "id": "selective-final",
+      "mode": "selective",
+      "states": [
+        {"id": "sel-controlled-portrait", "navigation": "controlled", "newNavigation": true, "orientation": "portrait", "recordSeconds": 30, "readyTimeoutSeconds": 8, "fixtureTimeoutSeconds": 12, "swipes": 3},
+        {"id": "sel-controlled-landscape", "navigation": "controlled", "newNavigation": true, "orientation": "landscape", "recordSeconds": 28, "readyTimeoutSeconds": 8, "fixtureTimeoutSeconds": 12, "swipes": 2},
+        {"id": "sel-google-mujer-cold", "url": "https://www.google.com/search?udm=2&q=mujer&safe=active", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
+        {"id": "sel-google-preview", "navigation": "foreground", "newNavigation": false, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8, "taps": [{"xPermille": 500, "yPermille": 520}]},
+        {"id": "sel-google-back", "navigation": "back", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "sel-google-forward", "navigation": "forward", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "sel-google-reload", "navigation": "reload", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "sel-google-landscape", "navigation": "foreground", "newNavigation": false, "orientation": "landscape", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "sel-google-background-foreground", "navigation": "background-foreground", "newNavigation": false, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "sel-fravega-list", "url": "https://www.fravega.com/l/?keyword=heladera", "newNavigation": true, "orientation": "portrait", "recordSeconds": 13, "readyTimeoutSeconds": 8, "swipes": 2},
+        {"id": "sel-fravega-detail", "navigation": "foreground", "newNavigation": true, "postGestureReadyRequired": true, "orientation": "portrait", "recordSeconds": 20, "readyTimeoutSeconds": 8, "taps": [{"xPermille": 500, "yPermille": 590}]},
+        {"id": "sel-fravega-back", "navigation": "back", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "sel-fravega-forward", "navigation": "forward", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "sel-fravega-reload", "navigation": "reload", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "sel-fravega-landscape", "navigation": "foreground", "newNavigation": false, "orientation": "landscape", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "sel-mimo-list", "url": "https://www.mimo.com.ar/", "newNavigation": true, "orientation": "portrait", "recordSeconds": 13, "readyTimeoutSeconds": 8, "swipes": 2},
+        {"id": "sel-mimo-detail", "navigation": "foreground", "newNavigation": true, "postGestureReadyRequired": true, "orientation": "portrait", "recordSeconds": 20, "readyTimeoutSeconds": 8, "taps": [{"xPermille": 500, "yPermille": 600}]},
+        {"id": "sel-mimo-back", "navigation": "back", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "sel-mimo-forward", "navigation": "forward", "newNavigation": true, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8},
+        {"id": "sel-mimo-reload", "navigation": "reload", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "sel-mimo-landscape", "navigation": "foreground", "newNavigation": false, "orientation": "landscape", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
+        {"id": "sel-mercadolibre", "url": "https://listado.mercadolibre.com.ar/zapatillas-mujer", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
+        {"id": "sel-infobae", "url": "https://www.infobae.com/", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
+        {"id": "sel-chrome-process-restart", "navigation": "restart-chrome", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8}
+      ]
+    }
+  ]
+}

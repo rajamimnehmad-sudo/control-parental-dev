@@ -89,6 +89,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        chromeVisualShieldController?.close()
+        chromeVisualProbeController?.close()
+        chromeVisualController?.close()
+        serviceScope?.cancel()
         ChromePhotosDataPlaneRuntimeAttestation.markAccessibilityBound(true)
         val scope = CoroutineScope(SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
         serviceScope = scope
@@ -254,6 +258,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+        ChromePhotosDataPlaneRuntimeAttestation.markAccessibilityBound(false)
+        chromeVisualProbeController?.onAccessibilityUnavailable()
         chromeVisualShieldController?.onAccessibilityUnavailable()
         serviceScope?.launch { telemetryReporter.recordServiceState("Accessibility service interrupted.") }
     }

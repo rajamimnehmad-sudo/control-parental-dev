@@ -18,6 +18,8 @@ internal data class ChromePhotosDataPlaneAttestation(
     val heartbeatElapsed: Long,
     val validUntilElapsed: Long,
     val accessibilityBound: Boolean = false,
+    val mediaAuthorityEnabled: Boolean = false,
+    val mediaPolicyEpoch: Long = 0L,
 )
 
 internal data class ChromePhotosDataPlaneLeaseContext(
@@ -25,6 +27,7 @@ internal data class ChromePhotosDataPlaneLeaseContext(
     val windowId: Int,
     val epoch: Long,
     val viewport: ChromeVisualViewport,
+    val foregroundDocument: ChromeMediaShieldForegroundDocument? = null,
 )
 
 /** An in-memory, one-session capability. It is never persisted or reused after revocation. */
@@ -35,6 +38,7 @@ internal data class ChromePhotosDataPlaneLease(
     val epoch: Long,
     val viewport: ChromeVisualViewport,
     val validUntilElapsed: Long,
+    val foregroundDocument: ChromeMediaShieldForegroundDocument? = null,
 )
 
 internal class ChromePhotosDataPlanePresentationPolicy {
@@ -89,7 +93,13 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
     ): ChromePhotosDataPlaneLease? {
         activeLease = null
         val now = elapsedRealtime()
-        if (!attestation.isEligible(now) || !context.isEligible()) return null
+        if (
+            !attestation.isPresentationEligible(now) ||
+            !context.isEligible() ||
+            !context.hasRequiredForegroundAuthority(attestation)
+        ) {
+            return null
+        }
         nextCapabilityId += 1L
         return ChromePhotosDataPlaneLease(
             capabilityId = nextCapabilityId,
@@ -98,6 +108,7 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
             epoch = context.epoch,
             viewport = context.viewport,
             validUntilElapsed = minOf(attestation.validUntilElapsed, now + LeaseDurationMillis),
+            foregroundDocument = context.foregroundDocument,
         ).also { activeLease = it }
     }
 
@@ -110,32 +121,20 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
         val now = elapsedRealtime()
         return activeLease == lease &&
             now < lease.validUntilElapsed &&
-            attestation.isEligible(now) &&
+            attestation.isPresentationEligible(now) &&
             context.isEligible() &&
             lease.sessionId == attestation.sessionId &&
             lease.windowId == context.windowId &&
             lease.epoch == context.epoch &&
-            lease.viewport == context.viewport
+            lease.viewport == context.viewport &&
+            lease.foregroundDocument == context.foregroundDocument &&
+            context.hasRequiredForegroundAuthority(attestation)
     }
 
     @Synchronized
     fun revoke() {
         activeLease = null
     }
-
-    private fun ChromePhotosDataPlaneAttestation.isEligible(now: Long): Boolean =
-        devBuild &&
-            sessionId.isNotBlank() &&
-            active &&
-            proxyHealthy &&
-            policyConfirmed &&
-            vpnConfirmed &&
-            vpnSessionId == sessionId &&
-            accessibilityBound &&
-            (fixtureConfirmed || realWebScopeConfirmed) &&
-            heartbeatElapsed in 1..now &&
-            now - heartbeatElapsed <= MaximumHeartbeatAgeMillis &&
-            validUntilElapsed > now
 
     private fun ChromePhotosDataPlaneLeaseContext.isEligible(): Boolean =
         packageName == ChromePhotosDataPlaneLabContract.ChromePackage &&
@@ -144,11 +143,37 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
             viewport.width > 0 &&
             viewport.height > 0
 
+    private fun ChromePhotosDataPlaneLeaseContext.hasRequiredForegroundAuthority(
+        attestation: ChromePhotosDataPlaneAttestation,
+    ): Boolean {
+        if (!attestation.mediaAuthorityEnabled) return foregroundDocument == null
+        val document = foregroundDocument ?: return false
+        return attestation.mediaPolicyEpoch > 0L &&
+            document.windowId == windowId &&
+            document.identity.topLevel &&
+            document.identity.protectionSessionId == attestation.sessionId &&
+            document.identity.policyEpoch == attestation.mediaPolicyEpoch
+    }
+
     internal companion object {
         const val LeaseDurationMillis = 500L
         const val MaximumHeartbeatAgeMillis = 500L
     }
 }
+
+internal fun ChromePhotosDataPlaneAttestation.isPresentationEligible(now: Long): Boolean =
+    devBuild &&
+        sessionId.isNotBlank() &&
+        active &&
+        proxyHealthy &&
+        policyConfirmed &&
+        vpnConfirmed &&
+        vpnSessionId == sessionId &&
+        accessibilityBound &&
+        (fixtureConfirmed || realWebScopeConfirmed) &&
+        heartbeatElapsed in 1..now &&
+        now - heartbeatElapsed <= ChromePhotosDataPlaneLeaseAuthority.MaximumHeartbeatAgeMillis &&
+        validUntilElapsed > now
 
 internal class ChromePhotosDataPlaneAttestationReader(
     context: Context,
@@ -175,6 +200,8 @@ internal class ChromePhotosDataPlaneAttestationReader(
             heartbeatElapsed = runtime.heartbeatElapsed,
             validUntilElapsed = runtime.validUntilElapsed,
             accessibilityBound = runtime.accessibilityBound,
+            mediaAuthorityEnabled = runtime.mediaAuthorityEnabled,
+            mediaPolicyEpoch = runtime.mediaPolicyEpoch,
         )
     }
 }

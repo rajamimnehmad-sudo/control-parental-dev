@@ -27,6 +27,50 @@ class ChromePhotosProxyRequestTest {
     }
 
     @Test
+    fun `HTTP absolute form parses exact public authority and origin form`() {
+        val request = parse("GET http://Example.com:80/images/a.png?q=1 HTTP/1.1\r\nHost: example.com:80\r\n\r\n")
+
+        assertEquals("http://Example.com:80/images/a.png?q=1", request.target)
+        assertEquals(
+            ChromeHttpAbsoluteTarget(host = "example.com", originForm = "/images/a.png?q=1"),
+            request.absoluteHttpTargetOrNull(),
+        )
+        assertTrue(request.authorityMatches("example.com", 80))
+    }
+
+    @Test
+    fun `absolute form rejects non HTTP ambiguous and nonstandard authorities`() {
+        listOf(
+            "https://example.com/image.png",
+            "http://user@example.com/image.png",
+            "http://example.com:81/image.png",
+            "http://example.com//other.example/image.png",
+            "http://127.0.0.1/image.png",
+            "http://example.com/image.png#fragment",
+        ).forEach { target ->
+            assertNull(ChromePhotosProxyRequest.parse("GET $target HTTP/1.1"), target)
+        }
+    }
+
+    @Test
+    fun `absolute HTTP Host requires the same host and port 80`() {
+        val target = ChromePhotosProxyRequest.parse("GET http://example.com/resource HTTP/1.1")!!
+
+        assertTrue(target.withHost("example.com").authorityMatches("example.com", 80))
+        assertTrue(target.withHost("example.com:80").authorityMatches("example.com", 80))
+        assertFalse(target.withHost("example.com:443").authorityMatches("example.com", 80))
+        assertFalse(target.withHost("other.example").authorityMatches("example.com", 80))
+        assertFalse(
+            target.copy(
+                headers = listOf(ChromeHttpHeader("Host", "example.com"), ChromeHttpHeader("Host", "example.com")),
+            ).authorityMatches("example.com", 80),
+        )
+    }
+
+    private fun ChromePhotosProxyRequest.withHost(authority: String): ChromePhotosProxyRequest =
+        copy(headers = listOf(ChromeHttpHeader("Host", authority)))
+
+    @Test
     fun `Content-Length preserves binary body and end to end headers`() {
         val body = byteArrayOf(0, 1, 2, 0x7f, 0xff.toByte())
         val prefix =

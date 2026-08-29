@@ -31,6 +31,8 @@ internal interface ChromePhotosFixtureSource {
     fun imageAuthorityReport(): String = "not_run"
 
     fun preRenderShieldReport(): String = "not_run"
+
+    fun mediaShieldReport(): String = "not_run"
 }
 
 /** In-memory controlled origin. No intercepted bytes are written to disk. */
@@ -53,6 +55,7 @@ internal class ChromePhotosFixtureOrigin(
             networkSentinelBytes = sentinelImageBytes,
             auditPlaceholderBytes = auditPlaceholderImageBytes,
         )
+    private val stockMediaAuthorityFixture = ChromeStockMediaAuthorityFixture(sentinelImageBytes)
 
     override fun webSemanticsReport(): String = report.get()
 
@@ -60,8 +63,11 @@ internal class ChromePhotosFixtureOrigin(
 
     override fun preRenderShieldReport(): String = preRenderShieldFixture.state()
 
+    override fun mediaShieldReport(): String = stockMediaAuthorityFixture.state()
+
     override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse {
         ChromeVisualShieldFixture.responseFor(request)?.let { return it }
+        stockMediaAuthorityFixture.responseFor(request)?.let { return it }
         preRenderShieldFixture.responseFor(request)?.let { return it }
         imageAuthorityFixture.responseFor(request)?.let { return it }
         val requestTarget = request.target

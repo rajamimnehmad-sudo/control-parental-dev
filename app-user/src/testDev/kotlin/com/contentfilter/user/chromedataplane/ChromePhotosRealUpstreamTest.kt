@@ -158,4 +158,20 @@ class ChromePhotosRealUpstreamTest {
             ChromePhotosRealUpstream.buildUrl("example.com", "//other.example/image.png")
         }
     }
+
+    @Test
+    fun `upstream endpoint builds exact HTTP port 80 URL`() {
+        val url =
+            ChromePhotosRealUpstream.buildUrl(
+                scheme = ChromePhotosUpstreamScheme.Http,
+                host = "example.com",
+                target = "/image.png?q=1",
+                port = 80,
+            )
+
+        assertEquals("http", url.scheme)
+        assertEquals("example.com", url.host)
+        assertEquals(80, url.port)
+        assertEquals("/image.png?q=1", url.encodedPath + "?" + url.encodedQuery)
+    }
 }

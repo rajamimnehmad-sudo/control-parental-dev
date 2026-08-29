@@ -25,11 +25,18 @@ object ChromePhotosDataPlaneLabContract {
     const val KeyUdpFixtureAddress = "udp_fixture_address"
     const val KeyUdpFixturePort = "udp_fixture_port"
     const val KeyUdpFixtureMalformedProbeEnabled = "udp_fixture_malformed_probe_enabled"
+    const val KeyStockMediaAuthorityEnabled = "stock_media_authority_enabled"
+    const val KeyRequestedStockMediaAuthorityEnabled = "requested_stock_media_authority_enabled"
+    const val KeyRequestedFullTunnelDevGateEnabled = "requested_full_tunnel_dev_gate_enabled"
+    const val KeyRequestedReplaceAllNetworkVisuals = "requested_replace_all_network_visuals"
 
-    const val TrustedBootstrapGeneration = 1
+    const val TrustedBootstrapGeneration = 2
+    const val StockMediaPolicyEpoch = 19L
 
     const val FixtureHost = "glosh-photos.test"
     const val FixtureUrl = "https://glosh-photos.test/"
+    const val MediaShieldReadyPath = "/.well-known/glosh-h19-ready"
+    const val MediaShieldReadyUrl = "https://glosh-photos.test/.well-known/glosh-h19-ready"
     const val FixtureIpv4 = "198.18.0.1"
     const val ProxyHost = "127.0.0.1"
     const val ProxyPort = 8877

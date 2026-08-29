@@ -62,6 +62,11 @@ import java.net.InetAddress
 import java.net.Socket
 import javax.inject.Inject
 
+private data class VpnEstablishment(
+    val descriptor: ParcelFileDescriptor,
+    val chromeAdmitted: Boolean,
+)
+
 /**
  * Local VPN entry point. Business decisions are delegated to PolicyEngine.
  */
@@ -182,16 +187,19 @@ class FilterVpnService : VpnService() {
                             "rules=${initialState.snapshot.rules.size} strictWebBlock=$strictWebBlockMode " +
                             "encryptedDnsEnforced=$encryptedDnsEnforcementMode",
                     )
-                    val establishedInterface = requireNotNull(establishVpn()) { "VPN establish returned null." }
+                    val fullTunnelRequested =
+                        ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(
+                            this@FilterVpnService,
+                        ) && !strictWebBlockMode
+                    val establishment =
+                        requireNotNull(establishVpn(fullTunnelRequested)) { "VPN establish returned null." }
+                    val fullTunnelApplied = fullTunnelRequested && establishment.chromeAdmitted
+                    val establishedInterface = establishment.descriptor
                     vpnInterface = establishedInterface
                     val dispatcher = VpnPacketDispatcher(establishedInterface)
                     packetDispatcher = dispatcher
                     transportGate09A =
                         if (ChromePhotosDataPlaneLabVpnPolicy.isActive(this@FilterVpnService)) {
-                            val fullTunnelEnabled =
-                                ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(
-                                    this@FilterVpnService,
-                                )
                             val controlledAddresses =
                                 ChromePhotosDataPlaneLabVpnPolicy.routes(this@FilterVpnService)
                                     .mapTo(linkedSetOf()) { route -> route.address }
@@ -207,7 +215,7 @@ class FilterVpnService : VpnService() {
                                     ChromePhotosDataPlaneLabVpnPolicy.udpFixtureGate(
                                         this@FilterVpnService,
                                     ),
-                                fullTunnelEnabled = fullTunnelEnabled,
+                                fullTunnelEnabled = fullTunnelApplied,
                                 writeToTun = dispatcher::writePacket,
                             )
                         } else {
@@ -225,6 +233,8 @@ class FilterVpnService : VpnService() {
                     ChromePhotosDataPlaneLabVpnPolicy.markTunnelState(
                         this@FilterVpnService,
                         established = true,
+                        fullTunnelApplied = fullTunnelApplied,
+                        chromePackageAdmitted = establishment.chromeAdmitted,
                     )
                     connectionBarrier?.close()
                     appliedVpnReconnectKey = initialState.vpnReconnectKey
@@ -333,7 +343,7 @@ class FilterVpnService : VpnService() {
                         upstreamDnsServers = currentDnsServers()
                         strictWebBlockMode = true
                         encryptedDnsEnforcementMode = true
-                        establishVpn()
+                        establishVpn()?.descriptor
                     } catch (exception: Throwable) {
                         Log.w(LogTag, "VPN connection barrier failed: ${exception.javaClass.simpleName}")
                         null
@@ -367,7 +377,7 @@ class FilterVpnService : VpnService() {
                     barrierHandedOff = true
                     startVpn(connectionBarrier = barrier)
                 } finally {
-                    if (!barrierHandedOff) barrier?.close()
+                    if (!barrierHandedOff) barrier.close()
                 }
             }
     }
@@ -400,23 +410,34 @@ class FilterVpnService : VpnService() {
         }
     }
 
-    private fun establishVpn(): ParcelFileDescriptor? =
-        Builder()
-            .setSession("Content Filter VPN")
-            .addAddress(LocalVpnAddress, LocalVpnPrefixLength)
-            .addAddress(LocalVpnIpv6Address, LocalVpnIpv6PrefixLength)
-            .applyTrafficRoutes(
-                upstreamServers = upstreamDnsServers,
-                strictWebBlock = strictWebBlockMode,
-                enforceEncryptedDns = encryptedDnsEnforcementMode,
-                blockedDestinations = blockedDestinationRoutes.activeRoutes(),
-            )
-            .applyChromePhotosDataPlaneLabRoute()
-            .applyDevFullTunnelRoutes()
-            .allowBrowserApps()
-            .setMtu(DefaultMtu)
-            .setBlocking(true)
-            .establish()
+    private fun establishVpn(
+        fullTunnelRequested: Boolean =
+            ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(this) && !strictWebBlockMode,
+    ): VpnEstablishment? {
+        val builder =
+            Builder()
+                .setSession("Content Filter VPN")
+                .addAddress(LocalVpnAddress, LocalVpnPrefixLength)
+                .addAddress(LocalVpnIpv6Address, LocalVpnIpv6PrefixLength)
+                .applyTrafficRoutes(
+                    upstreamServers = upstreamDnsServers,
+                    strictWebBlock = strictWebBlockMode,
+                    enforceEncryptedDns = encryptedDnsEnforcementMode,
+                    blockedDestinations = blockedDestinationRoutes.activeRoutes(),
+                )
+                .applyChromePhotosDataPlaneLabRoute()
+                .applyDevFullTunnelRoutes(fullTunnelRequested)
+        val admission = builder.allowBrowserApps(requireChrome = fullTunnelRequested)
+        val descriptor =
+            builder
+                .setMtu(DefaultMtu)
+                .setBlocking(true)
+                .establish() ?: return null
+        return VpnEstablishment(
+            descriptor = descriptor,
+            chromeAdmitted = admission.chromeAdmitted,
+        )
+    }
 
     private fun Builder.applyTrafficRoutes(
         upstreamServers: List<InetAddress>,
@@ -446,11 +467,8 @@ class FilterVpnService : VpnService() {
                 .forEach { route -> addRoute(route.address, route.prefixLength) }
         }
 
-    private fun Builder.applyDevFullTunnelRoutes(): Builder =
+    private fun Builder.applyDevFullTunnelRoutes(enabled: Boolean): Builder =
         apply {
-            val enabled =
-                ChromePhotosDataPlaneLabVpnPolicy.isFullTunnelDevGateEnabled(this@FilterVpnService) &&
-                    !strictWebBlockMode
             ChromePhotosDataPlaneLabVpnPolicy.fullTunnelRoutes(enabled).forEach { route ->
                 addRoute(route.address, route.prefixLength)
             }
@@ -522,13 +540,21 @@ class FilterVpnService : VpnService() {
         applicationTracker.report(PolicyConsumer.Vpn, state.snapshot.id, state.snapshot.version)
     }
 
-    private fun Builder.allowBrowserApps(): Builder =
-        apply {
-            var allowedCount = 0
-            BrowserPackageNames.forEach { packageName ->
-                runCatching { addAllowedApplication(packageName) }
-                    .onSuccess { allowedCount++ }
+    private fun Builder.allowBrowserApps(requireChrome: Boolean): BrowserVpnAdmissionResult {
+        val browserAdmission =
+            try {
+                BrowserVpnAdmissionPolicy.admit(
+                    browserPackages = BrowserPackageNames,
+                    chromePackage = ChromePackageName,
+                    requireChrome = requireChrome,
+                    addAllowedApplication = { packageName -> addAllowedApplication(packageName) },
+                )
+            } catch (error: Exception) {
+                Log.e(LogTag, "Chrome VPN admission failed error=${error.javaClass.simpleName}")
+                throw error
             }
+        var allowedCount = browserAdmission.admittedCount
+        apply {
             ChromePhotosDataPlaneLabVpnPolicy.additionalAllowedPackages(this@FilterVpnService).forEach { packageName ->
                 runCatching { addAllowedApplication(packageName) }
                     .onSuccess { allowedCount++ }
@@ -543,6 +569,8 @@ class FilterVpnService : VpnService() {
                 }
             }
         }
+        return browserAdmission
+    }
 
     @SuppressLint("MissingPermission")
     private fun currentDnsServers(): List<InetAddress> {
@@ -1002,10 +1030,11 @@ class FilterVpnService : VpnService() {
         private const val StopReasonRevoked = "system_revoked_vpn"
         private const val LogTag = "FilterVpnService"
         private const val TransportLogTag = "VpnTransport09A"
+        private const val ChromePackageName = "com.android.chrome"
 
         private val BrowserPackageNames =
             listOf(
-                "com.android.chrome",
+                ChromePackageName,
                 "com.google.android.googlequicksearchbox",
                 "com.sec.android.app.sbrowser",
                 "org.mozilla.firefox",

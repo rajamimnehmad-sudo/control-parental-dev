@@ -60,6 +60,7 @@ internal sealed interface ChromeImageContentResolution {
 
 private enum class DeclaredMimeDisposition {
     DeclaredImage,
+    InvalidOrMultipart,
     AmbiguousSniffable,
     DefiniteNonImage,
 }
@@ -78,6 +79,7 @@ private sealed interface ProgressiveSniffDecision {
 internal class ChromeImageContentAuthority(
     maximumConcurrentBodies: Int = DefaultMaximumConcurrentBodies,
     private val maximumSniffBytes: Int = DefaultMaximumSniffBytes,
+    private val stockMediaAuthority: Boolean = false,
 ) {
     private val bodyPermits = Semaphore(maximumConcurrentBodies, true)
     private val activeBodies = AtomicInteger()
@@ -93,7 +95,7 @@ internal class ChromeImageContentAuthority(
     }
 
     fun normalizeUpstreamRequest(request: ChromePhotosProxyRequest): ChromePhotosProxyRequest {
-        if (!request.isImageIntent()) return request
+        if (!request.isImageIntent(stockMediaAuthority)) return request
         val headers =
             request.headers.filterNot { header ->
                 header.name.lowercase(Locale.US) in ImageRequestHeadersRemoved
@@ -105,10 +107,14 @@ internal class ChromeImageContentAuthority(
         request: ChromePhotosProxyRequest,
         response: ChromePhotosUpstreamResponse,
     ): ChromeImageContentInspection {
-        val requestIntent = request.isImageIntent()
+        val requestIntent = request.isImageIntent(stockMediaAuthority)
         val declaredMimeTypes = response.headers.declaredContentTypes()
-        val mimeDisposition = declaredMimeTypes.disposition()
-        if (requestIntent || mimeDisposition == DeclaredMimeDisposition.DeclaredImage) {
+        val mimeDisposition = declaredMimeTypes.disposition(stockMediaAuthority)
+        if (
+            requestIntent ||
+            mimeDisposition == DeclaredMimeDisposition.DeclaredImage ||
+            mimeDisposition == DeclaredMimeDisposition.InvalidOrMultipart
+        ) {
             candidates.incrementAndGet()
             return ChromeImageContentInspection.Candidate(
                 response = response,
@@ -124,13 +130,17 @@ internal class ChromeImageContentAuthority(
             return ChromeImageContentInspection.Passthrough(response)
         }
         if (!response.headers.hasIdentityContentEncoding()) {
-            candidates.incrementAndGet()
-            return ChromeImageContentInspection.Candidate(
-                response = response,
-                requestIntent = false,
-                declaredMimeTypes = declaredMimeTypes,
-                prefixFormat = null,
-            )
+            return if (mimeDisposition == DeclaredMimeDisposition.DefiniteNonImage) {
+                ChromeImageContentInspection.Passthrough(response)
+            } else {
+                candidates.incrementAndGet()
+                ChromeImageContentInspection.Candidate(
+                    response = response,
+                    requestIntent = false,
+                    declaredMimeTypes = declaredMimeTypes,
+                    prefixFormat = null,
+                )
+            }
         }
 
         val peek = response.body.peekImagePrefix(maximumSniffBytes)
@@ -159,14 +169,25 @@ internal class ChromeImageContentAuthority(
         response: ChromePhotosUpstreamResponse,
         bytes: ByteArray,
     ): ChromeImageContentInspection {
-        val requestIntent = request.isImageIntent()
+        val requestIntent = request.isImageIntent(stockMediaAuthority)
         val declaredMimeTypes = response.headers.declaredContentTypes()
-        val mimeDisposition = declaredMimeTypes.disposition()
+        val mimeDisposition = declaredMimeTypes.disposition(stockMediaAuthority)
         val encodedAmbiguous =
             mimeDisposition == DeclaredMimeDisposition.AmbiguousSniffable &&
                 !response.headers.hasIdentityContentEncoding()
-        val format = if (encodedAmbiguous) null else sniffFormat(bytes)
-        return if (requestIntent || mimeDisposition == DeclaredMimeDisposition.DeclaredImage || encodedAmbiguous || format != null) {
+        val format =
+            if (encodedAmbiguous || mimeDisposition == DeclaredMimeDisposition.DefiniteNonImage) {
+                null
+            } else {
+                sniffFormat(bytes)
+            }
+        return if (
+            requestIntent ||
+            mimeDisposition == DeclaredMimeDisposition.DeclaredImage ||
+            mimeDisposition == DeclaredMimeDisposition.InvalidOrMultipart ||
+            encodedAmbiguous ||
+            format != null
+        ) {
             candidates.incrementAndGet()
             if (!requestIntent && mimeDisposition != DeclaredMimeDisposition.DeclaredImage && format != null) {
                 magicCandidates.incrementAndGet()
@@ -178,7 +199,12 @@ internal class ChromeImageContentAuthority(
                 prefixFormat = format,
             )
         } else {
-            ChromeImageContentInspection.Passthrough(response.copy(body = bytes.inputStream()))
+            ChromeImageContentInspection.Passthrough(
+                response.copy(
+                    headers = response.headers,
+                    body = bytes.inputStream(),
+                ),
+            )
         }
     }
 
@@ -192,6 +218,9 @@ internal class ChromeImageContentAuthority(
         }
         if (!format.supportedStaticRaster) {
             return ChromeImageContentResolution.Reject("unsupported_${format.name.lowercase(Locale.US)}")
+        }
+        if (format == ChromeImageFormat.Avif && !hasCompleteAvifBrandEvidence(bytes)) {
+            return ChromeImageContentResolution.Reject(AvifBrandEvidenceReason)
         }
         if (isAnimated(format, bytes)) {
             return ChromeImageContentResolution.Reject(AnimatedImageReason)
@@ -332,13 +361,21 @@ internal class ChromeImageContentAuthority(
         val declaredBoxSize = isoBmffBrandScanEnd(bytes)
         if (declaredBoxSize < IsoBmffMinimumBytes) return null
         var offset = IsoBmffBrandOffset
+        var avifFound = false
+        var heifFound = false
         while (offset + IsoBmffBrandBytes <= declaredBoxSize) {
             val brand = String(bytes, offset, IsoBmffBrandBytes, StandardCharsets.US_ASCII)
-            if (brand in AvifBrands) return ChromeImageFormat.Avif
-            if (brand in HeifBrands) return ChromeImageFormat.Heif
+            when (brand) {
+                in AvifBrands -> avifFound = true
+                in HeifBrands -> heifFound = true
+            }
             offset += IsoBmffBrandBytes
         }
-        return null
+        return when {
+            avifFound -> ChromeImageFormat.Avif
+            heifFound -> ChromeImageFormat.Heif
+            else -> null
+        }
     }
 
     private fun isAnimated(
@@ -367,6 +404,13 @@ internal class ChromeImageContentAuthority(
             offset += IsoBmffBrandBytes
         }
         return false
+    }
+
+    private fun hasCompleteAvifBrandEvidence(bytes: ByteArray): Boolean {
+        if (bytes.size < IsoBmffMinimumBytes || !bytes.matchesAscii(4, "ftyp")) return false
+        val declared = bytes.readUnsignedInt(0)
+        return declared in IsoBmffMinimumBytes.toLong()..MaximumIsoBmffBrandBytes.toLong() &&
+            declared <= bytes.size.toLong()
     }
 
     private fun isoBmffBrandScanEnd(bytes: ByteArray): Int =
@@ -449,6 +493,7 @@ internal class ChromeImageContentAuthority(
         const val UnknownFormatReason = "image_format_unknown"
         const val FormatChangedAfterPeekReason = "image_format_changed_after_peek"
         const val AnimatedImageReason = "animated_image"
+        const val AvifBrandEvidenceReason = "unsupported_avif_brand_evidence"
         val ImageRequestHeadersRemoved =
             setOf("accept-encoding", "range", "if-range", "if-none-match", "if-modified-since")
         val AvifBrands = setOf("avif", "avis")
@@ -467,19 +512,37 @@ private data class PrefixPeek(
     val format: ChromeImageFormat?,
 )
 
-private fun ChromePhotosProxyRequest.isImageIntent(): Boolean =
-    headerValues("Sec-Fetch-Dest").any { value -> value.trim().equals("image", ignoreCase = true) }
+private fun ChromePhotosProxyRequest.isImageIntent(stockMediaAuthority: Boolean): Boolean =
+    headerValues("Sec-Fetch-Dest").any { value ->
+        val destination = value.trim().lowercase(Locale.US)
+        destination == "image" || stockMediaAuthority && destination in H19ProtectedVisualDestinations
+    }
 
 private fun List<ChromeHttpHeader>.declaredContentTypes(): List<String> =
     filter { it.name.equals("Content-Type", ignoreCase = true) }
         .map { header -> header.value.normalizedImageMimeType() }
-        .filter(String::isNotEmpty)
 
-private fun List<String>.disposition(): DeclaredMimeDisposition {
-    if (any(String::isDeclaredImageMimeType)) return DeclaredMimeDisposition.DeclaredImage
+private fun List<String>.disposition(stockMediaAuthority: Boolean): DeclaredMimeDisposition {
+    if (
+        stockMediaAuthority &&
+        (size > 1 || any { !it.isSyntacticallyValidMimeType() || it.startsWith("multipart/") })
+    ) {
+        return DeclaredMimeDisposition.InvalidOrMultipart
+    }
+    if (any { it.isDeclaredImageMimeType(stockMediaAuthority) }) return DeclaredMimeDisposition.DeclaredImage
     if (isEmpty() || any(String::isAmbiguousSniffableMimeType)) return DeclaredMimeDisposition.AmbiguousSniffable
     return DeclaredMimeDisposition.DefiniteNonImage
 }
+
+private fun String.isSyntacticallyValidMimeType(): Boolean {
+    if (isEmpty() || ',' in this || count { it == '/' } != 1) return false
+    val type = substringBefore('/')
+    val subtype = substringAfter('/')
+    return type.isNotEmpty() && subtype.isNotEmpty() &&
+        type.all(::isMimeTokenCharacter) && subtype.all(::isMimeTokenCharacter)
+}
+
+private fun isMimeTokenCharacter(character: Char): Boolean = character.isLetterOrDigit() || character in "!#$&^_.+-"
 
 internal fun List<ChromeHttpHeader>.hasIdentityContentEncoding(): Boolean {
     val values = filter { it.name.equals("Content-Encoding", ignoreCase = true) }.map(ChromeHttpHeader::value)
@@ -488,7 +551,19 @@ internal fun List<ChromeHttpHeader>.hasIdentityContentEncoding(): Boolean {
     return codings.isNotEmpty() && codings.all { it.equals("identity", ignoreCase = true) }
 }
 
-private fun String.isDeclaredImageMimeType(): Boolean = startsWith("image/")
+private fun String.isDeclaredImageMimeType(stockMediaAuthority: Boolean): Boolean =
+    startsWith("image/") ||
+        stockMediaAuthority && (startsWith("video/") || this in H19ProtectedVisualContainerMimeTypes)
+
+private val H19ProtectedVisualDestinations = setOf("video", "object", "embed")
+private val H19ProtectedVisualContainerMimeTypes =
+    setOf(
+        "application/pdf",
+        "application/signed-exchange",
+        "application/webbundle",
+        "application/webbundle;v=b1",
+        "multipart/x-mixed-replace",
+    )
 
 private fun String.isAmbiguousSniffableMimeType(): Boolean =
     this == "text/plain" ||
@@ -508,7 +583,11 @@ private fun ByteArray.matchesAscii(
     offset: Int,
     value: String,
 ): Boolean =
-    offset >= 0 && offset + value.length <= size && value.indices.all { index -> this[offset + index] == value[index].code.toByte() }
+    offset >= 0 &&
+        offset + value.length <= size &&
+        value.indices.all { index ->
+            this[offset + index] == value[index].code.toByte()
+        }
 
 private fun ByteArray.indexOfAscii(value: String): Int {
     if (value.isEmpty() || value.length > size) return -1

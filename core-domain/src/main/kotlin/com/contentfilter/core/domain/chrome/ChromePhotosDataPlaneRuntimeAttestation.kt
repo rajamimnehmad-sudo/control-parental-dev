@@ -17,6 +17,8 @@ data class ChromePhotosDataPlaneRuntimeSnapshot(
     val heartbeatElapsed: Long = 0L,
     val validUntilElapsed: Long = 0L,
     val accessibilityBound: Boolean = false,
+    val mediaAuthorityEnabled: Boolean = false,
+    val mediaPolicyEpoch: Long = 0L,
 )
 
 object ChromePhotosDataPlaneRuntimeAttestation {
@@ -24,11 +26,17 @@ object ChromePhotosDataPlaneRuntimeAttestation {
     private var state = ChromePhotosDataPlaneRuntimeSnapshot()
 
     @Synchronized
-    fun beginSession(sessionId: String) {
+    fun beginSession(
+        sessionId: String,
+        mediaAuthorityEnabled: Boolean = false,
+        mediaPolicyEpoch: Long = 0L,
+    ) {
         state =
             ChromePhotosDataPlaneRuntimeSnapshot(
                 sessionId = sessionId,
                 accessibilityBound = accessibilityBound,
+                mediaAuthorityEnabled = mediaAuthorityEnabled,
+                mediaPolicyEpoch = if (mediaAuthorityEnabled) mediaPolicyEpoch else 0L,
             )
     }
 

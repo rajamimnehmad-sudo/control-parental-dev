@@ -1,5 +1,7 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldAccessibilityContext
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -137,16 +139,43 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         assertTrue(authority.isValid(second, attestation(), context(epoch = 8L)))
     }
 
+    @Test
+    fun `H19 requires exact current foreground document authority`() {
+        val protectedAttestation = attestation(mediaAuthorityEnabled = true, mediaPolicyEpoch = PolicyEpoch)
+        assertNull(authority.mint(protectedAttestation, context()))
+
+        val currentContext = context(foregroundDocument = foregroundDocument())
+        val lease = assertNotNull(authority.mint(protectedAttestation, currentContext))
+
+        assertTrue(authority.isValid(lease, protectedAttestation, currentContext))
+        assertFalse(
+            authority.isValid(
+                lease,
+                protectedAttestation,
+                currentContext.copy(foregroundDocument = foregroundDocument(documentSequence = 2L)),
+            ),
+        )
+        assertFalse(
+            authority.isValid(
+                lease,
+                protectedAttestation.copy(mediaPolicyEpoch = PolicyEpoch + 1L),
+                currentContext,
+            ),
+        )
+    }
+
     private fun context(
         packageName: String = ChromePhotosDataPlaneLabContract.ChromePackage,
         windowId: Int = 17,
         epoch: Long = 7L,
         viewport: ChromeVisualViewport = ChromeVisualViewport(0, 0, 1080, 2200),
+        foregroundDocument: ChromeMediaShieldForegroundDocument? = null,
     ) = ChromePhotosDataPlaneLeaseContext(
         packageName = packageName,
         windowId = windowId,
         epoch = epoch,
         viewport = viewport,
+        foregroundDocument = foregroundDocument,
     )
 
     private fun attestation(
@@ -160,6 +189,8 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         heartbeatElapsed: Long = now,
         validUntilElapsed: Long = now + 1_000L,
         accessibilityBound: Boolean = true,
+        mediaAuthorityEnabled: Boolean = false,
+        mediaPolicyEpoch: Long = 0L,
     ) = ChromePhotosDataPlaneAttestation(
         devBuild = devBuild,
         sessionId = SessionId,
@@ -173,9 +204,33 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         heartbeatElapsed = heartbeatElapsed,
         validUntilElapsed = validUntilElapsed,
         accessibilityBound = accessibilityBound,
+        mediaAuthorityEnabled = mediaAuthorityEnabled,
+        mediaPolicyEpoch = mediaPolicyEpoch,
     )
+
+    private fun foregroundDocument(documentSequence: Long = 1L) =
+        ChromeMediaShieldForegroundDocument(
+            identity =
+                ChromeMediaShieldDocumentIdentity(
+                    protectionSessionId = SessionId,
+                    policyEpoch = PolicyEpoch,
+                    navigationSequence = 1L,
+                    documentSequence = documentSequence,
+                    tokenDigest = "a".repeat(64),
+                    topLevel = true,
+                ),
+            lifecycleSequence = 1L,
+            windowId = 17,
+            accessibilityContext =
+                ChromeMediaShieldAccessibilityContext(
+                    windowId = 17,
+                    rootIdentityDigest = "b".repeat(64),
+                    markerIdentityDigest = "c".repeat(64),
+                ),
+        )
 
     private companion object {
         const val SessionId = "lab-session-a"
+        const val PolicyEpoch = 19L
     }
 }

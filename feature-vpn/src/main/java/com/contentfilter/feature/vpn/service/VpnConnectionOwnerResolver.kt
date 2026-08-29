@@ -34,7 +34,7 @@ internal fun interface ConnectionOwnerLookup {
 }
 
 internal fun interface UidPackageLookup {
-    fun packagesForUid(uid: Int): List<String>
+    fun packagesForUid(uid: Int): List<String>?
 }
 
 /**
@@ -69,13 +69,22 @@ internal class VpnConnectionOwnerResolver(
             }
         if (uid == InvalidUid) return VpnConnectionOwnerResult.Unknown
 
+        synchronized(packageCache) { packageCache[uid] }?.let { packages ->
+            return VpnConnectionOwnerResult.Resolved(uid = uid, packages = packages)
+        }
+
         val packages =
-            synchronized(packageCache) {
-                packageCache[uid]
-                    ?: runCatching { packageLookup.packagesForUid(uid).distinct().sorted() }
-                        .getOrDefault(emptyList())
-                        .also { packageCache[uid] = it }
-            }
+            try {
+                packageLookup.packagesForUid(uid)
+                    ?.filter(String::isNotBlank)
+                    ?.distinct()
+                    ?.sorted()
+            } catch (_: Exception) {
+                null
+            } ?: return VpnConnectionOwnerResult.Unknown
+        if (packages.isEmpty()) return VpnConnectionOwnerResult.Unknown
+
+        synchronized(packageCache) { packageCache[uid] = packages }
         return VpnConnectionOwnerResult.Resolved(uid = uid, packages = packages)
     }
 
@@ -103,7 +112,7 @@ internal class VpnConnectionOwnerResolver(
                     },
                 packageLookup =
                     UidPackageLookup { uid ->
-                        context.packageManager.getPackagesForUid(uid)?.toList().orEmpty()
+                        context.packageManager.getPackagesForUid(uid)?.toList()
                     },
             )
         }

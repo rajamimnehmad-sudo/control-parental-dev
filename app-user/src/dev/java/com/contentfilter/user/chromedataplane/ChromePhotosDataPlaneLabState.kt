@@ -52,5 +52,5 @@ internal class ChromePhotosDataPlaneLifecycle {
 
 internal object ChromePhotosChromePolicy {
     fun proxySettingsJson(): String =
-        """{"ProxyMode":"fixed_servers","ProxyServer":"${ChromePhotosDataPlaneLabContract.ProxyHost}:${ChromePhotosDataPlaneLabContract.ProxyPort}","ProxyBypassList":""}"""
+        """{"ProxyMode":"fixed_servers","ProxyServer":"${ChromePhotosDataPlaneLabContract.ProxyHost}:${ChromePhotosDataPlaneLabContract.ProxyPort}","ProxyBypassList":"<-loopback>"}"""
 }

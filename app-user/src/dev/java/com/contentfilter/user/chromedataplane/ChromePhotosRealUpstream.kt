@@ -45,12 +45,44 @@ internal data class ChromePhotosUpstreamMetrics(
     val protectFailure: Long,
 )
 
+internal enum class ChromePhotosUpstreamScheme(
+    val wireName: String,
+) {
+    Http("http"),
+    Https("https"),
+}
+
+internal data class ChromePhotosUpstreamEndpoint(
+    val scheme: ChromePhotosUpstreamScheme,
+    val host: String,
+    val port: Int,
+) {
+    init {
+        require(port in 1..65_535)
+    }
+
+    companion object {
+        const val HttpPort = 80
+        const val HttpsPort = 443
+    }
+}
+
 internal interface ChromePhotosUpstream : AutoCloseable {
     @Throws(IOException::class)
     fun execute(
         host: String,
         request: ChromePhotosProxyRequest,
     ): ChromePhotosUpstreamExchange
+
+    @Throws(IOException::class)
+    fun execute(
+        endpoint: ChromePhotosUpstreamEndpoint,
+        request: ChromePhotosProxyRequest,
+    ): ChromePhotosUpstreamExchange {
+        require(endpoint.scheme == ChromePhotosUpstreamScheme.Https)
+        require(endpoint.port == ChromePhotosUpstreamEndpoint.HttpsPort)
+        return execute(endpoint.host, request)
+    }
 
     fun metrics(): ChromePhotosUpstreamMetrics = ChromePhotosUpstreamMetrics(0, 0, 0)
 
@@ -71,12 +103,25 @@ internal class ChromePhotosRealUpstream(
     override fun execute(
         host: String,
         request: ChromePhotosProxyRequest,
+    ): ChromePhotosUpstreamExchange =
+        execute(
+            ChromePhotosUpstreamEndpoint(
+                scheme = ChromePhotosUpstreamScheme.Https,
+                host = host,
+                port = upstreamPort,
+            ),
+            request,
+        )
+
+    override fun execute(
+        endpoint: ChromePhotosUpstreamEndpoint,
+        request: ChromePhotosProxyRequest,
     ): ChromePhotosUpstreamExchange {
-        val normalizedHost = normalizeDnsHost(host)
+        val normalizedHost = normalizeDnsHost(endpoint.host)
         require(request.method in ChromePhotosProxyRequest.AllowedMethods)
         val upstreamRequest =
             Request.Builder()
-                .url(buildUrl(normalizedHost, request.target, upstreamPort))
+                .url(buildUrl(endpoint.scheme, normalizedHost, request.target, endpoint.port))
                 .method(request.method, request.upstreamBody())
                 .apply {
                     ChromeHttpHeaderPolicy.upstreamRequestHeaders(request).forEach { header ->
@@ -131,10 +176,11 @@ internal class ChromePhotosRealUpstream(
                 .build()
 
         fun buildUrl(
+            scheme: ChromePhotosUpstreamScheme,
             host: String,
             target: String,
-            port: Int = HttpsPort,
-        ) = "https://$host${if (port == HttpsPort) "" else ":$port"}$target"
+            port: Int,
+        ) = "${scheme.wireName}://$host${if (port == scheme.defaultPort()) "" else ":$port"}$target"
             .toHttpUrlOrNull()
             ?.takeIf { url ->
                 target.startsWith('/') &&
@@ -146,8 +192,20 @@ internal class ChromePhotosRealUpstream(
                     url.password.isEmpty()
             }
             ?: error("Invalid upstream target")
+
+        fun buildUrl(
+            host: String,
+            target: String,
+            port: Int = HttpsPort,
+        ) = buildUrl(ChromePhotosUpstreamScheme.Https, host, target, port)
     }
 }
+
+private fun ChromePhotosUpstreamScheme.defaultPort(): Int =
+    when (this) {
+        ChromePhotosUpstreamScheme.Http -> ChromePhotosUpstreamEndpoint.HttpPort
+        ChromePhotosUpstreamScheme.Https -> ChromePhotosUpstreamEndpoint.HttpsPort
+    }
 
 internal class ChromeProtectedSocketFactory(
     private val protect: (Socket) -> Boolean,

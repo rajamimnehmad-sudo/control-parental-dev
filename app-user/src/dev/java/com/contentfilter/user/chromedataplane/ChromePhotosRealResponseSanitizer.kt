@@ -2,6 +2,7 @@ package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import java.net.URI
+import java.util.Locale
 
 internal data class ChromePhotosSanitizedResponse(
     val statusCode: Int,
@@ -99,12 +100,29 @@ internal class ChromePhotosRealResponseSanitizer(
     }
 
     fun sanitizeRedirect(upstream: ChromePhotosUpstreamResponse): ChromePhotosSanitizedResponse {
-        val location = upstream.headers.firstValue("Location")?.takeIf { isAllowedRedirect(it) }
+        val sanitizedHeaders = ChromeHttpHeaderPolicy.downstreamResponseHeaders(upstream.headers)
+        val sourceLocation =
+            upstream.headers
+                .filter { it.name.equals("Location", ignoreCase = true) }
+                .singleOrNull()
+        val location =
+            sanitizedHeaders
+                .filter { it.name.equals("Location", ignoreCase = true) }
+                .singleOrNull()
+                ?.value
+                ?.takeIf { it == sourceLocation?.value }
+                ?.takeIf(::isAllowedRedirect)
         return if (location != null) {
             ChromePhotosSanitizedResponse(
                 statusCode = upstream.statusCode,
                 statusText = upstream.statusText,
-                headers = ChromeHttpHeaderPolicy.downstreamResponseHeaders(upstream.headers),
+                headers =
+                    sanitizedHeaders.filterNot { header ->
+                        header.name.equals("Location", ignoreCase = true) ||
+                            header.name.lowercase(Locale.US) in ChromeHttpHeaderPolicy.invalidatedImageEntityHeaders
+                    } +
+                        ChromeHttpHeader("Location", location) +
+                        ChromeHttpHeader("Cache-Control", "no-store"),
                 bytes = ByteArray(0),
                 decision = ChromePhotosResourceDecision.Passthrough,
                 cacheHit = false,
@@ -117,8 +135,11 @@ internal class ChromePhotosRealResponseSanitizer(
     }
 
     internal fun isAllowedRedirect(location: String): Boolean {
-        if (location.startsWith('/') && !location.startsWith("//")) return true
+        if (location.isBlank() || location != location.trim() || location.any { it.isISOControl() }) return false
         val uri = runCatching { URI(location) }.getOrNull() ?: return false
+        if (!uri.isAbsolute) {
+            return location.startsWith('/') && !location.startsWith("//") && uri.rawAuthority == null
+        }
         if (!uri.scheme.equals("https", ignoreCase = true) || uri.userInfo != null) return false
         if (uri.port !in setOf(-1, ChromePhotosRealUpstream.HttpsPort)) return false
         val host = uri.host ?: return false
@@ -181,31 +202,33 @@ internal class ChromePhotosRealResponseSanitizer(
         reason: String,
         inputBytes: Int = 0,
         observedBodyDigest: String? = null,
-    ) =
-        ChromePhotosSanitizedResponse(
-            statusCode = 200,
-            statusText = "OK",
-            headers = ChromeHttpHeaderPolicy.transformedImageHeaders(upstream.headers, PlaceholderContentType),
-            bytes = placeholderBytes,
-            decision = ChromePhotosResourceDecision.Unknown,
-            cacheHit = false,
-            contentHash = null,
-            inputBytes = inputBytes,
-            observedBodyDigest = observedBodyDigest,
-            decisionResult =
-                ChromePhotoDecisionResult(
-                    decision = ChromePhotoDecision.Unknown,
-                    reason = reason,
-                    source = ChromePhotoDecisionSource.Error,
-                ),
-        )
+    ) = ChromePhotosSanitizedResponse(
+        statusCode = 200,
+        statusText = "OK",
+        headers = ChromeHttpHeaderPolicy.transformedImageHeaders(upstream.headers, PlaceholderContentType),
+        bytes = placeholderBytes,
+        decision = ChromePhotosResourceDecision.Unknown,
+        cacheHit = false,
+        contentHash = null,
+        inputBytes = inputBytes,
+        observedBodyDigest = observedBodyDigest,
+        decisionResult =
+            ChromePhotoDecisionResult(
+                decision = ChromePhotoDecision.Unknown,
+                reason = reason,
+                source = ChromePhotoDecisionSource.Error,
+            ),
+    )
 
     private fun plainFailure(message: String): ChromePhotosSanitizedResponse {
         val bytes = message.toByteArray(Charsets.UTF_8)
         return ChromePhotosSanitizedResponse(
             statusCode = 502,
             statusText = "Bad Gateway",
-            headers = listOf(ChromeHttpHeader("Content-Type", "text/plain; charset=utf-8")),
+            headers =
+                ChromeHttpHeaderPolicy.downstreamResponseHeaders(
+                    listOf(ChromeHttpHeader("Content-Type", "text/plain; charset=utf-8")),
+                ),
             bytes = bytes,
             decision = ChromePhotosResourceDecision.Passthrough,
             cacheHit = false,

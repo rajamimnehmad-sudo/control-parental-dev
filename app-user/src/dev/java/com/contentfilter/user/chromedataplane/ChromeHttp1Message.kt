@@ -5,6 +5,7 @@ import java.io.EOFException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.SocketTimeoutException
+import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 
@@ -39,15 +40,21 @@ internal data class ChromePhotosProxyRequest(
                 .flatMap { it.split(',') }
                 .any { it.trim().equals("upgrade", ignoreCase = true) }
 
-    fun authorityMatches(expectedHost: String): Boolean {
+    fun authorityMatches(
+        expectedHost: String,
+        expectedPort: Int = HttpsPort,
+    ): Boolean {
         val values = headerValues("Host")
         if (version == Http11 && values.size != 1) return false
         if (values.isEmpty()) return true
         val authority = values.single().trim()
+        if (authority.count { it == ':' } > 1) return false
         val host = authority.substringBefore(':')
-        val port = authority.substringAfter(':', "443").toIntOrNull() ?: return false
-        return port == 443 && runCatching { normalizeDnsHost(host) }.getOrNull() == expectedHost
+        val port = authority.substringAfter(':', expectedPort.toString()).toIntOrNull() ?: return false
+        return port == expectedPort && runCatching { normalizeDnsHost(host) }.getOrNull() == expectedHost
     }
+
+    fun absoluteHttpTargetOrNull(): ChromeHttpAbsoluteTarget? = ChromeHttpAbsoluteTarget.parse(target)
 
     companion object {
         const val Head = "HEAD"
@@ -57,10 +64,35 @@ internal data class ChromePhotosProxyRequest(
         fun parse(line: String): ChromePhotosProxyRequest? {
             val parts = line.split(' ')
             if (parts.size != 3 || parts[2] !in setOf("HTTP/1.0", Http11)) return null
-            if (!parts[1].startsWith('/') || parts[1].startsWith("//") || '#' in parts[1]) return null
+            val target = parts[1]
+            val originForm = target.startsWith('/') && !target.startsWith("//") && '#' !in target
+            if (!originForm && ChromeHttpAbsoluteTarget.parse(target) == null) return null
             val method = parts[0].uppercase(Locale.US)
             if (method !in AllowedMethods) return null
-            return ChromePhotosProxyRequest(method = method, target = parts[1], version = parts[2])
+            return ChromePhotosProxyRequest(method = method, target = target, version = parts[2])
+        }
+
+        private const val HttpsPort = 443
+    }
+}
+
+internal data class ChromeHttpAbsoluteTarget(
+    val host: String,
+    val originForm: String,
+) {
+    companion object {
+        const val Port = 80
+
+        fun parse(rawTarget: String): ChromeHttpAbsoluteTarget? {
+            val uri = runCatching { URI(rawTarget) }.getOrNull() ?: return null
+            if (!uri.scheme.equals("http", ignoreCase = true) || uri.isOpaque) return null
+            if (uri.rawUserInfo != null || uri.rawFragment != null || uri.host == null) return null
+            if (uri.port !in setOf(-1, Port)) return null
+            val host = runCatching { normalizeDnsHost(uri.host) }.getOrNull() ?: return null
+            val path = uri.rawPath.ifEmpty { "/" }
+            if (!path.startsWith('/') || path.startsWith("//")) return null
+            val originForm = path + uri.rawQuery?.let { "?$it" }.orEmpty()
+            return ChromeHttpAbsoluteTarget(host = host, originForm = originForm)
         }
     }
 }

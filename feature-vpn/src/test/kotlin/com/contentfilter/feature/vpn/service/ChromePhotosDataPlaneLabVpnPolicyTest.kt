@@ -176,5 +176,74 @@ class ChromePhotosDataPlaneLabVpnPolicyTest {
                 established = false,
             ),
         )
+        assertFalse(
+            ChromePhotosDataPlaneLabVpnPolicy.isTunnelConfirmed(
+                active = true,
+                sessionId = "session-a",
+                established = true,
+                requiresFullTunnel = true,
+                fullTunnelApplied = false,
+            ),
+        )
+        assertFalse(
+            ChromePhotosDataPlaneLabVpnPolicy.isTunnelConfirmed(
+                active = true,
+                sessionId = "session-a",
+                established = true,
+                requiresFullTunnel = true,
+                fullTunnelApplied = true,
+                chromePackageAdmitted = false,
+            ),
+        )
+        assertTrue(
+            ChromePhotosDataPlaneLabVpnPolicy.isTunnelConfirmed(
+                active = true,
+                sessionId = "session-a",
+                established = true,
+                requiresFullTunnel = true,
+                fullTunnelApplied = true,
+                chromePackageAdmitted = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `active H19 cannot disable its full tunnel while rollback and legacy modes can`() {
+        assertFalse(
+            ChromePhotosDataPlaneLabVpnPolicy.canSetFullTunnelDevGate(
+                devBuild = true,
+                active = true,
+                stockMediaAuthorityEnabled = true,
+                sessionId = "session-a",
+                enabled = false,
+            ),
+        )
+        assertTrue(
+            ChromePhotosDataPlaneLabVpnPolicy.canSetFullTunnelDevGate(
+                devBuild = true,
+                active = true,
+                stockMediaAuthorityEnabled = false,
+                sessionId = "session-a",
+                enabled = false,
+            ),
+        )
+        assertTrue(
+            ChromePhotosDataPlaneLabVpnPolicy.canSetFullTunnelDevGate(
+                devBuild = true,
+                active = false,
+                stockMediaAuthorityEnabled = true,
+                sessionId = "session-a",
+                enabled = false,
+            ),
+        )
+        assertFalse(
+            ChromePhotosDataPlaneLabVpnPolicy.canSetFullTunnelDevGate(
+                devBuild = false,
+                active = true,
+                stockMediaAuthorityEnabled = false,
+                sessionId = "session-a",
+                enabled = true,
+            ),
+        )
     }
 }

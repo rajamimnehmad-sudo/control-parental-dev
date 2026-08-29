@@ -10,6 +10,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentAuthorityRegistry
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
 import com.contentfilter.feature.vpn.service.VpnController
@@ -27,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 class ChromePhotosDataPlaneLabService : Service() {
     private val lifecycle = ChromePhotosDataPlaneLifecycle()
@@ -43,6 +45,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     private lateinit var guardClient: ChromeGuardClient
     private var guardSession: ChromeGuardClientSession? = null
     private var lastGuardHeartbeatElapsed = 0L
+    private val statusSequence = AtomicLong()
 
     override fun onCreate() {
         super.onCreate()
@@ -86,7 +89,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         currentSessionId = ""
         guardSession = null
         guardClient.disconnect()
-        ChromePhotosDataPlaneRuntimeAttestation.clear()
+        clearChromePhotosDataPlaneAuthorityState()
         super.onDestroy()
     }
 
@@ -100,16 +103,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                 val preferences = labPreferences()
                 try {
                     val udpFixtureGate = ChromePhotosUdpFixtureGateConfig.fromIntent(intent)
-                    val fullTunnelDevGateEnabled =
-                        intent?.getBooleanExtra(
-                            ChromePhotosDataPlaneLabReceiver.ExtraFullTunnelDevGateEnabled,
-                            false,
-                        ) == true
-                    val replaceAllNetworkVisuals =
-                        intent?.getBooleanExtra(
-                            ChromePhotosDataPlaneLabReceiver.ExtraReplaceAllNetworkVisuals,
-                            false,
-                        ) == true
+                    val mode = resolveRuntimeMode(intent, preferences)
+                    val fullTunnelDevGateEnabled = mode.fullTunnelDevGateEnabled
+                    val replaceAllNetworkVisuals = mode.replaceAllNetworkVisuals
+                    val stockMediaAuthorityEnabled = mode.stockMediaAuthorityEnabled
+                    persistRequestedRuntimeMode(preferences, mode)
                     if (udpFixtureGate.enabled) {
                         require(
                             packageManager.getApplicationInfo(ChromePhotosDataPlaneLabContract.UdpFixturePackage, 0).enabled,
@@ -126,7 +124,19 @@ class ChromePhotosDataPlaneLabService : Service() {
                     val coverageLedger =
                         ChromeRealWebProvenanceLedger { message -> Log.i(CoverageLogTag, message) }
                             .also { ledger -> ledger.beginSession(sessionId) }
-                    ChromePhotosDataPlaneRuntimeAttestation.beginSession(sessionId)
+                    ChromePhotosDataPlaneRuntimeAttestation.beginSession(
+                        sessionId = sessionId,
+                        mediaAuthorityEnabled = stockMediaAuthorityEnabled,
+                        mediaPolicyEpoch = ChromePhotosDataPlaneLabContract.StockMediaPolicyEpoch,
+                    )
+                    if (stockMediaAuthorityEnabled) {
+                        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(
+                            sessionId,
+                            ChromePhotosDataPlaneLabContract.StockMediaPolicyEpoch,
+                        )
+                    } else {
+                        ChromeMediaShieldDocumentAuthorityRegistry.clear()
+                    }
                     guardSession =
                         guardClient.openSession(
                             sessionId = sessionId,
@@ -143,6 +153,22 @@ class ChromePhotosDataPlaneLabService : Service() {
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyVpnConfirmed, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyFixtureConfirmed, false)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed, false)
+                        .putBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyStockMediaAuthorityEnabled,
+                            stockMediaAuthorityEnabled,
+                        )
+                        .putBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyRequestedStockMediaAuthorityEnabled,
+                            stockMediaAuthorityEnabled,
+                        )
+                        .putBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyRequestedFullTunnelDevGateEnabled,
+                            fullTunnelDevGateEnabled,
+                        )
+                        .putBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals,
+                            replaceAllNetworkVisuals,
+                        )
                         .putBoolean(KeyVpnWasRunningBeforeLab, vpnWasRunningBeforeLab)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled, udpFixtureGate.enabled)
                         .putString(ChromePhotosDataPlaneLabContract.KeyUdpFixtureAddress, udpFixtureGate.address)
@@ -193,7 +219,21 @@ class ChromePhotosDataPlaneLabService : Service() {
                                     ChromeNetworkVisualDeliveryMode.Selective
                                 },
                             auditPlaceholderBytes = origin.auditPlaceholderImageBytes,
+                            replacementPlaceholderBytes = origin.placeholderImageBytes,
                         )
+                    val documentAuthority =
+                        if (stockMediaAuthorityEnabled) {
+                            ChromeMediaShieldDocumentAuthority(
+                                admission = ChromeMediaShieldDocumentAdmission(),
+                                transformer =
+                                    ChromeMediaShieldDocumentTransformer(
+                                        sessionId = sessionId,
+                                        policyEpoch = ChromePhotosDataPlaneLabContract.StockMediaPolicyEpoch,
+                                    ),
+                            )
+                        } else {
+                            null
+                        }
                     startedProxy =
                         ChromePhotosHttpsProxy(
                             tls = tls,
@@ -201,14 +241,25 @@ class ChromePhotosDataPlaneLabService : Service() {
                             onFixtureHeartbeat = ::markFixtureHeartbeat,
                             onFatalFailure = ::markFailClosed,
                             transformer = transformer,
+                            imageAuthority =
+                                ChromeImageContentAuthority(
+                                    stockMediaAuthority = stockMediaAuthorityEnabled,
+                                ),
                             visualDeliveryGate = visualDeliveryGate,
                             coverageLedger = coverageLedger,
+                            documentAuthority = documentAuthority,
+                            readyEndpoint =
+                                if (stockMediaAuthorityEnabled) {
+                                    ChromeMediaShieldReadyEndpoint()
+                                } else {
+                                    null
+                                },
                         )
                     proxy = startedProxy
                     startedProxy.start()
                     ChromePhotosDataPlaneRuntimeAttestation.markProxyHealthy(sessionId, true)
                     lifecycle.proxyReady()
-                    val policy = policyController.apply(tls)
+                    val policy = policyController.apply(tls, stockMediaAuthorityEnabled)
                     ChromePhotosDataPlaneRuntimeAttestation.markPolicyConfirmed(sessionId, true)
                     preferences.edit()
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyActive, true)
@@ -226,7 +277,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                         ),
                     ) { "full_tunnel_gate_configuration_failed" }
                     VpnController.refreshDevLabRoutes(this@ChromePhotosDataPlaneLabService)
-                    startHealthAttestation(sessionId, tls.caCertificateDer)
+                    startHealthAttestation(
+                        sessionId = sessionId,
+                        caCertificateDer = tls.caCertificateDer,
+                        requireFullTunnel = fullTunnelDevGateEnabled,
+                    )
                     Log.i(
                         LogTag,
                         "phase=active owner=device_owner scope=chrome_only session=${sessionId.take(SessionLogLength)} " +
@@ -239,6 +294,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             "udpTarget=${udpFixtureGate.address}:${udpFixtureGate.port} " +
                             "transport=${if (fullTunnelDevGateEnabled) "full_tunnel_dev" else "controlled"} " +
                             "networkVisualMode=${if (replaceAllNetworkVisuals) "replace_all" else "selective"} " +
+                            "stockMediaAuthority=$stockMediaAuthorityEnabled " +
                             "privacy=public_only_memory_only",
                     )
                 } catch (error: Throwable) {
@@ -251,6 +307,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                     guardClient.stopGuard("start_failed")
                     guardSession = null
                     guardClient.disconnect()
+                    clearChromePhotosDataPlaneAuthorityState()
                     Log.e(LogTag, "phase=start_failed error=${error.javaClass.simpleName}")
                 }
             }
@@ -272,7 +329,8 @@ class ChromePhotosDataPlaneLabService : Service() {
                 guardClient.stopGuard("manual_stop")
                 guardSession = null
                 guardClient.disconnect()
-                ChromePhotosDataPlaneRuntimeAttestation.clear()
+                clearChromePhotosDataPlaneAuthorityState()
+                clearRequestedRuntimeMode(labPreferences())
                 Log.i(LogTag, "phase=stopped rollback=complete cache=cleared")
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
@@ -316,6 +374,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                 Log.e(LogTag, "bootstrap=chrome_block_failed error=${error.javaClass.simpleName}")
             }
         ChromePhotosDataPlaneRuntimeAttestation.failClosed(currentSessionId)
+        ChromeMediaShieldDocumentAuthorityRegistry.invalidateTopLevel(currentSessionId)
         labPreferences().edit()
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
             .putBoolean(ChromePhotosDataPlaneLabContract.KeyProxyHealthy, false)
@@ -331,23 +390,30 @@ class ChromePhotosDataPlaneLabService : Service() {
     private fun startHealthAttestation(
         sessionId: String,
         caCertificateDer: ByteArray,
+        requireFullTunnel: Boolean,
     ) {
         healthJob?.cancel()
         healthJob =
             serviceScope?.launch {
                 while (currentSessionId == sessionId && lifecycle.current() in ActivePhases) {
                     val proxyHealthy = proxy?.isHealthy() == true
+                    val fullTunnelActive =
+                        VpnController.isDevFullTunnelGateActive(this@ChromePhotosDataPlaneLabService)
+                    val transportConfigured =
+                        if (requireFullTunnel) {
+                            fullTunnelActive
+                        } else {
+                            fullTunnelActive ||
+                                labPreferences()
+                                    .getStringSet(
+                                        ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
+                                        emptySet(),
+                                    ).orEmpty().isNotEmpty()
+                        }
                     val policyConfirmed =
                         runCatching {
                             policyController.isApplied(caCertificateDer) &&
-                                (
-                                    VpnController.isDevFullTunnelGateActive(this@ChromePhotosDataPlaneLabService) ||
-                                        labPreferences()
-                                            .getStringSet(
-                                                ChromePhotosDataPlaneLabContract.KeyResolvedRouteAddresses,
-                                                emptySet(),
-                                            ).orEmpty().isNotEmpty()
-                                )
+                                transportConfigured
                         }.getOrDefault(false)
                     ChromePhotosDataPlaneRuntimeAttestation.markProxyHealthy(sessionId, proxyHealthy)
                     ChromePhotosDataPlaneRuntimeAttestation.markPolicyConfirmed(sessionId, policyConfirmed)
@@ -462,16 +528,20 @@ class ChromePhotosDataPlaneLabService : Service() {
     }
 
     private fun logStatus() {
+        val sequence = statusSequence.incrementAndGet()
         val preferences = labPreferences()
         val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics()
         val decisions = metrics.decisionSession
         val images = metrics.imageAuthority
         val networkVisuals = metrics.networkVisualDelivery
+        val mediaDocuments = metrics.mediaShieldDocuments
+        val readyEndpoint = metrics.mediaShieldReady
+        val documentRegistry = ChromeMediaShieldDocumentAuthorityRegistry.snapshot()
         val bootstrap = bootstrapController.state()
         val coverage = proxy?.coverageSnapshot()
         Log.i(
             LogTag,
-            "phase=status lifecycle=${lifecycle.current()} active=${preferences.getBoolean(
+            "phase=status statusSequence=$sequence lifecycle=${lifecycle.current()} active=${preferences.getBoolean(
                 ChromePhotosDataPlaneLabContract.KeyActive,
                 false,
             )} ready=${preferences.getBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)} " +
@@ -503,7 +573,20 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "networkVisualCandidates=${networkVisuals.candidates} " +
                 "networkVisualReplaced=${networkVisuals.replaced} " +
                 "networkVisualRawDelivered=${networkVisuals.rawDelivered} " +
+                "networkVisualSafeRawDelivered=${networkVisuals.safeRawDelivered} " +
+                "networkVisualBlockedReplaced=${networkVisuals.blockedReplaced} " +
+                "networkVisualUnknownReplaced=${networkVisuals.unknownReplaced} " +
+                "networkVisualUnsupportedReplaced=${networkVisuals.unsupportedReplaced} " +
+                "networkVisualRawBlockedDelivered=${networkVisuals.rawBlockedDelivered} " +
+                "networkVisualRawUnknownDelivered=${networkVisuals.rawUnknownDelivered} " +
+                "networkVisualCacheHit=${networkVisuals.cacheHit} " +
+                "networkVisualInference=${networkVisuals.inference} " +
+                "mediaDocumentsTransformed=${mediaDocuments.transformed} " +
+                "mediaDocumentsFailClosed=${mediaDocuments.failClosed} " +
+                "documentTransformOutstanding=${mediaDocuments.outstanding} " +
+                "readyTokensOutstanding=${documentRegistry.issuedDocuments} " +
                 "h18=${metrics.preRenderShieldReport} " +
+                "h19=${metrics.mediaShieldReport} " +
                 "quicAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyQuicAttempts, 0L)} " +
                 "directTcpAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts, 0L)} " +
                 "bootstrapResetGeneration=${bootstrap.resetGeneration} " +
@@ -517,6 +600,47 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "audit17Events=${coverage?.events?.size ?: 0} " +
                 "audit17Dropped=${coverage?.droppedEvents ?: 0L}",
         )
+        Log.i(
+            StatusLogTag,
+            "v=1 seq=$sequence kind=network mode=${if (preferences.getBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals,
+                    false,
+                )
+            ) {
+                "replace_all"
+            } else {
+                "selective"
+            }} " +
+                "candidates=${networkVisuals.candidates} replaced=${networkVisuals.replaced} " +
+                "rawDelivered=${networkVisuals.rawDelivered} safeRaw=${networkVisuals.safeRawDelivered} " +
+                "blockedReplaced=${networkVisuals.blockedReplaced} unknownReplaced=${networkVisuals.unknownReplaced} " +
+                "unsupportedReplaced=${networkVisuals.unsupportedReplaced} rawBlocked=${networkVisuals.rawBlockedDelivered} " +
+                "rawUnknown=${networkVisuals.rawUnknownDelivered} cacheHit=${networkVisuals.cacheHit} " +
+                "decisionEngine=${networkVisuals.inference} engineCalls=${decisions.engineCalls}",
+        )
+        Log.i(
+            StatusLogTag,
+            "v=1 seq=$sequence kind=document transformed=${mediaDocuments.transformed} " +
+                "failClosed=${mediaDocuments.failClosed} outstanding=${mediaDocuments.outstanding} " +
+                "issued=${documentRegistry.issuedDocuments} claims=${documentRegistry.readyClaims} " +
+                "documentSequence=${documentRegistry.currentTopLevel?.documentSequence ?: 0L} " +
+                "navigationSequence=${documentRegistry.currentTopLevel?.navigationSequence ?: 0L} " +
+                "readyRequests=${readyEndpoint.requests} readyPreflights=${readyEndpoint.preflights} " +
+                "readyAccepted=${readyEndpoint.accepted} readyRejected=${readyEndpoint.rejected}",
+        )
+        Log.i(
+            StatusLogTag,
+            "v=1 seq=$sequence kind=health failures=${metrics.failures} proxyQueueRejects=${metrics.queueRejected} " +
+                "protectFailure=${metrics.upstream.protectFailure} quicAttempts=${preferences.getLong(
+                    ChromePhotosDataPlaneLabContract.KeyQuicAttempts,
+                    0L,
+                )} directTcpAttempts=${preferences.getLong(
+                    ChromePhotosDataPlaneLabContract.KeyDirectTcpAttempts,
+                    0L,
+                )} active=${preferences.getBoolean(ChromePhotosDataPlaneLabContract.KeyActive, false)} " +
+                "ready=${preferences.getBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)}",
+        )
+        Log.i(StatusLogTag, "v=1 seq=$sequence kind=fixture report=${metrics.mediaShieldReport}")
     }
 
     private fun restoreVpnStateAfterLab() {
@@ -534,6 +658,75 @@ class ChromePhotosDataPlaneLabService : Service() {
         preferences.edit().remove(KeyVpnWasRunningBeforeLab).commit()
         vpnRollbackCompleted = true
         Log.i(LogTag, "rollback=vpn_restored action=${action.logValue}")
+    }
+
+    private fun resolveRuntimeMode(
+        intent: Intent?,
+        preferences: android.content.SharedPreferences,
+    ): ChromeStockMediaRuntimeMode =
+        ChromeStockMediaRuntimeModeResolver.resolve(
+            hasExplicitMode =
+                intent?.hasExtra(ChromePhotosDataPlaneLabReceiver.ExtraStockMediaAuthorityEnabled) == true,
+            explicitStockMediaAuthorityEnabled =
+                intent?.getBooleanExtra(
+                    ChromePhotosDataPlaneLabReceiver.ExtraStockMediaAuthorityEnabled,
+                    false,
+                ) == true,
+            explicitFullTunnelDevGateEnabled =
+                intent?.getBooleanExtra(
+                    ChromePhotosDataPlaneLabReceiver.ExtraFullTunnelDevGateEnabled,
+                    false,
+                ) == true,
+            explicitReplaceAllNetworkVisuals =
+                intent?.getBooleanExtra(
+                    ChromePhotosDataPlaneLabReceiver.ExtraReplaceAllNetworkVisuals,
+                    false,
+                ) == true,
+            persistedStockMediaAuthorityEnabled =
+                preferences.getBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedStockMediaAuthorityEnabled,
+                    false,
+                ),
+            persistedFullTunnelDevGateEnabled =
+                preferences.getBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedFullTunnelDevGateEnabled,
+                    false,
+                ),
+            persistedReplaceAllNetworkVisuals =
+                preferences.getBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals,
+                    false,
+                ),
+        )
+
+    private fun persistRequestedRuntimeMode(
+        preferences: android.content.SharedPreferences,
+        mode: ChromeStockMediaRuntimeMode,
+    ) {
+        check(
+            preferences.edit()
+                .putBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedStockMediaAuthorityEnabled,
+                    mode.stockMediaAuthorityEnabled,
+                )
+                .putBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedFullTunnelDevGateEnabled,
+                    mode.fullTunnelDevGateEnabled,
+                )
+                .putBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals,
+                    mode.replaceAllNetworkVisuals,
+                )
+                .commit(),
+        ) { "runtime_mode_not_persisted" }
+    }
+
+    private fun clearRequestedRuntimeMode(preferences: android.content.SharedPreferences) {
+        preferences.edit()
+            .remove(ChromePhotosDataPlaneLabContract.KeyRequestedStockMediaAuthorityEnabled)
+            .remove(ChromePhotosDataPlaneLabContract.KeyRequestedFullTunnelDevGateEnabled)
+            .remove(ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals)
+            .commit()
     }
 
     private fun labPreferences() =
@@ -567,6 +760,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         const val ExtraAuditStateLabel = "chrome_coverage_audit_state_label"
         const val ExtraAuditNewNavigation = "chrome_coverage_audit_new_navigation"
         const val LogTag = "ChromePhotosDataPlane"
+        const val StatusLogTag = "ChromeMediaShieldStatus"
 
         private const val NotificationChannelId = "chrome_photos_data_plane_dev"
         private const val NotificationId = 18_742
@@ -584,6 +778,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                 ChromePhotosDataPlanePhase.PresentationReady,
             )
     }
+}
+
+internal fun clearChromePhotosDataPlaneAuthorityState() {
+    ChromePhotosDataPlaneRuntimeAttestation.clear()
+    ChromeMediaShieldDocumentAuthorityRegistry.clear()
 }
 
 internal enum class ChromePhotosVpnRollbackAction(

@@ -15,7 +15,13 @@ internal object ChromeHttpHeaderPolicy {
         )
 
     private val requestManaged = fixedHopByHop + setOf("host", "content-length", "proxy-authorization")
-    private val responseManaged = fixedHopByHop + setOf("content-length")
+    private val responseManaged =
+        fixedHopByHop +
+            setOf(
+                "alt-svc",
+                "content-length",
+                "x-content-type-options",
+            )
 
     fun upstreamRequestHeaders(request: ChromePhotosProxyRequest): List<ChromeHttpHeader> {
         val connectionNamed = connectionNamedHeaders(request.headers)
@@ -34,7 +40,7 @@ internal object ChromeHttpHeaderPolicy {
                 header.name.lowercase(Locale.US) in connectionNamed ||
                 header.value.contains('\r') ||
                 header.value.contains('\n')
-        }
+        } + ChromeHttpHeader("X-Content-Type-Options", "nosniff")
     }
 
     fun transformedImageHeaders(
@@ -47,7 +53,6 @@ internal object ChromeHttpHeaderPolicy {
             listOf(
                 ChromeHttpHeader("Content-Type", contentType),
                 ChromeHttpHeader("Cache-Control", "no-store"),
-                ChromeHttpHeader("X-Content-Type-Options", "nosniff"),
             )
 
     val invalidatedImageEntityHeaders: Set<String> =
@@ -57,6 +62,8 @@ internal object ChromeHttpHeaderPolicy {
             "etag",
             "last-modified",
             "content-md5",
+            "content-digest",
+            "repr-digest",
             "digest",
             "content-range",
             "accept-ranges",

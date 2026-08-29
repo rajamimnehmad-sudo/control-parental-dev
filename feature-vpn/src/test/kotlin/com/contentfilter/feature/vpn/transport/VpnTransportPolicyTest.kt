@@ -42,6 +42,17 @@ class VpnTransportPolicyTest {
     }
 
     @Test
+    fun `resolved UID without package identity fails closed`() {
+        assertEquals(
+            VpnTransportAction.DropUnknownOwner,
+            policy.decide(
+                flow(VpnTransportProtocol.Tcp),
+                VpnConnectionOwnerResult.Resolved(uid = 10_263, packages = emptyList()),
+            ),
+        )
+    }
+
+    @Test
     fun `DNS remains on existing pipeline and unapproved target never forwards`() {
         val other = VpnConnectionOwnerResult.Resolved(10_262, listOf("com.sec.android.app.sbrowser"))
 
