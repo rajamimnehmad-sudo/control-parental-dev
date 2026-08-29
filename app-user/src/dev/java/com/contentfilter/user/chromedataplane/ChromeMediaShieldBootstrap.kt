@@ -470,7 +470,11 @@ internal object ChromeMediaShieldBootstrap {
         nodeRemove.call(parent,BOOTSTRAP_SCRIPT);return !connected(BOOTSTRAP_SCRIPT)}catch(_){return false}};
         const retireBootstrapSecrets=()=>clearStyleNonce(shieldStyle)&&(!curtainStyle||clearStyleNonce(curtainStyle))&&removeCurrentScript();
         if(!installed){failClosedDocument();return}if(!retireBootstrapSecrets()){failClosedDocument();return}if(!TOP_LEVEL)return;
-        readyHost=create.call(DOC,'span');invoke(WeakSetAdd,protectedNodes,[readyHost]);nativeSet.call(readyHost,'id',READY_ID);watchStyle(readyHost);
+        readyHost=create.call(DOC,'span');invoke(WeakSetAdd,protectedNodes,[readyHost]);nativeSet.call(readyHost,'id',READY_ID);nativeSet.call(readyHost,'role','status');watchStyle(readyHost);
+        const readyStyle=styleOf(readyHost);nativeStyleSet.call(readyStyle,'position','fixed','important');nativeStyleSet.call(readyStyle,'left','0','important');
+        nativeStyleSet.call(readyStyle,'top','0','important');nativeStyleSet.call(readyStyle,'width','1px','important');nativeStyleSet.call(readyStyle,'height','1px','important');
+        nativeStyleSet.call(readyStyle,'overflow','hidden','important');nativeStyleSet.call(readyStyle,'color','transparent','important');
+        nativeStyleSet.call(readyStyle,'font-size','1px','important');nativeStyleSet.call(readyStyle,'pointer-events','none','important');
         const readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}]);
         const marker=create.call(DOC,'span');nativeSet.call(marker,'role','status');invoke(nodeText.set,marker,['']);nodeAppend.call(readyRoot,marker);
         let lifecycle=0,visibleCycleRequested=false;
@@ -479,10 +483,10 @@ internal object ChromeMediaShieldBootstrap {
         const detachMarker=()=>{const parent=parentOf(readyHost);if(connected(readyHost)&&parent)nodeRemove.call(parent,readyHost)};
         const revokeReady=()=>{showCurtain();detachMarker();visibleCycleRequested=false};
         const beginReadyLifecycle=()=>{if(visibleCycleRequested||visibilityState()!=='visible')return;visibleCycleRequested=true;lifecycle+=1;const currentLifecycle=lifecycle;
-        showCurtain();detachMarker();try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
+        showCurtain();detachMarker();try{const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle;nativeSet.call(readyHost,'aria-label',readyValue);invoke(nodeText.set,readyHost,[readyValue]);nodeAppend.call(documentElement(),readyHost);
+        const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
         xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle);if(read(xhrStatusProperty,xhr)!==204||read(xhrResponseUrlProperty,xhr)!==READY_URL||
-        currentLifecycle!==lifecycle||visibilityState()!=='visible'){visibleCycleRequested=false;return}
-        nativeSet.call(readyHost,'aria-label','glosh-shield-ready:'+READY+':'+currentLifecycle);nodeAppend.call(documentElement(),readyHost);if(!hideCurtain())revokeReady()}catch(_){showCurtain();detachMarker();visibleCycleRequested=false}};
+        currentLifecycle!==lifecycle||visibilityState()!=='visible'){revokeReady();return}if(!hideCurtain())revokeReady()}catch(_){showCurtain();detachMarker();visibleCycleRequested=false}};
         nativeAddEvent.call(SELF,'beforeunload',revokeReady,true);nativeAddEvent.call(SELF,'pagehide',revokeReady,true);
         nativeAddEvent.call(SELF,'pageshow',event=>{if(trustedEvent(event))beginReadyLifecycle()},true);nativeAddEvent.call(DOC,'visibilitychange',event=>{
         if(visibilityState()==='visible'){if(trustedEvent(event))beginReadyLifecycle()}else revokeReady()},true);

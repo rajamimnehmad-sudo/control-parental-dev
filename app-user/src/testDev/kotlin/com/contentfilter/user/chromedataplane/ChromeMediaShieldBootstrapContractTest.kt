@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ChromeMediaShieldBootstrapContractTest {
     private val script = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce)
@@ -14,13 +15,27 @@ class ChromeMediaShieldBootstrapContractTest {
         assertFalse(script.contains("setInterval"))
         assertFalse(script.contains("requestAnimationFrame"))
         assertContains(script, "const readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}])")
-        assertContains(script, "nativeSet.call(readyHost,'aria-label','glosh-shield-ready:'+READY+':'+currentLifecycle)")
+        assertContains(script, "nativeSet.call(readyHost,'role','status')")
+        assertContains(script, "nativeStyleSet.call(readyStyle,'width','1px','important')")
+        assertContains(script, "nativeStyleSet.call(readyStyle,'height','1px','important')")
+        assertContains(script, "nativeStyleSet.call(readyStyle,'overflow','hidden','important')")
+        assertContains(script, "nativeStyleSet.call(readyStyle,'color','transparent','important')")
+        assertContains(script, "nativeStyleSet.call(readyStyle,'font-size','1px','important')")
+        assertContains(script, "nativeStyleSet.call(readyStyle,'pointer-events','none','important')")
+        assertContains(script, "const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle")
+        assertContains(script, "nativeSet.call(readyHost,'aria-label',readyValue)")
+        assertContains(script, "invoke(nodeText.set,readyHost,[readyValue])")
         assertContains(script, "xhrOpen.call(xhr,'POST',READY_URL,false)")
         assertContains(script, "xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)")
         assertContains(script, "read(xhrStatusProperty,xhr)!==204")
         assertContains(script, "read(xhrResponseUrlProperty,xhr)!==READY_URL")
+        assertTrue(
+            script.indexOf("nativeSet.call(readyHost,'aria-label',readyValue)") <
+                script.indexOf("xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)"),
+        )
         assertContains(script, "showCurtain();detachMarker()")
-        assertContains(script, "nodeAppend.call(documentElement(),readyHost);if(!hideCurtain())revokeReady()")
+        assertContains(script, "nodeAppend.call(documentElement(),readyHost)")
+        assertContains(script, "visibilityState()!=='visible'){revokeReady();return}if(!hideCurtain())revokeReady()")
         assertContains(script, "nativeAddEvent.call(SELF,'beforeunload',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(SELF,'pagehide',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(DOC,'visibilitychange'")
