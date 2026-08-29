@@ -9,12 +9,12 @@ class ChromeMediaShieldBootstrapContractTest {
     private val script = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce)
 
     @Test
-    fun `boot is synchronous parser-first and ready marker is private and lifecycle bound`() {
+    fun `boot is synchronous parser-first and ready host is protected and lifecycle bound`() {
         assertFalse(script.contains("setTimeout"))
         assertFalse(script.contains("setInterval"))
         assertFalse(script.contains("requestAnimationFrame"))
         assertContains(script, "const readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}])")
-        assertContains(script, "nativeSet.call(marker,'aria-label','glosh-shield-ready:'+READY+':'+currentLifecycle)")
+        assertContains(script, "nativeSet.call(readyHost,'aria-label','glosh-shield-ready:'+READY+':'+currentLifecycle)")
         assertContains(script, "xhrOpen.call(xhr,'POST',READY_URL,false)")
         assertContains(script, "xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)")
         assertContains(script, "read(xhrStatusProperty,xhr)!==204")
@@ -176,7 +176,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertEquals(1, Regex(Regex.escape(ReadyToken)).findAll(script).count())
         assertEquals(1, Regex(Regex.escape(StyleNonce)).findAll(script).count())
         assertFalse(script.contains("data-glosh-ready-token"))
-        assertFalse(script.contains("nativeSet.call(readyHost,'aria-label'"))
+        assertContains(script, "nativeSet.call(readyHost,'aria-label'")
     }
 
     @Test

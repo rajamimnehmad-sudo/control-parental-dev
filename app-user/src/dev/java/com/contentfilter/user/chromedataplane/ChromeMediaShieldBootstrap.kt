@@ -482,7 +482,7 @@ internal object ChromeMediaShieldBootstrap {
         showCurtain();detachMarker();try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
         xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle);if(read(xhrStatusProperty,xhr)!==204||read(xhrResponseUrlProperty,xhr)!==READY_URL||
         currentLifecycle!==lifecycle||visibilityState()!=='visible'){visibleCycleRequested=false;return}
-        nativeSet.call(marker,'aria-label','glosh-shield-ready:'+READY+':'+currentLifecycle);nodeAppend.call(documentElement(),readyHost);if(!hideCurtain())revokeReady()}catch(_){showCurtain();detachMarker();visibleCycleRequested=false}};
+        nativeSet.call(readyHost,'aria-label','glosh-shield-ready:'+READY+':'+currentLifecycle);nodeAppend.call(documentElement(),readyHost);if(!hideCurtain())revokeReady()}catch(_){showCurtain();detachMarker();visibleCycleRequested=false}};
         nativeAddEvent.call(SELF,'beforeunload',revokeReady,true);nativeAddEvent.call(SELF,'pagehide',revokeReady,true);
         nativeAddEvent.call(SELF,'pageshow',event=>{if(trustedEvent(event))beginReadyLifecycle()},true);nativeAddEvent.call(DOC,'visibilitychange',event=>{
         if(visibilityState()==='visible'){if(trustedEvent(event))beginReadyLifecycle()}else revokeReady()},true);
