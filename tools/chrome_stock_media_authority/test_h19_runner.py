@@ -182,17 +182,19 @@ class H19RunnerTest(unittest.TestCase):
         previous = {
             "package": "com.android.chrome",
             "lifecycle": "7",
-            "tokenSha256": "old",
+            "tokenDigestPrefix": "old",
+            "windowId": "4",
         }
-        stale_ui = {"readyMarkers": [previous]}
-        fresh = {**previous, "lifecycle": "8", "tokenSha256": "fresh"}
+        fresh = {**previous, "lifecycle": "8", "tokenDigestPrefix": "fresh"}
         status = {
             "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
             "readyPhases": {"ready_foreground_released": 1},
         }
         with (
-            patch("run_a23_gate.accessibility_summary", side_effect=[stale_ui, {"readyMarkers": [fresh]}]),
-            patch("run_a23_gate.request_status", side_effect=[("", status), ("", status)]),
+            patch(
+                "run_a23_gate.request_status",
+                side_effect=[("", {**status, "readyMarkers": [previous]}), ("", {**status, "readyMarkers": [fresh]})],
+            ),
             patch("run_a23_gate.time.sleep"),
         ):
             result = wait_for_ready(
@@ -203,7 +205,7 @@ class H19RunnerTest(unittest.TestCase):
                 previous_marker=previous,
             )
 
-        self.assertEqual("fresh", result["marker"]["tokenSha256"])
+        self.assertEqual("fresh", result["marker"]["tokenDigestPrefix"])
         self.assertEqual(2, result["attempts"])
 
     def test_controlled_gate_requires_report_counts_to_advance(self):

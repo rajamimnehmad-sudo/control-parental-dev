@@ -21,6 +21,27 @@ from h19_plan import HarnessError, validate_plan
 
 
 class H19EvidenceTest(unittest.TestCase):
+    def test_ready_marker_evidence_comes_from_the_bound_accessibility_service(self) -> None:
+        line = (
+            "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=17 surfaceEpoch=8 "
+            "documentSequence=3 lifecycle=4 token=abcdef012345 axBound=true reason= rawPresented=false"
+        )
+
+        summary = summarize_logcat(line)
+
+        self.assertEqual(
+            {
+                "package": "com.android.chrome",
+                "windowId": "17",
+                "documentSequence": "3",
+                "lifecycle": "4",
+                "tokenDigestPrefix": "abcdef012345",
+                "axBound": True,
+            },
+            summary["readyMarkers"][0],
+        )
+        self.assertNotIn("glosh-shield-ready", str(summary))
+
     def test_structured_status_reconstructs_untruncated_security_counters(self) -> None:
         logcat = "\n".join(
             [

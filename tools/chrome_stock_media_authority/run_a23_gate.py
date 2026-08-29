@@ -223,24 +223,22 @@ def wait_for_ready(
 ) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_seconds
     attempts = 0
-    last_ui: dict[str, Any] = {}
     last_status: dict[str, Any] = {}
     while time.monotonic() < deadline:
         attempts += 1
-        last_ui = accessibility_summary(adb)
+        _, last_status = request_status(adb, since)
         markers = [
             marker
-            for marker in last_ui.get("readyMarkers", [])
+            for marker in last_status.get("readyMarkers", [])
             if marker.get("package") == CHROME_PACKAGE and marker.get("lifecycle", "").isdigit()
         ]
-        _, last_status = request_status(adb, since)
         fields = last_status.get("status", {}).get("fields", {})
         release_count = int(last_status.get("readyPhases", {}).get("ready_foreground_released", 0))
         marker_advanced = False
         if len(markers) == 1:
             marker_advanced = previous_marker is None or any(
                 markers[0].get(field) != previous_marker.get(field)
-                for field in ("tokenSha256", "lifecycle")
+                for field in ("tokenDigestPrefix", "lifecycle", "windowId")
             )
         if (
             len(markers) == 1
@@ -260,7 +258,7 @@ def wait_for_ready(
         time.sleep(0.25)
     raise HarnessError(
         "foreground READY authority did not become current within the bounded wait: "
-        f"ui={last_ui} status={last_status.get('status', {})}"
+        f"trustedReadyMarkers={last_status.get('readyMarkers', [])} status={last_status.get('status', {})}"
     )
 
 
@@ -413,10 +411,10 @@ def run_state(
         baseline_release_count = 0
         baseline_marker: dict[str, Any] | None = None
         if ready_evidence["required"] and navigation_requires_new_release(state):
-            baseline_ui = accessibility_summary(adb)
+            _, baseline_status_summary = request_status(adb, state_since)
             baseline_markers = [
                 marker
-                for marker in baseline_ui.get("readyMarkers", [])
+                for marker in baseline_status_summary.get("readyMarkers", [])
                 if marker.get("package") == CHROME_PACKAGE and marker.get("lifecycle", "").isdigit()
             ]
             _, baseline_status = request_status(adb, state_since)
@@ -503,8 +501,12 @@ def run_state(
         adb.run("pull", remote, str(video), timeout=90)
         captured = adb.run("exec-out", "screencap", "-p", timeout=30, text=False).stdout
         screenshot.write_bytes(captured)
-        ui = accessibility_summary(adb)
         _state_log, log_summary = request_status(adb, state_since)
+        ui = {
+            "source": "trusted_accessibility_service_log",
+            "readyMarkers": log_summary.get("readyMarkers", []),
+            "externalUiAutomationUsed": False,
+        }
         write_logcat_summary(directory / "logcat-summary.json", log_summary)
         current_counters = status_counter_snapshot(log_summary)
         deltas = counter_deltas(counter_baseline, current_counters)

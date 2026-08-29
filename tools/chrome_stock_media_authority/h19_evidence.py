@@ -389,11 +389,23 @@ def latest_structured_status(logcat: str) -> dict[str, Any]:
 
 def summarize_logcat(logcat: str) -> dict[str, Any]:
     ready_phases: Counter[str] = Counter()
+    ready_markers: list[dict[str, Any]] = []
     coverage_events: Counter[str] = Counter()
     for line in logcat.splitlines():
         if "ChromeMediaShieldReady" in line and "phase=" in line:
             fields = _key_values(line)
             ready_phases[fields.get("phase", "unknown")] += 1
+            if fields.get("phase") == "ready_foreground_released":
+                ready_markers.append(
+                    {
+                        "package": "com.android.chrome",
+                        "windowId": fields.get("windowId", ""),
+                        "documentSequence": fields.get("documentSequence", ""),
+                        "lifecycle": fields.get("lifecycle", ""),
+                        "tokenDigestPrefix": fields.get("token", ""),
+                        "axBound": fields.get("axBound") == "true",
+                    },
+                )
         if "audit17 event=" in line:
             match = re.search(r"audit17 event=([^\s]+)", line)
             coverage_events[match.group(1) if match else "unknown"] += 1
@@ -438,6 +450,7 @@ def summarize_logcat(logcat: str) -> dict[str, Any]:
             "zero": {field: status_fields.get(field) == "0" for field in zero_fields},
         },
         "readyPhases": dict(sorted(ready_phases.items())),
+        "readyMarkers": ready_markers,
         "fixtureReport": fixture_report,
         "coverageEvents": dict(sorted(coverage_events.items())),
         "healthSignals": crashes,
