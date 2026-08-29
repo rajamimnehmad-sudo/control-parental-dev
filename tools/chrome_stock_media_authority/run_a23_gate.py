@@ -140,7 +140,9 @@ def start_phase(
         expected_mode = "replace_all" if mode == "replace-all" else "selective"
         if (
             status.get("active") == "true"
-            and status.get("lifecycle") in {"ProxyReady", "PresentationReady"}
+            and status.get("lifecycle") == "PresentationReady"
+            and status.get("ready") == "true"
+            and status.get("chromeSuspended") == "false"
             and active.get("networkVisualMode") == expected_mode
             and active.get("stockMediaAuthority") == "true"
             and active.get("transport") == "full_tunnel_dev"
@@ -483,13 +485,14 @@ def run_state(
         except subprocess.TimeoutExpired:
             raise HarnessError(f"screenrecord did not terminate for {state_id}")
     finally:
+        state_exception_active = sys.exc_info()[0] is not None
         if screenrecord.poll() is None:
             screenrecord.terminate()
             try:
                 screenrecord.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 screenrecord.kill()
-        if screenrecord.returncode not in {0, None}:
+        if screenrecord.returncode not in {0, None} and not state_exception_active:
             adb.shell("rm", "-f", remote, check=False)
             raise HarnessError(f"screenrecord failed for {state_id} with {screenrecord.returncode}")
     video = directory / "screenrecord.mp4"

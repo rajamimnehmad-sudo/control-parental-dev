@@ -10,6 +10,7 @@ from run_a23_gate import (
     exit_info_delta,
     restart_glosh_phase,
     set_and_verify_orientation,
+    start_phase,
     wait_for_fixture_report,
     wait_for_ready,
     write_logcat_summary,
@@ -48,7 +49,56 @@ class FakeProcessRestartAdb:
         return ""
 
 
+class FakeStartAdb:
+    def __init__(self) -> None:
+        self.broadcasts: list[str] = []
+
+    def broadcast(self, action, _extras=None):
+        self.broadcasts.append(action)
+        return ""
+
+
 class H19RunnerTest(unittest.TestCase):
+    def test_phase_start_waits_for_guard_release_not_merely_proxy_ready(self):
+        common = {
+            "activeMode": {
+                "networkVisualMode": "replace_all",
+                "stockMediaAuthority": "true",
+                "transport": "full_tunnel_dev",
+                "session": "current",
+            },
+        }
+        suspended = {
+            **common,
+            "status": {
+                "fields": {
+                    "active": "true",
+                    "lifecycle": "ProxyReady",
+                    "ready": "false",
+                    "chromeSuspended": "true",
+                },
+            },
+        }
+        released = {
+            **common,
+            "status": {
+                "fields": {
+                    "active": "true",
+                    "lifecycle": "PresentationReady",
+                    "ready": "true",
+                    "chromeSuspended": "false",
+                },
+            },
+        }
+        with (
+            patch("run_a23_gate.request_status", side_effect=[("", suspended), ("", released)]) as status,
+            patch("run_a23_gate.time.sleep"),
+        ):
+            result = start_phase(FakeStartAdb(), "replace-all", "since", timeout_seconds=1)
+
+        self.assertEqual(released, result)
+        self.assertEqual(2, status.call_count)
+
     def test_ce_data_inode_uses_package_manager_for_non_debuggable_dev(self):
         package_dump = (
             "Packages:\n"
