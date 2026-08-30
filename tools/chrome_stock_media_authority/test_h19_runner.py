@@ -225,7 +225,18 @@ class H19RunnerTest(unittest.TestCase):
 
         self.assertEqual(("am", "force-stop", "com.android.chrome"), adb.calls[0])
         self.assertIn("chrome://policy", adb.calls[1])
+        self.assertIn("com.android.chrome/com.google.android.apps.chrome.Main", adb.calls[1])
         self.assertFalse(any("http://" in value or "https://" in value for value in adb.calls[1]))
+
+    def test_chrome_policy_cold_start_uses_the_stock_chrome_main_activity(self):
+        adb = FakeNavigationAdb()
+
+        navigate(adb, {"navigation": "chrome-policy"})
+
+        self.assertIn("chrome://policy", adb.calls[0])
+        self.assertIn("-n", adb.calls[0])
+        self.assertIn("com.android.chrome/com.google.android.apps.chrome.Main", adb.calls[0])
+        self.assertNotIn("-p", adb.calls[0])
 
     def test_physical_gate_acquires_and_restores_interactive_display_lease(self):
         adb = FakeInteractiveAdb(initially_awake=False)

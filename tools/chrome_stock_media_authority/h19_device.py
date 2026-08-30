@@ -17,6 +17,7 @@ from h19_plan import HarnessError
 
 APP_PACKAGE = "com.contentfilter.user.dev"
 CHROME_PACKAGE = "com.android.chrome"
+CHROME_MAIN_ACTIVITY = "com.android.chrome/com.google.android.apps.chrome.Main"
 RECEIVER = f"{APP_PACKAGE}/com.contentfilter.user.chromedataplane.ChromePhotosDataPlaneLabReceiver"
 CONTROLLED_URL = "https://glosh-photos.test/web19/controlled"
 CHROME_POLICY_URL = "chrome://policy"
@@ -308,8 +309,9 @@ def navigate(adb: Adb, state: dict[str, Any]) -> None:
             if action == "controlled"
             else CHROME_POLICY_URL
         )
+        selector = ("-n", CHROME_MAIN_ACTIVITY) if action == "chrome-policy" else ("-p", CHROME_PACKAGE)
         adb.shell(
-            "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", target, "-p", CHROME_PACKAGE,
+            "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", target, *selector,
             timeout=45,
         )
     elif action == "back":
@@ -327,7 +329,8 @@ def navigate(adb: Adb, state: dict[str, Any]) -> None:
     elif action == "restart-chrome":
         adb.shell("am", "force-stop", CHROME_PACKAGE)
         adb.shell(
-            "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", CHROME_POLICY_URL, "-p", CHROME_PACKAGE,
+            "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", CHROME_POLICY_URL,
+            "-n", CHROME_MAIN_ACTIVITY,
             timeout=45,
         )
     else:
