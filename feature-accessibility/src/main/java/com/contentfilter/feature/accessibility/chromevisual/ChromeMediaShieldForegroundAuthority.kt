@@ -300,47 +300,58 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
         window: AccessibilityWindowInfo,
         claim: ChromeMediaShieldReadyClaim,
         document: ChromeMediaShieldForegroundDocument,
-    ): Boolean =
-        try {
-            verifiesBoundAnchorOrThrow(window, claim, document)
-        } catch (_: RuntimeException) {
-            false
-        }
+    ): Boolean = boundAnchorFailureReason(window, claim, document) == null
 
-    private fun verifiesBoundAnchorOrThrow(
+    /** Returns a bounded reason code without changing the bound-anchor authority decision. */
+    fun boundAnchorFailureReason(
         window: AccessibilityWindowInfo,
         claim: ChromeMediaShieldReadyClaim,
         document: ChromeMediaShieldForegroundDocument,
-    ): Boolean {
-        if (!verifiesBoundContext(window, claim, document)) return false
-        val root = window.root ?: return false
+    ): String? =
+        try {
+            boundAnchorFailureReasonOrThrow(window, claim, document)
+        } catch (_: RuntimeException) {
+            "ready_boundary_anchor_stale"
+        }
+
+    private fun boundAnchorFailureReasonOrThrow(
+        window: AccessibilityWindowInfo,
+        claim: ChromeMediaShieldReadyClaim,
+        document: ChromeMediaShieldForegroundDocument,
+    ): String? {
+        if (!verifiesBoundContext(window, claim, document)) return "ready_boundary_context_mismatch"
+        val root = window.root ?: return "ready_boundary_root_missing"
         val matches =
             root.findAccessibilityNodeInfosByViewId(document.focusAnchor.viewIdResourceName).orEmpty()
+        if (matches.isEmpty()) return "ready_boundary_anchor_absent"
+        if (matches.size != 1) return "ready_boundary_anchor_ambiguous"
         val node = matches.singleOrNull()
         val webRootUniqueId = node?.webRootUniqueIdOrNull().orEmpty()
-        return ChromeMediaShieldBoundAnchorPolicy.verifies(
-            evidence =
-                ChromeMediaShieldBoundAnchorEvidence(
-                    windowId = window.id,
-                    rootPackageName = root.packageName?.toString().orEmpty(),
-                    rootUniqueId = webRootUniqueId,
-                    matchingNodeCount = matches.size,
-                    sourcePackageName = node?.packageName?.toString().orEmpty(),
-                    sourceWindowId = node?.windowId ?: -1,
-                    sourceViewIdResourceName = node?.viewIdResourceName.orEmpty(),
-                    sourceUniqueId = node?.uniqueIdOrNull().orEmpty(),
-                    sourceRootUniqueId = webRootUniqueId,
-                    sourceAttachedToForegroundRoot = node?.belongsToWindowRoot(root) == true,
-                    sourceVisibleToUser = node?.isVisibleToUser == true,
-                    markers =
-                        markersForNodeFields(
-                            contentDescription = node?.contentDescription?.toString(),
-                            text = node?.text?.toString(),
-                        ),
-                ),
-            claim = claim,
-            document = document,
-        )
+        val verified =
+            ChromeMediaShieldBoundAnchorPolicy.verifies(
+                evidence =
+                    ChromeMediaShieldBoundAnchorEvidence(
+                        windowId = window.id,
+                        rootPackageName = root.packageName?.toString().orEmpty(),
+                        rootUniqueId = webRootUniqueId,
+                        matchingNodeCount = matches.size,
+                        sourcePackageName = node?.packageName?.toString().orEmpty(),
+                        sourceWindowId = node?.windowId ?: -1,
+                        sourceViewIdResourceName = node?.viewIdResourceName.orEmpty(),
+                        sourceUniqueId = node?.uniqueIdOrNull().orEmpty(),
+                        sourceRootUniqueId = webRootUniqueId,
+                        sourceAttachedToForegroundRoot = node?.belongsToWindowRoot(root) == true,
+                        sourceVisibleToUser = node?.isVisibleToUser == true,
+                        markers =
+                            markersForNodeFields(
+                                contentDescription = node?.contentDescription?.toString(),
+                                text = node?.text?.toString(),
+                            ),
+                    ),
+                claim = claim,
+                document = document,
+            )
+        return if (verified) null else "ready_boundary_anchor_mismatch"
     }
 
     fun scan(

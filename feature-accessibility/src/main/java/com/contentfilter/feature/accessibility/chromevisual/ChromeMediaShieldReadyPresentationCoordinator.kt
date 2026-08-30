@@ -439,15 +439,20 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val lease = leaseAuthority.mint(firstAttestation, firstContext) ?: return false
 
         val boundarySnapshot = state.snapshot()
-        val boundaryDocument =
-            focusedDocument?.takeIf {
-                exactForegroundDocument(
-                    expected.claim,
-                    expected.surface.windowId,
-                    it,
-                    requireAnchor = true,
-                )
+        val boundaryDocument = focusedDocument
+        val boundaryWindow = windowInspector.findUniqueForeground()
+        val boundaryAnchorFailure =
+            when {
+                boundaryDocument == null -> "ready_boundary_document_missing"
+                boundaryWindow == null -> "ready_boundary_window_missing"
+                boundaryWindow.id != expected.surface.windowId -> "ready_boundary_window_mismatch"
+                else -> tokenScanner.boundAnchorFailureReason(boundaryWindow, expected.claim, boundaryDocument)
             }
+        if (boundaryAnchorFailure != null) {
+            leaseAuthority.revoke()
+            log("ready_release_rejected", expected, boundaryDocument, boundaryAnchorFailure)
+            return false
+        }
         val boundaryAttestation = attestationReader.read()
         val boundaryContext = boundaryDocument?.let { boundarySnapshot.toLeaseContext(viewport, it) }
         if (
