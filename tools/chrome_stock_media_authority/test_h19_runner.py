@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,7 +18,11 @@ from h19_navigation_admission import (
     materialize_restart_target,
     wait_for_controlled_document_admission,
 )
-from h19_proxy_policy import CHROME_PROXY_POLICY, chrome_proxy_policy_transition
+from h19_proxy_policy import (
+    CHROME_PROXY_POLICY,
+    chrome_proxy_policy_transition,
+    read_chrome_proxy_policy_transition,
+)
 from run_a23_gate import (
     HARNESS_CAPABILITIES,
     baseline_then_set_orientation,
@@ -140,6 +145,24 @@ class H19RunnerTest(unittest.TestCase):
         )
 
         self.assertIsNone(chrome_proxy_policy_transition([flush, set_line], 5729))
+
+    def test_chrome_proxy_policy_reads_set_and_flush_from_one_pipe_write(self):
+        set_line = (
+            "08-30 00:53:24.610  5729  5729 I cr_CombinedPProvider: "
+            f"#setPolicy() ProxySettings -> {CHROME_PROXY_POLICY}"
+        )
+        flush = "08-30 00:53:24.610  5729  5729 I cr_CombinedPProvider: #flushPolicies()"
+        read_descriptor, write_descriptor = os.pipe()
+        try:
+            os.write(write_descriptor, f"{set_line}\n{flush}\n".encode())
+            with os.fdopen(read_descriptor, "rb", buffering=0) as stream:
+                evidence = read_chrome_proxy_policy_transition(stream, 5729, 1.0)
+        finally:
+            os.close(write_descriptor)
+
+        self.assertIsNotNone(evidence)
+        self.assertTrue(evidence["pass"])
+        self.assertTrue(evidence["flushObservedAfterSet"])
 
     def test_controlled_navigation_url_is_fresh_but_keeps_exact_fixture_origin_and_path(self):
         first = controlled_navigation_url("a" * 32, 1)
