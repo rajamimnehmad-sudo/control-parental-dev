@@ -2,7 +2,7 @@
   "schema": "glosh-h19-a23-plan-v1",
   "expectedModel": "SM-A235M",
   "expectedSdk": 34,
-  "expectedAppVersionCode": 383,
+  "expectedAppVersionCode": 384,
   "minimumChromeMajor": 146,
   "samplingFps": 4,
   "startupTimeoutSeconds": 120,
@@ -43,6 +43,7 @@
       "mode": "selective",
       "states": [
         {"id": "sel-controlled-portrait", "navigation": "controlled", "newNavigation": true, "orientation": "portrait", "recordSeconds": 30, "readyTimeoutSeconds": 8, "fixtureTimeoutSeconds": 12, "swipes": 3},
+        {"id": "sel-two-tab-binding", "navigation": "two-tab-binding", "newNavigation": true, "visualReviewRequired": false, "orientation": "current", "recordSeconds": 30, "readyTimeoutSeconds": 8},
         {"id": "sel-controlled-landscape", "navigation": "controlled", "newNavigation": true, "orientation": "landscape", "recordSeconds": 28, "readyTimeoutSeconds": 8, "fixtureTimeoutSeconds": 12, "swipes": 2},
         {"id": "sel-google-mujer-cold", "url": "https://www.google.com/search?udm=2&q=mujer&safe=active", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
         {"id": "sel-google-preview", "navigation": "foreground", "newNavigation": false, "orientation": "portrait", "recordSeconds": 11, "readyTimeoutSeconds": 8, "taps": [{"xPermille": 500, "yPermille": 520}]},

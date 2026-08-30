@@ -42,6 +42,7 @@ from h19_device import (
     filtered_device_policy,
     locate_adb,
     navigate,
+    observed_display_rotation,
     package_info,
     restore_setting,
     set_and_verify_orientation,
@@ -60,6 +61,8 @@ from h19_plan import (
     validate_plan,
     visual_review_required_for,
 )
+from h19_ready import current_ready_result, ready_baseline
+from h19_lifecycle_gates import restart_glosh_phase, run_two_tab_binding_gate
 
 
 ACTION_PREFIX = "com.contentfilter.user.chromedataplane.command."
@@ -72,6 +75,20 @@ SECURITY_ZERO_COUNTERS = (
     "quicAttempts",
     "directTcpAttempts",
 )
+HARNESS_CAPABILITIES = {
+    "stockChromeTabSwitch": {
+        "status": "SUPPORTED",
+        "mechanism": "android.provider.Browser.EXTRA_CREATE_NEW_TAB_then_android_back",
+        "authority": "exact_event_source_ready_binding",
+        "coordinateUiAutomation": False,
+        "countsAsPass": True,
+    },
+    "backgroundForeground": {
+        "status": "SUPPORTED",
+        "meaning": "android_home_then_same_chrome_foreground",
+        "countsAsTabSwitch": False,
+    },
+}
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -102,7 +119,7 @@ def write_logcat_summary(path: Path, summary: dict[str, Any]) -> None:
 def logcat(adb: Adb, since: str) -> str:
     filters = [
         "ChromePhotosDataPlane:I", "ChromeMediaShieldStatus:I", "ChromeCoverageAudit17:I", "ChromeMediaShieldReady:I",
-        "ChromeProcessGuard:I", "FilterVpnService:I", "VpnTransport09A:I",
+        "ChromePhotosSurfaceProbe:I", "ChromeProcessGuard:I", "FilterVpnService:I", "VpnTransport09A:I",
         "AndroidRuntime:E", "libc:F", "DEBUG:F", "*:S",
     ]
     return adb.run("logcat", "-d", "-T", since, "-v", "threadtime", *filters, timeout=90).stdout
@@ -164,62 +181,13 @@ def stop_phase(adb: Adb, timeout_seconds: int = 20) -> None:
     raise HarnessError("H19 service did not stop and roll back within the bounded cleanup window")
 
 
-def restart_glosh_phase(
-    adb: Adb,
-    mode: str,
-    since: str,
-    timeout_seconds: int = 90,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """Exercise the existing DUMP-only main-process kill and restore current lab mode."""
-
-    overall_deadline = time.monotonic() + timeout_seconds
-    _, before = request_status(adb, since)
-    previous_session = str(before.get("activeMode", {}).get("session", ""))
-    before_pids = set(adb.shell("pidof", APP_PACKAGE, check=False).split())
-    if not previous_session or not before_pids:
-        raise HarnessError("cannot prove the current H19 session/main process before restart")
-    try:
-        adb.broadcast(ACTION_PREFIX + "MAIN_PROCESS_KILL")
-    except subprocess.CalledProcessError:
-        # The receiver intentionally kills its own process before `am broadcast`
-        # is guaranteed to observe a normal completion.
-        pass
-    deadline = min(overall_deadline, time.monotonic() + 10)
-    after_kill_pids: set[str] = set()
-    while time.monotonic() < deadline:
-        after_kill_pids = set(adb.shell("pidof", APP_PACKAGE, check=False).split())
-        services = adb.shell("dumpsys", "activity", "services", APP_PACKAGE, check=False)
-        if before_pids.isdisjoint(after_kill_pids) and "ChromePhotosDataPlaneLabService" not in services:
-            break
-        time.sleep(0.1)
-    else:
-        raise HarnessError("Glosh main process/service did not cross the bounded restart boundary")
-    remaining = max(1, int(overall_deadline - time.monotonic()))
-    active = start_phase(adb, mode, since, remaining, previous_session=previous_session)
-    after_pids = set(adb.shell("pidof", APP_PACKAGE, check=False).split())
-    current_session = str(active.get("activeMode", {}).get("session", ""))
-    if not after_pids or not before_pids.isdisjoint(after_pids) or current_session == previous_session:
-        raise HarnessError("Glosh restart did not produce a fresh process and protection session")
-    return (
-        {
-            "performed": True,
-            "oldPidCount": len(before_pids),
-            "newPidCount": len(after_pids),
-            "oldSessionSha256": sha256_text(previous_session),
-            "newSessionSha256": sha256_text(current_session),
-            "labServiceObservedStopped": True,
-            "modeRestored": mode,
-        },
-        active,
-    )
-
-
 def wait_for_ready(
     adb: Adb,
     since: str,
     timeout_seconds: int,
     minimum_release_count: int,
     previous_marker: dict[str, Any] | None = None,
+    require_advance: bool = False,
 ) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_seconds
     attempts = 0
@@ -227,39 +195,36 @@ def wait_for_ready(
     while time.monotonic() < deadline:
         attempts += 1
         _, last_status = request_status(adb, since)
-        markers = [
-            marker
-            for marker in last_status.get("readyMarkers", [])
-            if marker.get("package") == CHROME_PACKAGE and marker.get("lifecycle", "").isdigit()
-        ]
-        fields = last_status.get("status", {}).get("fields", {})
-        release_count = int(last_status.get("readyPhases", {}).get("ready_foreground_released", 0))
-        marker_advanced = False
-        if len(markers) == 1:
-            marker_advanced = previous_marker is None or any(
-                markers[0].get(field) != previous_marker.get(field)
-                for field in ("tokenDigestPrefix", "lifecycle", "windowId")
-            )
-        if (
-            len(markers) == 1
-            and fields.get("active") == "true"
-            and fields.get("lifecycle") == "PresentationReady"
-            and release_count >= minimum_release_count
-            and marker_advanced
-        ):
-            return {
-                "pass": True,
-                "attempts": attempts,
-                "marker": markers[0],
-                "lifecycle": fields.get("lifecycle"),
-                "releaseCountSinceStateStart": release_count,
-                "markerAdvanced": marker_advanced,
-            }
+        result = current_ready_result(
+            last_status,
+            expected_package=CHROME_PACKAGE,
+            minimum_release_count=minimum_release_count,
+            previous_marker=previous_marker,
+            require_advance=require_advance,
+        )
+        if result is not None:
+            return {**result, "attempts": attempts}
         time.sleep(0.25)
     raise HarnessError(
         "foreground READY authority did not become current within the bounded wait: "
-        f"trustedReadyMarkers={last_status.get('readyMarkers', [])} status={last_status.get('status', {})}"
+        f"currentReadyBinding={last_status.get('currentReadyBinding')} status={last_status.get('status', {})}"
     )
+
+
+def baseline_then_set_orientation(
+    adb: Adb,
+    phase_since: str,
+    orientation: str,
+) -> tuple[dict[str, Any], dict[str, Any], bool]:
+    """Snapshot READY before a rotation can invalidate it, then apply orientation."""
+
+    _, summary = request_status(adb, phase_since)
+    baseline = ready_baseline(summary)
+    before = observed_display_rotation(adb)
+    evidence = set_and_verify_orientation(adb, orientation)
+    after = evidence.get("observedRotation")
+    changed = orientation != "current" and before is not None and after is not None and before != after
+    return baseline, {**evidence, "baselineRotation": before, "changed": changed}, changed
 
 
 def wait_for_fixture_report(
@@ -375,12 +340,23 @@ def run_state(
     mode: str,
     previous_counters: dict[str, int],
     previous_fixture_counts: dict[str, int],
+    phase_since: str,
 ) -> dict[str, Any]:
     state_id = safe_id(state["id"])
     directory = output / "states" / state_id
     directory.mkdir(parents=True)
-    orientation_evidence = set_and_verify_orientation(adb, state.get("orientation", "current"))
     state_since = adb.shell("date", "+%m-%d %H:%M:%S.000").strip()
+    ready_required = ready_required_for(state)
+    if ready_required:
+        ready_state_baseline, orientation_evidence, orientation_changed = baseline_then_set_orientation(
+            adb,
+            phase_since,
+            state.get("orientation", "current"),
+        )
+    else:
+        ready_state_baseline = {"releaseCount": 0, "marker": None}
+        orientation_evidence = set_and_verify_orientation(adb, state.get("orientation", "current"))
+        orientation_changed = False
     new_navigation = new_navigation_for(state)
     adb.broadcast(
         ACTION_PREFIX + "AUDIT_MARK",
@@ -403,48 +379,59 @@ def run_state(
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    ready_evidence: dict[str, Any] = {"required": ready_required_for(state), "pass": False}
+    ready_evidence: dict[str, Any] = {"required": ready_required, "pass": False}
     process_restart: dict[str, Any] = {"performed": False}
     counter_baseline = previous_counters
     try:
         time.sleep(0.4)
-        baseline_release_count = 0
-        baseline_marker: dict[str, Any] | None = None
-        if ready_evidence["required"] and navigation_requires_new_release(state):
-            _, baseline_status_summary = request_status(adb, state_since)
-            baseline_markers = [
-                marker
-                for marker in baseline_status_summary.get("readyMarkers", [])
-                if marker.get("package") == CHROME_PACKAGE and marker.get("lifecycle", "").isdigit()
-            ]
-            _, baseline_status = request_status(adb, state_since)
-            baseline_release_count = int(
-                baseline_status.get("readyPhases", {}).get("ready_foreground_released", 0)
-            )
-            if len(baseline_markers) == 1:
-                baseline_marker = baseline_markers[0]
-        if state.get("navigation") == "restart-glosh":
+        baseline_release_count = int(ready_state_baseline["releaseCount"])
+        baseline_marker = ready_state_baseline["marker"]
+        transition_required = (
+            navigation_requires_new_release(state)
+            or orientation_changed
+            or state.get("navigation", "url") == "background-foreground"
+        )
+        ready_completed_by_action = False
+        if state.get("navigation") == "two-tab-binding":
+            ready_evidence = {
+                "required": True,
+                **run_two_tab_binding_gate(
+                    adb,
+                    phase_since,
+                    int(state.get("readyTimeoutSeconds", 8)),
+                    baseline_release_count,
+                    baseline_marker,
+                    wait_for_ready,
+                ),
+            }
+            ready_completed_by_action = True
+        elif state.get("navigation") == "restart-glosh":
             process_restart, restarted = restart_glosh_phase(
                 adb,
                 mode,
                 state_since,
                 timeout_seconds=int(state.get("processRestartTimeoutSeconds", 25)),
+                request_status=request_status,
+                start_phase=start_phase,
+                foreground_current=lambda device: navigate(device, {"navigation": "foreground"}),
             )
             counter_baseline = status_counter_snapshot(restarted)
             navigate(adb, {"navigation": "reload"})
+            process_restart["explicitReloadPerformedAfterFailClose"] = True
         else:
             navigate(adb, state)
-        if ready_evidence["required"]:
+        if ready_evidence["required"] and not ready_completed_by_action:
             ready_evidence = {
                 "required": True,
                 **wait_for_ready(
                     adb,
-                    state_since,
+                    phase_since,
                     int(state.get("readyTimeoutSeconds", 8)),
                     minimum_release_count=(
-                        baseline_release_count + 1 if navigation_requires_new_release(state) else 0
+                        baseline_release_count + 1 if transition_required else baseline_release_count
                     ),
                     previous_marker=baseline_marker,
+                    require_advance=transition_required,
                 ),
             }
         else:
@@ -461,13 +448,14 @@ def run_state(
             time.sleep(1.0)
         if post_gesture_ready_required_for(state):
             prior_marker = ready_evidence.get("marker")
-            prior_release_count = int(ready_evidence.get("releaseCountSinceStateStart", 0))
+            prior_release_count = int(ready_evidence.get("releaseCountInPhase", 0))
             ready_evidence["postGesture"] = wait_for_ready(
                 adb,
-                state_since,
+                phase_since,
                 int(state.get("readyTimeoutSeconds", 8)),
                 minimum_release_count=prior_release_count + 1,
                 previous_marker=prior_marker if isinstance(prior_marker, dict) else None,
+                require_advance=True,
             )
         controlled = state.get("navigation", "url") == "controlled" or urlsplit(state.get("url", "")).path == "/web19/controlled"
         if controlled:
@@ -550,6 +538,8 @@ def run_state(
     target = state.get("url", "")
     if state.get("navigation") == "controlled":
         target = CONTROLLED_URL
+    elif state.get("navigation") == "two-tab-binding":
+        target = CONTROLLED_URL
     elif state.get("navigation") == "chrome-policy":
         target = CHROME_POLICY_URL
     parsed = urlsplit(target)
@@ -567,6 +557,9 @@ def run_state(
         "urlSha256": sha256_text(target) if target else "",
         "orientationVerification": orientation_evidence,
         "readyWait": ready_evidence,
+        "stockChromeTabSwitch": (
+            ready_evidence if state.get("navigation") == "two-tab-binding" else {"applicable": False}
+        ),
         "accessibility": ui,
         "logcat": log_summary,
         "counters": {
@@ -607,6 +600,7 @@ def main() -> int:
     run_since = adb.shell("date", "+%m-%d %H:%M:%S.000").strip()
     started = time.time()
     preflight = collect_preflight(adb, plan.get("expectedModel", "SM-A235M"), int(plan.get("expectedSdk", 34)))
+    preflight["harnessCapabilities"] = HARNESS_CAPABILITIES
     expected_version = plan.get("expectedAppVersionCode")
     if expected_version is not None and preflight["app"]["versionCode"] != str(expected_version):
         raise HarnessError(f"installed app versionCode is {preflight['app']['versionCode']}, expected {expected_version}")
@@ -646,7 +640,7 @@ def main() -> int:
             for state in phase["states"]:
                 result = run_state(
                     adb, state, args.output, int(plan.get("samplingFps", 4)),
-                    phase_id, mode, previous_counters, previous_fixture_counts,
+                    phase_id, mode, previous_counters, previous_fixture_counts, last_phase_since,
                 )
                 previous_counters = result["counters"]["current"]
                 fixture_counts = result["controlledFixtureGate"].get("counts", {})
@@ -675,6 +669,7 @@ def main() -> int:
                         "auditPlaceholderFrames": len(video["auditPlaceholderVisibleFrames"]),
                         "controlledSentinelLikeFrames": len(video["controlledSentinelLikeVisibleFrames"]),
                         "readyMarkerCount": len(result["accessibility"].get("readyMarkers", [])),
+                        "stockChromeTabSwitchPass": result["stockChromeTabSwitch"].get("pass"),
                         "counterDelta": result["counters"]["delta"],
                         "controlledFixturePass": result["controlledFixtureGate"].get("pass"),
                         "visualReviewStatus": result["visualReview"].get("reviewStatus"),
@@ -692,6 +687,7 @@ def main() -> int:
                 "finalLogcat": final_summary,
                 "samplingResolution": f"{int(plan.get('samplingFps', 4))}_fps",
                 "screensAreEvidenceOnly": True,
+                "harnessCapabilities": HARNESS_CAPABILITIES,
                 "visualReviewGate": {
                     "status": "PENDING_MODEL_OR_HUMAN_REVIEW" if visual_review_entries else "NOT_REQUIRED",
                     "automaticPassEligible": False if visual_review_entries else True,

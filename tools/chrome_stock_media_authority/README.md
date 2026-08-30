@@ -30,6 +30,23 @@ The runner:
 - always stops H19, removes only its own device temporary directory, and restores
   the exact rotation settings on normal exit, failure, Ctrl-C, or SIGTERM.
 
+READY evidence is derived from the latest exact `event_source` release and is
+invalidated by a later revoke/fail-close event. A state that keeps the same
+foreground document may reuse that current verified binding without requiring a
+duplicate release log. The runner snapshots the current binding before changing
+orientation, so a real rotation must produce a later current binding before the
+state can proceed.
+
+The bounded `two-tab-binding` action uses Android's public
+`Browser.EXTRA_CREATE_NEW_TAB` contract to open a controlled tab B. It accepts B
+only after a distinct exact `event_source` READY binding, then uses Android Back
+and accepts tab A only when its document binding (window/document/token/root/source)
+is restored under a strictly newer visibility lifecycle. Any reuse of B's
+token/root/source binding across that boundary fails the gate. No Chrome UI
+coordinates, CDP, DevTools, or screenshot authority are involved. Android Home
+→ Chrome foregrounding remains a separate action and never counts as a tab
+switch.
+
 Run the deterministic local tests first:
 
 ```bash
@@ -45,13 +62,16 @@ python3 tools/chrome_stock_media_authority/run_a23_gate.py \
   --output .codex-tmp/chrome-stock-media-authority/h19-run
 ```
 
-Plans can contain up to four phases and 24 states per phase. Supported phase
+Plans can contain up to four phases and 25 states per phase. Supported phase
 modes are `replace-all` and `selective`. A state can open an HTTP(S) URL or use
 the bounded actions `controlled`, `back`, `forward`, `reload`, `foreground`,
-`background-foreground`, `restart-chrome`, `restart-glosh`, and
+`background-foreground`, `restart-chrome`, `restart-glosh`, `two-tab-binding`, and
 `chrome-policy`. `restart-glosh` uses the existing DUMP-only main-process kill,
-requires a fresh PID/protection session, restores the same lab mode, and reloads
-the current Chrome document under that session. The
+requires a fresh PID/protection session, restores the same lab mode, and first
+proves the existing Chrome document has no current READY binding and remains
+covered by an attached opaque surface. Only then does the runner explicitly
+reload: a process/session restart cannot rebind the old document token without
+new navigation/reload. The
 `controlled` and `chrome-policy` targets are fixed in code, so a plan cannot
 smuggle an arbitrary non-HTTP scheme. `restart-chrome` preserves the profile.
 Orientation is `current`, `portrait`, or `landscape`; swipe and recording counts

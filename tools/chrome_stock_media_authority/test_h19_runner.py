@@ -1,13 +1,16 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from h19_plan import HarnessError
 from h19_device import ce_data_inode_from_package_dump
 from run_a23_gate import (
+    HARNESS_CAPABILITIES,
+    baseline_then_set_orientation,
     enforce_counter_gate,
     exit_info_delta,
+    ready_baseline,
     restart_glosh_phase,
     set_and_verify_orientation,
     start_phase,
@@ -37,6 +40,8 @@ class FakeProcessRestartAdb:
         self.broadcasts: list[str] = []
 
     def shell(self, *args, **_kwargs):
+        if args[:1] == ("date",):
+            return "08-29 12:00:00.000"
         if args[:2] == ("pidof", "com.contentfilter.user.dev"):
             self.pid_calls += 1
             return "101" if self.pid_calls == 1 else "202"
@@ -59,6 +64,16 @@ class FakeStartAdb:
 
 
 class H19RunnerTest(unittest.TestCase):
+    def test_tab_switch_uses_exact_binding_and_is_not_aliased_to_app_foregrounding(self):
+        self.assertEqual("SUPPORTED", HARNESS_CAPABILITIES["stockChromeTabSwitch"]["status"])
+        self.assertEqual(
+            "exact_event_source_ready_binding",
+            HARNESS_CAPABILITIES["stockChromeTabSwitch"]["authority"],
+        )
+        self.assertFalse(HARNESS_CAPABILITIES["stockChromeTabSwitch"]["coordinateUiAutomation"])
+        self.assertTrue(HARNESS_CAPABILITIES["stockChromeTabSwitch"]["countsAsPass"])
+        self.assertFalse(HARNESS_CAPABILITIES["backgroundForeground"]["countsAsTabSwitch"])
+
     def test_phase_start_waits_for_guard_release_not_merely_proxy_ready(self):
         common = {
             "activeMode": {
@@ -130,19 +145,41 @@ class H19RunnerTest(unittest.TestCase):
         adb = FakeProcessRestartAdb()
         before = {"activeMode": {"session": "old-session"}}
         after = {"activeMode": {"session": "new-session"}}
-        with (
-            patch("run_a23_gate.request_status", return_value=("", before)),
-            patch("run_a23_gate.start_phase", return_value=after) as start,
-        ):
-            evidence, active = restart_glosh_phase(adb, "replace-all", "since", timeout_seconds=5)
+        fail_closed = {
+            "currentReadyBinding": None,
+            "currentSurfaceState": {
+                "phase": "data_plane_lease",
+                "action": "waiting",
+                "reason": "foreground_ready_absent",
+                "transparent": False,
+                "rawPresented": False,
+                "attachmentCount": 1,
+            },
+        }
+        request = Mock(side_effect=[("", before), ("", fail_closed)])
+        start = Mock(return_value=after)
+        foreground = Mock()
+        evidence, active = restart_glosh_phase(
+            adb,
+            "replace-all",
+            "since",
+            timeout_seconds=5,
+            request_status=request,
+            start_phase=start,
+            foreground_current=foreground,
+        )
 
         self.assertEqual(after, active)
         self.assertTrue(evidence["performed"])
+        self.assertTrue(evidence["preReloadFailClose"]["pass"])
+        self.assertFalse(evidence["reloadPerformedByRestartHelper"])
         self.assertEqual(
             ["com.contentfilter.user.chromedataplane.command.MAIN_PROCESS_KILL"],
             adb.broadcasts,
         )
         self.assertEqual("old-session", start.call_args.kwargs["previous_session"])
+        self.assertEqual("08-29 12:00:00.000", start.call_args.args[2])
+        foreground.assert_called_once_with(adb)
 
     def test_orientation_is_verified_before_state_recording(self):
         adb = FakeRotationAdb()
@@ -193,7 +230,10 @@ class H19RunnerTest(unittest.TestCase):
         with (
             patch(
                 "run_a23_gate.request_status",
-                side_effect=[("", {**status, "readyMarkers": [previous]}), ("", {**status, "readyMarkers": [fresh]})],
+                side_effect=[
+                    ("", {**status, "currentReadyBinding": previous}),
+                    ("", {**status, "currentReadyBinding": fresh, "readyPhases": {"ready_foreground_released": 2}}),
+                ],
             ),
             patch("run_a23_gate.time.sleep"),
         ):
@@ -203,10 +243,82 @@ class H19RunnerTest(unittest.TestCase):
                 timeout_seconds=1,
                 minimum_release_count=1,
                 previous_marker=previous,
+                require_advance=True,
             )
 
         self.assertEqual("fresh", result["marker"]["tokenDigestPrefix"])
         self.assertEqual(2, result["attempts"])
+
+    def test_ready_wait_accepts_the_current_verified_binding_without_a_new_release(self):
+        current = {
+            "package": "com.android.chrome",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "current",
+            "windowId": "4",
+            "rootDigestPrefix": "root",
+            "sourceDigestPrefix": "source",
+        }
+        summary = {
+            "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
+            "readyPhases": {"ready_foreground_released": 3},
+            "currentReadyBinding": current,
+        }
+        with patch("run_a23_gate.request_status", return_value=("", summary)):
+            result = wait_for_ready(
+                object(),
+                "phase-since",
+                timeout_seconds=1,
+                minimum_release_count=3,
+                previous_marker=current,
+                require_advance=False,
+            )
+
+        self.assertEqual(current, result["marker"])
+        self.assertTrue(result["acceptedCurrentBinding"])
+        self.assertFalse(result["markerAdvanced"])
+
+    def test_rotation_baseline_is_captured_before_orientation_mutation(self):
+        calls: list[str] = []
+        current = {"package": "com.android.chrome", "lifecycle": "2"}
+
+        def status(*_args, **_kwargs):
+            calls.append("status")
+            return "", {
+                "readyPhases": {"ready_foreground_released": 4},
+                "currentReadyBinding": current,
+            }
+
+        def observed(*_args, **_kwargs):
+            calls.append("observed")
+            return 0
+
+        def rotate(*_args, **_kwargs):
+            calls.append("rotate")
+            return {"requested": "landscape", "observedRotation": 1, "verified": True}
+
+        with (
+            patch("run_a23_gate.request_status", side_effect=status),
+            patch("run_a23_gate.observed_display_rotation", side_effect=observed),
+            patch("run_a23_gate.set_and_verify_orientation", side_effect=rotate),
+        ):
+            baseline, orientation, changed = baseline_then_set_orientation(object(), "phase", "landscape")
+
+        self.assertEqual(["status", "observed", "rotate"], calls)
+        self.assertEqual({"releaseCount": 4, "marker": current}, baseline)
+        self.assertEqual(0, orientation["baselineRotation"])
+        self.assertTrue(changed)
+
+    def test_ready_baseline_has_no_passive_marker_fallback(self):
+        self.assertEqual(
+            {"releaseCount": 2, "marker": None},
+            ready_baseline(
+                {
+                    "readyPhases": {"ready_foreground_released": 2},
+                    "readyMarkers": [{"tokenDigestPrefix": "historical-only"}],
+                    "currentReadyBinding": None,
+                }
+            ),
+        )
 
     def test_controlled_gate_requires_report_counts_to_advance(self):
         stale = {"fixtureReport": {"pass": True, "counts": {"reports": 1, "frame_reports": 1}}}

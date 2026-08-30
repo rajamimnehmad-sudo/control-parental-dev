@@ -18,6 +18,7 @@ ALLOWED_NAVIGATION = {
     "background-foreground",
     "restart-chrome",
     "restart-glosh",
+    "two-tab-binding",
     "chrome-policy",
 }
 ALLOWED_ORIENTATIONS = {"current", "portrait", "landscape"}
@@ -30,8 +31,10 @@ NAVIGATION_DEFAULTS_TO_NEW_DOCUMENT = {
     "reload",
     "restart-chrome",
     "restart-glosh",
+    "two-tab-binding",
     "chrome-policy",
 }
+AUTOMATIC_AUTHORITY_EVIDENCE_NAVIGATION = {"controlled", "two-tab-binding"}
 
 
 class HarnessError(RuntimeError):
@@ -73,7 +76,7 @@ def visual_review_required_for(state: dict[str, Any]) -> bool:
         if not isinstance(explicit, bool):
             raise HarnessError("visualReviewRequired must be boolean")
         return explicit
-    return state.get("navigation", "url") != "controlled"
+    return state.get("navigation", "url") not in AUTOMATIC_AUTHORITY_EVIDENCE_NAVIGATION
 
 
 def post_gesture_ready_required_for(state: dict[str, Any]) -> bool:
@@ -111,8 +114,8 @@ def validate_plan(raw: Any) -> dict[str, Any]:
             raise HarnessError("every phase requires mode replace-all or selective")
         safe_id(phase.get("id"))
         states = phase.get("states")
-        if not isinstance(states, list) or not 1 <= len(states) <= 24:
-            raise HarnessError("every phase requires 1..24 states")
+        if not isinstance(states, list) or not 1 <= len(states) <= 25:
+            raise HarnessError("every phase requires 1..25 states")
         for state in states:
             if not isinstance(state, dict):
                 raise HarnessError("state must be an object")
@@ -137,8 +140,8 @@ def validate_plan(raw: Any) -> dict[str, Any]:
             if navigation not in READY_OPTIONAL_NAVIGATION and not ready_required:
                 raise HarnessError("document/interaction states cannot disable foreground READY authority")
             visual_review_required = visual_review_required_for(state)
-            if navigation != "controlled" and not visual_review_required:
-                raise HarnessError("every non-controlled state requires digest-bound visual review")
+            if navigation not in AUTOMATIC_AUTHORITY_EVIDENCE_NAVIGATION and not visual_review_required:
+                raise HarnessError("every real-web/non-authority state requires digest-bound visual review")
             duration = state.get("recordSeconds", 12)
             ready_timeout = state.get("readyTimeoutSeconds", 8 if ready_required else 0)
             fixture_timeout = state.get("fixtureTimeoutSeconds", 10)
@@ -173,7 +176,8 @@ def validate_plan(raw: Any) -> dict[str, Any]:
             post_gesture_ready = post_gesture_ready_required_for(state)
             if post_gesture_ready and (not ready_required or not taps):
                 raise HarnessError("post-gesture READY requires a READY-bound state with at least one tap")
-            total_ready_wait = ready_timeout * (2 if post_gesture_ready else 1)
+            ready_wait_count = 3 if navigation == "two-tab-binding" else 2 if post_gesture_ready else 1
+            total_ready_wait = ready_timeout * ready_wait_count
             controlled = navigation == "controlled" or (
                 navigation == "url" and urlsplit(str(url)).path == "/web19/controlled"
             )

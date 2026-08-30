@@ -22,12 +22,21 @@ from h19_plan import HarnessError, validate_plan
 
 class H19EvidenceTest(unittest.TestCase):
     def test_ready_marker_evidence_comes_from_the_bound_accessibility_service(self) -> None:
-        line = (
+        common = (
+            "windowId=17 surfaceEpoch=8 documentSequence=3 lifecycle=4 token=abcdef012345 "
+        )
+        lines = (
+            "I ChromeMediaShieldReady: phase=ready_ack_accepted " + common +
+            "axBound=false binding=none root= source= reason= rawPresented=false",
+            "I ChromeMediaShieldReady: phase=ready_focus_bound " + common +
+            "root=111111111111 source=222222222222 binding=event_source axBound=true "
+            "reason= rawPresented=false",
             "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=17 surfaceEpoch=8 "
-            "documentSequence=3 lifecycle=4 token=abcdef012345 axBound=true reason= rawPresented=false"
+            "documentSequence=3 lifecycle=4 token=abcdef012345 root=111111111111 "
+            "source=222222222222 binding=event_source axBound=true reason= rawPresented=false",
         )
 
-        summary = summarize_logcat(line)
+        summary = summarize_logcat("\n".join(lines))
 
         self.assertEqual(
             {
@@ -36,11 +45,100 @@ class H19EvidenceTest(unittest.TestCase):
                 "documentSequence": "3",
                 "lifecycle": "4",
                 "tokenDigestPrefix": "abcdef012345",
+                "rootDigestPrefix": "111111111111",
+                "sourceDigestPrefix": "222222222222",
+                "binding": "event_source",
                 "axBound": True,
+                "phase": "ready_foreground_released",
+                "reason": "",
+                "rawPresented": False,
+                "orderingVerified": True,
             },
             summary["readyMarkers"][0],
         )
+        self.assertEqual(summary["readyMarkers"][0], summary["currentReadyBinding"])
+        self.assertEqual(0, summary["readyBindingOrder"]["violations"])
         self.assertNotIn("glosh-shield-ready", str(summary))
+
+    def test_release_without_ack_and_focus_order_never_becomes_current(self) -> None:
+        release = (
+            "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=7 documentSequence=2 "
+            "lifecycle=3 token=aaaaaaaaaaaa root=bbbbbbbbbbbb source=cccccccccccc "
+            "binding=event_source axBound=true reason= rawPresented=false"
+        )
+
+        summary = summarize_logcat(release)
+
+        self.assertIsNone(summary["currentReadyBinding"])
+        self.assertEqual(1, summary["readyBindingOrder"]["violations"])
+
+    def test_ordered_release_missing_source_digest_is_not_counted_as_verified(self) -> None:
+        common = "windowId=7 documentSequence=2 lifecycle=3 token=aaaaaaaaaaaa "
+        summary = summarize_logcat(
+            "\n".join(
+                (
+                    "I ChromeMediaShieldReady: phase=ready_ack_accepted " + common,
+                    "I ChromeMediaShieldReady: phase=ready_focus_bound " + common
+                    + "root=bbbbbbbbbbbb binding=event_source axBound=true rawPresented=false",
+                    "I ChromeMediaShieldReady: phase=ready_foreground_released " + common
+                    + "root=bbbbbbbbbbbb binding=event_source axBound=true rawPresented=false",
+                )
+            )
+        )
+
+        self.assertIsNone(summary["currentReadyBinding"])
+        self.assertEqual(0, summary["readyBindingOrder"]["verifiedReleaseCount"])
+
+    def test_ready_timeline_is_sanitized_and_revocation_clears_current_binding(self) -> None:
+        released = (
+            "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=7 documentSequence=2 "
+            "lifecycle=3 token=aaaaaaaaaaaa root=bbbbbbbbbbbb source=cccccccccccc "
+            "binding=event_source axBound=true reason= rawPresented=false"
+        )
+        rejected = (
+            "I ChromeMediaShieldReady: phase=ready_focus_rejected windowId=7 documentSequence=2 "
+            "lifecycle=3 token=secret-token root=raw-root source=raw-source binding=forged "
+            "axBound=false reason=ready_focus_wrong_window rawPresented=false"
+        )
+        revoked = (
+            "I ChromeMediaShieldReady: phase=ready_foreground_revoked windowId=7 documentSequence=2 "
+            "lifecycle=3 token=aaaaaaaaaaaa axBound=false reason=ready_lease_stale_or_unhealthy "
+            "rawPresented=false"
+        )
+
+        summary = summarize_logcat("\n".join((released, rejected, revoked)))
+
+        self.assertIsNone(summary["currentReadyBinding"])
+        self.assertEqual(1, summary["readyReasons"]["ready_focus_wrong_window"])
+        self.assertEqual(1, summary["readyReasons"]["ready_lease_stale_or_unhealthy"])
+        rejected_event = summary["readyTimeline"][1]
+        self.assertEqual("", rejected_event["tokenDigestPrefix"])
+        self.assertEqual("", rejected_event["rootDigestPrefix"])
+        self.assertEqual("", rejected_event["sourceDigestPrefix"])
+        self.assertEqual("", rejected_event["binding"])
+        self.assertNotIn("secret-token", str(summary))
+        self.assertNotIn("raw-root", str(summary))
+
+    def test_surface_probe_evidence_is_bounded_sanitized_and_tracks_opacity(self) -> None:
+        summary = summarize_logcat(
+            "I ChromePhotosSurfaceProbe: phase=data_plane_lease action=waiting "
+            "reason=foreground_ready_absent windowId=17 epoch=9 transparent=false "
+            "attachmentCount=1 rawPresented=false"
+        )
+
+        self.assertEqual(
+            {
+                "phase": "data_plane_lease",
+                "action": "waiting",
+                "reason": "foreground_ready_absent",
+                "windowId": "17",
+                "epoch": "9",
+                "transparent": False,
+                "attachmentCount": 1,
+                "rawPresented": False,
+            },
+            summary["currentSurfaceState"],
+        )
 
     def test_structured_status_reconstructs_untruncated_security_counters(self) -> None:
         logcat = "\n".join(
@@ -92,6 +190,8 @@ class H19EvidenceTest(unittest.TestCase):
             "DOCUMENTS=1,FRAMES=1,SCRIPTS=1,STYLES=1,WORKERS=1,SERVICE_WORKERS=0,"
             f"FRAME_REPORTS=1,FRAME_REPORT_REJECTS=0,FRAME_REPORT={frame},"
             f"FRAME_REPORT_SHA={'a' * 64},FRAME_CHALLENGE_SHA={'b' * 64},"
+            f"FRAME_GENERATION=1,FRAME_ACCEPTED_CHALLENGE_SHA={'b' * 64},"
+            f"FRAME_REPORT_BINDING_SHA={'c' * 64},"
             "SAME_URL_BODIES=2,REPORTS=1"
         )
 
@@ -99,6 +199,8 @@ class H19EvidenceTest(unittest.TestCase):
 
         self.assertTrue(parsed["pass"])
         self.assertEqual(5, len(parsed["frameOutcomes"]))
+        self.assertEqual(1, parsed["frameGeneration"])
+        self.assertEqual("c" * 64, parsed["frameReportBindingSha256"])
 
         escaped = parse_fixture_report(value.replace("frame-canvas=BLOCKED", "frame-canvas=ESCAPED"))
         errored = parse_fixture_report(value.replace("normal-css=SAFE", "normal-css=ERROR"))
@@ -106,6 +208,31 @@ class H19EvidenceTest(unittest.TestCase):
         self.assertIn("frame_report_not_all_blocked", escaped["reasons"])
         self.assertFalse(errored["pass"])
         self.assertIn("main_report_contains_error", errored["reasons"])
+
+        wrong_challenge = parse_fixture_report(
+            value.replace(
+                "FRAME_ACCEPTED_CHALLENGE_SHA=" + "b" * 64,
+                "FRAME_ACCEPTED_CHALLENGE_SHA=" + "d" * 64,
+            )
+        )
+        missing_binding = parse_fixture_report(
+            value.replace(
+                "FRAME_REPORT_BINDING_SHA=" + "c" * 64,
+                "FRAME_REPORT_BINDING_SHA=not_run",
+            )
+        )
+        self.assertIn("frame_accepted_challenge_mismatch", wrong_challenge["reasons"])
+        self.assertIn("frame_report_binding_missing", missing_binding["reasons"])
+
+    def test_legacy_fixture_schema_fails_closed(self) -> None:
+        legacy = (
+            "REPORT=normal-css=SAFE,DOCUMENTS=1,FRAMES=1,SCRIPTS=1,STYLES=1,WORKERS=1,"
+            "SERVICE_WORKERS=0,FRAME_REPORTS=1,FRAME_REPORT_REJECTS=0,FRAME_REPORT=not_run,"
+            f"FRAME_REPORT_SHA={'a' * 64},FRAME_CHALLENGE_SHA={'b' * 64},"
+            "SAME_URL_BODIES=1,REPORTS=1"
+        )
+
+        self.assertEqual(["malformed_fixture_report"], parse_fixture_report(legacy)["reasons"])
 
     def test_counter_snapshots_produce_current_vs_previous_deltas(self) -> None:
         previous = {"networkVisualInference": 3, "networkVisualCacheHit": 2, "proxyQueueRejects": 0}

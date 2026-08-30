@@ -56,6 +56,7 @@ class H19PlanTest(unittest.TestCase):
         self.assertFalse(navigation_requires_new_release({"navigation": "foreground", "newNavigation": True}))
         self.assertTrue(navigation_requires_new_release({"navigation": "reload"}))
         self.assertTrue(navigation_requires_new_release({"navigation": "restart-glosh"}))
+        self.assertTrue(navigation_requires_new_release({"navigation": "two-tab-binding"}))
         self.assertTrue(
             post_gesture_ready_required_for(
                 {"navigation": "foreground", "newNavigation": True, "postGestureReadyRequired": True, "taps": [{}]}
@@ -114,11 +115,31 @@ class H19PlanTest(unittest.TestCase):
         with self.assertRaises(HarnessError):
             validate_plan(value)
 
+    def test_two_tab_binding_has_three_bounded_ready_transitions(self):
+        value = plan_with_taps([])
+        state = value["phases"][0]["states"][0]
+        state.pop("url")
+        state.update(
+            {
+                "navigation": "two-tab-binding",
+                "newNavigation": True,
+                "visualReviewRequired": False,
+                "recordSeconds": 25,
+                "readyTimeoutSeconds": 8,
+            }
+        )
+        self.assertEqual(value, validate_plan(value))
+
+        state["recordSeconds"] = 24
+        with self.assertRaises(HarnessError):
+            validate_plan(value)
+
     def test_final_plan_is_bounded_and_valid(self):
         plan = json.loads((Path(__file__).with_name("final_plan.json")).read_text())
 
         self.assertEqual(plan, validate_plan(plan))
-        self.assertTrue(all(len(phase["states"]) <= 24 for phase in plan["phases"]))
+        self.assertEqual(384, plan["expectedAppVersionCode"])
+        self.assertTrue(all(len(phase["states"]) <= 25 for phase in plan["phases"]))
 
 
 if __name__ == "__main__":

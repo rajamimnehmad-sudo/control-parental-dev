@@ -56,6 +56,9 @@ FRAME_SCENARIOS = {
     "frame-service-worker",
     "frame-closed-shadow",
 }
+READY_BINDING_KIND = "event_source"
+READY_TIMELINE_LIMIT = 128
+SURFACE_TIMELINE_LIMIT = 128
 MANAGED_POLICY_NAMES = {
     "AIModeSettings",
     "AllowBackForwardCacheForCacheControlNoStorePageEnabled",
@@ -243,6 +246,9 @@ def parse_fixture_report(value: str) -> dict[str, Any]:
         r"FRAME_REPORT_REJECTS=(?P<frame_report_rejects>\d+),FRAME_REPORT=(?P<frame_report>.*?),"
         r"FRAME_REPORT_SHA=(?P<frame_report_sha>[0-9a-f]{64}|not_run),"
         r"FRAME_CHALLENGE_SHA=(?P<frame_challenge_sha>[0-9a-f]{64}|not_run),"
+        r"FRAME_GENERATION=(?P<frame_generation>\d+),"
+        r"FRAME_ACCEPTED_CHALLENGE_SHA=(?P<frame_accepted_challenge_sha>[0-9a-f]{64}|not_run),"
+        r"FRAME_REPORT_BINDING_SHA=(?P<frame_report_binding_sha>[0-9a-f]{64}|not_run),"
         r"SAME_URL_BODIES=(?P<same_url_bodies>\d+),REPORTS=(?P<reports>\d+)$"
     )
     match = pattern.fullmatch(value)
@@ -274,14 +280,25 @@ def parse_fixture_report(value: str) -> dict[str, Any]:
             "service_workers",
             "frame_reports",
             "frame_report_rejects",
+            "frame_generation",
             "same_url_bodies",
             "reports",
         )
     }
     if numeric["frame_reports"] < 1:
         reasons.append("no_accepted_frame_report")
+    elif fields["frame_report_sha"] == "not_run":
+        reasons.append("frame_report_digest_missing")
     if numeric["frame_report_rejects"] != 0:
         reasons.append("frame_report_rejected")
+    if numeric["frame_generation"] < 1:
+        reasons.append("frame_generation_missing")
+    if fields["frame_challenge_sha"] == "not_run":
+        reasons.append("frame_challenge_missing")
+    if fields["frame_accepted_challenge_sha"] != fields["frame_challenge_sha"]:
+        reasons.append("frame_accepted_challenge_mismatch")
+    if fields["frame_report_binding_sha"] == "not_run":
+        reasons.append("frame_report_binding_missing")
     if numeric["reports"] < 1:
         reasons.append("no_accepted_main_report")
     return {
@@ -294,6 +311,9 @@ def parse_fixture_report(value: str) -> dict[str, Any]:
         "frameOutcomes": dict(sorted((frame_report or {}).items())),
         "frameReportSha256": fields["frame_report_sha"],
         "frameChallengeSha256": fields["frame_challenge_sha"],
+        "frameGeneration": numeric["frame_generation"],
+        "frameAcceptedChallengeSha256": fields["frame_accepted_challenge_sha"],
+        "frameReportBindingSha256": fields["frame_report_binding_sha"],
     }
 
 
@@ -389,23 +409,40 @@ def latest_structured_status(logcat: str) -> dict[str, Any]:
 
 def summarize_logcat(logcat: str) -> dict[str, Any]:
     ready_phases: Counter[str] = Counter()
+    ready_reasons: Counter[str] = Counter()
     ready_markers: list[dict[str, Any]] = []
+    ready_timeline: list[dict[str, Any]] = []
+    current_ready_binding: dict[str, Any] | None = None
+    ready_claim_progress: dict[tuple[str, str, str, str], set[str]] = {}
+    ready_order_violations = 0
+    surface_timeline: list[dict[str, Any]] = []
     coverage_events: Counter[str] = Counter()
     for line in logcat.splitlines():
         if "ChromeMediaShieldReady" in line and "phase=" in line:
             fields = _key_values(line)
-            ready_phases[fields.get("phase", "unknown")] += 1
-            if fields.get("phase") == "ready_foreground_released":
-                ready_markers.append(
-                    {
-                        "package": "com.android.chrome",
-                        "windowId": fields.get("windowId", ""),
-                        "documentSequence": fields.get("documentSequence", ""),
-                        "lifecycle": fields.get("lifecycle", ""),
-                        "tokenDigestPrefix": fields.get("token", ""),
-                        "axBound": fields.get("axBound") == "true",
-                    },
-                )
+            phase = _safe_reason(fields.get("phase", ""), fallback="unknown")
+            reason = _safe_reason(fields.get("reason", ""), fallback="")
+            ready_phases[phase] += 1
+            if reason:
+                ready_reasons[reason] += 1
+            event = _ready_event(phase, reason, fields)
+            claim_key = _ready_claim_key(event)
+            progress = ready_claim_progress.setdefault(claim_key, set())
+            if phase == "ready_ack_accepted":
+                progress.add("ack")
+            elif phase == "ready_focus_bound" and "ack" in progress:
+                progress.add("focus")
+            ready_timeline.append(event)
+            if phase == "ready_foreground_released":
+                event["orderingVerified"] = {"ack", "focus"}.issubset(progress)
+                if not event["orderingVerified"]:
+                    ready_order_violations += 1
+                ready_markers.append(event)
+                current_ready_binding = event if _is_verified_ready_binding(event) else None
+            elif phase in {"ready_foreground_revoked", "ready_fail_closed"}:
+                current_ready_binding = None
+        if "ChromePhotosSurfaceProbe" in line and "phase=" in line:
+            surface_timeline.append(_surface_event(_key_values(line)))
         if "audit17 event=" in line:
             match = re.search(r"audit17 event=([^\s]+)", line)
             coverage_events[match.group(1) if match else "unknown"] += 1
@@ -450,12 +487,107 @@ def summarize_logcat(logcat: str) -> dict[str, Any]:
             "zero": {field: status_fields.get(field) == "0" for field in zero_fields},
         },
         "readyPhases": dict(sorted(ready_phases.items())),
-        "readyMarkers": ready_markers,
+        "readyReasons": dict(sorted(ready_reasons.items())),
+        "readyMarkers": ready_markers[-READY_TIMELINE_LIMIT:],
+        "readyMarkersDropped": max(0, len(ready_markers) - READY_TIMELINE_LIMIT),
+        "readyTimeline": ready_timeline[-READY_TIMELINE_LIMIT:],
+        "readyTimelineDropped": max(0, len(ready_timeline) - READY_TIMELINE_LIMIT),
+        "currentReadyBinding": current_ready_binding,
+        "readyBindingOrder": {
+            "releaseCount": len(ready_markers),
+            "verifiedReleaseCount": sum(
+                1 for marker in ready_markers if _is_verified_ready_binding(marker)
+            ),
+            "violations": ready_order_violations,
+        },
+        "surfaceTimeline": surface_timeline[-SURFACE_TIMELINE_LIMIT:],
+        "surfaceTimelineDropped": max(0, len(surface_timeline) - SURFACE_TIMELINE_LIMIT),
+        "currentSurfaceState": surface_timeline[-1] if surface_timeline else None,
         "fixtureReport": fixture_report,
         "coverageEvents": dict(sorted(coverage_events.items())),
         "healthSignals": crashes,
         "lineCount": len(logcat.splitlines()),
         "sha256": hashlib.sha256(logcat.encode()).hexdigest(),
+    }
+
+
+def _safe_reason(value: str, fallback: str) -> str:
+    return value if re.fullmatch(r"[a-z0-9_]{1,80}", value) else fallback
+
+
+def _safe_digest_prefix(value: str) -> str:
+    return value if re.fullmatch(r"[0-9a-f]{12,64}", value) else ""
+
+
+def _ready_event(phase: str, reason: str, fields: dict[str, str]) -> dict[str, Any]:
+    binding = fields.get("binding", "")
+    raw_presented = fields.get("rawPresented")
+    return {
+        "package": "com.android.chrome",
+        "phase": phase,
+        "windowId": (
+            fields.get("windowId", "") if fields.get("windowId", "").lstrip("-").isdigit() else ""
+        ),
+        "documentSequence": (
+            fields.get("documentSequence", "") if fields.get("documentSequence", "").isdigit() else ""
+        ),
+        "lifecycle": fields.get("lifecycle", "") if fields.get("lifecycle", "").isdigit() else "",
+        "tokenDigestPrefix": _safe_digest_prefix(fields.get("token", "")),
+        "rootDigestPrefix": _safe_digest_prefix(fields.get("root", "")),
+        "sourceDigestPrefix": _safe_digest_prefix(fields.get("source", "")),
+        "binding": binding if binding == READY_BINDING_KIND else "",
+        "axBound": fields.get("axBound") == "true",
+        "reason": reason,
+        "rawPresented": (
+            raw_presented == "true" if raw_presented in {"true", "false"} else None
+        ),
+    }
+
+
+def _is_verified_ready_binding(event: dict[str, Any]) -> bool:
+    return (
+        event.get("phase") == "ready_foreground_released"
+        and event.get("package") == "com.android.chrome"
+        and event.get("binding") == READY_BINDING_KIND
+        and event.get("axBound") is True
+        and event.get("rawPresented") is False
+        and event.get("orderingVerified") is True
+        and bool(event.get("tokenDigestPrefix"))
+        and bool(event.get("rootDigestPrefix"))
+        and bool(event.get("sourceDigestPrefix"))
+        and str(event.get("windowId", "")).isdigit()
+        and str(event.get("documentSequence", "")).isdigit()
+        and str(event.get("lifecycle", "")).isdigit()
+        and int(str(event.get("lifecycle", "0"))) > 0
+    )
+
+
+def _ready_claim_key(event: dict[str, Any]) -> tuple[str, str, str, str]:
+    return (
+        str(event.get("windowId", "")),
+        str(event.get("documentSequence", "")),
+        str(event.get("lifecycle", "")),
+        str(event.get("tokenDigestPrefix", "")),
+    )
+
+
+def _surface_event(fields: dict[str, str]) -> dict[str, Any]:
+    transparent = fields.get("transparent")
+    raw_presented = fields.get("rawPresented")
+    attachment_count = fields.get("attachmentCount", "")
+    return {
+        "phase": _safe_reason(fields.get("phase", ""), fallback="unknown"),
+        "action": _safe_reason(fields.get("action", ""), fallback=""),
+        "reason": _safe_reason(fields.get("reason", ""), fallback=""),
+        "windowId": (
+            fields.get("windowId", "") if fields.get("windowId", "").lstrip("-").isdigit() else ""
+        ),
+        "epoch": fields.get("epoch", "") if fields.get("epoch", "").isdigit() else "",
+        "transparent": transparent == "true" if transparent in {"true", "false"} else None,
+        "attachmentCount": int(attachment_count) if attachment_count.isdigit() else 0,
+        "rawPresented": (
+            raw_presented == "true" if raw_presented in {"true", "false"} else None
+        ),
     }
 
 
