@@ -36,12 +36,11 @@ class ChromeMediaShieldFocusEventPolicyTest {
     fun `stale replay background window and replaced root are rejected`() {
         assertRejected(
             "ready_focus_view_id_mismatch",
-            evidence(markers = listOf(ChromeMediaShieldReadyMarker(OtherToken, Marker.lifecycleSequence))),
+            evidence(sourceViewIdResourceName = "forged-ready-host"),
         )
         assertRejected(
             "ready_focus_claim_mismatch",
             evidence(
-                sourceViewIdResourceName = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + OtherToken,
                 markers = listOf(ChromeMediaShieldReadyMarker(OtherToken, Marker.lifecycleSequence)),
             ),
         )
@@ -338,7 +337,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         eventWindowId: Int = WindowId,
         sourcePackageName: String = ChromePackageName,
         sourceWindowId: Int = WindowId,
-        sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
+        sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewId,
         sourceUniqueId: String = SourceUniqueId,
         sourceRootUniqueId: String = WebRootUniqueId,
         sourceRootClassName: String = ChromeMediaShieldWebRootContract.ClassName,
@@ -396,7 +395,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         matchingNodeCount: Int = 1,
         sourcePackageName: String = ChromePackageName,
         sourceWindowId: Int = WindowId,
-        sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
+        sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewId,
         sourceUniqueId: String = SourceUniqueId,
         sourceRootUniqueId: String = WebRootUniqueId,
         sourceRootVisibleToUser: Boolean = true,
@@ -475,12 +474,12 @@ class ChromeMediaShieldFocusEventPolicyTest {
                             ),
                         markerIdentityDigest =
                             ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
-                                "focus:$SourceUniqueId:${ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix}$Token",
+                                "focus:$SourceUniqueId:${ChromeMediaShieldFocusEventPolicy.ReadyViewId}",
                             ),
                     ),
                 focusAnchor =
                     ChromeMediaShieldFocusAnchor(
-                        viewIdResourceName = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
+                        viewIdResourceName = ChromeMediaShieldFocusEventPolicy.ReadyViewId,
                         sourceUniqueId = SourceUniqueId,
                         webRootUniqueId = WebRootUniqueId,
                     ),

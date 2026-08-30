@@ -471,14 +471,13 @@ internal object ChromeMediaShieldBootstrap {
         nodeRemove.call(parent,BOOTSTRAP_SCRIPT);return !connected(BOOTSTRAP_SCRIPT)}catch(_){return false}};
         const retireBootstrapSecrets=()=>clearStyleNonce(shieldStyle)&&(!curtainStyle||clearStyleNonce(curtainStyle))&&removeCurrentScript();
         if(!installed){failClosedDocument();return}if(!retireBootstrapSecrets()){failClosedDocument();return}if(!TOP_LEVEL)return;
-        readyHost=create.call(DOC,'span');invoke(WeakSetAdd,protectedNodes,[readyHost]);nativeSet.call(readyHost,'id',READY_ID);nativeSet.call(readyHost,'role','status');watchStyle(readyHost);
+        readyHost=create.call(DOC,'span');invoke(WeakSetAdd,protectedNodes,[readyHost]);nativeSet.call(readyHost,'id',READY_ID);nativeSet.call(readyHost,'role','button');nativeSet.call(readyHost,'tabindex','-1');watchStyle(readyHost);
         const readyStyle=styleOf(readyHost);nativeStyleSet.call(readyStyle,'position','fixed','important');nativeStyleSet.call(readyStyle,'left','0','important');
         nativeStyleSet.call(readyStyle,'top','0','important');nativeStyleSet.call(readyStyle,'width','1px','important');nativeStyleSet.call(readyStyle,'height','1px','important');
         nativeStyleSet.call(readyStyle,'overflow','hidden','important');nativeStyleSet.call(readyStyle,'color','transparent','important');
         nativeStyleSet.call(readyStyle,'font-size','1px','important');nativeStyleSet.call(readyStyle,'pointer-events','none','important');
         const readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}]);
-        const marker=create.call(DOC,'button');nativeSet.call(marker,'type','button');nativeSet.call(marker,'tabindex','-1');
-        nativeSet.call(marker,'id','glosh-h19-ready-'+READY);invoke(nodeText.set,marker,['']);nodeAppend.call(readyRoot,marker);
+        const marker=create.call(DOC,'span');invoke(nodeText.set,marker,['']);nodeAppend.call(readyRoot,marker);
         let lifecycle=0,visibleCycleRequested=false;
         const showCurtain=()=>{curtainRequired=true;return ensureCurtain()};
         const hideCurtain=()=>{curtainRequired=false;return ensureCurtain()};
@@ -488,7 +487,7 @@ internal object ChromeMediaShieldBootstrap {
         showCurtain();detachMarker();try{const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle;nativeSet.call(marker,'aria-label',readyValue);invoke(nodeText.set,marker,[readyValue]);nodeAppend.call(documentElement(),readyHost);
         const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
         xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle);if(read(xhrStatusProperty,xhr)!==204||read(xhrResponseUrlProperty,xhr)!==READY_URL||
-        currentLifecycle!==lifecycle||visibilityState()!=='visible'){revokeReady();return}nativeFocus.call(marker,{preventScroll:true});
+        currentLifecycle!==lifecycle||visibilityState()!=='visible'){revokeReady();return}nativeFocus.call(readyHost,{preventScroll:true});
         if(!hideCurtain())revokeReady()}catch(_){showCurtain();detachMarker();visibleCycleRequested=false}};
         nativeAddEvent.call(SELF,'beforeunload',revokeReady,true);nativeAddEvent.call(SELF,'pagehide',revokeReady,true);
         nativeAddEvent.call(SELF,'pageshow',event=>{if(trustedEvent(event))beginReadyLifecycle()},true);nativeAddEvent.call(DOC,'visibilitychange',event=>{

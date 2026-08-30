@@ -15,10 +15,13 @@ class ChromeMediaShieldBootstrapContractTest {
         assertFalse(script.contains("setInterval"))
         assertFalse(script.contains("requestAnimationFrame"))
         assertContains(script, "const readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}])")
-        assertContains(script, "nativeSet.call(readyHost,'role','status')")
-        assertContains(script, "const marker=create.call(DOC,'button')")
-        assertContains(script, "nativeSet.call(marker,'tabindex','-1')")
-        assertContains(script, "nativeSet.call(marker,'id','glosh-h19-ready-'+READY)")
+        assertContains(script, "nativeSet.call(readyHost,'role','button')")
+        assertContains(script, "nativeSet.call(readyHost,'tabindex','-1')")
+        assertContains(script, "const marker=create.call(DOC,'span')")
+        assertContains(script, "nodeAppend.call(readyRoot,marker)")
+        assertFalse(script.contains("nativeSet.call(marker,'id','glosh-h19-ready-'+READY)"))
+        assertFalse(script.contains("nativeSet.call(readyHost,'aria-label'"))
+        assertFalse(script.contains("invoke(nodeText.set,readyHost"))
         assertContains(script, "nativeStyleSet.call(readyStyle,'width','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'height','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'overflow','hidden','important')")
@@ -38,17 +41,17 @@ class ChromeMediaShieldBootstrapContractTest {
         )
         assertTrue(
             script.indexOf("xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)") <
-                script.indexOf("nativeFocus.call(marker,{preventScroll:true})"),
+                script.indexOf("nativeFocus.call(readyHost,{preventScroll:true})"),
         )
         assertTrue(
-            script.indexOf("nativeFocus.call(marker,{preventScroll:true})") <
+            script.indexOf("nativeFocus.call(readyHost,{preventScroll:true})") <
                 script.indexOf("if(!hideCurtain())revokeReady()"),
         )
         assertContains(script, "showCurtain();detachMarker()")
         assertContains(script, "nodeAppend.call(documentElement(),readyHost)")
         assertContains(
             script,
-            "visibilityState()!=='visible'){revokeReady();return}nativeFocus.call(marker,{preventScroll:true})",
+            "visibilityState()!=='visible'){revokeReady();return}nativeFocus.call(readyHost,{preventScroll:true})",
         )
         assertContains(script, "nativeAddEvent.call(SELF,'beforeunload',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(SELF,'pagehide',revokeReady,true)")

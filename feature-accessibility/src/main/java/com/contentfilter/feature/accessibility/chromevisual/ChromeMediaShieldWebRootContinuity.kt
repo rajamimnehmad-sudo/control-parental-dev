@@ -154,13 +154,14 @@ internal object ChromeMediaShieldWebRootCandidatePolicy {
 /** Bounded, ownership-safe traversal of Chrome's virtual Accessibility tree. */
 internal object ChromeMediaShieldAccessibilityNodeTraversal {
     /**
-     * Reacquires only the exact secret anchor first authenticated by TYPE_VIEW_FOCUSED.
+     * Reacquires only the exact document host first authenticated by the secret focus event.
      *
      * Chrome does not implement virtual-node lookup by view id consistently, so the bounded tree
-     * walk compares both the browser-issued unique id and the unguessable document view id. The
-     * browser-issued unique id is unique within the window, so the walk can stop at the first
-     * node matching both identities instead of scanning a large real-web tree after success. The
-     * returned node is owned by the caller and must be recycled or transferred.
+     * walk compares the fixed protected host id and its browser-issued unique id. The secret READY
+     * marker stays inside the host's closed shadow root and authenticates the initial focus event;
+     * page-created hosts cannot reproduce the captured platform id. The walk can therefore stop at
+     * the first exact match. The returned node is owned by the caller and must be recycled or
+     * transferred.
      */
     @Suppress("DEPRECATION")
     fun copyExactBoundAnchorCandidate(

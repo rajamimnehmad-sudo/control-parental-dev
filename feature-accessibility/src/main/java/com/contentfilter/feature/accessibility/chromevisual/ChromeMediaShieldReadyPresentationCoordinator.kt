@@ -208,11 +208,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             val stillVerified =
                 viewport != null &&
                     document != null &&
-                    exactForegroundDocument(
-                        claim = expected.claim,
-                        expectedWindowId = expected.surface.windowId,
-                        document = document,
-                    ) &&
                     hasVerifiedPresentation(
                         snapshot = snapshot,
                         viewport = viewport,
@@ -224,6 +219,15 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                     presentationStillVerified = stillVerified,
                 )
             ) {
+                val reason =
+                    when {
+                        viewport == null -> "ready_accessibility_viewport_missing"
+                        document == null -> "ready_accessibility_document_missing"
+                        else ->
+                            tokenScanner.lastBoundAnchorFailureReason()
+                                .ifBlank { "ready_accessibility_observation_invalid" }
+                    }
+                log("ready_release_rejected", expected, document, reason)
                 releaseGate.onSurfaceInvalidated(retainFocus = false)
                 revokeLease("ready_accessibility_observation_invalid", clearFocus = true)
             } else {
@@ -556,14 +560,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         return true
     }
 
-    private fun exactForegroundDocument(
-        claim: ChromeMediaShieldReadyClaim,
-        expectedWindowId: Int,
-        document: ChromeMediaShieldForegroundDocument,
-    ): Boolean =
-        foregroundDocumentBinding(claim, expectedWindowId, document) ==
-            ChromeMediaShieldBoundContextBinding.ExactFocusSource
-
     private fun foregroundDocumentBinding(
         claim: ChromeMediaShieldReadyClaim,
         expectedWindowId: Int,
@@ -596,6 +592,14 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             viewport == null ||
             !hasVerifiedPresentation(snapshot, viewport, snapshot.windowId)
         ) {
+            val reason =
+                if (viewport == null) {
+                    "ready_watchdog_viewport_missing"
+                } else {
+                    tokenScanner.lastBoundAnchorFailureReason()
+                        .ifBlank { "ready_watchdog_presentation_invalid" }
+                }
+            log("ready_release_rejected", expected, activeDocument, reason)
             releaseGate.onSurfaceInvalidated(retainFocus = false)
             revokeLease("ready_lease_stale_or_unhealthy", clearFocus = true)
             return
