@@ -24,7 +24,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         )
         assertTrue(
             ChromeMediaShieldFocusEventPolicy.verify(
-                evidence(foregroundRootUniqueId = ""),
+                evidence(foregroundRootUniqueId = "native-chrome-window-root"),
                 Claim,
                 WindowId,
             ) is ChromeMediaShieldFocusEventResult.Verified,
@@ -72,7 +72,13 @@ class ChromeMediaShieldFocusEventPolicyTest {
                 WindowId,
             ) is ChromeMediaShieldFocusEventResult.Verified,
         )
-        assertRejected("ready_focus_not_presented", evidence(sourceVisibleToUser = false))
+        assertTrue(
+            ChromeMediaShieldFocusEventPolicy.verify(
+                evidence(sourceVisibleToUser = false),
+                Claim,
+                WindowId,
+            ) is ChromeMediaShieldFocusEventResult.Verified,
+        )
         assertRejected("ready_focus_root_mismatch", evidence(sourceUniqueId = ""))
         assertRejected("ready_focus_view_id_mismatch", evidence(sourceViewIdResourceName = "forged"))
         assertRejected("ready_focus_marker_ambiguous", evidence(markers = emptyList()))
@@ -101,7 +107,13 @@ class ChromeMediaShieldFocusEventPolicyTest {
         assertBoundAnchorRejected(boundEvidence(matchingNodeCount = 2))
         assertBoundAnchorRejected(boundEvidence(sourceUniqueId = "replacement-node"))
         assertBoundAnchorRejected(boundEvidence(sourceViewIdResourceName = "cloned-view-id"))
-        assertBoundAnchorRejected(boundEvidence(sourceVisibleToUser = false))
+        assertTrue(
+            ChromeMediaShieldBoundAnchorPolicy.verifies(
+                boundEvidence(sourceVisibleToUser = false),
+                Claim,
+                Document,
+            ),
+        )
     }
 
     @Test

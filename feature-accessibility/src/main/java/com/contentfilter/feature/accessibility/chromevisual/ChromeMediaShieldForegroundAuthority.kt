@@ -92,10 +92,10 @@ internal object ChromeMediaShieldFocusEventPolicy {
             return rejected("ready_focus_wrong_window")
         }
         // TYPE_VIEW_FOCUSED is the platform-authenticated focus transition. Chromium queues that
-        // event, so a later autofocus may legitimately make isFocused false by delivery time.
-        // Current window/root ancestry and visibility remain mandatory; the reread focus bit is
-        // diagnostic only and cannot turn an authentic current transition into a liveness failure.
-        if (!evidence.sourceVisibleToUser) return rejected("ready_focus_not_presented")
+        // event, so later focus and visibility reads may differ by delivery time. The ready beacon
+        // is deliberately transparent under the opaque surface, therefore isFocused and
+        // isVisibleToUser are diagnostic only. Exact current window/root ancestry and the claimed
+        // source identity remain mandatory.
         if (
             evidence.sourceUniqueId.isBlank() ||
             evidence.sourceRootUniqueId.isBlank() ||
@@ -164,7 +164,6 @@ internal object ChromeMediaShieldBoundAnchorPolicy {
         if (
             evidence.sourcePackageName != ChromePackageName ||
             evidence.sourceWindowId != document.windowId ||
-            !evidence.sourceVisibleToUser ||
             evidence.sourceViewIdResourceName != document.focusAnchor.viewIdResourceName ||
             evidence.sourceUniqueId != document.focusAnchor.sourceUniqueId ||
             evidence.sourceRootUniqueId != evidence.rootUniqueId ||
