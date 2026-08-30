@@ -9,6 +9,7 @@ def ready_baseline(summary: dict[str, Any]) -> dict[str, Any]:
     marker = summary.get("currentReadyBinding")
     return {
         "releaseCount": int(summary.get("readyPhases", {}).get("ready_foreground_released", 0)),
+        "continuityCount": int(summary.get("readyWebRootContinuity", {}).get("verified", 0)),
         "marker": marker if isinstance(marker, dict) else None,
     }
 
@@ -28,11 +29,12 @@ def current_ready_result(
     marker_advanced = previous_marker is None or any(
         marker.get(field) != previous_marker.get(field)
         for field in (
+            "documentSequence",
             "tokenDigestPrefix",
             "lifecycle",
             "windowId",
-            "rootDigestPrefix",
-            "sourceDigestPrefix",
+            "webRootDigestPrefix",
+            "surfaceEpoch",
         )
     )
     if (

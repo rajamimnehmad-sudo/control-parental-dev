@@ -9,6 +9,7 @@ from h19_plan import (
     post_gesture_ready_required_for,
     ready_required_for,
     validate_plan,
+    web_root_continuity_required_for,
 )
 
 
@@ -137,11 +138,34 @@ class H19PlanTest(unittest.TestCase):
         with self.assertRaises(HarnessError):
             validate_plan(value)
 
+    def test_web_root_continuity_gate_is_explicit_bounded_and_ready_authorized(self):
+        value = plan_with_taps([])
+        state = value["phases"][0]["states"][0]
+        state.update(
+            {
+                "webRootContinuityAfterPruneRequired": True,
+                "recordSeconds": 18,
+                "readyTimeoutSeconds": 8,
+            }
+        )
+
+        self.assertTrue(web_root_continuity_required_for(state))
+        self.assertEqual(value, validate_plan(value))
+
+        state["recordSeconds"] = 16
+        with self.assertRaises(HarnessError):
+            validate_plan(value)
+
+        state["recordSeconds"] = 18
+        state["webRootContinuityAfterPruneRequired"] = "true"
+        with self.assertRaises(HarnessError):
+            validate_plan(value)
+
     def test_final_plan_is_bounded_and_valid(self):
         plan = json.loads((Path(__file__).with_name("final_plan.json")).read_text())
 
         self.assertEqual(plan, validate_plan(plan))
-        self.assertEqual(388, plan["expectedAppVersionCode"])
+        self.assertEqual(389, plan["expectedAppVersionCode"])
         self.assertEqual("R3.1", plan["expectedGloshiaModelVersion"])
         self.assertEqual("dag-36", plan["expectedGloshiaPolicyVersion"])
         self.assertTrue(all(len(phase["states"]) <= 25 for phase in plan["phases"]))

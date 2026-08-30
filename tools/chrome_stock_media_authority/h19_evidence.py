@@ -415,6 +415,10 @@ def summarize_logcat(logcat: str) -> dict[str, Any]:
     current_ready_binding: dict[str, Any] | None = None
     ready_claim_progress: dict[tuple[str, str, str, str], set[str]] = {}
     ready_order_violations = 0
+    ready_continuity_verified = 0
+    ready_continuity_violations = 0
+    source_bound_document: dict[str, Any] | None = None
+    continuity_document_key: tuple[str, ...] | None = None
     surface_timeline: list[dict[str, Any]] = []
     coverage_events: Counter[str] = Counter()
     for line in logcat.splitlines():
@@ -430,17 +434,56 @@ def summarize_logcat(logcat: str) -> dict[str, Any]:
             progress = ready_claim_progress.setdefault(claim_key, set())
             if phase == "ready_ack_accepted":
                 progress.add("ack")
+                if (
+                    source_bound_document is not None
+                    and _ready_document_key(source_bound_document) != _ready_document_key(event)
+                ):
+                    source_bound_document = None
+                    continuity_document_key = None
             elif phase == "ready_focus_bound" and "ack" in progress:
                 progress.add("focus")
+            if phase == "ready_web_root_continuity":
+                event["continuityVerified"] = (
+                    source_bound_document is not None
+                    and _ready_document_key(source_bound_document) == _ready_document_key(event)
+                    and event.get("continuity") == "web_root"
+                    and event.get("rootBinding") == "web_root"
+                    and event.get("sourceCurrent") is False
+                    and event.get("rawPresented") is False
+                )
+                if event["continuityVerified"]:
+                    continuity_document_key = _ready_document_key(event)
+                    ready_continuity_verified += 1
+                else:
+                    ready_continuity_violations += 1
             ready_timeline.append(event)
             if phase == "ready_foreground_released":
                 event["orderingVerified"] = {"ack", "focus"}.issubset(progress)
+                if event.get("sourceCurrent") is False:
+                    continuity_verified = (
+                        source_bound_document is not None
+                        and continuity_document_key == _ready_document_key(event)
+                        and _ready_document_key(source_bound_document) == _ready_document_key(event)
+                        and event.get("continuity") == "web_root"
+                        and event.get("rootBinding") == "web_root"
+                    )
+                    event["continuityVerified"] = continuity_verified
+                    if continuity_verified:
+                        event["sourceDigestPrefix"] = source_bound_document.get(
+                            "sourceDigestPrefix",
+                            "",
+                        )
                 if not event["orderingVerified"]:
                     ready_order_violations += 1
                 ready_markers.append(event)
                 current_ready_binding = event if _is_verified_ready_binding(event) else None
+                if current_ready_binding is not None and event.get("sourceCurrent") is True:
+                    source_bound_document = event
             elif phase in {"ready_foreground_revoked", "ready_fail_closed"}:
                 current_ready_binding = None
+                if phase == "ready_fail_closed" or reason != "surface_invalidated":
+                    source_bound_document = None
+                    continuity_document_key = None
         if "ChromePhotosSurfaceProbe" in line and "phase=" in line:
             surface_timeline.append(_surface_event(_key_values(line)))
         if "audit17 event=" in line:
@@ -500,6 +543,11 @@ def summarize_logcat(logcat: str) -> dict[str, Any]:
             ),
             "violations": ready_order_violations,
         },
+        "readyWebRootContinuity": {
+            "verified": ready_continuity_verified,
+            "violations": ready_continuity_violations,
+            "currentDocumentVerified": continuity_document_key is not None,
+        },
         "surfaceTimeline": surface_timeline[-SURFACE_TIMELINE_LIMIT:],
         "surfaceTimelineDropped": max(0, len(surface_timeline) - SURFACE_TIMELINE_LIMIT),
         "currentSurfaceState": surface_timeline[-1] if surface_timeline else None,
@@ -521,7 +569,11 @@ def _safe_digest_prefix(value: str) -> str:
 
 def _ready_event(phase: str, reason: str, fields: dict[str, str]) -> dict[str, Any]:
     binding = fields.get("binding", "")
+    root_binding = fields.get("rootBinding", "")
+    continuity = fields.get("continuity", "")
     raw_presented = fields.get("rawPresented")
+    source_current = fields.get("sourceCurrent")
+    source_scope = fields.get("sourceEvidenceScope", "")
     return {
         "package": "com.android.chrome",
         "phase": phase,
@@ -531,11 +583,19 @@ def _ready_event(phase: str, reason: str, fields: dict[str, str]) -> dict[str, A
         "documentSequence": (
             fields.get("documentSequence", "") if fields.get("documentSequence", "").isdigit() else ""
         ),
+        "surfaceEpoch": fields.get("surfaceEpoch", "") if fields.get("surfaceEpoch", "").isdigit() else "",
         "lifecycle": fields.get("lifecycle", "") if fields.get("lifecycle", "").isdigit() else "",
         "tokenDigestPrefix": _safe_digest_prefix(fields.get("token", "")),
         "rootDigestPrefix": _safe_digest_prefix(fields.get("root", "")),
+        "webRootDigestPrefix": _safe_digest_prefix(fields.get("webRoot", "")),
         "sourceDigestPrefix": _safe_digest_prefix(fields.get("source", "")),
+        "sourceCurrent": source_current == "true" if source_current in {"true", "false"} else None,
+        "sourceEvidenceScope": (
+            source_scope if source_scope in {"current_boundary", "initial_only", "none"} else ""
+        ),
         "binding": binding if binding == READY_BINDING_KIND else "",
+        "rootBinding": root_binding if root_binding in {"native_root", "web_root"} else "",
+        "continuity": continuity if continuity in {"none", "web_root"} else "",
         "axBound": fields.get("axBound") == "true",
         "reason": reason,
         "rawPresented": (
@@ -554,11 +614,27 @@ def _is_verified_ready_binding(event: dict[str, Any]) -> bool:
         and event.get("orderingVerified") is True
         and bool(event.get("tokenDigestPrefix"))
         and bool(event.get("rootDigestPrefix"))
-        and bool(event.get("sourceDigestPrefix"))
+        and bool(event.get("webRootDigestPrefix"))
+        and event.get("rootBinding") in {"native_root", "web_root"}
         and str(event.get("windowId", "")).isdigit()
         and str(event.get("documentSequence", "")).isdigit()
+        and str(event.get("surfaceEpoch", "")).isdigit()
         and str(event.get("lifecycle", "")).isdigit()
         and int(str(event.get("lifecycle", "0"))) > 0
+        and (
+            (
+                event.get("sourceCurrent") is True
+                and event.get("sourceEvidenceScope") == "current_boundary"
+                and bool(event.get("sourceDigestPrefix"))
+            )
+            or (
+                event.get("sourceCurrent") is False
+                and event.get("sourceEvidenceScope") == "initial_only"
+                and event.get("continuity") == "web_root"
+                and event.get("continuityVerified") is True
+                and bool(event.get("sourceDigestPrefix"))
+            )
+        )
     )
 
 
@@ -568,6 +644,16 @@ def _ready_claim_key(event: dict[str, Any]) -> tuple[str, str, str, str]:
         str(event.get("documentSequence", "")),
         str(event.get("lifecycle", "")),
         str(event.get("tokenDigestPrefix", "")),
+    )
+
+
+def _ready_document_key(event: dict[str, Any]) -> tuple[str, ...]:
+    return (
+        str(event.get("windowId", "")),
+        str(event.get("documentSequence", "")),
+        str(event.get("lifecycle", "")),
+        str(event.get("tokenDigestPrefix", "")),
+        str(event.get("webRootDigestPrefix", "")),
     )
 
 

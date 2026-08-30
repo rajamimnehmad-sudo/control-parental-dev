@@ -179,6 +179,61 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
         }
     }
 
+    @Test
+    fun `web root can rearm only the same previously released document after viewport replacement`() {
+        assertTrue(
+            ChromeMediaShieldReadyContinuityReleasePolicy.canRetainReleasedDocument(
+                retainCurrentDocument = true,
+                releasedClaimCurrent = true,
+                activeLeasePresent = true,
+                activeDocumentPresent = true,
+            ),
+        )
+        listOf(
+            listOf(false, true, true, true),
+            listOf(true, false, true, true),
+            listOf(true, true, false, true),
+            listOf(true, true, true, false),
+        ).forEach { flags ->
+            assertFalse(
+                ChromeMediaShieldReadyContinuityReleasePolicy.canRetainReleasedDocument(
+                    retainCurrentDocument = flags[0],
+                    releasedClaimCurrent = flags[1],
+                    activeLeasePresent = flags[2],
+                    activeDocumentPresent = flags[3],
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `web root boundary cannot create a release and can only rearm an authorized one`() {
+        assertTrue(
+            ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
+                ChromeMediaShieldBoundContextBinding.ExactFocusSource,
+                retainedReleaseAuthorized = false,
+            ),
+        )
+        assertFalse(
+            ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
+                ChromeMediaShieldBoundContextBinding.ExactWebRoot,
+                retainedReleaseAuthorized = false,
+            ),
+        )
+        assertTrue(
+            ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
+                ChromeMediaShieldBoundContextBinding.ExactWebRoot,
+                retainedReleaseAuthorized = true,
+            ),
+        )
+        assertFalse(
+            ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
+                ChromeMediaShieldBoundContextBinding.Invalid,
+                retainedReleaseAuthorized = true,
+            ),
+        )
+    }
+
     private companion object {
         val FirstClaim = claim(token = "a", documentSequence = 1L)
         val SecondClaim = claim(token = "b", documentSequence = 2L)

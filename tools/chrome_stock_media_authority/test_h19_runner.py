@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from h19_plan import HarnessError
+from h19_ready import current_ready_result
 from h19_device import (
     ce_data_inode_from_package_dump,
     prepare_interactive_display,
@@ -20,6 +21,7 @@ from run_a23_gate import (
     start_phase,
     wait_for_fixture_report,
     wait_for_ready,
+    wait_for_web_root_continuity,
     write_logcat_summary,
 )
 
@@ -120,7 +122,7 @@ class H19RunnerTest(unittest.TestCase):
     def test_tab_switch_uses_exact_binding_and_is_not_aliased_to_app_foregrounding(self):
         self.assertEqual("SUPPORTED", HARNESS_CAPABILITIES["stockChromeTabSwitch"]["status"])
         self.assertEqual(
-            "exact_event_source_ready_binding",
+            "event_source_one_shot_plus_web_root_continuity",
             HARNESS_CAPABILITIES["stockChromeTabSwitch"]["authority"],
         )
         self.assertFalse(HARNESS_CAPABILITIES["stockChromeTabSwitch"]["coordinateUiAutomation"])
@@ -277,8 +279,21 @@ class H19RunnerTest(unittest.TestCase):
             "lifecycle": "7",
             "tokenDigestPrefix": "old",
             "windowId": "4",
+            "documentSequence": "2",
+            "surfaceEpoch": "8",
+            "rootDigestPrefix": "root-old",
+            "webRootDigestPrefix": "web-root-old",
+            "sourceDigestPrefix": "source-old",
+            "rootBinding": "native_root",
         }
-        fresh = {**previous, "lifecycle": "8", "tokenDigestPrefix": "fresh"}
+        fresh = {
+            **previous,
+            "lifecycle": "8",
+            "documentSequence": "3",
+            "surfaceEpoch": "9",
+            "tokenDigestPrefix": "fresh",
+            "webRootDigestPrefix": "web-root-fresh",
+        }
         status = {
             "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
             "readyPhases": {"ready_foreground_released": 1},
@@ -311,8 +326,13 @@ class H19RunnerTest(unittest.TestCase):
             "lifecycle": "7",
             "tokenDigestPrefix": "current",
             "windowId": "4",
+            "documentSequence": "2",
+            "surfaceEpoch": "8",
             "rootDigestPrefix": "root",
+            "webRootDigestPrefix": "web-root",
             "sourceDigestPrefix": "source",
+            "rootBinding": "native_root",
+            "continuity": "none",
         }
         summary = {
             "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
@@ -335,7 +355,14 @@ class H19RunnerTest(unittest.TestCase):
 
     def test_rotation_baseline_is_captured_before_orientation_mutation(self):
         calls: list[str] = []
-        current = {"package": "com.android.chrome", "lifecycle": "2"}
+        current = {
+            "package": "com.android.chrome",
+            "lifecycle": "2",
+            "documentSequence": "4",
+            "surfaceEpoch": "8",
+            "tokenDigestPrefix": "token",
+            "webRootDigestPrefix": "web-root",
+        }
 
         def status(*_args, **_kwargs):
             calls.append("status")
@@ -360,13 +387,55 @@ class H19RunnerTest(unittest.TestCase):
             baseline, orientation, changed = baseline_then_set_orientation(object(), "phase", "landscape")
 
         self.assertEqual(["status", "observed", "rotate"], calls)
-        self.assertEqual({"releaseCount": 4, "marker": current}, baseline)
+        self.assertEqual({"releaseCount": 4, "continuityCount": 0, "marker": current}, baseline)
         self.assertEqual(0, orientation["baselineRotation"])
         self.assertTrue(changed)
 
+    def test_ready_advance_ignores_recreated_source_and_native_root_but_tracks_surface_epoch(self):
+        previous = {
+            "package": "com.android.chrome",
+            "windowId": "4",
+            "documentSequence": "2",
+            "surfaceEpoch": "8",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "token",
+            "rootDigestPrefix": "native-root-a",
+            "webRootDigestPrefix": "web-root",
+            "sourceDigestPrefix": "source-a",
+        }
+        status = {
+            "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
+            "readyPhases": {"ready_foreground_released": 1},
+        }
+        recreated_source = {
+            **previous,
+            "rootDigestPrefix": "native-root-b",
+            "sourceDigestPrefix": "source-b",
+        }
+        rotated = {**recreated_source, "surfaceEpoch": "9"}
+
+        self.assertIsNone(
+            current_ready_result(
+                {**status, "currentReadyBinding": recreated_source},
+                "com.android.chrome",
+                1,
+                previous,
+                True,
+            )
+        )
+        self.assertIsNotNone(
+            current_ready_result(
+                {**status, "currentReadyBinding": rotated},
+                "com.android.chrome",
+                1,
+                previous,
+                True,
+            )
+        )
+
     def test_ready_baseline_has_no_passive_marker_fallback(self):
         self.assertEqual(
-            {"releaseCount": 2, "marker": None},
+            {"releaseCount": 2, "continuityCount": 0, "marker": None},
             ready_baseline(
                 {
                     "readyPhases": {"ready_foreground_released": 2},
@@ -375,6 +444,42 @@ class H19RunnerTest(unittest.TestCase):
                 }
             ),
         )
+
+    def test_web_root_continuity_wait_requires_same_current_document_after_pruning(self):
+        marker = {
+            "package": "com.android.chrome",
+            "binding": "event_source",
+            "axBound": True,
+            "rawPresented": False,
+            "windowId": "4",
+            "surfaceEpoch": "8",
+            "documentSequence": "2",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "aaaaaaaaaaaa",
+            "rootDigestPrefix": "bbbbbbbbbbbb",
+            "webRootDigestPrefix": "cccccccccccc",
+            "sourceDigestPrefix": "dddddddddddd",
+            "rootBinding": "native_root",
+        }
+        summary = {
+            "readyWebRootContinuity": {
+                "verified": 1,
+                "violations": 0,
+                "currentDocumentVerified": True,
+            },
+            "currentReadyBinding": marker,
+        }
+        with patch("run_a23_gate.request_status", return_value=("", summary)):
+            result = wait_for_web_root_continuity(
+                object(),
+                "since",
+                timeout_seconds=1,
+                minimum_verified_count=1,
+                expected_marker=marker,
+            )
+
+        self.assertTrue(result["pass"])
+        self.assertFalse(result["sourceCurrent"])
 
     def test_controlled_gate_requires_report_counts_to_advance(self):
         stale = {"fixtureReport": {"pass": True, "counts": {"reports": 1, "frame_reports": 1}}}

@@ -16,13 +16,20 @@ PhaseStart = Callable[..., dict[str, Any]]
 
 READY_BINDING_FIELDS = (
     "windowId",
+    "surfaceEpoch",
     "documentSequence",
     "lifecycle",
     "tokenDigestPrefix",
     "rootDigestPrefix",
+    "webRootDigestPrefix",
     "sourceDigestPrefix",
 )
-READY_DOCUMENT_FIELDS = tuple(field for field in READY_BINDING_FIELDS if field != "lifecycle")
+READY_DOCUMENT_FIELDS = (
+    "windowId",
+    "documentSequence",
+    "tokenDigestPrefix",
+    "webRootDigestPrefix",
+)
 
 
 def ready_binding_key(marker: dict[str, Any] | None) -> tuple[str, ...] | None:
@@ -34,8 +41,11 @@ def ready_binding_key(marker: dict[str, Any] | None) -> tuple[str, ...] | None:
         or marker.get("axBound") is not True
         or marker.get("rawPresented") is not False
         or not str(marker.get("windowId", "")).isdigit()
+        or not str(marker.get("surfaceEpoch", "")).isdigit()
+        or int(str(marker.get("surfaceEpoch", "0"))) <= 0
         or not str(marker.get("documentSequence", "")).isdigit()
         or not str(marker.get("lifecycle", "")).isdigit()
+        or marker.get("rootBinding") not in {"native_root", "web_root"}
     ):
         return None
     values = tuple(str(marker.get(field, "")) for field in READY_BINDING_FIELDS)

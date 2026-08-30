@@ -65,9 +65,10 @@ from h19_plan import (
     safe_id,
     validate_plan,
     visual_review_required_for,
+    web_root_continuity_required_for,
 )
 from h19_ready import current_ready_result, ready_baseline
-from h19_lifecycle_gates import restart_glosh_phase, run_two_tab_binding_gate
+from h19_lifecycle_gates import ready_document_key, restart_glosh_phase, run_two_tab_binding_gate
 
 
 ACTION_PREFIX = "com.contentfilter.user.chromedataplane.command."
@@ -84,7 +85,7 @@ HARNESS_CAPABILITIES = {
     "stockChromeTabSwitch": {
         "status": "SUPPORTED",
         "mechanism": "android.provider.Browser.EXTRA_CREATE_NEW_TAB_then_android_back",
-        "authority": "exact_event_source_ready_binding",
+        "authority": "event_source_one_shot_plus_web_root_continuity",
         "coordinateUiAutomation": False,
         "countsAsPass": True,
     },
@@ -216,6 +217,42 @@ def wait_for_ready(
     raise HarnessError(
         "foreground READY authority did not become current within the bounded wait: "
         f"currentReadyBinding={last_status.get('currentReadyBinding')} status={last_status.get('status', {})}"
+    )
+
+
+def wait_for_web_root_continuity(
+    adb: Adb,
+    since: str,
+    timeout_seconds: int,
+    minimum_verified_count: int,
+    expected_marker: dict[str, Any],
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout_seconds
+    last_status: dict[str, Any] = {}
+    while time.monotonic() < deadline:
+        _, last_status = request_status(adb, since)
+        continuity = last_status.get("readyWebRootContinuity", {})
+        current = last_status.get("currentReadyBinding")
+        if (
+            int(continuity.get("verified", 0)) >= minimum_verified_count
+            and int(continuity.get("violations", 0)) == 0
+            and continuity.get("currentDocumentVerified") is True
+            and isinstance(current, dict)
+            and ready_document_key(current) == ready_document_key(expected_marker)
+            and current.get("rawPresented") is False
+        ):
+            return {
+                "pass": True,
+                "verifiedCount": int(continuity["verified"]),
+                "documentKeyMatched": True,
+                "sourceCurrent": False,
+                "rawPresented": False,
+            }
+        time.sleep(0.25)
+    raise HarnessError(
+        "exact web-root continuity after source pruning was not observed: "
+        f"continuity={last_status.get('readyWebRootContinuity')} "
+        f"currentReadyBinding={last_status.get('currentReadyBinding')}"
     )
 
 
@@ -362,7 +399,7 @@ def run_state(
             state.get("orientation", "current"),
         )
     else:
-        ready_state_baseline = {"releaseCount": 0, "marker": None}
+        ready_state_baseline = {"releaseCount": 0, "continuityCount": 0, "marker": None}
         orientation_evidence = set_and_verify_orientation(adb, state.get("orientation", "current"))
         orientation_changed = False
     new_navigation = new_navigation_for(state)
@@ -444,6 +481,17 @@ def run_state(
             }
         else:
             ready_evidence = {"required": False, "pass": True, "reason": "bounded_non_document_probe"}
+        if web_root_continuity_required_for(state):
+            marker = ready_evidence.get("marker")
+            if not isinstance(marker, dict):
+                raise HarnessError("web-root continuity gate requires an exact released marker")
+            ready_evidence["webRootContinuity"] = wait_for_web_root_continuity(
+                adb,
+                phase_since,
+                int(state.get("readyTimeoutSeconds", 8)),
+                minimum_verified_count=int(ready_state_baseline["continuityCount"]) + 1,
+                expected_marker=marker,
+            )
         for _ in range(int(state.get("swipes", 0))):
             if screenrecord.poll() is not None:
                 raise HarnessError(f"screenrecord ended before all gestures for {state_id}")

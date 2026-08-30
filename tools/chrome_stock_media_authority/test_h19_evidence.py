@@ -27,13 +27,22 @@ class H19EvidenceTest(unittest.TestCase):
         )
         lines = (
             "I ChromeMediaShieldReady: phase=ready_ack_accepted " + common +
-            "axBound=false binding=none root= source= reason= rawPresented=false",
+            "axBound=false binding=none continuity=none rootBinding=none webRoot= root= source= "
+            "reason= rawPresented=false",
             "I ChromeMediaShieldReady: phase=ready_focus_bound " + common +
-            "root=111111111111 source=222222222222 binding=event_source axBound=true "
+            "rootBinding=web_root webRoot=333333333333 root=111111111111 source=222222222222 "
+            "continuity=none binding=event_source axBound=true sourceCurrent=true "
+            "sourceEvidenceScope=current_boundary "
             "reason= rawPresented=false",
             "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=17 surfaceEpoch=8 "
-            "documentSequence=3 lifecycle=4 token=abcdef012345 root=111111111111 "
-            "source=222222222222 binding=event_source axBound=true reason= rawPresented=false",
+            "documentSequence=3 lifecycle=4 token=abcdef012345 rootBinding=web_root "
+            "webRoot=333333333333 root=111111111111 source=222222222222 continuity=none "
+            "binding=event_source axBound=true sourceCurrent=true "
+            "sourceEvidenceScope=current_boundary reason= rawPresented=false",
+            "I ChromeMediaShieldReady: phase=ready_web_root_continuity " + common +
+            "rootBinding=web_root webRoot=333333333333 root=111111111111 source= "
+            "continuity=web_root binding=event_source axBound=true sourceCurrent=false "
+            "sourceEvidenceScope=initial_only reason= rawPresented=false",
         )
 
         summary = summarize_logcat("\n".join(lines))
@@ -43,11 +52,17 @@ class H19EvidenceTest(unittest.TestCase):
                 "package": "com.android.chrome",
                 "windowId": "17",
                 "documentSequence": "3",
+                "surfaceEpoch": "8",
                 "lifecycle": "4",
                 "tokenDigestPrefix": "abcdef012345",
                 "rootDigestPrefix": "111111111111",
+                "webRootDigestPrefix": "333333333333",
                 "sourceDigestPrefix": "222222222222",
+                "sourceCurrent": True,
+                "sourceEvidenceScope": "current_boundary",
                 "binding": "event_source",
+                "rootBinding": "web_root",
+                "continuity": "none",
                 "axBound": True,
                 "phase": "ready_foreground_released",
                 "reason": "",
@@ -58,13 +73,19 @@ class H19EvidenceTest(unittest.TestCase):
         )
         self.assertEqual(summary["readyMarkers"][0], summary["currentReadyBinding"])
         self.assertEqual(0, summary["readyBindingOrder"]["violations"])
+        self.assertEqual(
+            {"verified": 1, "violations": 0, "currentDocumentVerified": True},
+            summary["readyWebRootContinuity"],
+        )
         self.assertNotIn("glosh-shield-ready", str(summary))
 
     def test_release_without_ack_and_focus_order_never_becomes_current(self) -> None:
         release = (
-            "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=7 documentSequence=2 "
-            "lifecycle=3 token=aaaaaaaaaaaa root=bbbbbbbbbbbb source=cccccccccccc "
-            "binding=event_source axBound=true reason= rawPresented=false"
+            "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=7 surfaceEpoch=9 "
+            "documentSequence=2 lifecycle=3 token=aaaaaaaaaaaa rootBinding=native_root "
+            "webRoot=dddddddddddd root=bbbbbbbbbbbb source=cccccccccccc continuity=none "
+            "binding=event_source axBound=true sourceCurrent=true "
+            "sourceEvidenceScope=current_boundary reason= rawPresented=false"
         )
 
         summary = summarize_logcat(release)
@@ -72,8 +93,58 @@ class H19EvidenceTest(unittest.TestCase):
         self.assertIsNone(summary["currentReadyBinding"])
         self.assertEqual(1, summary["readyBindingOrder"]["violations"])
 
+    def test_web_root_rearm_requires_prior_source_release_and_ordered_continuity(self) -> None:
+        identity = "windowId=7 documentSequence=2 lifecycle=3 token=aaaaaaaaaaaa "
+        root = "rootBinding=native_root webRoot=dddddddddddd root=bbbbbbbbbbbb "
+        logcat = "\n".join(
+            (
+                "I ChromeMediaShieldReady: phase=ready_ack_accepted surfaceEpoch=8 " + identity,
+                "I ChromeMediaShieldReady: phase=ready_focus_bound surfaceEpoch=8 " + identity + root +
+                "source=cccccccccccc continuity=none binding=event_source axBound=true "
+                "sourceCurrent=true sourceEvidenceScope=current_boundary rawPresented=false",
+                "I ChromeMediaShieldReady: phase=ready_foreground_released surfaceEpoch=8 " + identity + root +
+                "source=cccccccccccc continuity=none binding=event_source axBound=true "
+                "sourceCurrent=true sourceEvidenceScope=current_boundary rawPresented=false",
+                "I ChromeMediaShieldReady: phase=ready_web_root_continuity surfaceEpoch=8 " + identity +
+                "rootBinding=web_root webRoot=dddddddddddd root=bbbbbbbbbbbb source= "
+                "continuity=web_root binding=event_source axBound=true sourceCurrent=false "
+                "sourceEvidenceScope=initial_only rawPresented=false",
+                "I ChromeMediaShieldReady: phase=ready_foreground_revoked surfaceEpoch=8 " + identity +
+                "reason=surface_invalidated rawPresented=false",
+                "I ChromeMediaShieldReady: phase=ready_foreground_released surfaceEpoch=9 " + identity +
+                "rootBinding=web_root webRoot=dddddddddddd root=bbbbbbbbbbbb source= "
+                "continuity=web_root binding=event_source axBound=true sourceCurrent=false "
+                "sourceEvidenceScope=initial_only rawPresented=false",
+            )
+        )
+
+        summary = summarize_logcat(logcat)
+
+        current = summary["currentReadyBinding"]
+        self.assertEqual("9", current["surfaceEpoch"])
+        self.assertFalse(current["sourceCurrent"])
+        self.assertTrue(current["continuityVerified"])
+        self.assertEqual("cccccccccccc", current["sourceDigestPrefix"])
+        self.assertEqual(2, summary["readyBindingOrder"]["verifiedReleaseCount"])
+
+    def test_web_root_continuity_before_source_release_never_creates_authority(self) -> None:
+        summary = summarize_logcat(
+            "I ChromeMediaShieldReady: phase=ready_web_root_continuity windowId=7 surfaceEpoch=8 "
+            "documentSequence=2 lifecycle=3 token=aaaaaaaaaaaa rootBinding=web_root "
+            "webRoot=dddddddddddd root=bbbbbbbbbbbb source= continuity=web_root "
+            "binding=event_source axBound=true sourceCurrent=false "
+            "sourceEvidenceScope=initial_only rawPresented=false"
+        )
+
+        self.assertIsNone(summary["currentReadyBinding"])
+        self.assertEqual(0, summary["readyWebRootContinuity"]["verified"])
+        self.assertEqual(1, summary["readyWebRootContinuity"]["violations"])
+
     def test_ordered_release_missing_source_digest_is_not_counted_as_verified(self) -> None:
-        common = "windowId=7 documentSequence=2 lifecycle=3 token=aaaaaaaaaaaa "
+        common = (
+            "windowId=7 surfaceEpoch=9 documentSequence=2 lifecycle=3 token=aaaaaaaaaaaa "
+            "rootBinding=web_root webRoot=dddddddddddd continuity=none "
+        )
         summary = summarize_logcat(
             "\n".join(
                 (
@@ -90,10 +161,20 @@ class H19EvidenceTest(unittest.TestCase):
         self.assertEqual(0, summary["readyBindingOrder"]["verifiedReleaseCount"])
 
     def test_ready_timeline_is_sanitized_and_revocation_clears_current_binding(self) -> None:
+        common = (
+            "windowId=7 surfaceEpoch=9 documentSequence=2 lifecycle=3 token=aaaaaaaaaaaa "
+            "rootBinding=native_root webRoot=dddddddddddd root=bbbbbbbbbbbb "
+        )
+        acknowledged = "I ChromeMediaShieldReady: phase=ready_ack_accepted " + common
+        focused = (
+            "I ChromeMediaShieldReady: phase=ready_focus_bound " + common +
+            "source=cccccccccccc continuity=none binding=event_source axBound=true "
+            "sourceCurrent=true sourceEvidenceScope=current_boundary rawPresented=false"
+        )
         released = (
-            "I ChromeMediaShieldReady: phase=ready_foreground_released windowId=7 documentSequence=2 "
-            "lifecycle=3 token=aaaaaaaaaaaa root=bbbbbbbbbbbb source=cccccccccccc "
-            "binding=event_source axBound=true reason= rawPresented=false"
+            "I ChromeMediaShieldReady: phase=ready_foreground_released " + common +
+            "source=cccccccccccc continuity=none binding=event_source axBound=true "
+            "sourceCurrent=true sourceEvidenceScope=current_boundary reason= rawPresented=false"
         )
         rejected = (
             "I ChromeMediaShieldReady: phase=ready_focus_rejected windowId=7 documentSequence=2 "
@@ -106,15 +187,17 @@ class H19EvidenceTest(unittest.TestCase):
             "rawPresented=false"
         )
 
-        summary = summarize_logcat("\n".join((released, rejected, revoked)))
+        summary = summarize_logcat("\n".join((acknowledged, focused, released, rejected, revoked)))
 
         self.assertIsNone(summary["currentReadyBinding"])
         self.assertEqual(1, summary["readyReasons"]["ready_focus_wrong_window"])
         self.assertEqual(1, summary["readyReasons"]["ready_lease_stale_or_unhealthy"])
-        rejected_event = summary["readyTimeline"][1]
+        self.assertEqual(1, summary["readyBindingOrder"]["verifiedReleaseCount"])
+        rejected_event = summary["readyTimeline"][3]
         self.assertEqual("", rejected_event["tokenDigestPrefix"])
         self.assertEqual("", rejected_event["rootDigestPrefix"])
         self.assertEqual("", rejected_event["sourceDigestPrefix"])
+        self.assertEqual("", rejected_event["webRootDigestPrefix"])
         self.assertEqual("", rejected_event["binding"])
         self.assertNotIn("secret-token", str(summary))
         self.assertNotIn("raw-root", str(summary))
