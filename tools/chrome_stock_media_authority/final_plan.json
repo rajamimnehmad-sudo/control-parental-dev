@@ -2,7 +2,7 @@
   "schema": "glosh-h19-a23-plan-v1",
   "expectedModel": "SM-A235M",
   "expectedSdk": 34,
-  "expectedAppVersionCode": 384,
+  "expectedAppVersionCode": 385,
   "minimumChromeMajor": 146,
   "samplingFps": 4,
   "startupTimeoutSeconds": 120,
