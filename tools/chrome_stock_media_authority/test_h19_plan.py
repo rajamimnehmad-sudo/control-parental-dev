@@ -15,6 +15,9 @@ from h19_plan import (
 def plan_with_taps(taps):
     return {
         "schema": "glosh-h19-a23-plan-v1",
+        "expectedGloshiaModelVersion": "R3.1",
+        "expectedGloshiaModelSha256": "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48",
+        "expectedGloshiaPolicyVersion": "dag-36",
         "phases": [
             {
                 "id": "phase",
@@ -138,8 +141,21 @@ class H19PlanTest(unittest.TestCase):
         plan = json.loads((Path(__file__).with_name("final_plan.json")).read_text())
 
         self.assertEqual(plan, validate_plan(plan))
-        self.assertEqual(386, plan["expectedAppVersionCode"])
+        self.assertEqual(387, plan["expectedAppVersionCode"])
+        self.assertEqual("R3.1", plan["expectedGloshiaModelVersion"])
+        self.assertEqual("dag-36", plan["expectedGloshiaPolicyVersion"])
         self.assertTrue(all(len(phase["states"]) <= 25 for phase in plan["phases"]))
+
+    def test_plan_requires_exact_reviewed_gloshia_identity(self):
+        for field, value in (
+            ("expectedGloshiaModelVersion", "R4"),
+            ("expectedGloshiaModelSha256", "0" * 64),
+            ("expectedGloshiaPolicyVersion", "dag-37"),
+        ):
+            plan = plan_with_taps([])
+            plan[field] = value
+            with self.subTest(field=field), self.assertRaises(HarnessError):
+                validate_plan(plan)
 
 
 if __name__ == "__main__":

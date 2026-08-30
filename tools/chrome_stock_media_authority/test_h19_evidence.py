@@ -327,6 +327,9 @@ class H19EvidenceTest(unittest.TestCase):
     def test_plan_is_bounded_and_rejects_non_web_navigation(self) -> None:
         plan = {
             "schema": "glosh-h19-a23-plan-v1",
+            "expectedGloshiaModelVersion": "R3.1",
+            "expectedGloshiaModelSha256": "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48",
+            "expectedGloshiaPolicyVersion": "dag-36",
             "phases": [
                 {
                     "id": "replace",

@@ -199,7 +199,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                         claim = expected.claim,
                         expectedWindowId = expected.surface.windowId,
                         document = document,
-                        requireAnchor = true,
                     ) &&
                     hasVerifiedPresentation(
                         snapshot = snapshot,
@@ -272,7 +271,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val expected = target ?: return false
         val lease = activeLease ?: return false
         val document = activeDocument ?: return false
-        if (!exactForegroundDocument(expected.claim, windowId, document, requireAnchor = false)) return false
+        if (!exactForegroundDocument(expected.claim, windowId, document)) return false
         val attestation = attestationReader.read()
         val context = snapshot.toLeaseContext(viewport, document)
         return surface.stats().transparent &&
@@ -413,7 +412,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 expected.claim,
                 expected.surface.windowId,
                 firstDocument,
-                requireAnchor = false,
             )
         ) {
             return false
@@ -441,16 +439,18 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val boundarySnapshot = state.snapshot()
         val boundaryDocument = focusedDocument
         val boundaryWindow = windowInspector.findUniqueForeground()
-        val boundaryAnchorFailure =
+        val boundaryFailure =
             when {
                 boundaryDocument == null -> "ready_boundary_document_missing"
                 boundaryWindow == null -> "ready_boundary_window_missing"
                 boundaryWindow.id != expected.surface.windowId -> "ready_boundary_window_mismatch"
-                else -> tokenScanner.boundAnchorFailureReason(boundaryWindow, expected.claim, boundaryDocument)
+                !tokenScanner.verifiesBoundContext(boundaryWindow, expected.claim, boundaryDocument) ->
+                    "ready_boundary_context_mismatch"
+                else -> null
             }
-        if (boundaryAnchorFailure != null) {
+        if (boundaryFailure != null) {
             leaseAuthority.revoke()
-            log("ready_release_rejected", expected, boundaryDocument, boundaryAnchorFailure)
+            log("ready_release_rejected", expected, boundaryDocument, boundaryFailure)
             return false
         }
         val boundaryAttestation = attestationReader.read()
@@ -473,6 +473,10 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             ) ||
             !leaseAuthority.isValid(lease, boundaryAttestation, boundaryContext) ||
             !releaseGate.commitRelease(expected.claim) {
+                val commitWindow = windowInspector.findUniqueForeground() ?: return@commitRelease false
+                if (!tokenScanner.verifiesBoundContext(commitWindow, expected.claim, boundaryDocument)) {
+                    return@commitRelease false
+                }
                 ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(
                     claim = expected.claim,
                     accessibilityContext = boundaryDocument.accessibilityContext,
@@ -490,6 +494,11 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         releasedTarget = expected
         scheduleLeaseWatchdog()
         log("ready_foreground_released", expected, boundaryDocument)
+        tokenScanner
+            .boundAnchorFailureReason(checkNotNull(boundaryWindow), expected.claim, boundaryDocument)
+            ?.let { diagnosticReason ->
+                log("ready_anchor_diagnostic", expected, boundaryDocument, diagnosticReason)
+            }
         return true
     }
 
@@ -497,15 +506,10 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         claim: ChromeMediaShieldReadyClaim,
         expectedWindowId: Int,
         document: ChromeMediaShieldForegroundDocument,
-        requireAnchor: Boolean,
     ): Boolean {
         val window = windowInspector.findUniqueForeground() ?: return false
         if (window.id != expectedWindowId) return false
-        return if (requireAnchor) {
-            tokenScanner.verifiesBoundAnchor(window, claim, document)
-        } else {
-            tokenScanner.verifiesBoundContext(window, claim, document)
-        }
+        return tokenScanner.verifiesBoundContext(window, claim, document)
     }
 
     private fun verifyLeaseOnMain() {

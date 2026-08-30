@@ -54,6 +54,9 @@ from h19_device import (
     tap_normalized,
 )
 from h19_plan import (
+    EXPECTED_GLOSHIA_MODEL_SHA256,
+    EXPECTED_GLOSHIA_MODEL_VERSION,
+    EXPECTED_GLOSHIA_POLICY_VERSION,
     HarnessError,
     navigation_requires_new_release,
     new_navigation_for,
@@ -165,6 +168,9 @@ def start_phase(
             and active.get("networkVisualMode") == expected_mode
             and active.get("stockMediaAuthority") == "true"
             and active.get("transport") == "full_tunnel_dev"
+            and active.get("model") == EXPECTED_GLOSHIA_MODEL_VERSION
+            and active.get("modelSha") == EXPECTED_GLOSHIA_MODEL_SHA256
+            and active.get("policy") == EXPECTED_GLOSHIA_POLICY_VERSION
             and (not previous_session or active.get("session") != previous_session)
         ):
             return last
@@ -637,6 +643,7 @@ def main() -> int:
             active = True
             active_summary = start_phase(adb, mode, last_phase_since, int(plan.get("startupTimeoutSeconds", 90)))
             previous_counters = status_counter_snapshot(active_summary)
+            enforce_counter_gate(mode, previous_counters, {field: 0 for field in previous_counters})
             previous_fixture_counts: dict[str, int] = {}
             write_json(
                 args.output / f"phase-{phase_id}.json",

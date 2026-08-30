@@ -22,6 +22,9 @@ ALLOWED_NAVIGATION = {
     "chrome-policy",
 }
 ALLOWED_ORIENTATIONS = {"current", "portrait", "landscape"}
+EXPECTED_GLOSHIA_MODEL_VERSION = "R3.1"
+EXPECTED_GLOSHIA_MODEL_SHA256 = "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48"
+EXPECTED_GLOSHIA_POLICY_VERSION = "dag-36"
 READY_OPTIONAL_NAVIGATION = {"chrome-policy"}
 NAVIGATION_DEFAULTS_TO_NEW_DOCUMENT = {
     "url",
@@ -106,6 +109,12 @@ def validate_plan(raw: Any) -> dict[str, Any]:
         raise HarnessError("expectedAppVersionCode must be a positive integer")
     if not isinstance(minimum_chrome, int) or not 100 <= minimum_chrome <= 999:
         raise HarnessError("minimumChromeMajor must be in 100..999")
+    if raw.get("expectedGloshiaModelVersion") != EXPECTED_GLOSHIA_MODEL_VERSION:
+        raise HarnessError(f"expectedGloshiaModelVersion must be {EXPECTED_GLOSHIA_MODEL_VERSION}")
+    if raw.get("expectedGloshiaModelSha256") != EXPECTED_GLOSHIA_MODEL_SHA256:
+        raise HarnessError("expectedGloshiaModelSha256 does not match the reviewed R3.1 model")
+    if raw.get("expectedGloshiaPolicyVersion") != EXPECTED_GLOSHIA_POLICY_VERSION:
+        raise HarnessError(f"expectedGloshiaPolicyVersion must be {EXPECTED_GLOSHIA_POLICY_VERSION}")
     if not isinstance(phases, list) or not 1 <= len(phases) <= 4:
         raise HarnessError("plan phases must contain 1..4 entries")
     seen: set[str] = set()

@@ -18,17 +18,12 @@ class ChromeMediaShieldFocusEventPolicyTest {
             ChromeMediaShieldFocusEventResult.Verified(
                 marker = Marker,
                 sourceUniqueId = SourceUniqueId,
-                rootUniqueId = RootUniqueId,
+                webRootUniqueId = WebRootUniqueId,
+                foregroundRootUniqueId = ForegroundRootUniqueId,
             ),
             result,
         )
-        assertTrue(
-            ChromeMediaShieldFocusEventPolicy.verify(
-                evidence(foregroundRootUniqueId = "native-chrome-window-root"),
-                Claim,
-                WindowId,
-            ) is ChromeMediaShieldFocusEventResult.Verified,
-        )
+        assertTrue(WebRootUniqueId != ForegroundRootUniqueId)
     }
 
     @Test
@@ -53,6 +48,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         assertRejected("ready_focus_wrong_window", evidence(eventWindowId = WindowId + 1))
         assertRejected("ready_focus_wrong_window", evidence(sourceWindowId = WindowId + 1))
         assertRejected("ready_focus_root_mismatch", evidence(sourceRootUniqueId = ""))
+        assertRejected("ready_focus_root_mismatch", evidence(foregroundRootUniqueId = ""))
         assertRejected("ready_focus_root_mismatch", evidence(sourceAttachedToForegroundRoot = false))
     }
 
@@ -117,8 +113,24 @@ class ChromeMediaShieldFocusEventPolicyTest {
     }
 
     @Test
+    fun `release context binds the current native Chrome root independently of the web root`() {
+        assertTrue(
+            ChromeMediaShieldForegroundContextPolicy.verifies(
+                foregroundContextEvidence(),
+                Document,
+            ),
+        )
+        assertTrue(WebRootUniqueId != ForegroundRootUniqueId)
+        assertForegroundContextRejected(foregroundContextEvidence(foregroundRootUniqueId = WebRootUniqueId))
+        assertForegroundContextRejected(foregroundContextEvidence(foregroundRootUniqueId = "replacement-native-root"))
+        assertForegroundContextRejected(foregroundContextEvidence(foregroundRootUniqueId = ""))
+        assertForegroundContextRejected(foregroundContextEvidence(windowId = WindowId + 1))
+        assertForegroundContextRejected(foregroundContextEvidence(rootPackageName = "example.hostile"))
+    }
+
+    @Test
     fun `same Chrome window cannot carry anchor across document root lifecycle or claim`() {
-        assertBoundAnchorRejected(boundEvidence(rootUniqueId = "replacement-root"))
+        assertBoundAnchorRejected(boundEvidence(foregroundRootUniqueId = "replacement-root"))
         assertBoundAnchorRejected(boundEvidence(sourceRootUniqueId = "background-root"))
         assertBoundAnchorRejected(boundEvidence(windowId = WindowId + 1))
         assertBoundAnchorRejected(
@@ -154,9 +166,9 @@ class ChromeMediaShieldFocusEventPolicyTest {
         sourceWindowId: Int = WindowId,
         sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
         sourceUniqueId: String = SourceUniqueId,
-        sourceRootUniqueId: String = RootUniqueId,
+        sourceRootUniqueId: String = WebRootUniqueId,
         foregroundRootPackageName: String = ChromePackageName,
-        foregroundRootUniqueId: String = RootUniqueId,
+        foregroundRootUniqueId: String = ForegroundRootUniqueId,
         sourceAttachedToForegroundRoot: Boolean = true,
         sourceFocused: Boolean = true,
         sourceVisibleToUser: Boolean = true,
@@ -182,23 +194,37 @@ class ChromeMediaShieldFocusEventPolicyTest {
         assertTrue(!ChromeMediaShieldBoundAnchorPolicy.verifies(evidence, Claim, Document))
     }
 
+    private fun assertForegroundContextRejected(evidence: ChromeMediaShieldForegroundContextEvidence) {
+        assertTrue(!ChromeMediaShieldForegroundContextPolicy.verifies(evidence, Document))
+    }
+
+    private fun foregroundContextEvidence(
+        windowId: Int = WindowId,
+        rootPackageName: String = ChromePackageName,
+        foregroundRootUniqueId: String = ForegroundRootUniqueId,
+    ) = ChromeMediaShieldForegroundContextEvidence(
+        windowId = windowId,
+        rootPackageName = rootPackageName,
+        foregroundRootUniqueId = foregroundRootUniqueId,
+    )
+
     private fun boundEvidence(
         windowId: Int = WindowId,
         rootPackageName: String = ChromePackageName,
-        rootUniqueId: String = RootUniqueId,
+        foregroundRootUniqueId: String = ForegroundRootUniqueId,
         matchingNodeCount: Int = 1,
         sourcePackageName: String = ChromePackageName,
         sourceWindowId: Int = WindowId,
         sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
         sourceUniqueId: String = SourceUniqueId,
-        sourceRootUniqueId: String = RootUniqueId,
+        sourceRootUniqueId: String = WebRootUniqueId,
         sourceAttachedToForegroundRoot: Boolean = true,
         sourceVisibleToUser: Boolean = true,
         markers: List<ChromeMediaShieldReadyMarker> = listOf(Marker),
     ) = ChromeMediaShieldBoundAnchorEvidence(
         windowId = windowId,
         rootPackageName = rootPackageName,
-        rootUniqueId = rootUniqueId,
+        foregroundRootUniqueId = foregroundRootUniqueId,
         matchingNodeCount = matchingNodeCount,
         sourcePackageName = sourcePackageName,
         sourceWindowId = sourceWindowId,
@@ -216,7 +242,8 @@ class ChromeMediaShieldFocusEventPolicyTest {
         const val Token = "AAAAAAAAAAAAAAAAAAAAAA"
         const val OtherToken = "BBBBBBBBBBBBBBBBBBBBBB"
         const val SourceUniqueId = "web-node:ready"
-        const val RootUniqueId = "chrome-root:17"
+        const val WebRootUniqueId = "chrome-web-root:17"
+        const val ForegroundRootUniqueId = "chrome-native-root:17"
         val Marker = ChromeMediaShieldReadyMarker(Token, 3L)
         val Claim =
             ChromeMediaShieldReadyClaim(
@@ -241,7 +268,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
                         windowId = WindowId,
                         rootIdentityDigest =
                             ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
-                                "root:$RootUniqueId",
+                                "root:$ForegroundRootUniqueId",
                             ),
                         markerIdentityDigest =
                             ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
@@ -252,6 +279,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
                     ChromeMediaShieldFocusAnchor(
                         viewIdResourceName = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
                         sourceUniqueId = SourceUniqueId,
+                        webRootUniqueId = WebRootUniqueId,
                     ),
             )
     }

@@ -231,6 +231,7 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
                 ChromeMediaShieldFocusAnchor(
                     viewIdResourceName = "glosh-h19-ready-redacted",
                     sourceUniqueId = "web-node:ready",
+                    webRootUniqueId = "web-root:ready",
                 ),
         )
 

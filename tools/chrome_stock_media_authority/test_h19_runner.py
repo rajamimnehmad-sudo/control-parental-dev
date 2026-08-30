@@ -134,6 +134,9 @@ class H19RunnerTest(unittest.TestCase):
                 "stockMediaAuthority": "true",
                 "transport": "full_tunnel_dev",
                 "session": "current",
+                "model": "R3.1",
+                "modelSha": "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48",
+                "policy": "dag-36",
             },
         }
         suspended = {

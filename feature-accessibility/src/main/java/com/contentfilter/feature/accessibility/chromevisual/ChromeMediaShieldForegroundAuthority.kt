@@ -20,6 +20,7 @@ internal data class ChromeMediaShieldForegroundDocument(
 internal data class ChromeMediaShieldFocusAnchor(
     val viewIdResourceName: String,
     val sourceUniqueId: String,
+    val webRootUniqueId: String,
 ) {
     override fun toString(): String = "ChromeMediaShieldFocusAnchor(redacted)"
 }
@@ -64,7 +65,8 @@ internal sealed interface ChromeMediaShieldFocusEventResult {
     data class Verified(
         val marker: ChromeMediaShieldReadyMarker,
         val sourceUniqueId: String,
-        val rootUniqueId: String,
+        val webRootUniqueId: String,
+        val foregroundRootUniqueId: String,
     ) : ChromeMediaShieldFocusEventResult {
         override fun toString(): String = "ChromeMediaShieldFocusEventResult.Verified(redacted)"
     }
@@ -99,6 +101,7 @@ internal object ChromeMediaShieldFocusEventPolicy {
         if (
             evidence.sourceUniqueId.isBlank() ||
             evidence.sourceRootUniqueId.isBlank() ||
+            evidence.foregroundRootUniqueId.isBlank() ||
             !evidence.sourceAttachedToForegroundRoot
         ) {
             return rejected("ready_focus_root_mismatch")
@@ -117,7 +120,8 @@ internal object ChromeMediaShieldFocusEventPolicy {
         return ChromeMediaShieldFocusEventResult.Verified(
             marker = marker,
             sourceUniqueId = evidence.sourceUniqueId,
-            rootUniqueId = evidence.sourceRootUniqueId,
+            webRootUniqueId = evidence.sourceRootUniqueId,
+            foregroundRootUniqueId = evidence.foregroundRootUniqueId,
         )
     }
 
@@ -127,10 +131,32 @@ internal object ChromeMediaShieldFocusEventPolicy {
     private const val ChromePackageName = "com.android.chrome"
 }
 
+internal data class ChromeMediaShieldForegroundContextEvidence(
+    val windowId: Int,
+    val rootPackageName: String,
+    val foregroundRootUniqueId: String,
+)
+
+internal object ChromeMediaShieldForegroundContextPolicy {
+    fun verifies(
+        evidence: ChromeMediaShieldForegroundContextEvidence,
+        document: ChromeMediaShieldForegroundDocument,
+    ): Boolean =
+        evidence.windowId == document.windowId &&
+            document.accessibilityContext.windowId == document.windowId &&
+            evidence.rootPackageName == ChromePackageName &&
+            evidence.foregroundRootUniqueId.isNotBlank() &&
+            ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
+                "root:${evidence.foregroundRootUniqueId}",
+            ) == document.accessibilityContext.rootIdentityDigest
+
+    private const val ChromePackageName = "com.android.chrome"
+}
+
 internal data class ChromeMediaShieldBoundAnchorEvidence(
     val windowId: Int,
     val rootPackageName: String,
-    val rootUniqueId: String,
+    val foregroundRootUniqueId: String,
     val matchingNodeCount: Int,
     val sourcePackageName: String,
     val sourceWindowId: Int,
@@ -154,8 +180,10 @@ internal object ChromeMediaShieldBoundAnchorPolicy {
             evidence.windowId != document.windowId ||
             document.accessibilityContext.windowId != document.windowId ||
             evidence.rootPackageName != ChromePackageName ||
-            evidence.rootUniqueId.isBlank() ||
-            ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken("root:${evidence.rootUniqueId}") !=
+            evidence.foregroundRootUniqueId.isBlank() ||
+            ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
+                "root:${evidence.foregroundRootUniqueId}",
+            ) !=
             document.accessibilityContext.rootIdentityDigest ||
             evidence.matchingNodeCount != 1
         ) {
@@ -166,7 +194,7 @@ internal object ChromeMediaShieldBoundAnchorPolicy {
             evidence.sourceWindowId != document.windowId ||
             evidence.sourceViewIdResourceName != document.focusAnchor.viewIdResourceName ||
             evidence.sourceUniqueId != document.focusAnchor.sourceUniqueId ||
-            evidence.sourceRootUniqueId != evidence.rootUniqueId ||
+            evidence.sourceRootUniqueId != document.focusAnchor.webRootUniqueId ||
             !evidence.sourceAttachedToForegroundRoot
         ) {
             return false
@@ -237,7 +265,7 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
                 windowId = window.id,
                 rootIdentityDigest =
                     ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
-                        "root:${verified.rootUniqueId}",
+                        "root:${verified.foregroundRootUniqueId}",
                     ),
                 markerIdentityDigest =
                     ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
@@ -262,6 +290,7 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
                     ChromeMediaShieldFocusAnchor(
                         viewIdResourceName = source.viewIdResourceName.orEmpty(),
                         sourceUniqueId = verified.sourceUniqueId,
+                        webRootUniqueId = verified.webRootUniqueId,
                     ),
             ),
         )
@@ -285,7 +314,20 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
     ): Boolean {
         if (window.id != document.windowId) return false
         val root = window.root ?: return false
-        if (root.packageName?.toString() != ChromePackageName) return false
+        val currentRootUniqueId = root.uniqueIdOrNull() ?: return false
+        if (
+            !ChromeMediaShieldForegroundContextPolicy.verifies(
+                evidence =
+                    ChromeMediaShieldForegroundContextEvidence(
+                        windowId = window.id,
+                        rootPackageName = root.packageName?.toString().orEmpty(),
+                        foregroundRootUniqueId = currentRootUniqueId,
+                    ),
+                document = document,
+            )
+        ) {
+            return false
+        }
         return ChromeMediaShieldDocumentAuthorityRegistry.resolveClaimedForeground(
             sessionId = claim.identity.protectionSessionId,
             epoch = claim.identity.policyEpoch,
@@ -295,7 +337,7 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
         ) == claim.identity
     }
 
-    /** Event-driven secondary continuity check; never creates authority or retries. */
+    /** Passive diagnostic only; event.source creates authority and this lookup never gates release. */
     fun verifiesBoundAnchor(
         window: AccessibilityWindowInfo,
         claim: ChromeMediaShieldReadyClaim,
@@ -326,6 +368,7 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
         if (matches.isEmpty()) return "ready_boundary_anchor_absent"
         if (matches.size != 1) return "ready_boundary_anchor_ambiguous"
         val node = matches.singleOrNull()
+        val foregroundRootUniqueId = root.uniqueIdOrNull().orEmpty()
         val webRootUniqueId = node?.webRootUniqueIdOrNull().orEmpty()
         val verified =
             ChromeMediaShieldBoundAnchorPolicy.verifies(
@@ -333,7 +376,7 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
                     ChromeMediaShieldBoundAnchorEvidence(
                         windowId = window.id,
                         rootPackageName = root.packageName?.toString().orEmpty(),
-                        rootUniqueId = webRootUniqueId,
+                        foregroundRootUniqueId = foregroundRootUniqueId,
                         matchingNodeCount = matches.size,
                         sourcePackageName = node?.packageName?.toString().orEmpty(),
                         sourceWindowId = node?.windowId ?: -1,
@@ -381,10 +424,13 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
                 val markerUniqueId =
                     node.uniqueIdOrNull()
                         ?: return ChromeMediaShieldTokenScanResult.FailClosed("ready_token_ax_identity_missing")
-                marker to markerUniqueId
+                val webRootUniqueId =
+                    node.webRootUniqueIdOrNull()
+                        ?: return ChromeMediaShieldTokenScanResult.FailClosed("ready_token_ax_identity_missing")
+                Triple(marker, markerUniqueId, webRootUniqueId)
             }
         val expected =
-            markerNodes.singleOrNull { (marker, _) ->
+            markerNodes.singleOrNull { (marker, _, _) ->
                 marker.lifecycleSequence == expectedClaim.lifecycleSequence &&
                     ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(marker.readyToken) ==
                     expectedClaim.identity.tokenDigest
@@ -426,6 +472,7 @@ internal class ChromeMediaShieldAccessibilityTokenScanner {
                     ChromeMediaShieldFocusAnchor(
                         viewIdResourceName = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + expected.first.readyToken,
                         sourceUniqueId = expected.second,
+                        webRootUniqueId = expected.third,
                     ),
             ),
         )
