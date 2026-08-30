@@ -12,6 +12,21 @@ import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyHandshakeBridg
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyHandshakeCompletion
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyHandshakeListener
 
+internal object ChromeMediaShieldAuthorityEventPolicy {
+    fun isSteadyChromeEvent(event: AccessibilityEvent): Boolean =
+        event.packageName?.toString() == ChromePackageName && event.eventType in SteadyEventTypes
+
+    private val SteadyEventTypes =
+        setOf(
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_SCROLLED,
+            AccessibilityEvent.TYPE_VIEW_FOCUSED,
+            AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_CLICKED,
+        )
+    private const val ChromePackageName = "com.android.chrome"
+}
+
 internal data class ChromeMediaShieldReadyPresentationTarget(
     val claim: ChromeMediaShieldReadyClaim,
     val surface: ChromePhotosProtectedSurfaceSnapshot,
@@ -235,22 +250,22 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             }
             return
         }
-        if (event.eventType != AccessibilityEvent.TYPE_VIEW_FOCUSED) return
-        val window = windowInspector.findUniqueForeground()
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
+        val window = windowInspector.findUniqueForegroundCandidate(expected.surface.windowId)
         if (window == null || window.id != expected.surface.windowId) return
-        when (val result = tokenScanner.bindFocusedEvent(event, window, expected.claim)) {
+        when (val result = tokenScanner.bindReadyEvent(event, window, expected.claim)) {
             is ChromeMediaShieldTokenScanResult.Current -> {
                 focusedDocument = result.document
-                log("ready_focus_bound", expected, result.document)
+                log("ready_ax_bound", expected, result.document)
                 if (
-                    releaseGate.onFocusBound(expected.claim) ==
+                    releaseGate.onEventBound(expected.claim) ==
                     ChromeMediaShieldReadyReleaseAction.AttemptRelease
                 ) {
                     tryReleaseCurrentBinding()
                 }
             }
             is ChromeMediaShieldTokenScanResult.FailClosed ->
-                log("ready_focus_rejected", expected, null, result.reason)
+                log("ready_ax_rejected", expected, null, result.reason)
         }
     }
 
@@ -291,7 +306,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val lease = activeLease ?: return false
         val document = activeDocument ?: return false
         val foregroundBinding = foregroundDocumentBinding(expected.claim, windowId, document)
-        if (foregroundBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource) return false
+        if (foregroundBinding != ChromeMediaShieldBoundContextBinding.ExactEventSource) return false
         val attestation = attestationReader.read()
         val context = snapshot.toLeaseContext(viewport, document)
         return surface.stats().transparent &&
@@ -433,7 +448,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 expected.surface.windowId,
                 firstDocument,
             )
-        if (firstBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource) {
+        if (firstBinding != ChromeMediaShieldBoundContextBinding.ExactEventSource) {
             return false
         }
         val firstAttestation = attestationReader.read()
@@ -474,7 +489,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 boundaryDocument == null -> "ready_boundary_document_missing"
                 boundaryWindow == null -> "ready_boundary_window_missing"
                 boundaryWindow.id != expected.surface.windowId -> "ready_boundary_window_mismatch"
-                boundaryBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource ->
+                boundaryBinding != ChromeMediaShieldBoundContextBinding.ExactEventSource ->
                     "ready_boundary_context_mismatch"
                 else -> null
             }
@@ -503,14 +518,19 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             ) ||
             !leaseAuthority.isValid(lease, boundaryAttestation, boundaryContext) ||
             !releaseGate.commitRelease(expected.claim) {
-                val commitWindow = windowInspector.findUniqueForeground() ?: return@commitRelease false
+                val commitWindow =
+                    windowInspector.findUniqueForeground()
+                        ?: return@commitRelease false
+                if (commitWindow.id != expected.surface.windowId) {
+                    return@commitRelease false
+                }
                 val commitBinding =
                     tokenScanner.boundContextBinding(
                         commitWindow,
                         expected.claim,
                         boundaryDocument,
                     )
-                if (commitBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource) {
+                if (commitBinding != ChromeMediaShieldBoundContextBinding.ExactEventSource) {
                     return@commitRelease false
                 }
                 ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(
@@ -555,7 +575,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             "ready_foreground_released",
             expected,
             boundaryDocument,
-            binding = ChromeMediaShieldBoundContextBinding.ExactFocusSource,
         )
         return true
     }
@@ -639,7 +658,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             phase = "ready_exact_anchor_rebound",
             expected = expected,
             document = document,
-            binding = ChromeMediaShieldBoundContextBinding.ExactFocusSource,
         )
     }
 
@@ -689,7 +707,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         expected: ChromeMediaShieldReadyPresentationTarget?,
         document: ChromeMediaShieldForegroundDocument?,
         reason: String = "",
-        binding: ChromeMediaShieldBoundContextBinding? = null,
     ) {
         val claim = expected?.claim ?: activeClaim
         val webRootDigest =
@@ -706,8 +723,8 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             }
         val sourceCurrent =
             document != null &&
-                binding == ChromeMediaShieldBoundContextBinding.ExactFocusSource &&
-                phase in setOf("ready_focus_bound", "ready_foreground_released")
+                phase in setOf("ready_ax_bound", "ready_foreground_released")
+        val bindingName = if (document == null) "none" else "event_source"
         val exactAnchorRebindCount = tokenScanner.exactAnchorRebindCount()
         Log.i(
             LogTag,
@@ -716,7 +733,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 "documentSequence=${claim?.identity?.documentSequence ?: 0L} " +
                 "lifecycle=${claim?.lifecycleSequence ?: 0L} " +
                 "token=${claim?.identity?.tokenDigest?.take(TokenDigestLogLength).orEmpty()} " +
-                "axBound=${document != null} binding=${if (document == null) "none" else "event_source"} " +
+                "axBound=${document != null} binding=$bindingName " +
                 "continuity=none exactAnchorRebinds=$exactAnchorRebindCount " +
                 "rootBinding=$rootBinding webRoot=${webRootDigest.take(TokenDigestLogLength)} " +
                 "root=${document?.accessibilityContext?.rootIdentityDigest?.take(TokenDigestLogLength).orEmpty()} " +
@@ -736,7 +753,9 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
     private companion object {
         const val ChromePackageName = "com.android.chrome"
         const val TokenDigestLogLength = 12
-        const val LeaseWatchdogMillis = 50L
+
+        // Lease health only. READY authority is event-driven; this never scans Accessibility.
+        const val LeaseWatchdogMillis = 200L
         const val LeaseRenewalLeadMillis = 150L
         const val LogTag = "ChromeMediaShieldReady"
     }

@@ -52,7 +52,7 @@ internal object ChromeMediaShieldReadyContinuityReleasePolicy {
             activeDocumentPresent
 
     fun acceptsBoundary(binding: ChromeMediaShieldBoundContextBinding): Boolean =
-        binding == ChromeMediaShieldBoundContextBinding.ExactFocusSource
+        binding == ChromeMediaShieldBoundContextBinding.ExactEventSource
 }
 
 /**
@@ -65,7 +65,7 @@ internal object ChromeMediaShieldReadyContinuityReleasePolicy {
 internal class ChromeMediaShieldReadyEventReleaseGate {
     private var activeClaim: ChromeMediaShieldReadyClaim? = null
     private var opaqueCommitted = false
-    private var focusBound = false
+    private var eventBound = false
     private var released = false
     private var closed = false
 
@@ -74,7 +74,7 @@ internal class ChromeMediaShieldReadyEventReleaseGate {
         val replaced = activeClaim != null
         activeClaim = claim
         opaqueCommitted = false
-        focusBound = false
+        eventBound = false
         released = false
         return if (replaced) ChromeMediaShieldReadyReleaseAction.Revoke else ChromeMediaShieldReadyReleaseAction.Ignore
     }
@@ -85,9 +85,9 @@ internal class ChromeMediaShieldReadyEventReleaseGate {
         return actionForCurrent(claim)
     }
 
-    fun onFocusBound(claim: ChromeMediaShieldReadyClaim): ChromeMediaShieldReadyReleaseAction {
+    fun onEventBound(claim: ChromeMediaShieldReadyClaim): ChromeMediaShieldReadyReleaseAction {
         if (closed || claim != activeClaim) return ChromeMediaShieldReadyReleaseAction.Ignore
-        focusBound = true
+        eventBound = true
         return actionForCurrent(claim)
     }
 
@@ -95,7 +95,7 @@ internal class ChromeMediaShieldReadyEventReleaseGate {
         if (closed || activeClaim == null) return ChromeMediaShieldReadyReleaseAction.Ignore
         opaqueCommitted = false
         released = false
-        if (!retainFocus) focusBound = false
+        if (!retainFocus) eventBound = false
         return ChromeMediaShieldReadyReleaseAction.Revoke
     }
 
@@ -103,7 +103,7 @@ internal class ChromeMediaShieldReadyEventReleaseGate {
         !closed &&
             claim == activeClaim &&
             opaqueCommitted &&
-            focusBound &&
+            eventBound &&
             !released
 
     /**
@@ -127,7 +127,7 @@ internal class ChromeMediaShieldReadyEventReleaseGate {
         val revoke = activeClaim != null || released
         activeClaim = null
         opaqueCommitted = false
-        focusBound = false
+        eventBound = false
         released = false
         return if (revoke) ChromeMediaShieldReadyReleaseAction.Revoke else ChromeMediaShieldReadyReleaseAction.Ignore
     }

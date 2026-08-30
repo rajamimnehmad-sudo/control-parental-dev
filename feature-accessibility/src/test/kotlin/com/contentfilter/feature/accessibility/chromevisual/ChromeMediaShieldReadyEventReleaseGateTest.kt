@@ -14,7 +14,7 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
 
         assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onClaim(FirstClaim))
         assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onOpaqueCommitted(FirstClaim))
-        assertEquals(ChromeMediaShieldReadyReleaseAction.AttemptRelease, gate.onFocusBound(FirstClaim))
+        assertEquals(ChromeMediaShieldReadyReleaseAction.AttemptRelease, gate.onEventBound(FirstClaim))
         assertTrue(gate.canAttemptRelease(FirstClaim))
         assertTrue(gate.commitRelease(FirstClaim) { true })
         assertFalse(gate.canAttemptRelease(FirstClaim))
@@ -26,7 +26,7 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
         val gate = ChromeMediaShieldReadyEventReleaseGate()
         gate.onClaim(FirstClaim)
 
-        assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onFocusBound(FirstClaim))
+        assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onEventBound(FirstClaim))
         assertFalse(gate.canAttemptRelease(FirstClaim))
         assertEquals(
             ChromeMediaShieldReadyReleaseAction.AttemptRelease,
@@ -40,11 +40,11 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
         gate.onClaim(FirstClaim)
         gate.onOpaqueCommitted(FirstClaim)
 
-        assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onFocusBound(SecondClaim))
+        assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onEventBound(SecondClaim))
         assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onOpaqueCommitted(SecondClaim))
         assertFalse(gate.canAttemptRelease(SecondClaim))
         assertFalse(gate.commitRelease(SecondClaim) { true })
-        assertEquals(ChromeMediaShieldReadyReleaseAction.AttemptRelease, gate.onFocusBound(FirstClaim))
+        assertEquals(ChromeMediaShieldReadyReleaseAction.AttemptRelease, gate.onEventBound(FirstClaim))
     }
 
     @Test
@@ -52,14 +52,14 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
         val gate = ChromeMediaShieldReadyEventReleaseGate()
         gate.onClaim(FirstClaim)
         gate.onOpaqueCommitted(FirstClaim)
-        gate.onFocusBound(FirstClaim)
+        gate.onEventBound(FirstClaim)
         assertTrue(gate.commitRelease(FirstClaim) { true })
 
         assertEquals(ChromeMediaShieldReadyReleaseAction.Revoke, gate.onClaim(SecondClaim))
         assertFalse(gate.canAttemptRelease(FirstClaim))
         assertFalse(gate.canAttemptRelease(SecondClaim))
         assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onOpaqueCommitted(SecondClaim))
-        assertEquals(ChromeMediaShieldReadyReleaseAction.AttemptRelease, gate.onFocusBound(SecondClaim))
+        assertEquals(ChromeMediaShieldReadyReleaseAction.AttemptRelease, gate.onEventBound(SecondClaim))
     }
 
     @Test
@@ -67,7 +67,7 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
         val gate = ChromeMediaShieldReadyEventReleaseGate()
         gate.onClaim(FirstClaim)
         gate.onOpaqueCommitted(FirstClaim)
-        gate.onFocusBound(FirstClaim)
+        gate.onEventBound(FirstClaim)
         gate.commitRelease(FirstClaim) { true }
 
         assertEquals(
@@ -91,7 +91,7 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
         gate.onOpaqueCommitted(FirstClaim)
 
         assertEquals(ChromeMediaShieldReadyReleaseAction.Revoke, gate.close())
-        assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onFocusBound(FirstClaim))
+        assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onEventBound(FirstClaim))
         assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onOpaqueCommitted(FirstClaim))
         assertEquals(ChromeMediaShieldReadyReleaseAction.Ignore, gate.onClaim(SecondClaim))
         assertFalse(gate.canAttemptRelease(FirstClaim))
@@ -103,7 +103,7 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
         val gate = ChromeMediaShieldReadyEventReleaseGate()
         gate.onClaim(FirstClaim)
         gate.onOpaqueCommitted(FirstClaim)
-        gate.onFocusBound(FirstClaim)
+        gate.onEventBound(FirstClaim)
         var commits = 0
 
         assertFalse(
@@ -210,7 +210,7 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
     fun `only an exact focus source is a release boundary`() {
         assertTrue(
             ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
-                ChromeMediaShieldBoundContextBinding.ExactFocusSource,
+                ChromeMediaShieldBoundContextBinding.ExactEventSource,
             ),
         )
         assertFalse(

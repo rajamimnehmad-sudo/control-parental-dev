@@ -17,35 +17,40 @@ internal class ChromeVisualWindowInspector(
         requestedWindowId: Int,
         allowBehindInputMethod: Boolean = false,
     ): AccessibilityWindowInfo? {
-        val candidates =
-            service.windows.filter { window ->
-                window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
-                    window.root?.packageName?.toString() == ChromePackageName
-            }
-        return candidates
-            .firstOrNull { requestedWindowId != AnyWindowId && it.id == requestedWindowId }
-            ?.takeIf { candidate ->
-                ChromeVisualWindowSelectionPolicy.canUseExactCandidate(
-                    isActive = candidate.isActive,
-                    isFocused = candidate.isFocused,
-                    allowBehindInputMethod = allowBehindInputMethod,
-                )
-            }
-            ?: candidates.firstOrNull { it.isActive }
-            ?: candidates.firstOrNull { it.isFocused }
-            ?: candidates.firstOrNull().takeIf { allowBehindInputMethod }
+        val applicationWindows = service.windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val ordered =
+            buildList {
+                applicationWindows
+                    .firstOrNull { requestedWindowId != AnyWindowId && it.id == requestedWindowId }
+                    ?.takeIf { candidate ->
+                        ChromeVisualWindowSelectionPolicy.canUseExactCandidate(
+                            isActive = candidate.isActive,
+                            isFocused = candidate.isFocused,
+                            allowBehindInputMethod = allowBehindInputMethod,
+                        )
+                    }?.let(::add)
+                applicationWindows.firstOrNull { it.isActive }?.let(::add)
+                applicationWindows.firstOrNull { it.isFocused }?.let(::add)
+                if (allowBehindInputMethod) applicationWindows.firstOrNull()?.let(::add)
+            }.distinctBy { it.id }
+        return ordered.firstOrNull(::isChromeWindow)
     }
 
     /** Fail-closed foreground selection for H19 READY authority; no arbitrary first-window fallback. */
     fun findUniqueForeground(): AccessibilityWindowInfo? {
-        val candidates =
-            service.windows.filter { window ->
-                window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
-                    window.root?.packageName?.toString() == ChromePackageName &&
-                    (window.isActive || window.isFocused)
-            }
-        return candidates.singleOrNull()
+        val candidate = findUniqueForegroundCandidate() ?: return null
+        return candidate.takeIf(::isChromeWindow)
     }
+
+    /** Root-free current-window check used after browser evidence already authenticated Chrome. */
+    fun findUniqueForegroundCandidate(expectedWindowId: Int? = null): AccessibilityWindowInfo? =
+        service.windows
+            .filter { window ->
+                window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                    (window.isActive || window.isFocused) &&
+                    (expectedWindowId == null || window.id == expectedWindowId)
+            }.distinctBy { it.id }
+            .singleOrNull()
 
     fun inputMethodTop(): Int? =
         service.windows
@@ -112,6 +117,16 @@ internal class ChromeVisualWindowInspector(
             repeat(node.childCount) { index -> node.getChild(index)?.let(queue::addLast) }
         }
         return result
+    }
+
+    private fun isChromeWindow(window: AccessibilityWindowInfo): Boolean {
+        val root = window.root ?: return false
+        return try {
+            root.packageName?.toString() == ChromePackageName
+        } finally {
+            @Suppress("DEPRECATION")
+            runCatching(root::recycle)
+        }
     }
 
     private companion object {

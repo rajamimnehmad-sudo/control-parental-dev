@@ -1,18 +1,58 @@
 package com.contentfilter.feature.accessibility.chromevisual
 
 import android.os.Build
+import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyClaim
 
 internal enum class ChromeMediaShieldBoundContextBinding {
-    ExactFocusSource,
+    ExactEventSource,
     Invalid,
 }
 
+internal data class ChromeMediaShieldRootEventFallbackEvidence(
+    val eventType: Int,
+    val contentChangeTypes: Int,
+    val eventPackageName: String,
+    val eventWindowId: Int,
+    val sourcePackageName: String,
+    val sourceWindowId: Int,
+    val sourceClassName: String,
+    val sourceIsWindowRoot: Boolean,
+)
+
+/** Allows one bounded lookup only when Chrome emits the current document change from its root. */
+internal object ChromeMediaShieldRootEventFallbackPolicy {
+    fun permits(
+        evidence: ChromeMediaShieldRootEventFallbackEvidence,
+        expectedWindowId: Int,
+        alreadyAttempted: Boolean,
+    ): Boolean =
+        !alreadyAttempted &&
+            evidence.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED &&
+            evidence.contentChangeTypes != AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED &&
+            evidence.contentChangeTypes and AllowedContentChangeTypes.inv() == 0 &&
+            evidence.eventPackageName == ChromePackageName &&
+            evidence.sourcePackageName == ChromePackageName &&
+            evidence.eventWindowId == expectedWindowId &&
+            evidence.sourceWindowId == expectedWindowId &&
+            (
+                evidence.sourceClassName == ChromeMediaShieldWebRootContract.ClassName ||
+                    evidence.sourceIsWindowRoot
+            )
+
+    // Diagnostic lookup is reserved for an accessible-name mutation. A preceding host insertion
+    // (SUBTREE/UNDEFINED) must not consume the one-shot budget.
+    private const val AllowedContentChangeTypes =
+        AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT or
+            AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION
+    private const val ChromePackageName = "com.android.chrome"
+}
+
 internal object ChromeMediaShieldBoundContextPolicy {
-    fun select(exactFocusSourceCurrent: Boolean): ChromeMediaShieldBoundContextBinding =
-        if (exactFocusSourceCurrent) {
-            ChromeMediaShieldBoundContextBinding.ExactFocusSource
+    fun select(exactEventSourceCurrent: Boolean): ChromeMediaShieldBoundContextBinding =
+        if (exactEventSourceCurrent) {
+            ChromeMediaShieldBoundContextBinding.ExactEventSource
         } else {
             ChromeMediaShieldBoundContextBinding.Invalid
         }
@@ -43,6 +83,8 @@ internal sealed interface ChromeMediaShieldOwnedNodeSearchResult<out T> {
     ) : ChromeMediaShieldOwnedNodeSearchResult<T>
 
     data object Absent : ChromeMediaShieldOwnedNodeSearchResult<Nothing>
+
+    data object Ambiguous : ChromeMediaShieldOwnedNodeSearchResult<Nothing>
 
     data object Overflow : ChromeMediaShieldOwnedNodeSearchResult<Nothing>
 }
@@ -102,6 +144,67 @@ internal class ChromeMediaShieldBoundedOwnedNodeSearch<T>(
         }
     }
 
+    /** Finds exactly one match; zero, multiple or an over-budget tree fail closed. */
+    fun findUniqueDescendant(
+        borrowedRoot: T,
+        childCount: (T) -> Int,
+        copyChild: (T, Int) -> T?,
+        isExactMatch: (T) -> Boolean,
+        close: (T) -> Unit,
+    ): ChromeMediaShieldOwnedNodeSearchResult<T> {
+        val queue = ArrayDeque<OwnedNode<T>>()
+        var current: OwnedNode<T>? = OwnedNode(borrowedRoot, owned = false)
+        var candidate: T? = null
+        var match: T? = null
+        var nodeReads = 0
+        try {
+            while (current != null) {
+                val parent = checkNotNull(current)
+                val count = childCount(parent.node)
+                for (index in 0 until count) {
+                    if (nodeReads++ >= maximumNodeReads) {
+                        match?.let(close)
+                        match = null
+                        closeOwned(parent, close)
+                        current = null
+                        closeQueue(queue, close)
+                        return ChromeMediaShieldOwnedNodeSearchResult.Overflow
+                    }
+                    val child = copyChild(parent.node, index) ?: continue
+                    candidate = child
+                    if (isExactMatch(child)) {
+                        if (match != null) {
+                            close(checkNotNull(match))
+                            match = null
+                            close(child)
+                            candidate = null
+                            closeOwned(parent, close)
+                            current = null
+                            closeQueue(queue, close)
+                            return ChromeMediaShieldOwnedNodeSearchResult.Ambiguous
+                        }
+                        match = child
+                    } else {
+                        queue.addLast(OwnedNode(child, owned = true))
+                    }
+                    candidate = null
+                }
+                closeOwned(parent, close)
+                current = null
+                current = queue.removeFirstOrNull()
+            }
+            return match
+                ?.let { ChromeMediaShieldOwnedNodeSearchResult.Found(it) }
+                ?: ChromeMediaShieldOwnedNodeSearchResult.Absent
+        } catch (error: RuntimeException) {
+            candidate?.let(close)
+            match?.let(close)
+            current?.let { closeOwned(it, close) }
+            closeQueue(queue, close)
+            throw error
+        }
+    }
+
     private fun closeQueue(
         queue: ArrayDeque<OwnedNode<T>>,
         close: (T) -> Unit,
@@ -153,6 +256,30 @@ internal object ChromeMediaShieldWebRootCandidatePolicy {
 
 /** Bounded, ownership-safe traversal of Chrome's virtual Accessibility tree. */
 internal object ChromeMediaShieldAccessibilityNodeTraversal {
+    /** One-shot fallback awakened by a current browser content-change event; never passive scan. */
+    @Suppress("DEPRECATION")
+    fun copyUniqueReadyAnchorCandidate(
+        windowRoot: AccessibilityNodeInfo,
+        expectedViewIdResourceName: String,
+        markerMatches: (contentDescription: String?, text: String?) -> Boolean,
+    ): ChromeMediaShieldOwnedNodeSearchResult<AccessibilityNodeInfo> {
+        if (expectedViewIdResourceName.isBlank()) return ChromeMediaShieldOwnedNodeSearchResult.Absent
+        return ChromeMediaShieldBoundedOwnedNodeSearch<AccessibilityNodeInfo>(MaximumCurrentTreeNodes)
+            .findUniqueDescendant(
+                borrowedRoot = windowRoot,
+                childCount = AccessibilityNodeInfo::getChildCount,
+                copyChild = AccessibilityNodeInfo::getChild,
+                isExactMatch = { node ->
+                    node.viewIdResourceName == expectedViewIdResourceName &&
+                        markerMatches(
+                            node.contentDescription?.toString(),
+                            node.text?.toString(),
+                        )
+                },
+                close = ::recycle,
+            )
+    }
+
     /**
      * Reacquires only the exact document host first authenticated by the secret focus event.
      *

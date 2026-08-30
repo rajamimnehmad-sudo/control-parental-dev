@@ -60,7 +60,7 @@ from h19_plan import (
     EXPECTED_GLOSHIA_MODEL_VERSION,
     EXPECTED_GLOSHIA_POLICY_VERSION,
     HarnessError,
-    exact_anchor_rebind_required_for,
+    exact_anchor_continuity_required_for,
     navigation_requires_new_release,
     new_navigation_for,
     post_gesture_ready_required_for,
@@ -139,12 +139,36 @@ def logcat(adb: Adb, since: str) -> str:
     return adb.run("logcat", "-d", "-T", since, "-v", "threadtime", *filters, timeout=90).stdout
 
 
-def request_status(adb: Adb, since: str) -> tuple[str, dict[str, Any]]:
-    adb.broadcast(ACTION_PREFIX + "STATUS")
-    adb.broadcast(ACTION_PREFIX + "TRANSPORT_STATUS")
-    time.sleep(0.25)
+def observe_status(adb: Adb, since: str) -> tuple[str, dict[str, Any]]:
+    """Read already-emitted state without adding work to the app main thread."""
+
     value = logcat(adb, since)
     return value, summarize_logcat(value)
+
+
+def request_status(
+    adb: Adb,
+    since: str,
+    *,
+    include_transport: bool = True,
+) -> tuple[str, dict[str, Any]]:
+    """Request one bounded snapshot; callers must not use this as a polling primitive."""
+
+    adb.broadcast(ACTION_PREFIX + "STATUS")
+    if include_transport:
+        adb.broadcast(ACTION_PREFIX + "TRANSPORT_STATUS")
+    time.sleep(0.25)
+    return observe_status(adb, since)
+
+
+def _phase_presentation_ready_observed(value: str) -> bool:
+    return any("phase=presentation_ready " in line for line in value.splitlines())
+
+
+def _fixture_report_event_counts(value: str) -> tuple[int, int]:
+    reports = len(re.findall(r"\bresource=h19-report\b", value))
+    frame_reports = len(re.findall(r"\bresource=h19-frame-report\b", value))
+    return reports, frame_reports
 
 
 def start_phase(
@@ -164,8 +188,12 @@ def start_phase(
     )
     deadline = time.monotonic() + timeout_seconds
     last: dict[str, Any] = {}
+    snapshot_requested = False
     while time.monotonic() < deadline:
-        _, last = request_status(adb, since)
+        value, last = observe_status(adb, since)
+        if not snapshot_requested and _phase_presentation_ready_observed(value):
+            _, last = request_status(adb, since)
+            snapshot_requested = True
         status = last.get("status", {}).get("fields", {})
         active = last.get("activeMode", {})
         expected_mode = "replace_all" if mode == "replace-all" else "selective"
@@ -211,7 +239,7 @@ def wait_for_ready(
     last_status: dict[str, Any] = {}
     while time.monotonic() < deadline:
         attempts += 1
-        _, last_status = request_status(adb, since)
+        _, last_status = observe_status(adb, since)
         result = current_ready_result(
             last_status,
             expected_package=CHROME_PACKAGE,
@@ -228,25 +256,24 @@ def wait_for_ready(
     )
 
 
-def wait_for_exact_anchor_rebind(
+def wait_for_exact_anchor_continuity(
     adb: Adb,
     since: str,
     timeout_seconds: int,
-    minimum_rebind_count: int,
+    baseline_rebind_count: int,
     expected_marker: dict[str, Any],
 ) -> dict[str, Any]:
     expected_document_key = ready_document_key(expected_marker)
     if expected_document_key is None:
-        raise HarnessError("exact-anchor rebind gate requires a structurally valid released marker")
+        raise HarnessError("exact-anchor continuity gate requires a structurally valid released marker")
     deadline = time.monotonic() + timeout_seconds
     last_status: dict[str, Any] = {}
     while time.monotonic() < deadline:
-        _, last_status = request_status(adb, since)
+        _, last_status = observe_status(adb, since)
         rebind = last_status.get("readyExactAnchorRebind", {})
         current = last_status.get("currentReadyBinding")
         if (
-            int(rebind.get("maxCount", 0)) >= minimum_rebind_count
-            and isinstance(current, dict)
+            isinstance(current, dict)
             and ready_document_key(current) == expected_document_key
             and current.get("binding") == "event_source"
             and current.get("axBound") is True
@@ -255,9 +282,18 @@ def wait_for_exact_anchor_rebind(
             and bool(current.get("sourceDigestPrefix"))
             and current.get("rawPresented") is False
         ):
+            current_rebind_count = current.get("exactAnchorRebindCount")
+            rebind_count = (
+                int(current_rebind_count)
+                if isinstance(current_rebind_count, int)
+                else int(rebind.get("maxCount", 0))
+            )
+            rebound = rebind_count > baseline_rebind_count
             return {
                 "pass": True,
-                "rebindCount": int(rebind["maxCount"]),
+                "continuity": "rebound" if rebound else "retained_current",
+                "rebindObserved": rebound,
+                "rebindCount": rebind_count,
                 "documentKeyMatched": True,
                 "sourceCurrent": True,
                 "sourceEvidenceScope": "current_boundary",
@@ -265,7 +301,7 @@ def wait_for_exact_anchor_rebind(
             }
         time.sleep(0.25)
     raise HarnessError(
-        "exact event-source anchor rebind was not observed: "
+        "exact current event-source anchor continuity was not observed: "
         f"rebind={last_status.get('readyExactAnchorRebind')} "
         f"currentReadyBinding={last_status.get('currentReadyBinding')}"
     )
@@ -278,7 +314,7 @@ def baseline_then_set_orientation(
 ) -> tuple[dict[str, Any], dict[str, Any], bool]:
     """Snapshot READY before a rotation can invalidate it, then apply orientation."""
 
-    _, summary = request_status(adb, phase_since)
+    _, summary = observe_status(adb, phase_since)
     baseline = ready_baseline(summary)
     before = observed_display_rotation(adb)
     evidence = set_and_verify_orientation(adb, orientation)
@@ -297,8 +333,17 @@ def wait_for_fixture_report(
     deadline = time.monotonic() + timeout_seconds
     last_log = ""
     last_summary: dict[str, Any] = {}
+    snapshot_requested = False
     while time.monotonic() < deadline:
-        last_log, last_summary = request_status(adb, since)
+        last_log, last_summary = observe_status(adb, since)
+        reports, frame_reports = _fixture_report_event_counts(last_log)
+        if (
+            not snapshot_requested
+            and reports > minimum_reports
+            and frame_reports > minimum_frame_reports
+        ):
+            last_log, last_summary = request_status(adb, since, include_transport=False)
+            snapshot_requested = True
         fixture = last_summary.get("fixtureReport", {})
         counts = fixture.get("counts", {})
         current_report_observed = (
@@ -482,7 +527,8 @@ def run_state(
                         int(state.get("fixtureTimeoutSeconds", 10)),
                         minimum_documents=controlled_activity_documents,
                         minimum_transformed=controlled_activity_transformed,
-                        request_status=request_status,
+                        observe_status=observe_status,
+                        refresh_status=request_status,
                     ),
                 ),
             }
@@ -494,6 +540,7 @@ def run_state(
                 state_since,
                 timeout_seconds=int(state.get("processRestartTimeoutSeconds", 25)),
                 request_status=request_status,
+                observe_status=observe_status,
                 start_phase=start_phase,
                 observe_proxy_policy=lambda device, since: wait_for_chrome_proxy_policy_observed(
                     device,
@@ -521,7 +568,8 @@ def run_state(
                     int(state.get("fixtureTimeoutSeconds", 10)),
                     minimum_documents=controlled_activity_documents,
                     minimum_transformed=controlled_activity_transformed,
-                    request_status=request_status,
+                    observe_status=observe_status,
+                    refresh_status=request_status,
                 )
         if ready_evidence["required"]:
             if not ready_completed_by_action:
@@ -549,15 +597,15 @@ def run_state(
             ready_evidence = {"required": False, "pass": True, "reason": "bounded_non_document_probe"}
         if screenrecord.poll() is not None:
             raise HarnessError(f"screenrecord ended before READY evidence completed for {state_id}")
-        if exact_anchor_rebind_required_for(state):
+        if exact_anchor_continuity_required_for(state):
             marker = ready_evidence.get("marker")
             if not isinstance(marker, dict):
-                raise HarnessError("exact-anchor rebind gate requires an exact released marker")
-            ready_evidence["exactAnchorRebind"] = wait_for_exact_anchor_rebind(
+                raise HarnessError("exact-anchor continuity gate requires an exact released marker")
+            ready_evidence["exactAnchorContinuity"] = wait_for_exact_anchor_continuity(
                 adb,
                 phase_since,
                 int(state.get("readyTimeoutSeconds", 8)),
-                minimum_rebind_count=int(ready_state_baseline["anchorRebindCount"]) + 1,
+                baseline_rebind_count=int(ready_state_baseline["anchorRebindCount"]),
                 expected_marker=marker,
             )
         for _ in range(int(state.get("swipes", 0))):

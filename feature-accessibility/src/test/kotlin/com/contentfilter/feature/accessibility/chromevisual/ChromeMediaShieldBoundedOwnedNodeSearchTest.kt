@@ -188,6 +188,80 @@ class ChromeMediaShieldBoundedOwnedNodeSearchTest {
         predicate.assertEveryHandleClosedOnce()
     }
 
+    @Test
+    fun `unique fallback scans the bounded tree and transfers exactly one authenticated node`() {
+        val tracker = HandleTracker()
+        val result =
+            search(maximumNodeReads = 8).findUniqueDescendant(
+                borrowedRoot =
+                    tracker.borrow(
+                        Node(
+                            "root",
+                            children = listOf(Node("before"), Node("anchor", exact = true), Node("after")),
+                        ),
+                    ),
+                childCount = tracker::childCount,
+                copyChild = tracker::copyChild,
+                isExactMatch = { it.node.exact },
+                close = tracker::close,
+            )
+
+        assertTrue(result is ChromeMediaShieldOwnedNodeSearchResult.Found)
+        val anchor = (result as ChromeMediaShieldOwnedNodeSearchResult.Found).node
+        assertEquals("anchor", anchor.node.id)
+        assertEquals(0, tracker.closeCount(anchor))
+        tracker.close(anchor)
+        tracker.assertEveryHandleClosedOnce()
+    }
+
+    @Test
+    fun `unique fallback rejects duplicate authenticated nodes and closes both`() {
+        val tracker = HandleTracker()
+        val result =
+            search(maximumNodeReads = 8).findUniqueDescendant(
+                borrowedRoot =
+                    tracker.borrow(
+                        Node(
+                            "root",
+                            children = listOf(Node("first", exact = true), Node("second", exact = true)),
+                        ),
+                    ),
+                childCount = tracker::childCount,
+                copyChild = tracker::copyChild,
+                isExactMatch = { it.node.exact },
+                close = tracker::close,
+            )
+
+        assertEquals(ChromeMediaShieldOwnedNodeSearchResult.Ambiguous, result)
+        tracker.assertEveryHandleClosedOnce()
+    }
+
+    @Test
+    fun `unique fallback closes a retained match when the bounded tree overflows`() {
+        val tracker = HandleTracker()
+        val result =
+            search(maximumNodeReads = 2).findUniqueDescendant(
+                borrowedRoot =
+                    tracker.borrow(
+                        Node(
+                            "root",
+                            children =
+                                listOf(
+                                    Node("anchor", exact = true),
+                                    Node("queued", children = listOf(Node("overflow"))),
+                                ),
+                        ),
+                    ),
+                childCount = tracker::childCount,
+                copyChild = tracker::copyChild,
+                isExactMatch = { it.node.exact },
+                close = tracker::close,
+            )
+
+        assertEquals(ChromeMediaShieldOwnedNodeSearchResult.Overflow, result)
+        tracker.assertEveryHandleClosedOnce()
+    }
+
     private fun search(maximumNodeReads: Int) = ChromeMediaShieldBoundedOwnedNodeSearch<Handle>(maximumNodeReads)
 
     private data class Node(

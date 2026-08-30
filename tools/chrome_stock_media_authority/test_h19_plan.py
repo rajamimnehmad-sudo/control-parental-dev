@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 from h19_plan import (
-    exact_anchor_rebind_required_for,
+    exact_anchor_continuity_required_for,
     HarnessError,
     navigation_requires_new_release,
     new_navigation_for,
@@ -138,34 +138,42 @@ class H19PlanTest(unittest.TestCase):
         with self.assertRaises(HarnessError):
             validate_plan(value)
 
-    def test_exact_anchor_rebind_gate_is_explicit_bounded_and_ready_authorized(self):
+    def test_exact_anchor_continuity_gate_is_explicit_and_ready_authorized(self):
         value = plan_with_taps([])
         state = value["phases"][0]["states"][0]
         state.update(
             {
-                "exactAnchorRebindRequired": True,
+                "exactAnchorContinuityRequired": True,
                 "recordSeconds": 18,
                 "readyTimeoutSeconds": 8,
             }
         )
 
-        self.assertTrue(exact_anchor_rebind_required_for(state))
+        self.assertTrue(exact_anchor_continuity_required_for(state))
         self.assertEqual(value, validate_plan(value))
 
-        state["recordSeconds"] = 16
+        state["recordSeconds"] = 8
         with self.assertRaises(HarnessError):
             validate_plan(value)
 
         state["recordSeconds"] = 18
-        state["exactAnchorRebindRequired"] = "true"
+        state["exactAnchorContinuityRequired"] = "true"
         with self.assertRaises(HarnessError):
+            validate_plan(value)
+
+    def test_retired_exact_anchor_rebind_gate_is_rejected(self):
+        value = plan_with_taps([])
+        state = value["phases"][0]["states"][0]
+        state["exactAnchorRebindRequired"] = True
+
+        with self.assertRaisesRegex(HarnessError, "retired"):
             validate_plan(value)
 
     def test_final_plan_is_bounded_and_valid(self):
         plan = json.loads((Path(__file__).with_name("final_plan.json")).read_text())
 
         self.assertEqual(plan, validate_plan(plan))
-        self.assertEqual(391, plan["expectedAppVersionCode"])
+        self.assertEqual(392, plan["expectedAppVersionCode"])
         self.assertEqual("R3.1", plan["expectedGloshiaModelVersion"])
         self.assertEqual("dag-36", plan["expectedGloshiaPolicyVersion"])
         self.assertTrue(all(len(phase["states"]) <= 25 for phase in plan["phases"]))

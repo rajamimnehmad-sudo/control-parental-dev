@@ -70,9 +70,19 @@ internal class ChromeVisualProbeController(
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!enabled) return
         // H19 consumes the exact focused source synchronously before reducing the event. The
-        // authority scanner owns an AccessibilityNodeInfo copy solely for refresh-based
-        // continuity checks and recycles it on invalidation/STOP.
+        // The authority scanner consumes the exact event source and owns any retained
+        // AccessibilityNodeInfo copies until invalidation/STOP.
         mediaReadyCoordinator?.onAccessibilityEvent(event)
+        if (
+            mediaReadyCoordinator?.hasCurrentClaim() == true &&
+            attestationReader.read().mediaAuthorityEnabled &&
+            ChromeMediaShieldAuthorityEventPolicy.isSteadyChromeEvent(event)
+        ) {
+            // H19 is content-authoritative, not geometry-authoritative. The exact READY event was
+            // consumed above; ordinary DOM/focus/scroll churn must not synchronously rescan the
+            // Chrome tree or invalidate a current per-body authority.
+            return
+        }
         val signal =
             ProbeSignal(
                 eventType = event.eventType,

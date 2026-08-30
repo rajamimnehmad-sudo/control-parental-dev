@@ -9,6 +9,7 @@ import shlex
 import shutil
 import subprocess
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -208,17 +209,120 @@ def filtered_device_policy(value: str) -> dict[str, Any]:
     return {"sha256": sha256_text(value), "selectedLines": selected[:120]}
 
 
+EXIT_RECORD_START = re.compile(r"ApplicationExitInfo(?:\s*#\d+)?|Historical Process Exit", re.IGNORECASE)
+EXIT_FIELD = re.compile(r"^\s*([A-Za-z][A-Za-z0-9]*)\s*=\s*(.*?)\s*$")
+EXIT_REASON = re.compile(r"^(?:(\d+)\s*(?:\((.*)\))?|([A-Z][A-Z0-9_ ()-]*))$")
+
+
+def _exit_record_blocks(output: str) -> list[str]:
+    lines = output.splitlines()
+    starts = [index for index, line in enumerate(lines) if EXIT_RECORD_START.search(line)]
+    blocks: list[str] = []
+    for position, start in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(lines)
+        block = "\n".join(lines[start:end])
+        if re.search(r"^\s*reason\s*=", block, flags=re.MULTILINE | re.IGNORECASE):
+            blocks.append(block)
+    if blocks:
+        return blocks
+    return [line for line in lines if re.search(r"\breason\s*=", line, flags=re.IGNORECASE)]
+
+
+def _exit_reason_category(code: int | None, label: str) -> str:
+    normalized = re.sub(r"[^A-Z0-9]+", "_", label.upper()).strip("_")
+    if code == 6 or normalized in {"ANR", "REASON_ANR"}:
+        return "anr"
+    if code in {4, 5} or normalized in {
+        "APP_CRASH",
+        "APP_CRASH_NATIVE",
+        "CRASH",
+        "CRASH_NATIVE",
+        "REASON_CRASH",
+        "REASON_CRASH_NATIVE",
+    }:
+        return "crash"
+    if code == 3 or normalized in {"LOW_MEMORY", "REASON_LOW_MEMORY"}:
+        return "lowMemory"
+    return "other"
+
+
+def parse_exit_info_output(output: str) -> dict[str, Any]:
+    """Parse both AOSP symbolic and Android 14/Samsung numeric exit reasons."""
+
+    records: list[dict[str, Any]] = []
+    for block in _exit_record_blocks(output):
+        fields = {
+            match.group(1): match.group(2)
+            for line in block.splitlines()
+            if (match := EXIT_FIELD.match(line)) is not None
+        }
+        reason_value = fields.get("reason", "")
+        reason_match = EXIT_REASON.match(reason_value)
+        if reason_match is None:
+            continue
+        reason_code = int(reason_match.group(1)) if reason_match.group(1) else None
+        reason_label = (reason_match.group(2) or reason_match.group(3) or "").strip()
+        category = _exit_reason_category(reason_code, reason_label)
+        timestamp = fields.get("timestamp", "")
+        pid = fields.get("pid", "")
+        process = fields.get("process", "")
+        stable_identity = "|".join((timestamp, pid, process, str(reason_code), reason_label))
+        if not any((timestamp, pid, process)):
+            stable_identity = re.sub(r"\s+", " ", block).strip()
+        records.append(
+            {
+                "id": sha256_text(stable_identity),
+                "timestamp": timestamp,
+                "pid": pid if pid.isdigit() else "",
+                "process": process,
+                "reasonCode": reason_code,
+                "reasonLabel": reason_label,
+                "category": category,
+            }
+        )
+    counts = Counter(record["category"] for record in records)
+    return {
+        "formatRecognized": bool(
+            records or re.search(r"PROCESS EXIT INFO|No historical process exit", output, re.IGNORECASE)
+        ),
+        "records": records,
+        "reasons": {
+            "crash": counts["crash"],
+            "anr": counts["anr"],
+            "lowMemory": counts["lowMemory"],
+        },
+    }
+
+
 def exit_info(adb: Adb, package_name: str) -> dict[str, Any]:
     output = adb.shell("dumpsys", "activity", "exit-info", package_name, check=False, timeout=60)
-    reasons = {
-        "crash": len(re.findall(r"REASON_CRASH(?:_NATIVE)?", output)),
-        "anr": len(re.findall(r"REASON_ANR", output)),
-        "lowMemory": len(re.findall(r"REASON_LOW_MEMORY", output)),
-    }
-    return {"sha256": sha256_text(output), "reasons": reasons}
+    return {"sha256": sha256_text(output), **parse_exit_info_output(output)}
 
 
 def exit_info_delta(before: dict[str, Any], after: dict[str, Any]) -> dict[str, int]:
+    before_records = before.get("records")
+    after_records = after.get("records")
+    if isinstance(before_records, list) and isinstance(after_records, list):
+        remaining = Counter(
+            record.get("id")
+            for record in before_records
+            if isinstance(record, dict) and isinstance(record.get("id"), str)
+        )
+        new_records: list[dict[str, Any]] = []
+        for record in after_records:
+            if not isinstance(record, dict) or not isinstance(record.get("id"), str):
+                continue
+            record_id = record["id"]
+            if remaining[record_id] > 0:
+                remaining[record_id] -= 1
+            else:
+                new_records.append(record)
+        counts = Counter(record.get("category") for record in new_records)
+        return {
+            "crash": counts["crash"],
+            "anr": counts["anr"],
+            "lowMemory": counts["lowMemory"],
+        }
     before_reasons = before.get("reasons", {})
     after_reasons = after.get("reasons", {})
     return {

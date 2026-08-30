@@ -2,14 +2,16 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 from h19_plan import HarnessError
 from h19_ready import current_ready_result
 from h19_device import (
     ce_data_inode_from_package_dump,
     controlled_navigation_url,
+    exit_info_delta,
     navigate,
+    parse_exit_info_output,
     prepare_interactive_display,
     restore_interactive_display,
 )
@@ -27,12 +29,13 @@ from run_a23_gate import (
     HARNESS_CAPABILITIES,
     baseline_then_set_orientation,
     enforce_counter_gate,
-    exit_info_delta,
+    observe_status,
+    request_status,
     ready_baseline,
     restart_glosh_phase,
     set_and_verify_orientation,
     start_phase,
-    wait_for_exact_anchor_rebind,
+    wait_for_exact_anchor_continuity,
     wait_for_fixture_report,
     wait_for_ready,
     write_logcat_summary,
@@ -308,13 +311,40 @@ class H19RunnerTest(unittest.TestCase):
             },
         }
         with (
-            patch("run_a23_gate.request_status", side_effect=[("", suspended), ("", released)]) as status,
+            patch(
+                "run_a23_gate.observe_status",
+                side_effect=[
+                    ("phase=active owner=device_owner", suspended),
+                    ("phase=presentation_ready scope=real_web", suspended),
+                ],
+            ) as observe,
+            patch("run_a23_gate.request_status", return_value=("", released)) as refresh,
             patch("run_a23_gate.time.sleep"),
         ):
             result = start_phase(FakeStartAdb(), "replace-all", "since", timeout_seconds=1)
 
         self.assertEqual(released, result)
-        self.assertEqual(2, status.call_count)
+        self.assertEqual(2, observe.call_count)
+        refresh.assert_called_once_with(ANY, "since")
+
+    def test_one_status_snapshot_broadcasts_once_and_transport_is_explicit(self):
+        adb = FakeStartAdb()
+        with (
+            patch("run_a23_gate.observe_status", return_value=("log", {"status": "ok"})),
+            patch("run_a23_gate.time.sleep"),
+        ):
+            value = request_status(adb, "since")
+            request_status(adb, "since", include_transport=False)
+
+        self.assertEqual(("log", {"status": "ok"}), value)
+        self.assertEqual(
+            [
+                "com.contentfilter.user.chromedataplane.command.STATUS",
+                "com.contentfilter.user.chromedataplane.command.TRANSPORT_STATUS",
+                "com.contentfilter.user.chromedataplane.command.STATUS",
+            ],
+            adb.broadcasts,
+        )
 
     def test_ce_data_inode_uses_package_manager_for_non_debuggable_dev(self):
         package_dump = (
@@ -358,7 +388,8 @@ class H19RunnerTest(unittest.TestCase):
                 "attachmentCount": 1,
             },
         }
-        request = Mock(side_effect=[("", before), ("", fail_closed)])
+        request = Mock(return_value=("", before))
+        observe = Mock(return_value=("", fail_closed))
         start = Mock(return_value=after)
         ordering: list[str] = []
         policy = Mock(side_effect=lambda *_args: ordering.append("policy") or {"pass": True})
@@ -369,6 +400,7 @@ class H19RunnerTest(unittest.TestCase):
             "since",
             timeout_seconds=5,
             request_status=request,
+            observe_status=observe,
             start_phase=start,
             observe_proxy_policy=policy,
             foreground_current=foreground,
@@ -387,6 +419,8 @@ class H19RunnerTest(unittest.TestCase):
         self.assertEqual(["policy", "foreground"], ordering)
         self.assertTrue(evidence["chromeProxyPolicyObserved"]["pass"])
         foreground.assert_called_once_with(adb)
+        request.assert_called_once()
+        observe.assert_called_once()
 
     def test_orientation_is_verified_before_state_recording(self):
         adb = FakeRotationAdb()
@@ -399,6 +433,81 @@ class H19RunnerTest(unittest.TestCase):
     def test_exit_info_is_gated_as_pre_post_delta(self):
         before = {"reasons": {"crash": 4, "anr": 2, "lowMemory": 1}}
         after = {"reasons": {"crash": 4, "anr": 3, "lowMemory": 1}}
+
+        self.assertEqual(
+            {"crash": 0, "anr": 1, "lowMemory": 0},
+            exit_info_delta(before, after),
+        )
+
+    def test_exit_info_parses_android14_samsung_numeric_reasons(self):
+        parsed = parse_exit_info_output(
+            """
+            ACTIVITY MANAGER PROCESS EXIT INFO
+              ApplicationExitInfo #0:
+                timestamp=2026-08-30 02:35:31.937
+                pid=2374
+                process=com.contentfilter.user.dev
+                reason=6 (ANR)
+              ApplicationExitInfo #1:
+                timestamp=2026-08-29 22:10:00.000
+                pid=2100
+                process=com.contentfilter.user.dev
+                reason=5 (APP CRASH(NATIVE))
+              ApplicationExitInfo #2:
+                timestamp=2026-08-29 20:00:00.000
+                pid=1999
+                process=com.contentfilter.user.dev
+                reason=3 (LOW MEMORY)
+            """
+        )
+
+        self.assertTrue(parsed["formatRecognized"])
+        self.assertEqual({"crash": 1, "anr": 1, "lowMemory": 1}, parsed["reasons"])
+        self.assertEqual([6, 5, 3], [record["reasonCode"] for record in parsed["records"]])
+
+    def test_exit_info_parses_symbolic_aosp_reason(self):
+        parsed = parse_exit_info_output(
+            """
+            Historical Process Exit for com.contentfilter.user.dev:
+              ApplicationExitInfo #0:
+                timestamp=1725000000000
+                pid=123
+                process=com.contentfilter.user.dev
+                reason=REASON_ANR
+            """
+        )
+
+        self.assertEqual({"crash": 0, "anr": 1, "lowMemory": 0}, parsed["reasons"])
+
+    def test_exit_info_delta_detects_new_anr_when_ring_count_is_unchanged(self):
+        before = parse_exit_info_output(
+            """
+            ApplicationExitInfo #0:
+              timestamp=1000
+              pid=10
+              process=com.contentfilter.user.dev
+              reason=10 (USER REQUESTED)
+            ApplicationExitInfo #1:
+              timestamp=2000
+              pid=20
+              process=com.contentfilter.user.dev
+              reason=10 (USER REQUESTED)
+            """
+        )
+        after = parse_exit_info_output(
+            """
+            ApplicationExitInfo #0:
+              timestamp=2000
+              pid=20
+              process=com.contentfilter.user.dev
+              reason=10 (USER REQUESTED)
+            ApplicationExitInfo #1:
+              timestamp=3000
+              pid=30
+              process=com.contentfilter.user.dev
+              reason=6 (ANR)
+            """
+        )
 
         self.assertEqual(
             {"crash": 0, "anr": 1, "lowMemory": 0},
@@ -449,7 +558,7 @@ class H19RunnerTest(unittest.TestCase):
         }
         with (
             patch(
-                "run_a23_gate.request_status",
+                "run_a23_gate.observe_status",
                 side_effect=[
                     ("", {**status, "currentReadyBinding": previous}),
                     ("", {**status, "currentReadyBinding": fresh, "readyPhases": {"ready_foreground_released": 2}}),
@@ -488,7 +597,7 @@ class H19RunnerTest(unittest.TestCase):
             "readyPhases": {"ready_foreground_released": 3},
             "currentReadyBinding": current,
         }
-        with patch("run_a23_gate.request_status", return_value=("", summary)):
+        with patch("run_a23_gate.observe_status", return_value=("", summary)):
             result = wait_for_ready(
                 object(),
                 "phase-since",
@@ -501,6 +610,51 @@ class H19RunnerTest(unittest.TestCase):
         self.assertEqual(current, result["marker"])
         self.assertTrue(result["acceptedCurrentBinding"])
         self.assertFalse(result["markerAdvanced"])
+
+    def test_ready_wait_observes_state_without_status_broadcast_polling(self):
+        adb = FakeStartAdb()
+        stale = {"readyPhases": {}, "currentReadyBinding": None}
+        current = {
+            "package": "com.android.chrome",
+            "binding": "event_source",
+            "axBound": True,
+            "rawPresented": False,
+            "windowId": "4",
+            "surfaceEpoch": "8",
+            "documentSequence": "2",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "aaaaaaaaaaaa",
+            "rootDigestPrefix": "bbbbbbbbbbbb",
+            "webRootDigestPrefix": "cccccccccccc",
+            "sourceDigestPrefix": "dddddddddddd",
+            "sourceCurrent": True,
+            "sourceEvidenceScope": "current_boundary",
+            "exactAnchorRebindCount": 0,
+            "rootBinding": "native_root",
+        }
+        ready = {
+            "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
+            "readyPhases": {"ready_foreground_released": 1},
+            "currentReadyBinding": current,
+        }
+        with (
+            patch(
+                "run_a23_gate.observe_status",
+                side_effect=[("", stale), ("", stale), ("", ready)],
+            ) as observe,
+            patch("run_a23_gate.time.monotonic", side_effect=[0.0, 0.0, 0.1, 0.2]),
+            patch("run_a23_gate.time.sleep"),
+        ):
+            result = wait_for_ready(
+                adb,
+                "since",
+                timeout_seconds=1,
+                minimum_release_count=1,
+            )
+
+        self.assertTrue(result["pass"])
+        self.assertEqual(3, observe.call_count)
+        self.assertEqual([], adb.broadcasts)
 
     def test_rotation_baseline_is_captured_before_orientation_mutation(self):
         calls: list[str] = []
@@ -529,7 +683,7 @@ class H19RunnerTest(unittest.TestCase):
             return {"requested": "landscape", "observedRotation": 1, "verified": True}
 
         with (
-            patch("run_a23_gate.request_status", side_effect=status),
+            patch("run_a23_gate.observe_status", side_effect=status),
             patch("run_a23_gate.observed_display_rotation", side_effect=observed),
             patch("run_a23_gate.set_and_verify_orientation", side_effect=rotate),
         ):
@@ -594,7 +748,7 @@ class H19RunnerTest(unittest.TestCase):
             ),
         )
 
-    def test_exact_anchor_rebind_wait_requires_same_current_exact_document(self):
+    def test_exact_anchor_continuity_accepts_retained_current_source_without_rebind(self):
         marker = {
             "package": "com.android.chrome",
             "binding": "event_source",
@@ -610,26 +764,64 @@ class H19RunnerTest(unittest.TestCase):
             "sourceDigestPrefix": "dddddddddddd",
             "sourceCurrent": True,
             "sourceEvidenceScope": "current_boundary",
+            "exactAnchorRebindCount": 0,
             "rootBinding": "native_root",
         }
         summary = {
-            "readyExactAnchorRebind": {"maxCount": 1},
+            "readyExactAnchorRebind": {"maxCount": 0},
             "currentReadyBinding": marker,
         }
-        with patch("run_a23_gate.request_status", return_value=("", summary)):
-            result = wait_for_exact_anchor_rebind(
+        with patch("run_a23_gate.observe_status", return_value=("", summary)):
+            result = wait_for_exact_anchor_continuity(
                 object(),
                 "since",
                 timeout_seconds=1,
-                minimum_rebind_count=1,
+                baseline_rebind_count=0,
                 expected_marker=marker,
             )
 
         self.assertTrue(result["pass"])
+        self.assertEqual("retained_current", result["continuity"])
+        self.assertFalse(result["rebindObserved"])
         self.assertTrue(result["sourceCurrent"])
         self.assertEqual("current_boundary", result["sourceEvidenceScope"])
 
-    def test_exact_anchor_rebind_wait_rejects_web_root_only_fallback(self):
+    def test_exact_anchor_continuity_accepts_a_real_rebind(self):
+        marker = {
+            "package": "com.android.chrome",
+            "binding": "event_source",
+            "axBound": True,
+            "rawPresented": False,
+            "windowId": "4",
+            "surfaceEpoch": "8",
+            "documentSequence": "2",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "aaaaaaaaaaaa",
+            "rootDigestPrefix": "bbbbbbbbbbbb",
+            "webRootDigestPrefix": "cccccccccccc",
+            "sourceDigestPrefix": "dddddddddddd",
+            "sourceCurrent": True,
+            "sourceEvidenceScope": "current_boundary",
+            "exactAnchorRebindCount": 4,
+            "rootBinding": "native_root",
+        }
+        summary = {
+            "readyExactAnchorRebind": {"maxCount": 4},
+            "currentReadyBinding": marker,
+        }
+        with patch("run_a23_gate.observe_status", return_value=("", summary)):
+            result = wait_for_exact_anchor_continuity(
+                object(),
+                "since",
+                timeout_seconds=1,
+                baseline_rebind_count=3,
+                expected_marker=marker,
+            )
+
+        self.assertEqual("rebound", result["continuity"])
+        self.assertTrue(result["rebindObserved"])
+
+    def test_exact_anchor_continuity_rejects_web_root_only_fallback(self):
         marker = {
             "package": "com.android.chrome",
             "binding": "event_source",
@@ -650,24 +842,32 @@ class H19RunnerTest(unittest.TestCase):
             "currentReadyBinding": marker,
         }
         with (
-            patch("run_a23_gate.request_status", return_value=("", summary)),
+            patch("run_a23_gate.observe_status", return_value=("", summary)),
             patch("run_a23_gate.time.monotonic", side_effect=[0.0, 0.0, 2.0]),
             patch("run_a23_gate.time.sleep"),
             self.assertRaises(HarnessError),
         ):
-            wait_for_exact_anchor_rebind(
+            wait_for_exact_anchor_continuity(
                 object(),
                 "since",
                 timeout_seconds=1,
-                minimum_rebind_count=1,
+                baseline_rebind_count=0,
                 expected_marker=marker,
             )
 
     def test_controlled_gate_requires_report_counts_to_advance(self):
         stale = {"fixtureReport": {"pass": True, "counts": {"reports": 1, "frame_reports": 1}}}
         fresh = {"fixtureReport": {"pass": True, "counts": {"reports": 2, "frame_reports": 2}}}
+        completion_events = "\n".join(
+            [
+                "resource=h19-report origin=fixture_local",
+                "resource=h19-frame-report origin=fixture_local",
+            ]
+            * 2
+        )
         with (
-            patch("run_a23_gate.request_status", side_effect=[("stale", stale), ("fresh", fresh)]),
+            patch("run_a23_gate.observe_status", return_value=(completion_events, stale)),
+            patch("run_a23_gate.request_status", return_value=("fresh", fresh)) as refresh,
             patch("run_a23_gate.time.sleep"),
         ):
             log, summary = wait_for_fixture_report(
@@ -680,6 +880,7 @@ class H19RunnerTest(unittest.TestCase):
 
         self.assertEqual("fresh", log)
         self.assertEqual(2, summary["fixtureReport"]["counts"]["reports"])
+        refresh.assert_called_once_with(ANY, "since", include_transport=False)
 
     def test_controlled_document_must_cross_fixture_and_transformer_before_ready(self):
         stale = {
@@ -690,6 +891,7 @@ class H19RunnerTest(unittest.TestCase):
             "fixtureReport": {"counts": {"documents": 5}},
             "status": {"fields": {"mediaDocumentsTransformed": "9"}},
         }
+        event = "phase=media_shield_document origin=fixture resource=h19-media-shield-document"
         with patch("h19_navigation_admission.time.sleep"):
             result = wait_for_controlled_document_admission(
                 object(),
@@ -697,7 +899,8 @@ class H19RunnerTest(unittest.TestCase):
                 timeout_seconds=1,
                 minimum_documents=4,
                 minimum_transformed=8,
-                request_status=Mock(side_effect=[("stale", stale), ("fresh", fresh)]),
+                observe_status=Mock(return_value=("\n".join([event] * 5), stale)),
+                refresh_status=Mock(return_value=("fresh", fresh)),
             )
 
         self.assertTrue(result["pass"])

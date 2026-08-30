@@ -11,7 +11,7 @@ import org.junit.Test
 
 class ChromeMediaShieldFocusEventPolicyTest {
     @Test
-    fun `exact focused source in current Chrome root verifies the ready claim`() {
+    fun `exact content changed source in current Chrome root verifies the ready claim`() {
         val result = ChromeMediaShieldFocusEventPolicy.verify(evidence(), Claim, WindowId)
 
         assertEquals(
@@ -28,40 +28,41 @@ class ChromeMediaShieldFocusEventPolicyTest {
 
     @Test
     fun `event before or after the claimed lifecycle is rejected`() {
-        assertRejected("ready_focus_claim_mismatch", evidence(markers = listOf(Marker.copy(lifecycleSequence = 2L))))
-        assertRejected("ready_focus_claim_mismatch", evidence(markers = listOf(Marker.copy(lifecycleSequence = 4L))))
+        assertRejected("ready_ax_claim_mismatch", evidence(markers = listOf(Marker.copy(lifecycleSequence = 2L))))
+        assertRejected("ready_ax_claim_mismatch", evidence(markers = listOf(Marker.copy(lifecycleSequence = 4L))))
     }
 
     @Test
     fun `stale replay background window and replaced root are rejected`() {
         assertRejected(
-            "ready_focus_view_id_mismatch",
+            "ready_ax_view_id_mismatch",
             evidence(sourceViewIdResourceName = "forged-ready-host"),
         )
         assertRejected(
-            "ready_focus_claim_mismatch",
+            "ready_ax_claim_mismatch",
             evidence(
                 markers = listOf(ChromeMediaShieldReadyMarker(OtherToken, Marker.lifecycleSequence)),
             ),
         )
-        assertRejected("ready_focus_wrong_window", evidence(eventWindowId = WindowId + 1))
-        assertRejected("ready_focus_wrong_window", evidence(sourceWindowId = WindowId + 1))
-        assertRejected("ready_focus_root_mismatch", evidence(sourceRootUniqueId = ""))
-        assertRejected("ready_focus_root_mismatch", evidence(sourceRootUniqueId = ForegroundRootUniqueId))
-        assertRejected("ready_focus_root_mismatch", evidence(sourceRootClassName = "android.widget.FrameLayout"))
-        assertRejected("ready_focus_root_mismatch", evidence(sourceRootVisibleToUser = false))
-        assertRejected("ready_focus_root_mismatch", evidence(sourceAttachedToForegroundRoot = false))
+        assertRejected("ready_ax_wrong_window", evidence(eventWindowId = WindowId + 1))
+        assertRejected("ready_ax_wrong_window", evidence(sourceWindowId = WindowId + 1))
+        assertRejected("ready_ax_root_mismatch", evidence(sourceRootUniqueId = ""))
+        assertRejected("ready_ax_root_mismatch", evidence(sourceRootUniqueId = ForegroundRootUniqueId))
+        assertRejected("ready_ax_root_mismatch", evidence(sourceRootClassName = "android.widget.FrameLayout"))
+        assertRejected("ready_ax_root_mismatch", evidence(sourceRootVisibleToUser = false))
+        assertRejected("ready_ax_root_mismatch", evidence(sourceAttachedToForegroundRoot = false))
     }
 
     @Test
-    fun `only an exact platform focus source can carry authority`() {
+    fun `only an exact platform content change source can carry authority`() {
         assertRejected(
-            "ready_focus_wrong_event",
-            evidence(eventType = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED),
+            "ready_ax_wrong_event",
+            evidence(eventType = AccessibilityEvent.TYPE_VIEW_FOCUSED),
         )
-        assertRejected("ready_focus_not_chrome", evidence(eventPackageName = "example.hostile"))
-        assertRejected("ready_focus_not_chrome", evidence(sourcePackageName = "example.hostile"))
-        assertRejected("ready_focus_not_chrome", evidence(foregroundRootPackageName = "example.hostile"))
+        assertRejected("ready_ax_wrong_change_type", evidence(contentChangeTypes = 1 shl 20))
+        assertRejected("ready_ax_not_chrome", evidence(eventPackageName = "example.hostile"))
+        assertRejected("ready_ax_not_chrome", evidence(sourcePackageName = "example.hostile"))
+        assertRejected("ready_ax_not_chrome", evidence(foregroundRootPackageName = "example.hostile"))
         assertTrue(
             ChromeMediaShieldFocusEventPolicy.verify(
                 evidence(sourceFocused = false),
@@ -76,11 +77,11 @@ class ChromeMediaShieldFocusEventPolicyTest {
                 WindowId,
             ) is ChromeMediaShieldFocusEventResult.Verified,
         )
-        assertRejected("ready_focus_root_mismatch", evidence(sourceUniqueId = ""))
-        assertRejected("ready_focus_view_id_mismatch", evidence(sourceViewIdResourceName = "forged"))
-        assertRejected("ready_focus_marker_ambiguous", evidence(markers = emptyList()))
+        assertRejected("ready_ax_root_mismatch", evidence(sourceUniqueId = ""))
+        assertRejected("ready_ax_view_id_mismatch", evidence(sourceViewIdResourceName = "forged"))
+        assertRejected("ready_ax_marker_ambiguous", evidence(markers = emptyList()))
         assertRejected(
-            "ready_focus_marker_ambiguous",
+            "ready_ax_marker_ambiguous",
             evidence(
                 markers =
                     listOf(
@@ -95,6 +96,78 @@ class ChromeMediaShieldFocusEventPolicyTest {
                 Claim,
                 WindowId,
             ) is ChromeMediaShieldFocusEventResult.Verified,
+        )
+    }
+
+    @Test
+    fun `only characterized content change subtypes can wake ready authority`() {
+        listOf(
+            AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED,
+            AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE,
+            AccessibilityEvent.CONTENT_CHANGE_TYPE_TEXT,
+            AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION,
+            AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE or
+                AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION,
+        ).forEach { changeTypes ->
+            assertTrue(
+                ChromeMediaShieldFocusEventPolicy.verify(
+                    evidence(contentChangeTypes = changeTypes),
+                    Claim,
+                    WindowId,
+                ) is ChromeMediaShieldFocusEventResult.Verified,
+            )
+        }
+    }
+
+    @Test
+    fun `root sourced fallback is current event triggered and one shot`() {
+        val evidence =
+            ChromeMediaShieldRootEventFallbackEvidence(
+                eventType = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+                contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION,
+                eventPackageName = ChromePackageName,
+                eventWindowId = WindowId,
+                sourcePackageName = ChromePackageName,
+                sourceWindowId = WindowId,
+                sourceClassName = ChromeMediaShieldWebRootContract.ClassName,
+                sourceIsWindowRoot = false,
+            )
+        assertTrue(ChromeMediaShieldRootEventFallbackPolicy.permits(evidence, WindowId, alreadyAttempted = false))
+        assertTrue(!ChromeMediaShieldRootEventFallbackPolicy.permits(evidence, WindowId, alreadyAttempted = true))
+        assertTrue(
+            !ChromeMediaShieldRootEventFallbackPolicy.permits(
+                evidence.copy(contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE),
+                WindowId,
+                alreadyAttempted = false,
+            ),
+        )
+        assertTrue(
+            !ChromeMediaShieldRootEventFallbackPolicy.permits(
+                evidence.copy(contentChangeTypes = AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED),
+                WindowId,
+                alreadyAttempted = false,
+            ),
+        )
+        assertTrue(
+            !ChromeMediaShieldRootEventFallbackPolicy.permits(
+                evidence.copy(eventWindowId = WindowId + 1),
+                WindowId,
+                alreadyAttempted = false,
+            ),
+        )
+        assertTrue(
+            !ChromeMediaShieldRootEventFallbackPolicy.permits(
+                evidence.copy(sourceClassName = "android.widget.Button"),
+                WindowId,
+                alreadyAttempted = false,
+            ),
+        )
+        assertTrue(
+            ChromeMediaShieldRootEventFallbackPolicy.permits(
+                evidence.copy(sourceClassName = "android.widget.FrameLayout", sourceIsWindowRoot = true),
+                WindowId,
+                alreadyAttempted = false,
+            ),
         )
     }
 
@@ -312,13 +385,13 @@ class ChromeMediaShieldFocusEventPolicyTest {
     fun `only the exact focus source can create or maintain a release boundary`() {
         assertTrue(
             ChromeMediaShieldBoundContextPolicy.select(
-                exactFocusSourceCurrent = false,
+                exactEventSourceCurrent = false,
             ) == ChromeMediaShieldBoundContextBinding.Invalid,
         )
         assertTrue(
             ChromeMediaShieldBoundContextPolicy.select(
-                exactFocusSourceCurrent = true,
-            ) == ChromeMediaShieldBoundContextBinding.ExactFocusSource,
+                exactEventSourceCurrent = true,
+            ) == ChromeMediaShieldBoundContextBinding.ExactEventSource,
         )
     }
 
@@ -332,7 +405,8 @@ class ChromeMediaShieldFocusEventPolicyTest {
     }
 
     private fun evidence(
-        eventType: Int = AccessibilityEvent.TYPE_VIEW_FOCUSED,
+        eventType: Int = AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+        contentChangeTypes: Int = AccessibilityEvent.CONTENT_CHANGE_TYPE_CONTENT_DESCRIPTION,
         eventPackageName: String = ChromePackageName,
         eventWindowId: Int = WindowId,
         sourcePackageName: String = ChromePackageName,
@@ -350,6 +424,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         markers: List<ChromeMediaShieldReadyMarker> = listOf(Marker),
     ) = ChromeMediaShieldFocusEventEvidence(
         eventType = eventType,
+        contentChangeTypes = contentChangeTypes,
         eventPackageName = eventPackageName,
         eventWindowId = eventWindowId,
         sourcePackageName = sourcePackageName,
@@ -474,7 +549,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
                             ),
                         markerIdentityDigest =
                             ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(
-                                "focus:$SourceUniqueId:${ChromeMediaShieldFocusEventPolicy.ReadyViewId}",
+                                "event:$SourceUniqueId:${ChromeMediaShieldFocusEventPolicy.ReadyViewId}",
                             ),
                     ),
                 focusAnchor =

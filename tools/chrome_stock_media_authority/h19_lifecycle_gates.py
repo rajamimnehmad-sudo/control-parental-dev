@@ -170,14 +170,14 @@ def wait_for_existing_document_fail_close(
     adb: Any,
     since: str,
     timeout_seconds: int,
-    request_status: StatusRequest,
+    observe_status: StatusRequest,
 ) -> dict[str, Any]:
     """Observe a new-session opaque surface before any explicit reload."""
 
     deadline = time.monotonic() + timeout_seconds
     last: dict[str, Any] = {}
     while time.monotonic() < deadline:
-        _, last = request_status(adb, since)
+        _, last = observe_status(adb, since)
         surface = last.get("currentSurfaceState")
         release_count = int(last.get("readyPhases", {}).get("ready_foreground_released", 0))
         if (
@@ -213,6 +213,7 @@ def restart_glosh_phase(
     since: str,
     timeout_seconds: int,
     request_status: StatusRequest,
+    observe_status: StatusRequest,
     start_phase: PhaseStart,
     observe_proxy_policy: Callable[[Any, str], dict[str, Any]],
     foreground_current: Callable[[Any], None],
@@ -260,7 +261,7 @@ def restart_glosh_phase(
         adb,
         restarted_since,
         max(1, int(overall_deadline - time.monotonic())),
-        request_status,
+        observe_status,
     )
     return (
         {

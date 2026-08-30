@@ -63,7 +63,7 @@ internal object ChromeMediaShieldBootstrap {
         const SELF=self,DOC=document,NAV=navigator,BOOTSTRAP_SCRIPT=DOC.currentScript,ReflectApply=Reflect.apply,ObjectDefine=Object.defineProperty,ObjectDescribe=Object.getOwnPropertyDescriptor;
         const ObjectPrototype=Object.prototype,ObjectGetPrototype=Object.getPrototypeOf,ObjectHasOwn=ObjectPrototype.hasOwnProperty;
         const NativeString=String,NativeNumber=Number,NativeURL=URL,NativeDOMException=DOMException,NativeArray=Array,NativeEvent=Event,NativeMutationObserver=MutationObserver;
-        const NativeXMLHttpRequest=SELF.XMLHttpRequest;
+        const NativeXMLHttpRequest=SELF.XMLHttpRequest,NativeHTMLElement=SELF.HTMLElement,NativeCustomElements=SELF.customElements,NativeElementInternals=SELF.ElementInternals;
         const NumberIsSafeInteger=Number.isSafeInteger;
         const StringLower=String.prototype.toLowerCase,StringIncludes=String.prototype.includes,StringTrim=String.prototype.trim,StringLastIndex=String.prototype.lastIndexOf,StringSlice=String.prototype.slice;
         const SetHas=Set.prototype.has,SetAdd=Set.prototype.add,WeakSetHas=WeakSet.prototype.has,WeakSetAdd=WeakSet.prototype.add;
@@ -71,7 +71,8 @@ internal object ChromeMediaShieldBootstrap {
         const invoke=(fn,owner,args)=>ReflectApply(fn,owner,args),method=(fn)=>({call:(owner,...args)=>invoke(fn,owner,args),apply:(owner,args)=>invoke(fn,owner,args)});
         const xhrOpen=NativeXMLHttpRequest?method(NativeXMLHttpRequest.prototype.open):null;
         const xhrSend=NativeXMLHttpRequest?method(NativeXMLHttpRequest.prototype.send):null,xhrSetHeader=NativeXMLHttpRequest?method(NativeXMLHttpRequest.prototype.setRequestHeader):null;
-        const nativeFocus=SELF.HTMLElement&&HTMLElement.prototype.focus?method(HTMLElement.prototype.focus):null;
+        const nativeCustomDefine=NativeCustomElements&&SELF.CustomElementRegistry?method(CustomElementRegistry.prototype.define):null;
+        const nativeAttachInternals=NativeHTMLElement&&NativeHTMLElement.prototype.attachInternals?method(NativeHTMLElement.prototype.attachInternals):null;
         const descriptor=(owner,name)=>ObjectDescribe(owner,name),propertyOwner=(value,name)=>{let owner=value;while(owner&&!invoke(ObjectHasOwn,owner,[name]))owner=ObjectGetPrototype(owner);return owner};
         const propertyDescriptor=(value,name)=>{const owner=propertyOwner(value,name);return owner?descriptor(owner,name):null};
         const read=(entry,value)=>entry&&entry.get?invoke(entry.get,value,[]):undefined,stringOf=(value)=>NativeString(value),lower=(value)=>invoke(StringLower,stringOf(value),[]);
@@ -118,10 +119,11 @@ internal object ChromeMediaShieldBootstrap {
         const attrOwnerProperty=self.Attr?propertyDescriptor(Attr.prototype,'ownerElement'):null,urlProtocolProperty=propertyDescriptor(new NativeURL('https://glosh.invalid/'),'protocol');
         const iframeSandboxProperty=self.HTMLIFrameElement?propertyDescriptor(HTMLIFrameElement.prototype,'sandbox'):null;
         const attributeStyleMapProperty=self.StylePropertyMap?propertyDescriptor(DOC.documentElement,'attributeStyleMap'):null;
+        const internalsAriaLabelProperty=NativeElementInternals?propertyDescriptor(NativeElementInternals.prototype,'ariaLabel'):null;
         const requiredPrimordials=[nodeText,nodeValue,nodeTypeProperty,localNameProperty,parentNodeProperty,firstChildProperty,isConnectedProperty,baseUriProperty,styleProperty,
         elementAttributesProperty,documentElementProperty,documentHeadProperty,visibilityProperty,eventTargetProperty,eventTrustedProperty,mutationTypeProperty,mutationTargetProperty,mutationAddedProperty,
         nodeListLength,namedMapLength,urlProtocolProperty,templateContentProperty];
-        if(TOP_LEVEL&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!nativeFocus))installed=false;
+        if(TOP_LEVEL&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!NativeHTMLElement||!NativeCustomElements||!nativeCustomDefine||!nativeAttachInternals||!internalsAriaLabelProperty||!internalsAriaLabelProperty.set))installed=false;
         for(let index=0;index<requiredPrimordials.length;index+=1)if(!requiredPrimordials[index])installed=false;
         if(self.Attr&&(!attrNameProperty||!attrValueProperty||!attrNamespaceProperty||!attrLocalNameProperty||!attrOwnerProperty))installed=false;
         if(self.HTMLIFrameElement&&!iframeSandboxProperty)installed=false;if(self.StylePropertyMap&&!attributeStyleMapProperty)installed=false;
@@ -471,24 +473,25 @@ internal object ChromeMediaShieldBootstrap {
         nodeRemove.call(parent,BOOTSTRAP_SCRIPT);return !connected(BOOTSTRAP_SCRIPT)}catch(_){return false}};
         const retireBootstrapSecrets=()=>clearStyleNonce(shieldStyle)&&(!curtainStyle||clearStyleNonce(curtainStyle))&&removeCurrentScript();
         if(!installed){failClosedDocument();return}if(!retireBootstrapSecrets()){failClosedDocument();return}if(!TOP_LEVEL)return;
-        readyHost=create.call(DOC,'span');invoke(WeakSetAdd,protectedNodes,[readyHost]);nativeSet.call(readyHost,'id',READY_ID);nativeSet.call(readyHost,'role','button');nativeSet.call(readyHost,'tabindex','-1');watchStyle(readyHost);
+        let creatingReadyHost=false,readyInternals=null;const ReadyHostClass=class extends NativeHTMLElement{constructor(){super();if(creatingReadyHost&&readyInternals===null)readyInternals=nativeAttachInternals.call(this)}};
+        try{nativeCustomDefine.call(NativeCustomElements,'glosh-h19-ready-host',ReadyHostClass);creatingReadyHost=true;readyHost=create.call(DOC,'glosh-h19-ready-host')}catch(_){installed=false}finally{creatingReadyHost=false}
+        if(!installed||!readyHost||!readyInternals){failClosedDocument();return}invoke(WeakSetAdd,protectedNodes,[readyHost]);nativeSet.call(readyHost,'id',READY_ID);nativeSet.call(readyHost,'role','group');nativeSet.call(readyHost,'tabindex','-1');watchStyle(readyHost);
         const readyStyle=styleOf(readyHost);nativeStyleSet.call(readyStyle,'position','fixed','important');nativeStyleSet.call(readyStyle,'left','0','important');
         nativeStyleSet.call(readyStyle,'top','0','important');nativeStyleSet.call(readyStyle,'width','1px','important');nativeStyleSet.call(readyStyle,'height','1px','important');
         nativeStyleSet.call(readyStyle,'overflow','hidden','important');nativeStyleSet.call(readyStyle,'color','transparent','important');
         nativeStyleSet.call(readyStyle,'font-size','1px','important');nativeStyleSet.call(readyStyle,'pointer-events','none','important');
-        const readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}]);
-        const marker=create.call(DOC,'span');invoke(nodeText.set,marker,['']);nodeAppend.call(readyRoot,marker);
         let lifecycle=0,visibleCycleRequested=false;
         const showCurtain=()=>{curtainRequired=true;return ensureCurtain()};
         const hideCurtain=()=>{curtainRequired=false;return ensureCurtain()};
         const detachMarker=()=>{const parent=parentOf(readyHost);if(connected(readyHost)&&parent)nodeRemove.call(parent,readyHost)};
-        const revokeReady=()=>{showCurtain();detachMarker();visibleCycleRequested=false};
+        const clearReadyLabel=()=>{try{invoke(internalsAriaLabelProperty.set,readyInternals,['']);return true}catch(_){return false}};
+        const revokeReady=()=>{showCurtain();clearReadyLabel();detachMarker();visibleCycleRequested=false};
         const beginReadyLifecycle=()=>{if(visibleCycleRequested||visibilityState()!=='visible')return;visibleCycleRequested=true;lifecycle+=1;const currentLifecycle=lifecycle;
-        showCurtain();detachMarker();try{const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle;nativeSet.call(marker,'aria-label',readyValue);invoke(nodeText.set,marker,[readyValue]);nodeAppend.call(documentElement(),readyHost);
+        showCurtain();clearReadyLabel();detachMarker();try{const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle;
         const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
         xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle);if(read(xhrStatusProperty,xhr)!==204||read(xhrResponseUrlProperty,xhr)!==READY_URL||
-        currentLifecycle!==lifecycle||visibilityState()!=='visible'){revokeReady();return}nativeFocus.call(readyHost,{preventScroll:true});
-        if(!hideCurtain())revokeReady()}catch(_){showCurtain();detachMarker();visibleCycleRequested=false}};
+        currentLifecycle!==lifecycle||visibilityState()!=='visible'){revokeReady();return}nodeAppend.call(documentElement(),readyHost);invoke(internalsAriaLabelProperty.set,readyInternals,[readyValue]);
+        if(!hideCurtain())revokeReady()}catch(_){revokeReady()}};
         nativeAddEvent.call(SELF,'beforeunload',revokeReady,true);nativeAddEvent.call(SELF,'pagehide',revokeReady,true);
         nativeAddEvent.call(SELF,'pageshow',event=>{if(trustedEvent(event))beginReadyLifecycle()},true);nativeAddEvent.call(DOC,'visibilitychange',event=>{
         if(visibilityState()==='visible'){if(trustedEvent(event))beginReadyLifecycle()}else revokeReady()},true);

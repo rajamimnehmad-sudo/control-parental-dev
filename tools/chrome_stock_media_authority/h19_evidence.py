@@ -435,7 +435,7 @@ def summarize_logcat(logcat: str) -> dict[str, Any]:
             progress = ready_claim_progress.setdefault(claim_key, set())
             if phase == "ready_ack_accepted":
                 progress.add("ack")
-            elif phase == "ready_focus_bound" and "ack" in progress:
+            elif phase in {"ready_focus_bound", "ready_ax_bound"} and "ack" in progress:
                 progress.add("focus")
             ready_timeline.append(event)
             if phase == "ready_foreground_released":

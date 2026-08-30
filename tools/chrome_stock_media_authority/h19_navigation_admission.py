@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import time
 from typing import Any, Callable
 
@@ -11,6 +12,7 @@ from h19_plan import HarnessError
 
 
 StatusRequest = Callable[[Adb, str], tuple[str, dict[str, Any]]]
+StatusRefresh = Callable[..., tuple[str, dict[str, Any]]]
 
 
 def wait_for_controlled_document_admission(
@@ -19,15 +21,23 @@ def wait_for_controlled_document_admission(
     timeout_seconds: int,
     minimum_documents: int,
     minimum_transformed: int,
-    request_status: StatusRequest,
+    observe_status: StatusRequest,
+    refresh_status: StatusRefresh,
 ) -> dict[str, Any]:
     """Require post-navigation fixture/transform activity before evaluating exact READY authority."""
 
     deadline = time.monotonic() + timeout_seconds
     last_documents = minimum_documents
     last_transformed = minimum_transformed
+    snapshot_requested = False
     while time.monotonic() < deadline:
-        _, summary = request_status(adb, since)
+        value, summary = observe_status(adb, since)
+        fixture_documents = len(
+            re.findall(r"\bphase=media_shield_document origin=fixture\b", value)
+        )
+        if not snapshot_requested and fixture_documents > minimum_documents:
+            _, summary = refresh_status(adb, since, include_transport=False)
+            snapshot_requested = True
         last_documents = int(summary.get("fixtureReport", {}).get("counts", {}).get("documents", 0))
         last_transformed = status_counter_snapshot(summary).get("mediaDocumentsTransformed", 0)
         if last_documents > minimum_documents and last_transformed > minimum_transformed:
