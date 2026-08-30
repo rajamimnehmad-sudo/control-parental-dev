@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import json
 import re
+import secrets
 import shlex
 import shutil
 import signal
@@ -36,6 +37,7 @@ from h19_device import (
     CONTROLLED_URL,
     Adb,
     collect_preflight,
+    controlled_navigation_url,
     ce_data_inode,
     exit_info,
     exit_info_delta,
@@ -69,6 +71,12 @@ from h19_plan import (
 )
 from h19_ready import current_ready_result, ready_baseline
 from h19_lifecycle_gates import ready_document_key, restart_glosh_phase, run_two_tab_binding_gate
+from h19_navigation_admission import (
+    materialize_controlled_navigation,
+    materialize_restart_target,
+    wait_for_controlled_document_admission,
+)
+from h19_proxy_policy import wait_for_chrome_proxy_policy_observed
 
 
 ACTION_PREFIX = "com.contentfilter.user.chromedataplane.command."
@@ -425,6 +433,7 @@ def run_state(
         stderr=subprocess.DEVNULL,
     )
     ready_evidence: dict[str, Any] = {"required": ready_required, "pass": False}
+    document_admission_evidence: dict[str, Any] | None = None
     process_restart: dict[str, Any] = {"performed": False}
     counter_baseline = previous_counters
     try:
@@ -437,7 +446,19 @@ def run_state(
             or state.get("navigation", "url") == "background-foreground"
         )
         ready_completed_by_action = False
+        controlled_activity_documents = int(previous_fixture_counts.get("documents", 0))
+        controlled_activity_transformed = int(previous_counters.get("mediaDocumentsTransformed", 0))
+        if state.get("navigation", "url") in {"controlled", "two-tab-binding"}:
+            _, controlled_baseline = request_status(adb, phase_since)
+            controlled_activity_documents = int(
+                controlled_baseline.get("fixtureReport", {}).get("counts", {}).get("documents", 0)
+            )
+            controlled_activity_transformed = status_counter_snapshot(controlled_baseline).get(
+                "mediaDocumentsTransformed",
+                0,
+            )
         if state.get("navigation") == "two-tab-binding":
+            controlled_url = str(state.get("controlledUrl", CONTROLLED_URL))
             ready_evidence = {
                 "required": True,
                 **run_two_tab_binding_gate(
@@ -447,6 +468,15 @@ def run_state(
                     baseline_release_count,
                     baseline_marker,
                     wait_for_ready,
+                    controlled_url=controlled_url,
+                    wait_document_admission=lambda: wait_for_controlled_document_admission(
+                        adb,
+                        phase_since,
+                        int(state.get("fixtureTimeoutSeconds", 10)),
+                        minimum_documents=controlled_activity_documents,
+                        minimum_transformed=controlled_activity_transformed,
+                        request_status=request_status,
+                    ),
                 ),
             }
             ready_completed_by_action = True
@@ -458,6 +488,11 @@ def run_state(
                 timeout_seconds=int(state.get("processRestartTimeoutSeconds", 25)),
                 request_status=request_status,
                 start_phase=start_phase,
+                observe_proxy_policy=lambda device, since: wait_for_chrome_proxy_policy_observed(
+                    device,
+                    since,
+                    launch_policy_page=False,
+                ),
                 foreground_current=lambda device: navigate(device, {"navigation": "foreground"}),
             )
             counter_baseline = status_counter_snapshot(restarted)
@@ -465,22 +500,48 @@ def run_state(
             process_restart["explicitReloadPerformedAfterFailClose"] = True
         else:
             navigate(adb, state)
-        if ready_evidence["required"] and not ready_completed_by_action:
-            ready_evidence = {
-                "required": True,
-                **wait_for_ready(
+            if state.get("navigation", "url") == "restart-chrome":
+                ready_evidence["chromeProxyPolicyObserved"] = wait_for_chrome_proxy_policy_observed(
+                    adb,
+                    state_since,
+                    launch_policy_page=False,
+                )
+                navigate(adb, {"navigation": "url", "url": str(state["restartUrl"])})
+            if state.get("navigation", "url") == "controlled":
+                document_admission_evidence = wait_for_controlled_document_admission(
                     adb,
                     phase_since,
-                    int(state.get("readyTimeoutSeconds", 8)),
-                    minimum_release_count=(
-                        baseline_release_count + 1 if transition_required else baseline_release_count
+                    int(state.get("fixtureTimeoutSeconds", 10)),
+                    minimum_documents=controlled_activity_documents,
+                    minimum_transformed=controlled_activity_transformed,
+                    request_status=request_status,
+                )
+        if ready_evidence["required"]:
+            if not ready_completed_by_action:
+                prior_ready_evidence = ready_evidence
+                ready_evidence = {
+                    "required": True,
+                    **prior_ready_evidence,
+                    **(
+                        {"documentAdmission": document_admission_evidence}
+                        if document_admission_evidence is not None
+                        else {}
                     ),
-                    previous_marker=baseline_marker,
-                    require_advance=transition_required,
-                ),
-            }
+                    **wait_for_ready(
+                        adb,
+                        phase_since,
+                        int(state.get("readyTimeoutSeconds", 8)),
+                        minimum_release_count=(
+                            baseline_release_count + 1 if transition_required else baseline_release_count
+                        ),
+                        previous_marker=baseline_marker,
+                        require_advance=transition_required,
+                    ),
+                }
         else:
             ready_evidence = {"required": False, "pass": True, "reason": "bounded_non_document_probe"}
+        if screenrecord.poll() is not None:
+            raise HarnessError(f"screenrecord ended before READY evidence completed for {state_id}")
         if web_root_continuity_required_for(state):
             marker = ready_evidence.get("marker")
             if not isinstance(marker, dict):
@@ -593,9 +654,9 @@ def run_state(
         screenshot.unlink(missing_ok=True)
     target = state.get("url", "")
     if state.get("navigation") == "controlled":
-        target = CONTROLLED_URL
+        target = str(state.get("controlledUrl", CONTROLLED_URL))
     elif state.get("navigation") == "two-tab-binding":
-        target = CONTROLLED_URL
+        target = str(state.get("controlledUrl", CONTROLLED_URL))
     elif state.get("navigation") == "chrome-policy":
         target = CHROME_POLICY_URL
     parsed = urlsplit(target)
@@ -670,6 +731,9 @@ def main() -> int:
     active = False
     last_phase_since = run_since
     display_lease: dict[str, Any] | None = None
+    controlled_run_nonce = secrets.token_hex(16)
+    controlled_navigation_sequence = 0
+    last_explicit_target = ""
 
     def stop_for_signal(_signal: int, _frame: Any) -> None:
         raise KeyboardInterrupt
@@ -690,14 +754,27 @@ def main() -> int:
             last_phase_since = adb.shell("date", "+%m-%d %H:%M:%S.000").strip()
             active = True
             active_summary = start_phase(adb, mode, last_phase_since, int(plan.get("startupTimeoutSeconds", 90)))
+            chrome_proxy_policy = wait_for_chrome_proxy_policy_observed(adb, last_phase_since)
             previous_counters = status_counter_snapshot(active_summary)
             enforce_counter_gate(mode, previous_counters, {field: 0 for field in previous_counters})
             previous_fixture_counts: dict[str, int] = {}
             write_json(
                 args.output / f"phase-{phase_id}.json",
-                {"id": phase_id, "mode": mode, "active": active_summary, "initialCounters": previous_counters},
+                {
+                    "id": phase_id,
+                    "mode": mode,
+                    "active": active_summary,
+                    "chromeProxyPolicyObserved": chrome_proxy_policy,
+                    "initialCounters": previous_counters,
+                },
             )
             for state in phase["states"]:
+                state, controlled_navigation_sequence = materialize_controlled_navigation(
+                    state,
+                    controlled_run_nonce,
+                    controlled_navigation_sequence,
+                )
+                state, last_explicit_target = materialize_restart_target(state, last_explicit_target)
                 result = run_state(
                     adb, state, args.output, int(plan.get("samplingFps", 4)),
                     phase_id, mode, previous_counters, previous_fixture_counts, last_phase_since,

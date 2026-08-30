@@ -48,11 +48,13 @@ class FakeTabAdb:
 class H19LifecycleGatesTest(unittest.TestCase):
     def test_new_tab_uses_public_android_browser_extra_without_ui_coordinates(self) -> None:
         adb = FakeTabAdb()
+        controlled_url = "https://glosh-photos.test/web19/controlled?h19_nav=" + "c" * 32 + "-3"
 
-        evidence = open_controlled_new_tab(adb)
+        evidence = open_controlled_new_tab(adb, controlled_url)
 
         args, kwargs = adb.calls[0]
         self.assertEqual("android.provider.Browser.EXTRA_CREATE_NEW_TAB", evidence["mechanism"])
+        self.assertIn(controlled_url, args)
         self.assertIn(("--ez", "create_new_tab", "true"), tuple(zip(args, args[1:], args[2:])))
         self.assertNotIn("input", args)
         self.assertEqual(45, kwargs["timeout"])

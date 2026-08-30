@@ -7,9 +7,17 @@ from h19_plan import HarnessError
 from h19_ready import current_ready_result
 from h19_device import (
     ce_data_inode_from_package_dump,
+    controlled_navigation_url,
+    navigate,
     prepare_interactive_display,
     restore_interactive_display,
 )
+from h19_navigation_admission import (
+    materialize_controlled_navigation,
+    materialize_restart_target,
+    wait_for_controlled_document_admission,
+)
+from h19_proxy_policy import CHROME_PROXY_POLICY, chrome_proxy_policy_transition
 from run_a23_gate import (
     HARNESS_CAPABILITIES,
     baseline_then_set_orientation,
@@ -69,6 +77,15 @@ class FakeStartAdb:
         return ""
 
 
+class FakeNavigationAdb:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, ...]] = []
+
+    def shell(self, *args, **_kwargs):
+        self.calls.append(tuple(args))
+        return "Status: ok"
+
+
 class FakeInteractiveAdb:
     def __init__(self, initially_awake: bool = False) -> None:
         self.awake = initially_awake
@@ -94,6 +111,99 @@ class FakeInteractiveAdb:
 
 
 class H19RunnerTest(unittest.TestCase):
+    def test_chrome_proxy_policy_requires_current_pid_set_then_flush(self):
+        correct_set = (
+            "08-30 00:28:57.654  5729  5729 I cr_CombinedPProvider: "
+            f"#setPolicy() ProxySettings -> {CHROME_PROXY_POLICY}"
+        )
+        wrong_pid_flush = "08-30 00:28:57.655  9999  9999 I cr_CombinedPProvider: #flushPolicies()"
+        correct_flush = "08-30 00:28:57.656  5729  5729 I cr_CombinedPProvider: #flushPolicies()"
+
+        self.assertIsNone(chrome_proxy_policy_transition([correct_set, wrong_pid_flush], 5729))
+        evidence = chrome_proxy_policy_transition([correct_set, wrong_pid_flush, correct_flush], 5729)
+
+        self.assertIsNotNone(evidence)
+        self.assertTrue(evidence["pass"])
+        self.assertEqual(5729, evidence["browserPid"])
+
+        wrong_set = (
+            "08-30 00:28:57.655  5729  5729 I cr_CombinedPProvider: "
+            "#setPolicy() ProxySettings -> {\"ProxyMode\":\"direct\"}"
+        )
+        self.assertIsNone(chrome_proxy_policy_transition([correct_set, wrong_set, correct_flush], 5729))
+
+    def test_chrome_proxy_policy_rejects_flush_before_current_set(self):
+        flush = "08-30 00:28:57.600  5729  5729 I cr_CombinedPProvider: #flushPolicies()"
+        set_line = (
+            "08-30 00:28:57.654  5729  5729 I cr_CombinedPProvider: "
+            f"#setPolicy() ProxySettings -> {CHROME_PROXY_POLICY}"
+        )
+
+        self.assertIsNone(chrome_proxy_policy_transition([flush, set_line], 5729))
+
+    def test_controlled_navigation_url_is_fresh_but_keeps_exact_fixture_origin_and_path(self):
+        first = controlled_navigation_url("a" * 32, 1)
+        second = controlled_navigation_url("a" * 32, 2)
+
+        self.assertEqual("https://glosh-photos.test/web19/controlled?h19_nav=" + "a" * 32 + "-1", first)
+        self.assertNotEqual(first, second)
+
+    def test_only_fresh_controlled_navigation_consumes_a_sequence(self):
+        controlled, sequence = materialize_controlled_navigation(
+            {"id": "a", "navigation": "controlled"},
+            "b" * 32,
+            0,
+        )
+        reload_state, after_reload = materialize_controlled_navigation(
+            {"id": "reload", "navigation": "reload"},
+            "b" * 32,
+            sequence,
+        )
+        tab, after_tab = materialize_controlled_navigation(
+            {"id": "tab", "navigation": "two-tab-binding"},
+            "b" * 32,
+            after_reload,
+        )
+
+        self.assertIn("controlledUrl", controlled)
+        self.assertNotIn("controlledUrl", reload_state)
+        self.assertEqual(1, after_reload)
+        self.assertIn("h19_nav=" + "b" * 32 + "-2", tab["controlledUrl"])
+        self.assertEqual(2, after_tab)
+
+    def test_chrome_restart_reuses_only_a_known_explicit_target(self):
+        explicit, target = materialize_restart_target(
+            {"id": "site", "navigation": "url", "url": "https://example.test/page"},
+            "",
+        )
+        restart, target_after_restart = materialize_restart_target(
+            {"id": "restart", "navigation": "restart-chrome"},
+            target,
+        )
+
+        self.assertEqual("https://example.test/page", explicit["url"])
+        self.assertEqual("https://example.test/page", restart["restartUrl"])
+        self.assertEqual(target, target_after_restart)
+
+    def test_chrome_restart_rejects_unknown_target_after_back_or_tab_switch(self):
+        _, target = materialize_restart_target(
+            {"id": "back", "navigation": "back"},
+            "https://example.test/page",
+        )
+
+        self.assertEqual("", target)
+        with self.assertRaises(HarnessError):
+            materialize_restart_target({"id": "restart", "navigation": "restart-chrome"}, target)
+
+    def test_chrome_restart_opens_only_local_policy_page_before_network_target(self):
+        adb = FakeNavigationAdb()
+
+        navigate(adb, {"navigation": "restart-chrome"})
+
+        self.assertEqual(("am", "force-stop", "com.android.chrome"), adb.calls[0])
+        self.assertIn("chrome://policy", adb.calls[1])
+        self.assertFalse(any("http://" in value or "https://" in value for value in adb.calls[1]))
+
     def test_physical_gate_acquires_and_restores_interactive_display_lease(self):
         adb = FakeInteractiveAdb(initially_awake=False)
 
@@ -216,7 +326,9 @@ class H19RunnerTest(unittest.TestCase):
         }
         request = Mock(side_effect=[("", before), ("", fail_closed)])
         start = Mock(return_value=after)
-        foreground = Mock()
+        ordering: list[str] = []
+        policy = Mock(side_effect=lambda *_args: ordering.append("policy") or {"pass": True})
+        foreground = Mock(side_effect=lambda *_args: ordering.append("foreground"))
         evidence, active = restart_glosh_phase(
             adb,
             "replace-all",
@@ -224,6 +336,7 @@ class H19RunnerTest(unittest.TestCase):
             timeout_seconds=5,
             request_status=request,
             start_phase=start,
+            observe_proxy_policy=policy,
             foreground_current=foreground,
         )
 
@@ -237,6 +350,8 @@ class H19RunnerTest(unittest.TestCase):
         )
         self.assertEqual("old-session", start.call_args.kwargs["previous_session"])
         self.assertEqual("08-29 12:00:00.000", start.call_args.args[2])
+        self.assertEqual(["policy", "foreground"], ordering)
+        self.assertTrue(evidence["chromeProxyPolicyObserved"]["pass"])
         foreground.assert_called_once_with(adb)
 
     def test_orientation_is_verified_before_state_recording(self):
@@ -498,6 +613,29 @@ class H19RunnerTest(unittest.TestCase):
 
         self.assertEqual("fresh", log)
         self.assertEqual(2, summary["fixtureReport"]["counts"]["reports"])
+
+    def test_controlled_document_must_cross_fixture_and_transformer_before_ready(self):
+        stale = {
+            "fixtureReport": {"counts": {"documents": 4}},
+            "status": {"fields": {"mediaDocumentsTransformed": "8"}},
+        }
+        fresh = {
+            "fixtureReport": {"counts": {"documents": 5}},
+            "status": {"fields": {"mediaDocumentsTransformed": "9"}},
+        }
+        with patch("h19_navigation_admission.time.sleep"):
+            result = wait_for_controlled_document_admission(
+                object(),
+                "since",
+                timeout_seconds=1,
+                minimum_documents=4,
+                minimum_transformed=8,
+                request_status=Mock(side_effect=[("stale", stale), ("fresh", fresh)]),
+            )
+
+        self.assertTrue(result["pass"])
+        self.assertEqual(5, result["documents"])
+        self.assertEqual(9, result["mediaDocumentsTransformed"])
 
 
 if __name__ == "__main__":

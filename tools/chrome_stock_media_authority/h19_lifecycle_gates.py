@@ -58,7 +58,10 @@ def ready_document_key(marker: dict[str, Any] | None) -> tuple[str, ...] | None:
     return tuple(str(marker.get(field, "")) for field in READY_DOCUMENT_FIELDS)
 
 
-def open_controlled_new_tab(adb: Any) -> dict[str, Any]:
+def open_controlled_new_tab(
+    adb: Any,
+    controlled_url: str = CONTROLLED_URL,
+) -> dict[str, Any]:
     """Use Android's public Browser.EXTRA_CREATE_NEW_TAB contract."""
 
     output = adb.shell(
@@ -68,7 +71,7 @@ def open_controlled_new_tab(adb: Any) -> dict[str, Any]:
         "-a",
         "android.intent.action.VIEW",
         "-d",
-        CONTROLLED_URL,
+        controlled_url,
         "-p",
         CHROME_PACKAGE,
         "--ez",
@@ -80,7 +83,7 @@ def open_controlled_new_tab(adb: Any) -> dict[str, Any]:
         raise HarnessError("stock Chrome rejected the bounded create-new-tab intent")
     return {
         "mechanism": "android.provider.Browser.EXTRA_CREATE_NEW_TAB",
-        "targetSha256": sha256_text(CONTROLLED_URL),
+        "targetSha256": sha256_text(controlled_url),
         "intentResultSha256": sha256_text(output),
     }
 
@@ -92,6 +95,8 @@ def run_two_tab_binding_gate(
     baseline_release_count: int,
     tab_a_marker: dict[str, Any] | None,
     wait_ready: ReadyWait,
+    controlled_url: str = CONTROLLED_URL,
+    wait_document_admission: Callable[[], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Open controlled tab B, then Back to A, proving exact READY identities."""
 
@@ -103,8 +108,9 @@ def run_two_tab_binding_gate(
     returned = False
     tab_b: dict[str, Any] | None = None
     try:
-        intent_evidence = open_controlled_new_tab(adb)
+        intent_evidence = open_controlled_new_tab(adb, controlled_url)
         opened = True
+        document_admission = wait_document_admission() if wait_document_admission is not None else None
         tab_b = wait_ready(
             adb,
             since,
@@ -144,6 +150,7 @@ def run_two_tab_binding_gate(
             "pass": True,
             "kind": "stock_chrome_two_tab_foreground_binding",
             "intent": intent_evidence,
+            "documentAdmission": document_admission,
             "tabA": tab_a_marker,
             "tabB": tab_b_marker,
             "tabAReturn": return_marker,
@@ -207,6 +214,7 @@ def restart_glosh_phase(
     timeout_seconds: int,
     request_status: StatusRequest,
     start_phase: PhaseStart,
+    observe_proxy_policy: Callable[[Any, str], dict[str, Any]],
     foreground_current: Callable[[Any], None],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Restart Glosh, prove the existing document opaque, and leave reload to the caller."""
@@ -246,6 +254,7 @@ def restart_glosh_phase(
     current_session = str(active.get("activeMode", {}).get("session", ""))
     if not after_pids or not before_pids.isdisjoint(after_pids) or current_session == previous_session:
         raise HarnessError("Glosh restart did not produce a fresh process and protection session")
+    proxy_policy = observe_proxy_policy(adb, restarted_since)
     foreground_current(adb)
     fail_close = wait_for_existing_document_fail_close(
         adb,
@@ -262,6 +271,7 @@ def restart_glosh_phase(
             "newSessionSha256": sha256_text(current_session),
             "labServiceObservedStopped": True,
             "modeRestored": mode,
+            "chromeProxyPolicyObserved": proxy_policy,
             "preReloadFailClose": fail_close,
             "reloadPerformedByRestartHelper": False,
         },

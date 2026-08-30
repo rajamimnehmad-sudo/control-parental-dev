@@ -22,6 +22,16 @@ CONTROLLED_URL = "https://glosh-photos.test/web19/controlled"
 CHROME_POLICY_URL = "chrome://policy"
 
 
+def controlled_navigation_url(run_nonce: str, sequence: int) -> str:
+    """Return a fresh, non-secret controlled-document identity for one navigation."""
+
+    if not re.fullmatch(r"[0-9a-f]{32}", run_nonce):
+        raise HarnessError("controlled navigation run nonce must be 128-bit lowercase hex")
+    if sequence <= 0:
+        raise HarnessError("controlled navigation sequence must be positive")
+    return f"{CONTROLLED_URL}?h19_nav={run_nonce}-{sequence}"
+
+
 class Adb:
     def __init__(self, binary: str, serial: str) -> None:
         self.prefix = [binary, "-s", serial]
@@ -291,7 +301,13 @@ def set_and_verify_orientation(adb: Adb, orientation: str, timeout_seconds: int 
 def navigate(adb: Adb, state: dict[str, Any]) -> None:
     action = state.get("navigation", "url")
     if action in {"url", "controlled", "chrome-policy"}:
-        target = state["url"] if action == "url" else CONTROLLED_URL if action == "controlled" else CHROME_POLICY_URL
+        target = (
+            state["url"]
+            if action == "url"
+            else state.get("controlledUrl", CONTROLLED_URL)
+            if action == "controlled"
+            else CHROME_POLICY_URL
+        )
         adb.shell(
             "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", target, "-p", CHROME_PACKAGE,
             timeout=45,
@@ -310,7 +326,10 @@ def navigate(adb: Adb, state: dict[str, Any]) -> None:
         adb.shell("monkey", "-p", CHROME_PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
     elif action == "restart-chrome":
         adb.shell("am", "force-stop", CHROME_PACKAGE)
-        adb.shell("monkey", "-p", CHROME_PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
+        adb.shell(
+            "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", CHROME_POLICY_URL, "-p", CHROME_PACKAGE,
+            timeout=45,
+        )
     else:
         raise HarnessError(f"unsupported bounded navigation action: {action}")
 

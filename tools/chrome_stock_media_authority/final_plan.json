@@ -37,7 +37,7 @@
         {"id": "ra-mercadolibre", "url": "https://listado.mercadolibre.com.ar/zapatillas-mujer", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
         {"id": "ra-infobae", "url": "https://www.infobae.com/", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
         {"id": "ra-glosh-process-restart", "navigation": "restart-glosh", "newNavigation": true, "orientation": "portrait", "recordSeconds": 45, "readyTimeoutSeconds": 18, "processRestartTimeoutSeconds": 25},
-        {"id": "ra-chrome-process-restart", "navigation": "restart-chrome", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8},
+        {"id": "ra-chrome-process-restart", "navigation": "restart-chrome", "newNavigation": true, "orientation": "portrait", "recordSeconds": 24, "readyTimeoutSeconds": 8},
         {"id": "ra-chrome-policy", "navigation": "chrome-policy", "newNavigation": true, "readyRequired": false, "readyTimeoutSeconds": 0, "visualReviewRequired": true, "orientation": "portrait", "recordSeconds": 10, "swipes": 3}
       ]
     },
@@ -69,7 +69,7 @@
         {"id": "sel-mimo-landscape", "navigation": "foreground", "newNavigation": false, "orientation": "landscape", "recordSeconds": 12, "readyTimeoutSeconds": 8, "swipes": 1},
         {"id": "sel-mercadolibre", "url": "https://listado.mercadolibre.com.ar/zapatillas-mujer", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
         {"id": "sel-infobae", "url": "https://www.infobae.com/", "newNavigation": true, "orientation": "portrait", "recordSeconds": 14, "readyTimeoutSeconds": 8, "swipes": 3},
-        {"id": "sel-chrome-process-restart", "navigation": "restart-chrome", "newNavigation": true, "orientation": "portrait", "recordSeconds": 12, "readyTimeoutSeconds": 8}
+        {"id": "sel-chrome-process-restart", "navigation": "restart-chrome", "newNavigation": true, "orientation": "portrait", "recordSeconds": 24, "readyTimeoutSeconds": 8}
       ]
     }
   ]

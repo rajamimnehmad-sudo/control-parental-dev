@@ -38,6 +38,7 @@ NAVIGATION_DEFAULTS_TO_NEW_DOCUMENT = {
     "chrome-policy",
 }
 AUTOMATIC_AUTHORITY_EVIDENCE_NAVIGATION = {"controlled", "two-tab-binding"}
+RESTART_CHROME_POLICY_OBSERVE_SECONDS = 12
 
 
 class HarnessError(RuntimeError):
@@ -204,7 +205,10 @@ def validate_plan(raw: Any) -> dict[str, Any]:
             )
             total_fixture_wait = fixture_timeout if controlled else 0
             total_process_restart_wait = process_restart_timeout if navigation == "restart-glosh" else 0
-            if duration < 1 + total_ready_wait + total_fixture_wait + total_process_restart_wait + swipes + len(taps):
+            total_policy_wait = RESTART_CHROME_POLICY_OBSERVE_SECONDS if navigation == "restart-chrome" else 0
+            if duration < (
+                1 + total_ready_wait + total_fixture_wait + total_process_restart_wait + total_policy_wait + swipes + len(taps)
+            ):
                 raise HarnessError("recordSeconds must cover READY plus every bounded gesture")
             if state.get("orientation", "current") not in ALLOWED_ORIENTATIONS:
                 raise HarnessError("invalid orientation")
