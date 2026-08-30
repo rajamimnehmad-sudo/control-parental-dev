@@ -141,7 +141,7 @@ class H19PlanTest(unittest.TestCase):
         plan = json.loads((Path(__file__).with_name("final_plan.json")).read_text())
 
         self.assertEqual(plan, validate_plan(plan))
-        self.assertEqual(387, plan["expectedAppVersionCode"])
+        self.assertEqual(388, plan["expectedAppVersionCode"])
         self.assertEqual("R3.1", plan["expectedGloshiaModelVersion"])
         self.assertEqual("dag-36", plan["expectedGloshiaPolicyVersion"])
         self.assertTrue(all(len(phase["states"]) <= 25 for phase in plan["phases"]))

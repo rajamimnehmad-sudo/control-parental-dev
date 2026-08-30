@@ -69,8 +69,9 @@ internal class ChromeVisualProbeController(
 
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!enabled) return
-        // AccessibilityEvent/source are only valid during this callback. H19 consumes the exact
-        // focused source synchronously before reducing the event to the legacy probe signal.
+        // H19 consumes the exact focused source synchronously before reducing the event. The
+        // authority scanner owns an AccessibilityNodeInfo copy solely for refresh-based
+        // continuity checks and recycles it on invalidation/STOP.
         mediaReadyCoordinator?.onAccessibilityEvent(event)
         val signal =
             ProbeSignal(

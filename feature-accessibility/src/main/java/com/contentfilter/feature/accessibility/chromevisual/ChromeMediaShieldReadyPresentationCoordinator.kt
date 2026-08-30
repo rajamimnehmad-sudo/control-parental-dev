@@ -557,6 +557,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         activeDocument = null
         if (clearFocus) {
             activeClaim?.let(ChromeMediaShieldDocumentAuthorityRegistry::deactivateClaimedForeground)
+            tokenScanner.clearBoundFocusSource()
             focusedDocument = null
         }
         leaseAuthority.revoke()
