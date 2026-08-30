@@ -254,6 +254,47 @@ internal object ChromeMediaShieldWebRootCandidatePolicy {
     private const val ChromePackageName = "com.android.chrome"
 }
 
+internal data class ChromeMediaShieldCurrentWebRootEvidence(
+    val expectedWindowId: Int,
+    val windowRootPackageName: String,
+    val nativeWindowRootUniqueId: String,
+    val candidatePackageName: String,
+    val candidateClassName: String,
+    val candidateWindowId: Int,
+    val candidateUniqueId: String?,
+    val candidateVisibleToUser: Boolean,
+    val candidateAttachedToWindowRoot: Boolean,
+)
+
+/**
+ * Continues authority created by one exact focus event only while the same browser-issued WebView
+ * root is the current visible document root of the exact Chrome window.
+ *
+ * This never searches for a token and cannot create authority. A page cannot nominate the
+ * browser-issued [AccessibilityNodeInfo.getUniqueId] captured from the original event source.
+ */
+internal object ChromeMediaShieldCurrentWebRootPolicy {
+    fun verifies(
+        evidence: ChromeMediaShieldCurrentWebRootEvidence,
+        expectedWebRootUniqueId: String,
+        expectedRootIdentityDigest: String,
+    ): Boolean =
+        expectedWebRootUniqueId.isNotBlank() &&
+            ChromeMediaShieldForegroundContextPolicy.bindingDigest(
+                nativeRootUniqueId = evidence.nativeWindowRootUniqueId,
+                webRootUniqueId = expectedWebRootUniqueId,
+            ) == expectedRootIdentityDigest &&
+            evidence.windowRootPackageName == ChromePackageName &&
+            evidence.candidatePackageName == ChromePackageName &&
+            evidence.candidateClassName == ChromeMediaShieldWebRootContract.ClassName &&
+            evidence.candidateWindowId == evidence.expectedWindowId &&
+            evidence.candidateUniqueId == expectedWebRootUniqueId &&
+            evidence.candidateVisibleToUser &&
+            evidence.candidateAttachedToWindowRoot
+
+    private const val ChromePackageName = "com.android.chrome"
+}
+
 /** Bounded, ownership-safe traversal of Chrome's virtual Accessibility tree. */
 internal object ChromeMediaShieldAccessibilityNodeTraversal {
     /** One-shot fallback awakened by a current browser content-change event; never passive scan. */
@@ -307,6 +348,42 @@ internal object ChromeMediaShieldAccessibilityNodeTraversal {
                 isExactMatch = { node ->
                     node.viewIdResourceName == expectedViewIdResourceName &&
                         uniqueIdOrNull(node) == expectedUniqueId
+                },
+                close = ::recycle,
+            )
+    }
+
+    /** Reacquires only the exact browser-issued WebView root authenticated by the focus event. */
+    @Suppress("DEPRECATION")
+    fun copyExactWebDocumentRootCandidate(
+        windowRoot: AccessibilityNodeInfo,
+        expectedWindowId: Int,
+        expectedUniqueId: String,
+        expectedRootIdentityDigest: String,
+    ): ChromeMediaShieldOwnedNodeSearchResult<AccessibilityNodeInfo> {
+        if (expectedUniqueId.isBlank()) return ChromeMediaShieldOwnedNodeSearchResult.Absent
+        return ChromeMediaShieldBoundedOwnedNodeSearch<AccessibilityNodeInfo>(MaximumCurrentTreeNodes)
+            .findUniqueDescendant(
+                borrowedRoot = windowRoot,
+                childCount = AccessibilityNodeInfo::getChildCount,
+                copyChild = AccessibilityNodeInfo::getChild,
+                isExactMatch = { node ->
+                    ChromeMediaShieldCurrentWebRootPolicy.verifies(
+                        evidence =
+                            ChromeMediaShieldCurrentWebRootEvidence(
+                                expectedWindowId = expectedWindowId,
+                                windowRootPackageName = windowRoot.packageName?.toString().orEmpty(),
+                                nativeWindowRootUniqueId = uniqueIdOrNull(windowRoot).orEmpty(),
+                                candidatePackageName = node.packageName?.toString().orEmpty(),
+                                candidateClassName = node.className?.toString().orEmpty(),
+                                candidateWindowId = node.windowId,
+                                candidateUniqueId = uniqueIdOrNull(node),
+                                candidateVisibleToUser = node.isVisibleToUser,
+                                candidateAttachedToWindowRoot = belongsToWindowRoot(node, windowRoot),
+                            ),
+                        expectedWebRootUniqueId = expectedUniqueId,
+                        expectedRootIdentityDigest = expectedRootIdentityDigest,
+                    )
                 },
                 close = ::recycle,
             )

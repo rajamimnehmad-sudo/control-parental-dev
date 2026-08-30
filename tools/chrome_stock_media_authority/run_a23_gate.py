@@ -70,7 +70,12 @@ from h19_plan import (
     visual_review_required_for,
 )
 from h19_ready import current_ready_result, ready_baseline
-from h19_lifecycle_gates import ready_document_key, restart_glosh_phase, run_two_tab_binding_gate
+from h19_lifecycle_gates import (
+    ready_binding_key,
+    ready_document_key,
+    restart_glosh_phase,
+    run_two_tab_binding_gate,
+)
 from h19_navigation_admission import (
     materialize_controlled_navigation,
     materialize_restart_target,
@@ -305,6 +310,35 @@ def wait_for_exact_anchor_continuity(
         f"rebind={last_status.get('readyExactAnchorRebind')} "
         f"currentReadyBinding={last_status.get('currentReadyBinding')}"
     )
+
+
+def require_current_ready_binding_at_state_close(
+    summary: dict[str, Any],
+    expected_marker: dict[str, Any],
+) -> dict[str, Any]:
+    """Reject a release that was revoked or replaced before the state finished."""
+
+    expected_key = ready_binding_key(expected_marker)
+    current = summary.get("currentReadyBinding")
+    current_key = ready_binding_key(current if isinstance(current, dict) else None)
+    status = summary.get("status", {}).get("fields", {})
+    if (
+        expected_key is None
+        or current_key != expected_key
+        or status.get("active") != "true"
+        or status.get("lifecycle") != "PresentationReady"
+    ):
+        raise HarnessError(
+            "foreground READY binding was revoked or replaced before state close: "
+            f"expected={expected_key} current={current_key} status={status}"
+        )
+    return {
+        "pass": True,
+        "bindingKeyMatched": True,
+        "sourceCurrent": current.get("sourceCurrent") is True,
+        "sourceEvidenceScope": current.get("sourceEvidenceScope"),
+        "rawPresented": current.get("rawPresented"),
+    }
 
 
 def baseline_then_set_orientation(
@@ -662,6 +696,15 @@ def run_state(
         captured = adb.run("exec-out", "screencap", "-p", timeout=30, text=False).stdout
         screenshot.write_bytes(captured)
         _state_log, log_summary = request_status(adb, state_since)
+        if ready_evidence.get("required") is True:
+            closing_ready = ready_evidence.get("postGesture", ready_evidence)
+            closing_marker = closing_ready.get("marker") if isinstance(closing_ready, dict) else None
+            if not isinstance(closing_marker, dict):
+                raise HarnessError("READY-required state lacks an exact closing marker")
+            ready_evidence["currentAtStateClose"] = require_current_ready_binding_at_state_close(
+                log_summary,
+                closing_marker,
+            )
         ui = {
             "source": "trusted_accessibility_service_log",
             "readyMarkers": log_summary.get("readyMarkers", []),

@@ -14,14 +14,15 @@ class ChromeMediaShieldBootstrapContractTest {
         assertFalse(script.contains("setTimeout"))
         assertFalse(script.contains("setInterval"))
         assertFalse(script.contains("requestAnimationFrame"))
-        assertContains(script, "nativeAttachInternals.call(this)")
-        assertContains(script, "nativeCustomDefine.call(NativeCustomElements,'glosh-h19-ready-host',ReadyHostClass)")
-        assertContains(script, "if(creatingReadyHost&&readyInternals===null)")
-        assertContains(script, "nativeSet.call(readyHost,'role','group')")
-        assertContains(script, "nativeSet.call(readyHost,'tabindex','-1')")
-        assertFalse(script.contains("const marker="))
+        assertContains(script, "readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}])")
+        assertContains(script, "readyMarker=create.call(DOC,'button')")
+        assertContains(script, "nativeSet.call(readyMarker,'id',READY_ID)")
+        assertContains(script, "nativeSet.call(readyMarker,'role','button')")
+        assertContains(script, "nativeSet.call(readyMarker,'tabindex','-1')")
+        assertContains(script, "nativeSet.call(readyHost,'id',READY_HOST_ID)")
         assertFalse(script.contains("nativeSet.call(readyHost,'aria-label'"))
         assertFalse(script.contains("invoke(nodeText.set,readyHost"))
+        assertFalse(script.contains("invoke(nodeText.set,readyMarker,[readyValue])"))
         assertContains(script, "nativeStyleSet.call(readyStyle,'width','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'height','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'overflow','hidden','important')")
@@ -29,30 +30,34 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "nativeStyleSet.call(readyStyle,'font-size','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'pointer-events','none','important')")
         assertContains(script, "const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle")
-        assertContains(script, "invoke(internalsAriaLabelProperty.set,readyInternals,[readyValue])")
+        assertContains(script, "nativeSet.call(readyMarker,'aria-label',readyValue)")
+        assertContains(script, "nativeFocus.call(readyMarker,{preventScroll:true})")
         assertContains(script, "xhrOpen.call(xhr,'POST',READY_URL,false)")
         assertContains(script, "xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)")
         assertContains(script, "read(xhrStatusProperty,xhr)!==204")
         assertContains(script, "read(xhrResponseUrlProperty,xhr)!==READY_URL")
         assertTrue(
             script.indexOf("xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)") <
+                script.indexOf("nativeSet.call(readyMarker,'aria-label',readyValue)"),
+        )
+        assertTrue(
+            script.indexOf("nativeSet.call(readyMarker,'aria-label',readyValue)") <
                 script.indexOf("nodeAppend.call(documentElement(),readyHost)"),
         )
         assertTrue(
             script.indexOf("nodeAppend.call(documentElement(),readyHost)") <
-                script.indexOf("invoke(internalsAriaLabelProperty.set,readyInternals,[readyValue])"),
+                script.indexOf("nativeFocus.call(readyMarker,{preventScroll:true})"),
         )
         assertTrue(
-            script.indexOf("invoke(internalsAriaLabelProperty.set,readyInternals,[readyValue])") <
+            script.indexOf("nativeFocus.call(readyMarker,{preventScroll:true})") <
                 script.indexOf("if(!hideCurtain())revokeReady()"),
         )
-        assertFalse(script.contains("nativeFocus"))
         assertContains(script, "const revokeReady=()=>{showCurtain();clearReadyLabel();detachMarker()")
         assertContains(script, "catch(_){revokeReady()}")
         assertContains(script, "nodeAppend.call(documentElement(),readyHost)")
         assertContains(
             script,
-            "visibilityState()!=='visible'){revokeReady();return}nodeAppend.call(documentElement(),readyHost);invoke(internalsAriaLabelProperty.set,readyInternals,[readyValue])",
+            "visibilityState()!=='visible'){revokeReady();return}nativeSet.call(readyMarker,'aria-label',readyValue);nodeAppend.call(documentElement(),readyHost);nativeFocus.call(readyMarker,{preventScroll:true})",
         )
         assertContains(script, "nativeAddEvent.call(SELF,'beforeunload',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(SELF,'pagehide',revokeReady,true)")
@@ -209,13 +214,16 @@ class ChromeMediaShieldBootstrapContractTest {
         assertEquals(1, Regex(Regex.escape(ReadyToken)).findAll(script).count())
         assertEquals(1, Regex(Regex.escape(StyleNonce)).findAll(script).count())
         assertFalse(script.contains("data-glosh-ready-token"))
-        assertContains(script, "internalsAriaLabelProperty")
-        assertFalse(script.contains("aria-label',readyValue"))
+        assertFalse(script.contains("internalsAriaLabelProperty"))
+        assertContains(script, "nativeSet.call(readyMarker,'aria-label',readyValue)")
+        assertContains(script, "nativeRemove.call(readyMarker,'aria-label')")
+        assertFalse(script.contains("READY_ID+'-'") || script.contains("'glosh-h19-ready-'+READY"))
     }
 
     @Test
     fun `ready host and shield style cannot be moved or rewritten through ordinary APIs`() {
-        assertContains(script, "readyHost=create.call(DOC,'glosh-h19-ready-host')")
+        assertContains(script, "readyHost=create.call(DOC,'span')")
+        assertContains(script, "invoke(WeakSetAdd,protectedNodes,[readyMarker])")
         assertContains(script, "rejectProtectedMove")
         assertContains(script, "if(containsProtected(node))deny()")
         assertContains(script, "if(invoke(WeakSetHas,protectedSheets,[this]))deny()")

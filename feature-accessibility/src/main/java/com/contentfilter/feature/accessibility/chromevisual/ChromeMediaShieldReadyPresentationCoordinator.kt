@@ -250,13 +250,13 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             }
             return
         }
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED) return
+        if (event.eventType != AccessibilityEvent.TYPE_VIEW_FOCUSED) return
         val window = windowInspector.findUniqueForegroundCandidate(expected.surface.windowId)
         if (window == null || window.id != expected.surface.windowId) return
         when (val result = tokenScanner.bindReadyEvent(event, window, expected.claim)) {
             is ChromeMediaShieldTokenScanResult.Current -> {
                 focusedDocument = result.document
-                log("ready_ax_bound", expected, result.document)
+                log("ready_focus_bound", expected, result.document)
                 if (
                     releaseGate.onEventBound(expected.claim) ==
                     ChromeMediaShieldReadyReleaseAction.AttemptRelease
@@ -265,7 +265,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 }
             }
             is ChromeMediaShieldTokenScanResult.FailClosed ->
-                log("ready_ax_rejected", expected, null, result.reason)
+                log("ready_focus_rejected", expected, null, result.reason)
         }
     }
 
@@ -723,7 +723,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             }
         val sourceCurrent =
             document != null &&
-                phase in setOf("ready_ax_bound", "ready_foreground_released")
+                phase in setOf("ready_focus_bound", "ready_ax_bound", "ready_foreground_released")
         val bindingName = if (document == null) "none" else "event_source"
         val exactAnchorRebindCount = tokenScanner.exactAnchorRebindCount()
         Log.i(

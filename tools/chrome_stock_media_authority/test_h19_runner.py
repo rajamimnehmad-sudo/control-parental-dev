@@ -31,6 +31,7 @@ from run_a23_gate import (
     enforce_counter_gate,
     observe_status,
     request_status,
+    require_current_ready_binding_at_state_close,
     ready_baseline,
     restart_glosh_phase,
     set_and_verify_orientation,
@@ -853,6 +854,62 @@ class H19RunnerTest(unittest.TestCase):
                 timeout_seconds=1,
                 baseline_rebind_count=0,
                 expected_marker=marker,
+            )
+
+    def test_ready_state_close_requires_the_same_still_current_binding(self):
+        marker = {
+            "package": "com.android.chrome",
+            "binding": "event_source",
+            "axBound": True,
+            "rawPresented": False,
+            "windowId": "4",
+            "surfaceEpoch": "8",
+            "documentSequence": "2",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "aaaaaaaaaaaa",
+            "rootDigestPrefix": "bbbbbbbbbbbb",
+            "webRootDigestPrefix": "cccccccccccc",
+            "sourceDigestPrefix": "dddddddddddd",
+            "sourceCurrent": True,
+            "sourceEvidenceScope": "current_boundary",
+            "rootBinding": "web_root",
+        }
+        result = require_current_ready_binding_at_state_close(
+            {
+                "status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}},
+                "currentReadyBinding": marker,
+            },
+            marker,
+        )
+
+        self.assertTrue(result["pass"])
+        self.assertTrue(result["bindingKeyMatched"])
+        self.assertTrue(result["sourceCurrent"])
+
+    def test_ready_state_close_rejects_revoked_or_replaced_binding(self):
+        marker = {
+            "package": "com.android.chrome",
+            "binding": "event_source",
+            "axBound": True,
+            "rawPresented": False,
+            "windowId": "4",
+            "surfaceEpoch": "8",
+            "documentSequence": "2",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "aaaaaaaaaaaa",
+            "rootDigestPrefix": "bbbbbbbbbbbb",
+            "webRootDigestPrefix": "cccccccccccc",
+            "sourceDigestPrefix": "dddddddddddd",
+            "rootBinding": "web_root",
+        }
+        status = {"status": {"fields": {"active": "true", "lifecycle": "PresentationReady"}}}
+
+        with self.assertRaisesRegex(HarnessError, "revoked or replaced"):
+            require_current_ready_binding_at_state_close(status, marker)
+        with self.assertRaisesRegex(HarnessError, "revoked or replaced"):
+            require_current_ready_binding_at_state_close(
+                {**status, "currentReadyBinding": {**marker, "documentSequence": "3"}},
+                marker,
             )
 
     def test_controlled_gate_requires_report_counts_to_advance(self):
