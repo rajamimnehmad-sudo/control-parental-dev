@@ -207,29 +207,15 @@ class ChromeMediaShieldReadyEventReleaseGateTest {
     }
 
     @Test
-    fun `web root boundary cannot create a release and can only rearm an authorized one`() {
+    fun `only an exact focus source is a release boundary`() {
         assertTrue(
             ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
                 ChromeMediaShieldBoundContextBinding.ExactFocusSource,
-                retainedReleaseAuthorized = false,
-            ),
-        )
-        assertFalse(
-            ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
-                ChromeMediaShieldBoundContextBinding.ExactWebRoot,
-                retainedReleaseAuthorized = false,
-            ),
-        )
-        assertTrue(
-            ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
-                ChromeMediaShieldBoundContextBinding.ExactWebRoot,
-                retainedReleaseAuthorized = true,
             ),
         )
         assertFalse(
             ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
                 ChromeMediaShieldBoundContextBinding.Invalid,
-                retainedReleaseAuthorized = true,
             ),
         )
     }

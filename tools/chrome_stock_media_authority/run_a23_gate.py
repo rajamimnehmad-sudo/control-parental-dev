@@ -60,6 +60,7 @@ from h19_plan import (
     EXPECTED_GLOSHIA_MODEL_VERSION,
     EXPECTED_GLOSHIA_POLICY_VERSION,
     HarnessError,
+    exact_anchor_rebind_required_for,
     navigation_requires_new_release,
     new_navigation_for,
     post_gesture_ready_required_for,
@@ -67,7 +68,6 @@ from h19_plan import (
     safe_id,
     validate_plan,
     visual_review_required_for,
-    web_root_continuity_required_for,
 )
 from h19_ready import current_ready_result, ready_baseline
 from h19_lifecycle_gates import ready_document_key, restart_glosh_phase, run_two_tab_binding_gate
@@ -93,7 +93,7 @@ HARNESS_CAPABILITIES = {
     "stockChromeTabSwitch": {
         "status": "SUPPORTED",
         "mechanism": "android.provider.Browser.EXTRA_CREATE_NEW_TAB_then_android_back",
-        "authority": "event_source_one_shot_plus_web_root_continuity",
+        "authority": "exact_event_source_anchor_current",
         "coordinateUiAutomation": False,
         "countsAsPass": True,
     },
@@ -228,38 +228,45 @@ def wait_for_ready(
     )
 
 
-def wait_for_web_root_continuity(
+def wait_for_exact_anchor_rebind(
     adb: Adb,
     since: str,
     timeout_seconds: int,
-    minimum_verified_count: int,
+    minimum_rebind_count: int,
     expected_marker: dict[str, Any],
 ) -> dict[str, Any]:
+    expected_document_key = ready_document_key(expected_marker)
+    if expected_document_key is None:
+        raise HarnessError("exact-anchor rebind gate requires a structurally valid released marker")
     deadline = time.monotonic() + timeout_seconds
     last_status: dict[str, Any] = {}
     while time.monotonic() < deadline:
         _, last_status = request_status(adb, since)
-        continuity = last_status.get("readyWebRootContinuity", {})
+        rebind = last_status.get("readyExactAnchorRebind", {})
         current = last_status.get("currentReadyBinding")
         if (
-            int(continuity.get("verified", 0)) >= minimum_verified_count
-            and int(continuity.get("violations", 0)) == 0
-            and continuity.get("currentDocumentVerified") is True
+            int(rebind.get("maxCount", 0)) >= minimum_rebind_count
             and isinstance(current, dict)
-            and ready_document_key(current) == ready_document_key(expected_marker)
+            and ready_document_key(current) == expected_document_key
+            and current.get("binding") == "event_source"
+            and current.get("axBound") is True
+            and current.get("sourceCurrent") is True
+            and current.get("sourceEvidenceScope") == "current_boundary"
+            and bool(current.get("sourceDigestPrefix"))
             and current.get("rawPresented") is False
         ):
             return {
                 "pass": True,
-                "verifiedCount": int(continuity["verified"]),
+                "rebindCount": int(rebind["maxCount"]),
                 "documentKeyMatched": True,
-                "sourceCurrent": False,
+                "sourceCurrent": True,
+                "sourceEvidenceScope": "current_boundary",
                 "rawPresented": False,
             }
         time.sleep(0.25)
     raise HarnessError(
-        "exact web-root continuity after source pruning was not observed: "
-        f"continuity={last_status.get('readyWebRootContinuity')} "
+        "exact event-source anchor rebind was not observed: "
+        f"rebind={last_status.get('readyExactAnchorRebind')} "
         f"currentReadyBinding={last_status.get('currentReadyBinding')}"
     )
 
@@ -407,7 +414,7 @@ def run_state(
             state.get("orientation", "current"),
         )
     else:
-        ready_state_baseline = {"releaseCount": 0, "continuityCount": 0, "marker": None}
+        ready_state_baseline = {"releaseCount": 0, "anchorRebindCount": 0, "marker": None}
         orientation_evidence = set_and_verify_orientation(adb, state.get("orientation", "current"))
         orientation_changed = False
     new_navigation = new_navigation_for(state)
@@ -542,15 +549,15 @@ def run_state(
             ready_evidence = {"required": False, "pass": True, "reason": "bounded_non_document_probe"}
         if screenrecord.poll() is not None:
             raise HarnessError(f"screenrecord ended before READY evidence completed for {state_id}")
-        if web_root_continuity_required_for(state):
+        if exact_anchor_rebind_required_for(state):
             marker = ready_evidence.get("marker")
             if not isinstance(marker, dict):
-                raise HarnessError("web-root continuity gate requires an exact released marker")
-            ready_evidence["webRootContinuity"] = wait_for_web_root_continuity(
+                raise HarnessError("exact-anchor rebind gate requires an exact released marker")
+            ready_evidence["exactAnchorRebind"] = wait_for_exact_anchor_rebind(
                 adb,
                 phase_since,
                 int(state.get("readyTimeoutSeconds", 8)),
-                minimum_verified_count=int(ready_state_baseline["continuityCount"]) + 1,
+                minimum_rebind_count=int(ready_state_baseline["anchorRebindCount"]) + 1,
                 expected_marker=marker,
             )
         for _ in range(int(state.get("swipes", 0))):

@@ -3,13 +3,13 @@ import unittest
 from pathlib import Path
 
 from h19_plan import (
+    exact_anchor_rebind_required_for,
     HarnessError,
     navigation_requires_new_release,
     new_navigation_for,
     post_gesture_ready_required_for,
     ready_required_for,
     validate_plan,
-    web_root_continuity_required_for,
 )
 
 
@@ -138,18 +138,18 @@ class H19PlanTest(unittest.TestCase):
         with self.assertRaises(HarnessError):
             validate_plan(value)
 
-    def test_web_root_continuity_gate_is_explicit_bounded_and_ready_authorized(self):
+    def test_exact_anchor_rebind_gate_is_explicit_bounded_and_ready_authorized(self):
         value = plan_with_taps([])
         state = value["phases"][0]["states"][0]
         state.update(
             {
-                "webRootContinuityAfterPruneRequired": True,
+                "exactAnchorRebindRequired": True,
                 "recordSeconds": 18,
                 "readyTimeoutSeconds": 8,
             }
         )
 
-        self.assertTrue(web_root_continuity_required_for(state))
+        self.assertTrue(exact_anchor_rebind_required_for(state))
         self.assertEqual(value, validate_plan(value))
 
         state["recordSeconds"] = 16
@@ -157,7 +157,7 @@ class H19PlanTest(unittest.TestCase):
             validate_plan(value)
 
         state["recordSeconds"] = 18
-        state["webRootContinuityAfterPruneRequired"] = "true"
+        state["exactAnchorRebindRequired"] = "true"
         with self.assertRaises(HarnessError):
             validate_plan(value)
 
@@ -165,7 +165,7 @@ class H19PlanTest(unittest.TestCase):
         plan = json.loads((Path(__file__).with_name("final_plan.json")).read_text())
 
         self.assertEqual(plan, validate_plan(plan))
-        self.assertEqual(389, plan["expectedAppVersionCode"])
+        self.assertEqual(390, plan["expectedAppVersionCode"])
         self.assertEqual("R3.1", plan["expectedGloshiaModelVersion"])
         self.assertEqual("dag-36", plan["expectedGloshiaPolicyVersion"])
         self.assertTrue(all(len(phase["states"]) <= 25 for phase in plan["phases"]))

@@ -50,6 +50,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         assertRejected("ready_focus_root_mismatch", evidence(sourceRootUniqueId = ""))
         assertRejected("ready_focus_root_mismatch", evidence(sourceRootUniqueId = ForegroundRootUniqueId))
         assertRejected("ready_focus_root_mismatch", evidence(sourceRootClassName = "android.widget.FrameLayout"))
+        assertRejected("ready_focus_root_mismatch", evidence(sourceRootVisibleToUser = false))
         assertRejected("ready_focus_root_mismatch", evidence(sourceAttachedToForegroundRoot = false))
     }
 
@@ -112,6 +113,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         assertBoundAnchorRejected(boundEvidence(exactAnchorCurrent = false))
         assertBoundAnchorRejected(boundEvidence(sourceUniqueId = "replacement-node"))
         assertBoundAnchorRejected(boundEvidence(sourceViewIdResourceName = "cloned-view-id"))
+        assertBoundAnchorRejected(boundEvidence(sourceRootVisibleToUser = false))
         assertTrue(
             ChromeMediaShieldBoundAnchorPolicy.verifies(
                 boundEvidence(sourceVisibleToUser = false),
@@ -119,6 +121,79 @@ class ChromeMediaShieldFocusEventPolicyTest {
                 Document,
             ),
         )
+    }
+
+    @Test
+    fun `anchor traversal can refresh only the exact claim first bound by the focus event`() {
+        assertTrue(
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = Claim,
+                expectedClaim = Claim,
+                document = Document,
+                currentWindowId = WindowId,
+                hasBoundSource = true,
+                hasBoundWebRoot = true,
+            ),
+        )
+        listOf(
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = null,
+                expectedClaim = Claim,
+                document = Document,
+                currentWindowId = WindowId,
+                hasBoundSource = true,
+                hasBoundWebRoot = true,
+            ),
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = Claim.copy(lifecycleSequence = Claim.lifecycleSequence + 1L),
+                expectedClaim = Claim,
+                document = Document,
+                currentWindowId = WindowId,
+                hasBoundSource = true,
+                hasBoundWebRoot = true,
+            ),
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = Claim,
+                expectedClaim = Claim,
+                document = Document.copy(lifecycleSequence = Document.lifecycleSequence + 1L),
+                currentWindowId = WindowId,
+                hasBoundSource = true,
+                hasBoundWebRoot = true,
+            ),
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = Claim,
+                expectedClaim = Claim,
+                document = Document,
+                currentWindowId = WindowId + 1,
+                hasBoundSource = true,
+                hasBoundWebRoot = true,
+            ),
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = Claim,
+                expectedClaim = Claim,
+                document = Document,
+                currentWindowId = WindowId,
+                hasBoundSource = false,
+                hasBoundWebRoot = true,
+            ),
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = Claim,
+                expectedClaim = Claim,
+                document = Document,
+                currentWindowId = WindowId,
+                hasBoundSource = true,
+                hasBoundWebRoot = false,
+            ),
+            ChromeMediaShieldBoundAnchorRebindPolicy.permits(
+                eventBoundClaim = Claim,
+                expectedClaim = Claim,
+                document = Document,
+                currentWindowId = WindowId,
+                hasBoundSource = true,
+                hasBoundWebRoot = true,
+                rebindAlreadyAttempted = true,
+            ),
+        ).forEach { permitted -> assertTrue(!permitted) }
     }
 
     @Test
@@ -211,30 +286,6 @@ class ChromeMediaShieldFocusEventPolicyTest {
     }
 
     @Test
-    fun `browser issued web root maintains only an already event-bound current document`() {
-        assertTrue(
-            ChromeMediaShieldWebRootContinuityPolicy.verifies(
-                webRootEvidence(),
-                Document,
-            ),
-        )
-        assertTrue(
-            ChromeMediaShieldWebRootContinuityPolicy.verifies(
-                webRootEvidence(nativeRootUniqueId = ""),
-                WebRootDocument,
-            ),
-        )
-        assertWebRootRejected(webRootEvidence(webRootUniqueId = "replacement-web-root"))
-        assertWebRootRejected(webRootEvidence(webRootWindowId = WindowId + 1))
-        assertWebRootRejected(webRootEvidence(webRootPackageName = "example.hostile"))
-        assertWebRootRejected(webRootEvidence(webRootClassName = "android.widget.FrameLayout"))
-        assertWebRootRejected(webRootEvidence(webRootUniqueId = ForegroundRootUniqueId))
-        assertWebRootRejected(webRootEvidence(webRootAttachedToForegroundRoot = false))
-        assertWebRootRejected(webRootEvidence(webRootVisibleToUser = false))
-        assertWebRootRejected(webRootEvidence(nativeRootUniqueId = "replacement-native-root"))
-    }
-
-    @Test
     fun `web root traversal candidate accepts missing native root identity but remains window exact`() {
         assertTrue(
             ChromeMediaShieldWebRootCandidatePolicy.verifies(
@@ -259,26 +310,15 @@ class ChromeMediaShieldFocusEventPolicyTest {
     }
 
     @Test
-    fun `web root continuity can maintain but never create a release boundary`() {
+    fun `only the exact focus source can create or maintain a release boundary`() {
         assertTrue(
             ChromeMediaShieldBoundContextPolicy.select(
                 exactFocusSourceCurrent = false,
-                exactWebRootCurrent = true,
-                requireExactFocusSource = false,
-            ) == ChromeMediaShieldBoundContextBinding.ExactWebRoot,
-        )
-        assertTrue(
-            ChromeMediaShieldBoundContextPolicy.select(
-                exactFocusSourceCurrent = false,
-                exactWebRootCurrent = true,
-                requireExactFocusSource = true,
             ) == ChromeMediaShieldBoundContextBinding.Invalid,
         )
         assertTrue(
             ChromeMediaShieldBoundContextPolicy.select(
                 exactFocusSourceCurrent = true,
-                exactWebRootCurrent = false,
-                requireExactFocusSource = true,
             ) == ChromeMediaShieldBoundContextBinding.ExactFocusSource,
         )
     }
@@ -301,7 +341,8 @@ class ChromeMediaShieldFocusEventPolicyTest {
         sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
         sourceUniqueId: String = SourceUniqueId,
         sourceRootUniqueId: String = WebRootUniqueId,
-        sourceRootClassName: String = ChromeMediaShieldWebRootContinuityPolicy.WebRootClassName,
+        sourceRootClassName: String = ChromeMediaShieldWebRootContract.ClassName,
+        sourceRootVisibleToUser: Boolean = true,
         foregroundRootPackageName: String = ChromePackageName,
         foregroundRootUniqueId: String = ForegroundRootUniqueId,
         sourceAttachedToForegroundRoot: Boolean = true,
@@ -318,6 +359,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         sourceUniqueId = sourceUniqueId,
         sourceRootUniqueId = sourceRootUniqueId,
         sourceRootClassName = sourceRootClassName,
+        sourceRootVisibleToUser = sourceRootVisibleToUser,
         foregroundRootPackageName = foregroundRootPackageName,
         foregroundRootUniqueId = foregroundRootUniqueId,
         sourceAttachedToForegroundRoot = sourceAttachedToForegroundRoot,
@@ -332,10 +374,6 @@ class ChromeMediaShieldFocusEventPolicyTest {
 
     private fun assertForegroundContextRejected(evidence: ChromeMediaShieldForegroundContextEvidence) {
         assertTrue(!ChromeMediaShieldForegroundContextPolicy.verifies(evidence, Document))
-    }
-
-    private fun assertWebRootRejected(evidence: ChromeMediaShieldWebRootEvidence) {
-        assertTrue(!ChromeMediaShieldWebRootContinuityPolicy.verifies(evidence, Document))
     }
 
     private fun foregroundContextEvidence(
@@ -361,6 +399,7 @@ class ChromeMediaShieldFocusEventPolicyTest {
         sourceViewIdResourceName: String = ChromeMediaShieldFocusEventPolicy.ReadyViewIdPrefix + Token,
         sourceUniqueId: String = SourceUniqueId,
         sourceRootUniqueId: String = WebRootUniqueId,
+        sourceRootVisibleToUser: Boolean = true,
         sourceAttachedToForegroundRoot: Boolean = true,
         sourceVisibleToUser: Boolean = true,
         markers: List<ChromeMediaShieldReadyMarker> = listOf(Marker),
@@ -375,38 +414,17 @@ class ChromeMediaShieldFocusEventPolicyTest {
         sourceViewIdResourceName = sourceViewIdResourceName,
         sourceUniqueId = sourceUniqueId,
         sourceRootUniqueId = sourceRootUniqueId,
+        sourceRootVisibleToUser = sourceRootVisibleToUser,
         sourceAttachedToForegroundRoot = sourceAttachedToForegroundRoot,
         sourceVisibleToUser = sourceVisibleToUser,
         markers = markers,
-    )
-
-    private fun webRootEvidence(
-        windowId: Int = WindowId,
-        rootPackageName: String = ChromePackageName,
-        nativeRootUniqueId: String = ForegroundRootUniqueId,
-        webRootPackageName: String = ChromePackageName,
-        webRootClassName: String = ChromeMediaShieldWebRootContinuityPolicy.WebRootClassName,
-        webRootWindowId: Int = WindowId,
-        webRootUniqueId: String = WebRootUniqueId,
-        webRootAttachedToForegroundRoot: Boolean = true,
-        webRootVisibleToUser: Boolean = true,
-    ) = ChromeMediaShieldWebRootEvidence(
-        windowId = windowId,
-        rootPackageName = rootPackageName,
-        nativeRootUniqueId = nativeRootUniqueId,
-        webRootPackageName = webRootPackageName,
-        webRootClassName = webRootClassName,
-        webRootWindowId = webRootWindowId,
-        webRootUniqueId = webRootUniqueId,
-        webRootAttachedToForegroundRoot = webRootAttachedToForegroundRoot,
-        webRootVisibleToUser = webRootVisibleToUser,
     )
 
     private fun webRootCandidateEvidence(
         expectedWindowId: Int = WindowId,
         nativeRootUniqueId: String? = ForegroundRootUniqueId,
         candidatePackageName: String = ChromePackageName,
-        candidateClassName: String = ChromeMediaShieldWebRootContinuityPolicy.WebRootClassName,
+        candidateClassName: String = ChromeMediaShieldWebRootContract.ClassName,
         candidateWindowId: Int = WindowId,
         candidateUniqueId: String? = WebRootUniqueId,
     ) = ChromeMediaShieldWebRootCandidateEvidence(

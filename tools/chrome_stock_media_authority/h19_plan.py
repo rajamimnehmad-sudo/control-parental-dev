@@ -92,10 +92,10 @@ def post_gesture_ready_required_for(state: dict[str, Any]) -> bool:
     return False
 
 
-def web_root_continuity_required_for(state: dict[str, Any]) -> bool:
-    explicit = state.get("webRootContinuityAfterPruneRequired", False)
+def exact_anchor_rebind_required_for(state: dict[str, Any]) -> bool:
+    explicit = state.get("exactAnchorRebindRequired", False)
     if not isinstance(explicit, bool):
-        raise HarnessError("webRootContinuityAfterPruneRequired must be boolean")
+        raise HarnessError("exactAnchorRebindRequired must be boolean")
     return explicit
 
 
@@ -193,11 +193,11 @@ def validate_plan(raw: Any) -> dict[str, Any]:
             post_gesture_ready = post_gesture_ready_required_for(state)
             if post_gesture_ready and (not ready_required or not taps):
                 raise HarnessError("post-gesture READY requires a READY-bound state with at least one tap")
-            continuity_required = web_root_continuity_required_for(state)
-            if continuity_required and not ready_required:
-                raise HarnessError("web-root continuity requires foreground READY authority")
+            exact_rebind_required = exact_anchor_rebind_required_for(state)
+            if exact_rebind_required and not ready_required:
+                raise HarnessError("exact-anchor rebind requires foreground READY authority")
             ready_wait_count = 3 if navigation == "two-tab-binding" else 2 if post_gesture_ready else 1
-            if continuity_required:
+            if exact_rebind_required:
                 ready_wait_count += 1
             total_ready_wait = ready_timeout * ready_wait_count
             controlled = navigation == "controlled" or (

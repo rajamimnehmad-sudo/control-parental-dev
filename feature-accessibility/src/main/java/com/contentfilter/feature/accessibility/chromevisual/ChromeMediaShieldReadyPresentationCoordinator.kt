@@ -72,6 +72,11 @@ internal object ChromeMediaShieldReadyPresentationPolicy {
         released: Boolean,
         presentationStillVerified: Boolean,
     ): Boolean = released && !presentationStillVerified
+
+    fun isCurrentPostCommitWindow(
+        expectedWindowId: Int,
+        currentWindowId: Int?,
+    ): Boolean = currentWindowId == expectedWindowId
 }
 
 /**
@@ -105,8 +110,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
     private var activeLease: ChromePhotosDataPlaneLease? = null
     private var activeDocument: ChromeMediaShieldForegroundDocument? = null
     private var focusedDocument: ChromeMediaShieldForegroundDocument? = null
-    private var continuityRearmClaim: ChromeMediaShieldReadyClaim? = null
-    private var webRootContinuityLogged = false
+    private var lastLoggedExactAnchorRebindCount = 0L
     private var closed = false
 
     fun hasCurrentClaim(): Boolean = activeClaim != null && !closed
@@ -121,17 +125,15 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             rejectAndForget("ready_document_invalidated")
             return
         }
-        continuityRearmClaim =
-            claim.takeIf {
-                ChromeMediaShieldReadyContinuityReleasePolicy.canRetainReleasedDocument(
-                    retainCurrentDocument = true,
-                    releasedClaimCurrent = releasedTarget == target && releasedTarget?.claim == claim,
-                    activeLeasePresent = activeLease != null,
-                    activeDocumentPresent = activeDocument != null,
-                )
-            }
-        releaseGate.onSurfaceInvalidated(retainFocus = true)
-        val retainedDocument = (activeDocument ?: focusedDocument).takeIf { retainCurrentDocument }
+        val retainReleasedDocument =
+            ChromeMediaShieldReadyContinuityReleasePolicy.canRetainReleasedDocument(
+                retainCurrentDocument = retainCurrentDocument,
+                releasedClaimCurrent = releasedTarget == target && releasedTarget?.claim == claim,
+                activeLeasePresent = activeLease != null,
+                activeDocumentPresent = activeDocument != null,
+            )
+        releaseGate.onSurfaceInvalidated(retainFocus = retainReleasedDocument)
+        val retainedDocument = (activeDocument ?: focusedDocument).takeIf { retainReleasedDocument }
         revokeLease("surface_invalidated")
         focusedDocument = retainedDocument
         target = ChromeMediaShieldReadyPresentationTarget(claim, snapshot)
@@ -224,6 +226,8 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             ) {
                 releaseGate.onSurfaceInvalidated(retainFocus = false)
                 revokeLease("ready_accessibility_observation_invalid", clearFocus = true)
+            } else {
+                logExactAnchorRebindIfChanged(expected, document)
             }
             return
         }
@@ -283,19 +287,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val lease = activeLease ?: return false
         val document = activeDocument ?: return false
         val foregroundBinding = foregroundDocumentBinding(expected.claim, windowId, document)
-        if (foregroundBinding == ChromeMediaShieldBoundContextBinding.Invalid) return false
-        if (
-            foregroundBinding == ChromeMediaShieldBoundContextBinding.ExactWebRoot &&
-            !webRootContinuityLogged
-        ) {
-            webRootContinuityLogged = true
-            log(
-                "ready_web_root_continuity",
-                expected,
-                document,
-                binding = ChromeMediaShieldBoundContextBinding.ExactWebRoot,
-            )
-        }
+        if (foregroundBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource) return false
         val attestation = attestationReader.read()
         val context = snapshot.toLeaseContext(viewport, document)
         return surface.stats().transparent &&
@@ -381,8 +373,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         }
         pendingCompletion?.reject()
         revokeLease("ready_claim_superseded", clearFocus = true)
-        continuityRearmClaim = null
-        webRootContinuityLogged = false
         onLegacyWorkCancelled()
         releaseGate.onClaim(claim)
         activeClaim = claim
@@ -433,19 +423,13 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             )
         }
         val firstDocument = focusedDocument ?: return false
-        val retainedReleaseAuthorized = continuityRearmClaim == expected.claim
         val firstBinding =
             releaseBoundaryBinding(
                 expected.claim,
                 expected.surface.windowId,
                 firstDocument,
             )
-        if (
-            !ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
-                firstBinding,
-                retainedReleaseAuthorized,
-            )
-        ) {
+        if (firstBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource) {
             return false
         }
         val firstAttestation = attestationReader.read()
@@ -473,7 +457,11 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val boundaryWindow = windowInspector.findUniqueForeground()
         val boundaryBinding =
             if (boundaryWindow != null && boundaryDocument != null) {
-                tokenScanner.boundContextBinding(boundaryWindow, expected.claim, boundaryDocument)
+                tokenScanner.boundContextBinding(
+                    boundaryWindow,
+                    expected.claim,
+                    boundaryDocument,
+                )
             } else {
                 ChromeMediaShieldBoundContextBinding.Invalid
             }
@@ -482,10 +470,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 boundaryDocument == null -> "ready_boundary_document_missing"
                 boundaryWindow == null -> "ready_boundary_window_missing"
                 boundaryWindow.id != expected.surface.windowId -> "ready_boundary_window_mismatch"
-                !ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
-                    boundaryBinding,
-                    retainedReleaseAuthorized,
-                ) ->
+                boundaryBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource ->
                     "ready_boundary_context_mismatch"
                 else -> null
             }
@@ -496,9 +481,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         }
         val boundaryAttestation = attestationReader.read()
         val boundaryContext = boundaryDocument?.let { boundarySnapshot.toLeaseContext(viewport, it) }
-        var releaseUsedWebRoot =
-            firstBinding == ChromeMediaShieldBoundContextBinding.ExactWebRoot ||
-                boundaryBinding == ChromeMediaShieldBoundContextBinding.ExactWebRoot
         if (
             boundaryDocument == null ||
             boundaryContext == null ||
@@ -519,18 +501,14 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             !releaseGate.commitRelease(expected.claim) {
                 val commitWindow = windowInspector.findUniqueForeground() ?: return@commitRelease false
                 val commitBinding =
-                    tokenScanner.boundContextBinding(commitWindow, expected.claim, boundaryDocument)
-                if (
-                    !ChromeMediaShieldReadyContinuityReleasePolicy.acceptsBoundary(
-                        commitBinding,
-                        retainedReleaseAuthorized,
+                    tokenScanner.boundContextBinding(
+                        commitWindow,
+                        expected.claim,
+                        boundaryDocument,
                     )
-                ) {
+                if (commitBinding != ChromeMediaShieldBoundContextBinding.ExactFocusSource) {
                     return@commitRelease false
                 }
-                releaseUsedWebRoot =
-                    releaseUsedWebRoot ||
-                    commitBinding == ChromeMediaShieldBoundContextBinding.ExactWebRoot
                 ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(
                     claim = expected.claim,
                     accessibilityContext = boundaryDocument.accessibilityContext,
@@ -543,27 +521,38 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             surface.revokeTransparency()
             return false
         }
+        val postCommitWindow = windowInspector.findUniqueForeground()
+        val postCommitFailure =
+            when {
+                postCommitWindow == null -> "ready_post_commit_window_missing"
+                !ChromeMediaShieldReadyPresentationPolicy.isCurrentPostCommitWindow(
+                    expectedWindowId = expected.surface.windowId,
+                    currentWindowId = postCommitWindow.id,
+                ) ->
+                    "ready_post_commit_window_mismatch"
+                else ->
+                    tokenScanner.boundAnchorFailureReason(
+                        postCommitWindow,
+                        expected.claim,
+                        boundaryDocument,
+                    )
+            }
+        if (postCommitFailure != null) {
+            log("ready_release_rejected", expected, boundaryDocument, postCommitFailure)
+            releaseGate.onSurfaceInvalidated(retainFocus = false)
+            revokeLease("ready_post_commit_anchor_invalid", clearFocus = true)
+            return false
+        }
         activeLease = lease
         activeDocument = boundaryDocument
         releasedTarget = expected
-        continuityRearmClaim = null
         scheduleLeaseWatchdog()
         log(
             "ready_foreground_released",
             expected,
             boundaryDocument,
-            binding =
-                if (releaseUsedWebRoot) {
-                    ChromeMediaShieldBoundContextBinding.ExactWebRoot
-                } else {
-                    ChromeMediaShieldBoundContextBinding.ExactFocusSource
-                },
+            binding = ChromeMediaShieldBoundContextBinding.ExactFocusSource,
         )
-        tokenScanner
-            .boundAnchorFailureReason(checkNotNull(boundaryWindow), expected.claim, boundaryDocument)
-            ?.let { diagnosticReason ->
-                log("ready_anchor_diagnostic", expected, boundaryDocument, diagnosticReason)
-            }
         return true
     }
 
@@ -572,8 +561,8 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         expectedWindowId: Int,
         document: ChromeMediaShieldForegroundDocument,
     ): Boolean =
-        foregroundDocumentBinding(claim, expectedWindowId, document) !=
-            ChromeMediaShieldBoundContextBinding.Invalid
+        foregroundDocumentBinding(claim, expectedWindowId, document) ==
+            ChromeMediaShieldBoundContextBinding.ExactFocusSource
 
     private fun foregroundDocumentBinding(
         claim: ChromeMediaShieldReadyClaim,
@@ -611,6 +600,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             revokeLease("ready_lease_stale_or_unhealthy", clearFocus = true)
             return
         }
+        logExactAnchorRebindIfChanged(expected, activeDocument)
         val lease = activeLease ?: return
         if (lease.validUntilElapsed - SystemClock.elapsedRealtime() <= LeaseRenewalLeadMillis) {
             val document = activeDocument ?: return revokeLease("ready_document_absent")
@@ -634,6 +624,21 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         mainHandler.postDelayed(leaseWatchdog, LeaseWatchdogMillis)
     }
 
+    /** Emits a DEV observation only after the exact current anchor passed the release boundary. */
+    private fun logExactAnchorRebindIfChanged(
+        expected: ChromeMediaShieldReadyPresentationTarget,
+        document: ChromeMediaShieldForegroundDocument?,
+    ) {
+        val count = tokenScanner.exactAnchorRebindCount()
+        if (count <= lastLoggedExactAnchorRebindCount || document == null) return
+        log(
+            phase = "ready_exact_anchor_rebound",
+            expected = expected,
+            document = document,
+            binding = ChromeMediaShieldBoundContextBinding.ExactFocusSource,
+        )
+    }
+
     private fun revokeLease(
         reason: String,
         clearFocus: Boolean = false,
@@ -646,8 +651,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             activeClaim?.let(ChromeMediaShieldDocumentAuthorityRegistry::deactivateClaimedForeground)
             tokenScanner.clearBoundFocusSource()
             focusedDocument = null
-            continuityRearmClaim = null
-            webRootContinuityLogged = false
         }
         leaseAuthority.revoke()
         surface.revokeTransparency()
@@ -663,8 +666,6 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         releasedTarget = null
         activeClaim = null
         focusedDocument = null
-        continuityRearmClaim = null
-        webRootContinuityLogged = false
         log("ready_fail_closed", null, null, reason)
     }
 
@@ -696,14 +697,14 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val rootBinding =
             when {
                 document == null -> "none"
-                binding == ChromeMediaShieldBoundContextBinding.ExactWebRoot -> "web_root"
                 document.accessibilityContext.rootIdentityDigest == webRootDigest -> "web_root"
                 else -> "native_root"
             }
         val sourceCurrent =
             document != null &&
-                binding != ChromeMediaShieldBoundContextBinding.ExactWebRoot &&
+                binding == ChromeMediaShieldBoundContextBinding.ExactFocusSource &&
                 phase in setOf("ready_focus_bound", "ready_foreground_released")
+        val exactAnchorRebindCount = tokenScanner.exactAnchorRebindCount()
         Log.i(
             LogTag,
             "phase=$phase windowId=${expected?.surface?.windowId ?: -1} " +
@@ -712,7 +713,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 "lifecycle=${claim?.lifecycleSequence ?: 0L} " +
                 "token=${claim?.identity?.tokenDigest?.take(TokenDigestLogLength).orEmpty()} " +
                 "axBound=${document != null} binding=${if (document == null) "none" else "event_source"} " +
-                "continuity=${if (binding == ChromeMediaShieldBoundContextBinding.ExactWebRoot || phase == "ready_web_root_continuity") "web_root" else "none"} " +
+                "continuity=none exactAnchorRebinds=$exactAnchorRebindCount " +
                 "rootBinding=$rootBinding webRoot=${webRootDigest.take(TokenDigestLogLength)} " +
                 "root=${document?.accessibilityContext?.rootIdentityDigest?.take(TokenDigestLogLength).orEmpty()} " +
                 "sourceCurrent=$sourceCurrent " +
@@ -720,6 +721,8 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 "source=${if (sourceCurrent) document.accessibilityContext.markerIdentityDigest.take(TokenDigestLogLength) else ""} " +
                 "reason=$reason rawPresented=false",
         )
+        lastLoggedExactAnchorRebindCount =
+            maxOf(lastLoggedExactAnchorRebindCount, exactAnchorRebindCount)
     }
 
     private fun checkMainThread() {

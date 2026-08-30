@@ -246,6 +246,28 @@ class ChromeMediaShieldReadyPresentationPolicyTest {
         )
     }
 
+    @Test
+    fun `post commit release requires the same unique foreground window`() {
+        assertTrue(
+            ChromeMediaShieldReadyPresentationPolicy.isCurrentPostCommitWindow(
+                expectedWindowId = WindowId,
+                currentWindowId = WindowId,
+            ),
+        )
+        assertFalse(
+            ChromeMediaShieldReadyPresentationPolicy.isCurrentPostCommitWindow(
+                expectedWindowId = WindowId,
+                currentWindowId = WindowId + 1,
+            ),
+        )
+        assertFalse(
+            ChromeMediaShieldReadyPresentationPolicy.isCurrentPostCommitWindow(
+                expectedWindowId = WindowId,
+                currentWindowId = null,
+            ),
+        )
+    }
+
     private fun claim() =
         ChromeMediaShieldReadyClaim(
             identity =

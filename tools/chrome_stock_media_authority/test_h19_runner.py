@@ -32,9 +32,9 @@ from run_a23_gate import (
     restart_glosh_phase,
     set_and_verify_orientation,
     start_phase,
+    wait_for_exact_anchor_rebind,
     wait_for_fixture_report,
     wait_for_ready,
-    wait_for_web_root_continuity,
     write_logcat_summary,
 )
 
@@ -255,7 +255,7 @@ class H19RunnerTest(unittest.TestCase):
     def test_tab_switch_uses_exact_binding_and_is_not_aliased_to_app_foregrounding(self):
         self.assertEqual("SUPPORTED", HARNESS_CAPABILITIES["stockChromeTabSwitch"]["status"])
         self.assertEqual(
-            "event_source_one_shot_plus_web_root_continuity",
+            "exact_event_source_anchor_current",
             HARNESS_CAPABILITIES["stockChromeTabSwitch"]["authority"],
         )
         self.assertFalse(HARNESS_CAPABILITIES["stockChromeTabSwitch"]["coordinateUiAutomation"])
@@ -525,7 +525,7 @@ class H19RunnerTest(unittest.TestCase):
             baseline, orientation, changed = baseline_then_set_orientation(object(), "phase", "landscape")
 
         self.assertEqual(["status", "observed", "rotate"], calls)
-        self.assertEqual({"releaseCount": 4, "continuityCount": 0, "marker": current}, baseline)
+        self.assertEqual({"releaseCount": 4, "anchorRebindCount": 0, "marker": current}, baseline)
         self.assertEqual(0, orientation["baselineRotation"])
         self.assertTrue(changed)
 
@@ -573,7 +573,7 @@ class H19RunnerTest(unittest.TestCase):
 
     def test_ready_baseline_has_no_passive_marker_fallback(self):
         self.assertEqual(
-            {"releaseCount": 2, "continuityCount": 0, "marker": None},
+            {"releaseCount": 2, "anchorRebindCount": 0, "marker": None},
             ready_baseline(
                 {
                     "readyPhases": {"ready_foreground_released": 2},
@@ -583,7 +583,7 @@ class H19RunnerTest(unittest.TestCase):
             ),
         )
 
-    def test_web_root_continuity_wait_requires_same_current_document_after_pruning(self):
+    def test_exact_anchor_rebind_wait_requires_same_current_exact_document(self):
         marker = {
             "package": "com.android.chrome",
             "binding": "event_source",
@@ -597,27 +597,60 @@ class H19RunnerTest(unittest.TestCase):
             "rootDigestPrefix": "bbbbbbbbbbbb",
             "webRootDigestPrefix": "cccccccccccc",
             "sourceDigestPrefix": "dddddddddddd",
+            "sourceCurrent": True,
+            "sourceEvidenceScope": "current_boundary",
             "rootBinding": "native_root",
         }
         summary = {
-            "readyWebRootContinuity": {
-                "verified": 1,
-                "violations": 0,
-                "currentDocumentVerified": True,
-            },
+            "readyExactAnchorRebind": {"maxCount": 1},
             "currentReadyBinding": marker,
         }
         with patch("run_a23_gate.request_status", return_value=("", summary)):
-            result = wait_for_web_root_continuity(
+            result = wait_for_exact_anchor_rebind(
                 object(),
                 "since",
                 timeout_seconds=1,
-                minimum_verified_count=1,
+                minimum_rebind_count=1,
                 expected_marker=marker,
             )
 
         self.assertTrue(result["pass"])
-        self.assertFalse(result["sourceCurrent"])
+        self.assertTrue(result["sourceCurrent"])
+        self.assertEqual("current_boundary", result["sourceEvidenceScope"])
+
+    def test_exact_anchor_rebind_wait_rejects_web_root_only_fallback(self):
+        marker = {
+            "package": "com.android.chrome",
+            "binding": "event_source",
+            "rawPresented": False,
+            "windowId": "4",
+            "surfaceEpoch": "8",
+            "documentSequence": "2",
+            "lifecycle": "7",
+            "tokenDigestPrefix": "aaaaaaaaaaaa",
+            "webRootDigestPrefix": "cccccccccccc",
+            "sourceDigestPrefix": "dddddddddddd",
+            "sourceCurrent": False,
+            "sourceEvidenceScope": "initial_only",
+            "continuity": "web_root",
+        }
+        summary = {
+            "readyExactAnchorRebind": {"maxCount": 1},
+            "currentReadyBinding": marker,
+        }
+        with (
+            patch("run_a23_gate.request_status", return_value=("", summary)),
+            patch("run_a23_gate.time.monotonic", side_effect=[0.0, 0.0, 2.0]),
+            patch("run_a23_gate.time.sleep"),
+            self.assertRaises(HarnessError),
+        ):
+            wait_for_exact_anchor_rebind(
+                object(),
+                "since",
+                timeout_seconds=1,
+                minimum_rebind_count=1,
+                expected_marker=marker,
+            )
 
     def test_controlled_gate_requires_report_counts_to_advance(self):
         stale = {"fixtureReport": {"pass": True, "counts": {"reports": 1, "frame_reports": 1}}}

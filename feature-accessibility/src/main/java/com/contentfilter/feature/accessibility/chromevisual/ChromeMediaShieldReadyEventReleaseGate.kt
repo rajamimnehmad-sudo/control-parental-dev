@@ -38,7 +38,7 @@ internal object ChromeMediaShieldReadyViewportTransitionPolicy {
         )
 }
 
-/** Allows web-root rearm only after the same claim already held a released, current lease. */
+/** Retains state only for a released document whose exact event-bound anchor can be reverified. */
 internal object ChromeMediaShieldReadyContinuityReleasePolicy {
     fun canRetainReleasedDocument(
         retainCurrentDocument: Boolean,
@@ -51,15 +51,8 @@ internal object ChromeMediaShieldReadyContinuityReleasePolicy {
             activeLeasePresent &&
             activeDocumentPresent
 
-    fun acceptsBoundary(
-        binding: ChromeMediaShieldBoundContextBinding,
-        retainedReleaseAuthorized: Boolean,
-    ): Boolean =
-        binding == ChromeMediaShieldBoundContextBinding.ExactFocusSource ||
-            (
-                retainedReleaseAuthorized &&
-                    binding == ChromeMediaShieldBoundContextBinding.ExactWebRoot
-            )
+    fun acceptsBoundary(binding: ChromeMediaShieldBoundContextBinding): Boolean =
+        binding == ChromeMediaShieldBoundContextBinding.ExactFocusSource
 }
 
 /**

@@ -2,67 +2,130 @@ package com.contentfilter.feature.accessibility.chromevisual
 
 import android.os.Build
 import android.view.accessibility.AccessibilityNodeInfo
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyClaim
 
 internal enum class ChromeMediaShieldBoundContextBinding {
     ExactFocusSource,
-    ExactWebRoot,
     Invalid,
 }
 
 internal object ChromeMediaShieldBoundContextPolicy {
-    fun select(
-        exactFocusSourceCurrent: Boolean,
-        exactWebRootCurrent: Boolean,
-        requireExactFocusSource: Boolean,
-    ): ChromeMediaShieldBoundContextBinding =
-        when {
-            exactFocusSourceCurrent -> ChromeMediaShieldBoundContextBinding.ExactFocusSource
-            !requireExactFocusSource && exactWebRootCurrent -> ChromeMediaShieldBoundContextBinding.ExactWebRoot
-            else -> ChromeMediaShieldBoundContextBinding.Invalid
+    fun select(exactFocusSourceCurrent: Boolean): ChromeMediaShieldBoundContextBinding =
+        if (exactFocusSourceCurrent) {
+            ChromeMediaShieldBoundContextBinding.ExactFocusSource
+        } else {
+            ChromeMediaShieldBoundContextBinding.Invalid
         }
 }
 
-internal data class ChromeMediaShieldWebRootEvidence(
-    val windowId: Int,
-    val rootPackageName: String,
-    val nativeRootUniqueId: String,
-    val webRootPackageName: String,
-    val webRootClassName: String,
-    val webRootWindowId: Int,
-    val webRootUniqueId: String,
-    val webRootAttachedToForegroundRoot: Boolean,
-    val webRootVisibleToUser: Boolean,
-)
-
-/** Maintains an already event-bound lease; it can never create foreground authority. */
-internal object ChromeMediaShieldWebRootContinuityPolicy {
-    fun verifies(
-        evidence: ChromeMediaShieldWebRootEvidence,
+internal object ChromeMediaShieldBoundAnchorRebindPolicy {
+    fun permits(
+        eventBoundClaim: ChromeMediaShieldReadyClaim?,
+        expectedClaim: ChromeMediaShieldReadyClaim,
         document: ChromeMediaShieldForegroundDocument,
+        currentWindowId: Int,
+        hasBoundSource: Boolean,
+        hasBoundWebRoot: Boolean,
+        rebindAlreadyAttempted: Boolean = false,
     ): Boolean =
-        ChromeMediaShieldForegroundContextPolicy.verifies(
-            evidence =
-                ChromeMediaShieldForegroundContextEvidence(
-                    windowId = evidence.windowId,
-                    rootPackageName = evidence.rootPackageName,
-                    nativeRootUniqueId = evidence.nativeRootUniqueId,
-                    exactAnchorCurrent =
-                        evidence.webRootAttachedToForegroundRoot &&
-                            evidence.webRootUniqueId == document.focusAnchor.webRootUniqueId,
-                ),
-            document = document,
-        ) &&
-            evidence.webRootPackageName == ChromePackageName &&
-            evidence.webRootClassName == WebRootClassName &&
-            evidence.webRootWindowId == document.windowId &&
-            evidence.webRootUniqueId.isNotBlank() &&
-            evidence.webRootUniqueId != evidence.nativeRootUniqueId &&
-            evidence.webRootUniqueId == document.focusAnchor.webRootUniqueId &&
-            evidence.webRootAttachedToForegroundRoot &&
-            evidence.webRootVisibleToUser
+        eventBoundClaim == expectedClaim &&
+            document.identity == expectedClaim.identity &&
+            document.lifecycleSequence == expectedClaim.lifecycleSequence &&
+            document.windowId == currentWindowId &&
+            hasBoundSource &&
+            hasBoundWebRoot &&
+            !rebindAlreadyAttempted
+}
 
-    const val WebRootClassName = "android.webkit.WebView"
-    private const val ChromePackageName = "com.android.chrome"
+internal sealed interface ChromeMediaShieldOwnedNodeSearchResult<out T> {
+    data class Found<T>(
+        val node: T,
+    ) : ChromeMediaShieldOwnedNodeSearchResult<T>
+
+    data object Absent : ChromeMediaShieldOwnedNodeSearchResult<Nothing>
+
+    data object Overflow : ChromeMediaShieldOwnedNodeSearchResult<Nothing>
+}
+
+/** Finds one exact browser-owned node while closing every candidate it does not return. */
+internal class ChromeMediaShieldBoundedOwnedNodeSearch<T>(
+    private val maximumNodeReads: Int,
+) {
+    init {
+        require(maximumNodeReads > 0)
+    }
+
+    fun findDescendant(
+        borrowedRoot: T,
+        childCount: (T) -> Int,
+        copyChild: (T, Int) -> T?,
+        isExactMatch: (T) -> Boolean,
+        close: (T) -> Unit,
+    ): ChromeMediaShieldOwnedNodeSearchResult<T> {
+        val queue = ArrayDeque<OwnedNode<T>>()
+        var current: OwnedNode<T>? = OwnedNode(borrowedRoot, owned = false)
+        var candidate: T? = null
+        var nodeReads = 0
+        try {
+            while (current != null) {
+                val parent = checkNotNull(current)
+                val count = childCount(parent.node)
+                for (index in 0 until count) {
+                    if (nodeReads++ >= maximumNodeReads) {
+                        closeOwned(parent, close)
+                        current = null
+                        closeQueue(queue, close)
+                        return ChromeMediaShieldOwnedNodeSearchResult.Overflow
+                    }
+                    val child = copyChild(parent.node, index) ?: continue
+                    candidate = child
+                    if (isExactMatch(child)) {
+                        closeOwned(parent, close)
+                        current = null
+                        closeQueue(queue, close)
+                        candidate = null
+                        return ChromeMediaShieldOwnedNodeSearchResult.Found(child)
+                    }
+                    queue.addLast(OwnedNode(child, owned = true))
+                    candidate = null
+                }
+                closeOwned(parent, close)
+                current = null
+                current = queue.removeFirstOrNull()
+            }
+            return ChromeMediaShieldOwnedNodeSearchResult.Absent
+        } catch (error: RuntimeException) {
+            candidate?.let(close)
+            current?.let { closeOwned(it, close) }
+            closeQueue(queue, close)
+            throw error
+        }
+    }
+
+    private fun closeQueue(
+        queue: ArrayDeque<OwnedNode<T>>,
+        close: (T) -> Unit,
+    ) {
+        queue.forEach { closeOwned(it, close) }
+        queue.clear()
+    }
+
+    private fun closeOwned(
+        node: OwnedNode<T>,
+        close: (T) -> Unit,
+    ) {
+        if (node.owned) close(node.node)
+    }
+
+    private data class OwnedNode<T>(
+        val node: T,
+        val owned: Boolean,
+    )
+}
+
+/** WebView ancestry is context evidence only; it is never a release boundary. */
+internal object ChromeMediaShieldWebRootContract {
+    const val ClassName = "android.webkit.WebView"
 }
 
 internal data class ChromeMediaShieldWebRootCandidateEvidence(
@@ -80,7 +143,7 @@ internal object ChromeMediaShieldWebRootCandidatePolicy {
         val candidateUniqueId = evidence.candidateUniqueId?.takeIf(String::isNotBlank) ?: return false
         val nativeRootUniqueId = evidence.nativeRootUniqueId?.takeIf(String::isNotBlank)
         return evidence.candidatePackageName == ChromePackageName &&
-            evidence.candidateClassName == ChromeMediaShieldWebRootContinuityPolicy.WebRootClassName &&
+            evidence.candidateClassName == ChromeMediaShieldWebRootContract.ClassName &&
             evidence.candidateWindowId == evidence.expectedWindowId &&
             (nativeRootUniqueId == null || candidateUniqueId != nativeRootUniqueId)
     }
@@ -90,6 +153,37 @@ internal object ChromeMediaShieldWebRootCandidatePolicy {
 
 /** Bounded, ownership-safe traversal of Chrome's virtual Accessibility tree. */
 internal object ChromeMediaShieldAccessibilityNodeTraversal {
+    /**
+     * Reacquires only the exact secret anchor first authenticated by TYPE_VIEW_FOCUSED.
+     *
+     * Chrome does not implement virtual-node lookup by view id consistently, so the bounded tree
+     * walk compares both the browser-issued unique id and the unguessable document view id. The
+     * browser-issued unique id is unique within the window, so the walk can stop at the first
+     * node matching both identities instead of scanning a large real-web tree after success. The
+     * returned node is owned by the caller and must be recycled or transferred.
+     */
+    @Suppress("DEPRECATION")
+    fun copyExactBoundAnchorCandidate(
+        windowRoot: AccessibilityNodeInfo,
+        expectedViewIdResourceName: String,
+        expectedUniqueId: String,
+    ): ChromeMediaShieldOwnedNodeSearchResult<AccessibilityNodeInfo> {
+        if (expectedViewIdResourceName.isBlank() || expectedUniqueId.isBlank()) {
+            return ChromeMediaShieldOwnedNodeSearchResult.Absent
+        }
+        return ChromeMediaShieldBoundedOwnedNodeSearch<AccessibilityNodeInfo>(MaximumCurrentTreeNodes)
+            .findDescendant(
+                borrowedRoot = windowRoot,
+                childCount = AccessibilityNodeInfo::getChildCount,
+                copyChild = AccessibilityNodeInfo::getChild,
+                isExactMatch = { node ->
+                    node.viewIdResourceName == expectedViewIdResourceName &&
+                        uniqueIdOrNull(node) == expectedUniqueId
+                },
+                close = ::recycle,
+            )
+    }
+
     @Suppress("DEPRECATION")
     fun copyWebDocumentRoot(
         source: AccessibilityNodeInfo,
@@ -166,4 +260,5 @@ internal object ChromeMediaShieldAccessibilityNodeTraversal {
     }
 
     private const val MaximumAncestorDepth = 128
+    private const val MaximumCurrentTreeNodes = 512
 }

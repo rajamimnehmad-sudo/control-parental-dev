@@ -9,7 +9,7 @@ def ready_baseline(summary: dict[str, Any]) -> dict[str, Any]:
     marker = summary.get("currentReadyBinding")
     return {
         "releaseCount": int(summary.get("readyPhases", {}).get("ready_foreground_released", 0)),
-        "continuityCount": int(summary.get("readyWebRootContinuity", {}).get("verified", 0)),
+        "anchorRebindCount": int(summary.get("readyExactAnchorRebind", {}).get("maxCount", 0)),
         "marker": marker if isinstance(marker, dict) else None,
     }
 
