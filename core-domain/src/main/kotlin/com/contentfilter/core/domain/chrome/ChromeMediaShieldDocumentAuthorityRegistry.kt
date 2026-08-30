@@ -41,6 +41,12 @@ data class ChromeMediaShieldAccessibilityContext(
     val markerIdentityDigest: String,
 )
 
+data class ChromeMediaShieldForegroundActivation(
+    val claim: ChromeMediaShieldReadyClaim,
+    val accessibilityContext: ChromeMediaShieldAccessibilityContext,
+    val activationSequence: Long,
+)
+
 /**
  * Process-local, bounded authority issued by the DEV document transformer.
  *
@@ -55,6 +61,8 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
     private val issuedByDigest =
         LinkedHashMap<String, ChromeMediaShieldDocumentIdentity>(MaximumIssuedDocuments, 0.75f, true)
     private val readyLifecycleByDigest = mutableMapOf<String, Long>()
+    private var foregroundActivationSequence = 0L
+    private var foregroundActivation: ChromeMediaShieldForegroundActivation? = null
 
     @Synchronized
     fun beginSession(
@@ -69,6 +77,8 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         documentSequence = 0L
         issuedByDigest.clear()
         readyLifecycleByDigest.clear()
+        foregroundActivationSequence = 0L
+        foregroundActivation = null
     }
 
     @Synchronized
@@ -88,6 +98,9 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
             if (removable == null) break
             issuedByDigest.remove(removable.key)
             readyLifecycleByDigest.remove(removable.key)
+            if (foregroundActivation?.claim?.identity?.tokenDigest == removable.key) {
+                foregroundActivation = null
+            }
         }
         val identity =
             ChromeMediaShieldDocumentIdentity(
@@ -148,6 +161,33 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         )
     }
 
+    /**
+     * Activates foreground authority only after an exact browser-side Accessibility focus source
+     * has been verified. A network READY claim alone can never choose the foreground tab/window.
+     */
+    @Synchronized
+    fun activateClaimedForeground(
+        claim: ChromeMediaShieldReadyClaim,
+        accessibilityContext: ChromeMediaShieldAccessibilityContext,
+    ): ChromeMediaShieldForegroundActivation? {
+        if (!accessibilityContext.isValid()) return null
+        val identity = issuedByDigest[claim.identity.tokenDigest] ?: return null
+        if (
+            identity != claim.identity ||
+            !identity.topLevel ||
+            !matchesSession(identity.protectionSessionId, identity.policyEpoch) ||
+            readyLifecycleByDigest[identity.tokenDigest] != claim.lifecycleSequence
+        ) {
+            return null
+        }
+        foregroundActivationSequence += 1L
+        return ChromeMediaShieldForegroundActivation(
+            claim = claim,
+            accessibilityContext = accessibilityContext,
+            activationSequence = foregroundActivationSequence,
+        ).also { foregroundActivation = it }
+    }
+
     /** Read-only AX resolution after an accepted ready handshake; it performs no TOFU claim. */
     @Synchronized
     fun resolveClaimedForeground(
@@ -165,13 +205,49 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         ) {
             return null
         }
-        val identity = issuedByDigest[tokenDigest] ?: return null
-        return identity.takeIf {
-            it.topLevel &&
-                it.protectionSessionId == sessionId &&
-                it.policyEpoch == epoch &&
-                readyLifecycleByDigest[tokenDigest] == lifecycleSequence
-        }
+        return foregroundActivation
+            ?.takeIf { activation ->
+                activation.claim.identity.tokenDigest == tokenDigest &&
+                    activation.claim.identity.protectionSessionId == sessionId &&
+                    activation.claim.identity.policyEpoch == epoch &&
+                    activation.claim.lifecycleSequence == lifecycleSequence &&
+                    activation.accessibilityContext == accessibilityContext &&
+                    issuedByDigest[tokenDigest] == activation.claim.identity &&
+                    readyLifecycleByDigest[tokenDigest] == lifecycleSequence
+            }?.claim?.identity
+    }
+
+    /**
+     * Performs the final presentation commit under the same registry monitor as the exact
+     * foreground validation. Activation, invalidation, session replacement, and this commit
+     * therefore have one in-process total order. Chrome's external window/root continuity is
+     * checked separately at the Accessibility boundary; this monitor does not claim to serialize
+     * browser-process presentation changes.
+     */
+    @Synchronized
+    fun commitIfClaimedForegroundCurrent(
+        claim: ChromeMediaShieldReadyClaim,
+        accessibilityContext: ChromeMediaShieldAccessibilityContext,
+        commit: () -> Boolean,
+    ): Boolean {
+        val identity =
+            resolveClaimedForeground(
+                sessionId = claim.identity.protectionSessionId,
+                epoch = claim.identity.policyEpoch,
+                tokenDigest = claim.identity.tokenDigest,
+                lifecycleSequence = claim.lifecycleSequence,
+                accessibilityContext = accessibilityContext,
+            ) ?: return false
+        if (identity != claim.identity) return false
+        return commit()
+    }
+
+    @Synchronized
+    fun deactivateClaimedForeground(claim: ChromeMediaShieldReadyClaim? = null): Boolean {
+        val current = foregroundActivation ?: return false
+        if (claim != null && current.claim != claim) return false
+        foregroundActivation = null
+        return true
     }
 
     @Synchronized
@@ -180,6 +256,7 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         val digests = issuedByDigest.filterValues { it.topLevel }.keys
         issuedByDigest.keys.removeAll(digests)
         readyLifecycleByDigest.keys.removeAll(digests)
+        foregroundActivation = null
     }
 
     @Synchronized
@@ -200,6 +277,8 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         documentSequence = 0L
         issuedByDigest.clear()
         readyLifecycleByDigest.clear()
+        foregroundActivationSequence = 0L
+        foregroundActivation = null
     }
 
     fun digestReadyToken(token: String): String =

@@ -16,6 +16,9 @@ class ChromeMediaShieldBootstrapContractTest {
         assertFalse(script.contains("requestAnimationFrame"))
         assertContains(script, "const readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}])")
         assertContains(script, "nativeSet.call(readyHost,'role','status')")
+        assertContains(script, "const marker=create.call(DOC,'button')")
+        assertContains(script, "nativeSet.call(marker,'tabindex','-1')")
+        assertContains(script, "nativeSet.call(marker,'id','glosh-h19-ready-'+READY)")
         assertContains(script, "nativeStyleSet.call(readyStyle,'width','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'height','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'overflow','hidden','important')")
@@ -23,19 +26,30 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "nativeStyleSet.call(readyStyle,'font-size','1px','important')")
         assertContains(script, "nativeStyleSet.call(readyStyle,'pointer-events','none','important')")
         assertContains(script, "const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle")
-        assertContains(script, "nativeSet.call(readyHost,'aria-label',readyValue)")
-        assertContains(script, "invoke(nodeText.set,readyHost,[readyValue])")
+        assertContains(script, "nativeSet.call(marker,'aria-label',readyValue)")
+        assertContains(script, "invoke(nodeText.set,marker,[readyValue])")
         assertContains(script, "xhrOpen.call(xhr,'POST',READY_URL,false)")
         assertContains(script, "xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)")
         assertContains(script, "read(xhrStatusProperty,xhr)!==204")
         assertContains(script, "read(xhrResponseUrlProperty,xhr)!==READY_URL")
         assertTrue(
-            script.indexOf("nativeSet.call(readyHost,'aria-label',readyValue)") <
+            script.indexOf("nativeSet.call(marker,'aria-label',readyValue)") <
                 script.indexOf("xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)"),
+        )
+        assertTrue(
+            script.indexOf("xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)") <
+                script.indexOf("nativeFocus.call(marker,{preventScroll:true})"),
+        )
+        assertTrue(
+            script.indexOf("nativeFocus.call(marker,{preventScroll:true})") <
+                script.indexOf("if(!hideCurtain())revokeReady()"),
         )
         assertContains(script, "showCurtain();detachMarker()")
         assertContains(script, "nodeAppend.call(documentElement(),readyHost)")
-        assertContains(script, "visibilityState()!=='visible'){revokeReady();return}if(!hideCurtain())revokeReady()")
+        assertContains(
+            script,
+            "visibilityState()!=='visible'){revokeReady();return}nativeFocus.call(marker,{preventScroll:true})",
+        )
         assertContains(script, "nativeAddEvent.call(SELF,'beforeunload',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(SELF,'pagehide',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(DOC,'visibilitychange'")
@@ -191,7 +205,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertEquals(1, Regex(Regex.escape(ReadyToken)).findAll(script).count())
         assertEquals(1, Regex(Regex.escape(StyleNonce)).findAll(script).count())
         assertFalse(script.contains("data-glosh-ready-token"))
-        assertContains(script, "nativeSet.call(readyHost,'aria-label'")
+        assertContains(script, "nativeSet.call(marker,'aria-label'")
     }
 
     @Test

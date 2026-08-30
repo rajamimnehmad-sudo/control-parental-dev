@@ -69,6 +69,9 @@ internal class ChromeVisualProbeController(
 
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!enabled) return
+        // AccessibilityEvent/source are only valid during this callback. H19 consumes the exact
+        // focused source synchronously before reducing the event to the legacy probe signal.
+        mediaReadyCoordinator?.onAccessibilityEvent(event)
         val signal =
             ProbeSignal(
                 eventType = event.eventType,
@@ -155,9 +158,6 @@ internal class ChromeVisualProbeController(
             !current.isActive ||
                 current.windowId != window.id ||
                 current.viewport != viewport
-        if (!contextChanged && chromeEvent) {
-            mediaReadyCoordinator?.onAccessibilityEvent()
-        }
         val verifiedDataPlanePresentation =
             !contextChanged && hasVerifiedDataPlanePresentation(current, viewport, window)
         if (
@@ -192,22 +192,29 @@ internal class ChromeVisualProbeController(
             return
         }
 
-        revokeLeaseOnMain(if (contextChanged) "context_changed" else "epoch_invalidated")
-
         val motion = chromeEvent && signal.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED
+        val readyTransition =
+            ChromeMediaShieldReadyViewportTransitionPolicy.decide(
+                currentActive = current.isActive,
+                currentWindowId = current.windowId,
+                currentViewport = current.viewport,
+                nextWindowId = window.id,
+                nextViewport = viewport,
+            )
+        revokeLeaseOnMain(
+            reason = if (contextChanged) "context_changed" else "epoch_invalidated",
+            retainMediaReadyDocument = !readyTransition.revokeBeforePrepare,
+        )
+
         val snapshot =
             if (!current.isActive) {
                 state.arm(window.id, viewport)
             } else {
                 state.invalidate(window.id, viewport, motion)
             }
-        val retainCurrentDocument =
-            current.isActive &&
-                current.windowId == window.id &&
-                current.viewport != viewport
         mediaReadyCoordinator
             ?.takeIf { attestationReader.read().mediaAuthorityEnabled && it.hasCurrentClaim() }
-            ?.prepareCoveredSnapshot(snapshot, retainCurrentDocument)
+            ?.prepareCoveredSnapshot(snapshot, readyTransition.retainCurrentDocument)
         when (
             surface.cover(window.id, viewport, snapshot.epoch) {
                 onOpaqueCommitted(snapshot, trigger, motion)
@@ -588,8 +595,11 @@ internal class ChromeVisualProbeController(
         )
     }
 
-    private fun revokeLeaseOnMain(reason: String) {
-        mediaReadyCoordinator?.revokePresentation(reason)
+    private fun revokeLeaseOnMain(
+        reason: String,
+        retainMediaReadyDocument: Boolean = false,
+    ) {
+        if (!retainMediaReadyDocument) mediaReadyCoordinator?.revokePresentation(reason)
         mainHandler.removeCallbacks(leaseWatchdog)
         val lease = activeLease
         val wasTransparent = surface.stats().transparent

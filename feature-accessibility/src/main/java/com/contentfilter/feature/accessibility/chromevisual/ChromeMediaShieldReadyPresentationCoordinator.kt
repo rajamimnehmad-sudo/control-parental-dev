@@ -5,6 +5,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.accessibility.AccessibilityEvent
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentAuthorityRegistry
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyClaim
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyHandshakeBridge
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyHandshakeCompletion
@@ -90,6 +92,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
 ) : AutoCloseable {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val leaseAuthority = ChromePhotosDataPlaneLeaseAuthority()
+    private val releaseGate = ChromeMediaShieldReadyEventReleaseGate()
     private val registration =
         ChromeMediaShieldReadyHandshakeBridge.register(
             ChromeMediaShieldReadyHandshakeListener(::onReadyClaim),
@@ -101,6 +104,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
     private var releasedTarget: ChromeMediaShieldReadyPresentationTarget? = null
     private var activeLease: ChromePhotosDataPlaneLease? = null
     private var activeDocument: ChromeMediaShieldForegroundDocument? = null
+    private var focusedDocument: ChromeMediaShieldForegroundDocument? = null
     private var closed = false
 
     fun hasCurrentClaim(): Boolean = activeClaim != null && !closed
@@ -115,7 +119,10 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             rejectAndForget("ready_document_invalidated")
             return
         }
+        releaseGate.onSurfaceInvalidated(retainFocus = true)
+        val retainedDocument = (activeDocument ?: focusedDocument).takeIf { retainCurrentDocument }
         revokeLease("surface_invalidated")
+        focusedDocument = retainedDocument
         target = ChromeMediaShieldReadyPresentationTarget(claim, snapshot)
         releasedTarget = null
     }
@@ -151,7 +158,9 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             }
             log("ready_ack_accepted", committed, null)
         }
-        tryReleaseCurrentMarker()
+        if (releaseGate.onOpaqueCommitted(committed.claim) == ChromeMediaShieldReadyReleaseAction.AttemptRelease) {
+            tryReleaseCurrentBinding()
+        }
     }
 
     fun onHostPublicationChanged(): Boolean {
@@ -176,14 +185,22 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         return true
     }
 
-    fun onAccessibilityEvent() {
+    fun onAccessibilityEvent(event: AccessibilityEvent) {
         checkMainThread()
         val expected = target?.takeIf { it.opaqueCommitted } ?: return
         if (releasedTarget == expected) {
             val snapshot = state.snapshot()
             val viewport = expected.surface.viewport
+            val document = activeDocument
             val stillVerified =
                 viewport != null &&
+                    document != null &&
+                    exactForegroundDocument(
+                        claim = expected.claim,
+                        expectedWindowId = expected.surface.windowId,
+                        document = document,
+                        requireAnchor = true,
+                    ) &&
                     hasVerifiedPresentation(
                         snapshot = snapshot,
                         viewport = viewport,
@@ -195,11 +212,28 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                     presentationStillVerified = stillVerified,
                 )
             ) {
-                revokeLease("ready_accessibility_observation_invalid")
+                releaseGate.onSurfaceInvalidated(retainFocus = false)
+                revokeLease("ready_accessibility_observation_invalid", clearFocus = true)
             }
             return
         }
-        tryReleaseCurrentMarker()
+        if (event.eventType != AccessibilityEvent.TYPE_VIEW_FOCUSED) return
+        val window = windowInspector.findUniqueForeground()
+        if (window == null || window.id != expected.surface.windowId) return
+        when (val result = tokenScanner.bindFocusedEvent(event, window, expected.claim)) {
+            is ChromeMediaShieldTokenScanResult.Current -> {
+                focusedDocument = result.document
+                log("ready_focus_bound", expected, result.document)
+                if (
+                    releaseGate.onFocusBound(expected.claim) ==
+                    ChromeMediaShieldReadyReleaseAction.AttemptRelease
+                ) {
+                    tryReleaseCurrentBinding()
+                }
+            }
+            is ChromeMediaShieldTokenScanResult.FailClosed ->
+                log("ready_focus_rejected", expected, null, result.reason)
+        }
     }
 
     fun isAwaitingCurrentMarker(
@@ -237,7 +271,8 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         checkMainThread()
         val expected = target ?: return false
         val lease = activeLease ?: return false
-        val document = exactForegroundDocument(expected.claim, windowId) ?: return false
+        val document = activeDocument ?: return false
+        if (!exactForegroundDocument(expected.claim, windowId, document, requireAnchor = false)) return false
         val attestation = attestationReader.read()
         val context = snapshot.toLeaseContext(viewport, document)
         return surface.stats().transparent &&
@@ -262,13 +297,19 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         forgetClaim: Boolean = false,
     ) {
         checkMainThread()
-        revokeLease(reason)
+        if (forgetClaim) {
+            releaseGate.forget()
+        } else {
+            releaseGate.onSurfaceInvalidated(retainFocus = false)
+        }
+        revokeLease(reason, clearFocus = true)
         if (forgetClaim) {
             pendingCompletion?.reject()
             pendingCompletion = null
             target = null
             releasedTarget = null
             activeClaim = null
+            focusedDocument = null
         }
     }
 
@@ -279,6 +320,7 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         }
         if (closed) return
         closed = true
+        releaseGate.close()
         registration.close()
         revokePresentation("ready_coordinator_closed", forgetClaim = true)
     }
@@ -315,11 +357,13 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             return
         }
         pendingCompletion?.reject()
-        revokeLease("ready_claim_superseded")
+        revokeLease("ready_claim_superseded", clearFocus = true)
         onLegacyWorkCancelled()
+        releaseGate.onClaim(claim)
         activeClaim = claim
         pendingCompletion = completion
         releasedTarget = null
+        focusedDocument = null
         val current = state.snapshot()
         val snapshot =
             if (!current.isActive) {
@@ -345,9 +389,15 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         }
     }
 
-    private fun tryReleaseCurrentMarker(): Boolean {
+    private fun tryReleaseCurrentBinding(): Boolean {
         val expected = target ?: return false
-        if (!expected.opaqueCommitted || expected.claim != activeClaim) return false
+        if (
+            !expected.opaqueCommitted ||
+            expected.claim != activeClaim ||
+            !releaseGate.canAttemptRelease(expected.claim)
+        ) {
+            return false
+        }
         val snapshot = state.snapshot()
         val viewport = expected.surface.viewport ?: return false
         if (releasedTarget == expected) {
@@ -357,7 +407,17 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 windowId = expected.surface.windowId,
             )
         }
-        val firstDocument = exactForegroundDocument(expected.claim, expected.surface.windowId) ?: return false
+        val firstDocument = focusedDocument ?: return false
+        if (
+            !exactForegroundDocument(
+                expected.claim,
+                expected.surface.windowId,
+                firstDocument,
+                requireAnchor = false,
+            )
+        ) {
+            return false
+        }
         val firstAttestation = attestationReader.read()
         if (
             !ChromeMediaShieldReadyPresentationPolicy.acceptsAttestation(
@@ -379,7 +439,15 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         val lease = leaseAuthority.mint(firstAttestation, firstContext) ?: return false
 
         val boundarySnapshot = state.snapshot()
-        val boundaryDocument = exactForegroundDocument(expected.claim, expected.surface.windowId)
+        val boundaryDocument =
+            focusedDocument?.takeIf {
+                exactForegroundDocument(
+                    expected.claim,
+                    expected.surface.windowId,
+                    it,
+                    requireAnchor = true,
+                )
+            }
         val boundaryAttestation = attestationReader.read()
         val boundaryContext = boundaryDocument?.let { boundarySnapshot.toLeaseContext(viewport, it) }
         if (
@@ -399,7 +467,14 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 boundaryDocument,
             ) ||
             !leaseAuthority.isValid(lease, boundaryAttestation, boundaryContext) ||
-            !surface.presentTransparent(lease)
+            !releaseGate.commitRelease(expected.claim) {
+                ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(
+                    claim = expected.claim,
+                    accessibilityContext = boundaryDocument.accessibilityContext,
+                ) {
+                    surface.presentTransparent(lease)
+                }
+            }
         ) {
             leaseAuthority.revoke()
             surface.revokeTransparency()
@@ -416,12 +491,15 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
     private fun exactForegroundDocument(
         claim: ChromeMediaShieldReadyClaim,
         expectedWindowId: Int,
-    ): ChromeMediaShieldForegroundDocument? {
-        val window = windowInspector.findUniqueForeground() ?: return null
-        if (window.id != expectedWindowId) return null
-        return when (val result = tokenScanner.scan(window, claim)) {
-            is ChromeMediaShieldTokenScanResult.Current -> result.document
-            is ChromeMediaShieldTokenScanResult.FailClosed -> null
+        document: ChromeMediaShieldForegroundDocument,
+        requireAnchor: Boolean,
+    ): Boolean {
+        val window = windowInspector.findUniqueForeground() ?: return false
+        if (window.id != expectedWindowId) return false
+        return if (requireAnchor) {
+            tokenScanner.verifiesBoundAnchor(window, claim, document)
+        } else {
+            tokenScanner.verifiesBoundContext(window, claim, document)
         }
     }
 
@@ -433,7 +511,8 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
             viewport == null ||
             !hasVerifiedPresentation(snapshot, viewport, snapshot.windowId)
         ) {
-            revokeLease("ready_lease_stale_or_unhealthy")
+            releaseGate.onSurfaceInvalidated(retainFocus = false)
+            revokeLease("ready_lease_stale_or_unhealthy", clearFocus = true)
             return
         }
         val lease = activeLease ?: return
@@ -459,11 +538,18 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
         mainHandler.postDelayed(leaseWatchdog, LeaseWatchdogMillis)
     }
 
-    private fun revokeLease(reason: String) {
+    private fun revokeLease(
+        reason: String,
+        clearFocus: Boolean = false,
+    ) {
         mainHandler.removeCallbacks(leaseWatchdog)
         val hadLease = activeLease != null || surface.stats().transparent
         activeLease = null
         activeDocument = null
+        if (clearFocus) {
+            activeClaim?.let(ChromeMediaShieldDocumentAuthorityRegistry::deactivateClaimedForeground)
+            focusedDocument = null
+        }
         leaseAuthority.revoke()
         surface.revokeTransparency()
         if (hadLease) log("ready_foreground_revoked", target, null, reason)
@@ -472,10 +558,12 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
     private fun rejectAndForget(reason: String) {
         pendingCompletion?.reject()
         pendingCompletion = null
-        revokeLease(reason)
+        releaseGate.forget()
+        revokeLease(reason, clearFocus = true)
         target = null
         releasedTarget = null
         activeClaim = null
+        focusedDocument = null
         log("ready_fail_closed", null, null, reason)
     }
 
@@ -504,7 +592,10 @@ internal class ChromeMediaShieldReadyPresentationCoordinator(
                 "documentSequence=${claim?.identity?.documentSequence ?: 0L} " +
                 "lifecycle=${claim?.lifecycleSequence ?: 0L} " +
                 "token=${claim?.identity?.tokenDigest?.take(TokenDigestLogLength).orEmpty()} " +
-                "axBound=${document != null} reason=$reason rawPresented=false",
+                "axBound=${document != null} binding=${if (document == null) "none" else "event_source"} " +
+                "root=${document?.accessibilityContext?.rootIdentityDigest?.take(TokenDigestLogLength).orEmpty()} " +
+                "source=${document?.accessibilityContext?.markerIdentityDigest?.take(TokenDigestLogLength).orEmpty()} " +
+                "reason=$reason rawPresented=false",
         )
     }
 

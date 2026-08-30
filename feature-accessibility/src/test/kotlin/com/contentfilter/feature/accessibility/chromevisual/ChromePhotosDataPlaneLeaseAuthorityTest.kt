@@ -227,6 +227,11 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
                     rootIdentityDigest = "b".repeat(64),
                     markerIdentityDigest = "c".repeat(64),
                 ),
+            focusAnchor =
+                ChromeMediaShieldFocusAnchor(
+                    viewIdResourceName = "glosh-h19-ready-redacted",
+                    sourceUniqueId = "web-node:ready",
+                ),
         )
 
     private companion object {

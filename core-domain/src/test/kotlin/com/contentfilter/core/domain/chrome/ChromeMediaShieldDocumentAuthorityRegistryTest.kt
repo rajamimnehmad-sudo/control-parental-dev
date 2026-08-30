@@ -2,9 +2,13 @@ package com.contentfilter.core.domain.chrome
 
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class ChromeMediaShieldDocumentAuthorityRegistryTest {
     @After
@@ -63,27 +67,26 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
     }
 
     @Test
-    fun `claimed foreground resolves only exact session epoch digest lifecycle and valid AX context`() {
+    fun `network claim alone has no foreground authority and exact AX activation is required`() {
         ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
         val issued =
             requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true))
-        assertTrue(
-            ChromeMediaShieldDocumentAuthorityRegistry.claimReady(
-                TopToken,
-                1L,
-            ) is ChromeMediaShieldReadyClaimResult.Claimed,
-        )
+        val claim = claimTopLevel(TopToken, 1L)
         val context = accessibilityContext(windowId = 17)
 
+        assertNull(resolve(claim, context))
+        val activation =
+            requireNotNull(
+                ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(
+                    claim,
+                    context,
+                ),
+            )
+        assertEquals(claim, activation.claim)
+        assertEquals(context, activation.accessibilityContext)
         assertEquals(
             issued,
-            ChromeMediaShieldDocumentAuthorityRegistry.resolveClaimedForeground(
-                Session,
-                PolicyEpoch,
-                issued.tokenDigest,
-                1L,
-                context,
-            ),
+            resolve(claim, context),
         )
         assertNull(
             ChromeMediaShieldDocumentAuthorityRegistry.resolveClaimedForeground(
@@ -130,6 +133,7 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
                 context.copy(windowId = -1),
             ),
         )
+        assertNull(resolve(claim, context.copy(markerIdentityDigest = digest("replacement"))))
     }
 
     @Test
@@ -141,14 +145,145 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
             requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, NextToken, true))
 
         assertEquals(first.navigationSequence + 1L, second.navigationSequence)
+        val firstClaim = claimTopLevel(TopToken, 1L)
+        val secondClaim = claimTopLevel(NextToken, 1L)
+        val firstContext = accessibilityContext(windowId = 17)
+        val secondContext = accessibilityContext(windowId = 18)
+
+        assertNull(resolve(firstClaim, firstContext))
+        assertNull(resolve(secondClaim, secondContext))
+        assertTrue(
+            ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(
+                firstClaim,
+                firstContext,
+            ) != null,
+        )
+        assertEquals(first, resolve(firstClaim, firstContext))
+        assertTrue(
+            ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(
+                secondClaim,
+                secondContext,
+            ) != null,
+        )
+        assertNull(
+            resolve(firstClaim, firstContext),
+        )
+        assertEquals(second, resolve(secondClaim, secondContext))
+    }
+
+    @Test
+    fun `foreground claim can reactivate an issued bfcache document while older claim loses authority`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        val first =
+            requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true))
+        val second =
+            requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, NextToken, true))
+        val context = accessibilityContext(windowId = 17)
+
+        val firstClaim = claimTopLevel(TopToken, 1L)
+        requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(firstClaim, context))
         assertEquals(
-            ChromeMediaShieldReadyClaimResult.Claimed(ChromeMediaShieldReadyClaim(first, 1L)),
-            ChromeMediaShieldDocumentAuthorityRegistry.claimReady(TopToken, 1L),
+            first,
+            resolve(firstClaim, context),
+        )
+
+        val secondClaim = claimTopLevel(NextToken, 1L)
+        assertEquals(first, resolve(firstClaim, context))
+        requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(secondClaim, context))
+        assertNull(
+            resolve(firstClaim, context),
         )
         assertEquals(
-            ChromeMediaShieldReadyClaimResult.Claimed(ChromeMediaShieldReadyClaim(second, 1L)),
-            ChromeMediaShieldDocumentAuthorityRegistry.claimReady(NextToken, 1L),
+            second,
+            resolve(secondClaim, context),
         )
+
+        val restoredClaim = claimTopLevel(TopToken, 2L)
+        assertNull(resolve(restoredClaim, context))
+        requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(restoredClaim, context))
+        assertEquals(
+            first,
+            resolve(restoredClaim, context),
+        )
+        assertNull(
+            resolve(secondClaim, context),
+        )
+    }
+
+    @Test
+    fun `final foreground commit is atomic with activation replacement`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true)
+        ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, NextToken, true)
+        val first = claimTopLevel(TopToken, 1L)
+        val second = claimTopLevel(NextToken, 1L)
+        val firstContext = accessibilityContext(17)
+        val secondContext = accessibilityContext(18)
+        requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(first, firstContext))
+        val commitEntered = CountDownLatch(1)
+        val allowCommitToFinish = CountDownLatch(1)
+        val replacementFinished = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val committed =
+                executor.submit<Boolean> {
+                    ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(
+                        first,
+                        firstContext,
+                    ) {
+                        commitEntered.countDown()
+                        allowCommitToFinish.await(TestWaitMillis, TimeUnit.MILLISECONDS)
+                    }
+                }
+            assertTrue(commitEntered.await(TestWaitMillis, TimeUnit.MILLISECONDS))
+            executor.execute {
+                ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(second, secondContext)
+                replacementFinished.countDown()
+            }
+            assertFalse(replacementFinished.await(ShortWaitMillis, TimeUnit.MILLISECONDS))
+            allowCommitToFinish.countDown()
+            assertTrue(committed.get(TestWaitMillis, TimeUnit.MILLISECONDS))
+            assertTrue(replacementFinished.await(TestWaitMillis, TimeUnit.MILLISECONDS))
+            assertNull(resolve(first, firstContext))
+            assertEquals(second.identity, resolve(second, secondContext))
+        } finally {
+            executor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `invalid stale and deactivated foreground never execute presentation commit`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true)
+        val claim = claimTopLevel(TopToken, 1L)
+        val context = accessibilityContext(17)
+        var commits = 0
+
+        assertFalse(
+            ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(claim, context) {
+                commits += 1
+                true
+            },
+        )
+        requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.activateClaimedForeground(claim, context))
+        assertFalse(
+            ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(
+                claim,
+                context.copy(windowId = 18),
+            ) {
+                commits += 1
+                true
+            },
+        )
+        assertTrue(ChromeMediaShieldDocumentAuthorityRegistry.deactivateClaimedForeground(claim))
+        assertFalse(ChromeMediaShieldDocumentAuthorityRegistry.deactivateClaimedForeground(claim))
+        assertFalse(
+            ChromeMediaShieldDocumentAuthorityRegistry.commitIfClaimedForegroundCurrent(claim, context) {
+                commits += 1
+                true
+            },
+        )
+        assertEquals(0, commits)
     }
 
     @Test
@@ -189,6 +324,29 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
         assertTrue(result is ChromeMediaShieldReadyClaimResult.Invalid)
     }
 
+    private fun claimTopLevel(
+        token: String,
+        lifecycle: Long,
+    ): ChromeMediaShieldReadyClaim =
+        (
+            ChromeMediaShieldDocumentAuthorityRegistry.claimTopLevelReady(token, lifecycle) as
+                ChromeMediaShieldReadyClaimResult.Claimed
+        ).claim
+
+    private fun resolve(
+        claim: ChromeMediaShieldReadyClaim,
+        context: ChromeMediaShieldAccessibilityContext,
+    ): ChromeMediaShieldDocumentIdentity? =
+        ChromeMediaShieldDocumentAuthorityRegistry.resolveClaimedForeground(
+            claim.identity.protectionSessionId,
+            claim.identity.policyEpoch,
+            claim.identity.tokenDigest,
+            claim.lifecycleSequence,
+            context,
+        )
+
+    private fun digest(value: String): String = ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(value)
+
     private fun token(index: Int): String = "AAAAAAAAAAAAAAAAAAAAAA${index.toString().padStart(4, '0')}"
 
     private fun accessibilityContext(windowId: Int) =
@@ -204,5 +362,7 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
         const val FrameToken = "BBBBBBBBBBBBBBBBBBBBBB"
         const val TopToken = "CCCCCCCCCCCCCCCCCCCCCC"
         const val NextToken = "DDDDDDDDDDDDDDDDDDDDDD"
+        const val TestWaitMillis = 2_000L
+        const val ShortWaitMillis = 50L
     }
 }
