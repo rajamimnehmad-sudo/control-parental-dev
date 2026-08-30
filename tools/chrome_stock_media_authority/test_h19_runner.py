@@ -4,7 +4,11 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from h19_plan import HarnessError
-from h19_device import ce_data_inode_from_package_dump
+from h19_device import (
+    ce_data_inode_from_package_dump,
+    prepare_interactive_display,
+    restore_interactive_display,
+)
 from run_a23_gate import (
     HARNESS_CAPABILITIES,
     baseline_then_set_orientation,
@@ -63,7 +67,56 @@ class FakeStartAdb:
         return ""
 
 
+class FakeInteractiveAdb:
+    def __init__(self, initially_awake: bool = False) -> None:
+        self.awake = initially_awake
+        self.stay_awake = "0"
+        self.calls: list[tuple[str, ...]] = []
+
+    def shell(self, *args, **_kwargs):
+        self.calls.append(tuple(args))
+        if args[:2] == ("dumpsys", "power"):
+            return f"mWakefulness={'Awake' if self.awake else 'Dozing'}\n"
+        if args[:3] == ("dumpsys", "window", "policy"):
+            state = "INTERACTIVE_STATE_AWAKE" if self.awake else "INTERACTIVE_STATE_SLEEP"
+            return f"interactiveState={state}\nmIsShowing=false\n"
+        if args[:4] == ("settings", "get", "global", "stay_on_while_plugged_in"):
+            return self.stay_awake
+        if args[:4] == ("settings", "put", "global", "stay_on_while_plugged_in"):
+            self.stay_awake = args[4]
+        if args[:3] == ("input", "keyevent", "224"):
+            self.awake = True
+        if args[:3] == ("input", "keyevent", "223"):
+            self.awake = False
+        return ""
+
+
 class H19RunnerTest(unittest.TestCase):
+    def test_physical_gate_acquires_and_restores_interactive_display_lease(self):
+        adb = FakeInteractiveAdb(initially_awake=False)
+
+        lease = prepare_interactive_display(adb, timeout_seconds=1)
+
+        self.assertEqual("Awake", lease["current"]["wakefulness"])
+        self.assertEqual("3", adb.stay_awake)
+        self.assertTrue(lease["restoreSleep"])
+
+        restored = restore_interactive_display(adb, lease)
+
+        self.assertEqual("0", restored["stayOnWhilePluggedIn"])
+        self.assertEqual("Dozing", restored["display"]["wakefulness"])
+        self.assertIn(("wm", "dismiss-keyguard"), adb.calls)
+
+    def test_already_awake_device_is_not_put_to_sleep_at_cleanup(self):
+        adb = FakeInteractiveAdb(initially_awake=True)
+
+        lease = prepare_interactive_display(adb, timeout_seconds=1)
+        restored = restore_interactive_display(adb, lease)
+
+        self.assertFalse(lease["restoreSleep"])
+        self.assertEqual("Awake", restored["display"]["wakefulness"])
+        self.assertNotIn(("input", "keyevent", "223"), adb.calls)
+
     def test_tab_switch_uses_exact_binding_and_is_not_aliased_to_app_foregrounding(self):
         self.assertEqual("SUPPORTED", HARNESS_CAPABILITIES["stockChromeTabSwitch"]["status"])
         self.assertEqual(

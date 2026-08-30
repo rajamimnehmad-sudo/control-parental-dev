@@ -84,6 +84,87 @@ def restore_setting(adb: Adb, name: str, value: str | None) -> None:
         adb.shell("settings", "put", "system", name, value, check=False)
 
 
+def namespaced_setting(adb: Adb, namespace: str, name: str) -> str | None:
+    if namespace not in {"system", "secure", "global"}:
+        raise HarnessError(f"unsupported settings namespace: {namespace}")
+    value = adb.shell("settings", "get", namespace, name).strip()
+    return None if value in {"", "null"} else value
+
+
+def restore_namespaced_setting(adb: Adb, namespace: str, name: str, value: str | None) -> None:
+    if namespace not in {"system", "secure", "global"}:
+        raise HarnessError(f"unsupported settings namespace: {namespace}")
+    if value is None:
+        adb.shell("settings", "delete", namespace, name, check=False)
+    else:
+        adb.shell("settings", "put", namespace, name, value, check=False)
+
+
+def interactive_display_snapshot(adb: Adb) -> dict[str, Any]:
+    power = adb.shell("dumpsys", "power", check=False, timeout=30)
+    policy = adb.shell("dumpsys", "window", "policy", check=False, timeout=30)
+    wakefulness = re.search(r"\bmWakefulness=([A-Za-z]+)", power)
+    interactive = re.search(r"\binteractiveState=([A-Z_]+)", policy)
+    keyguard = re.search(r"\bmIsShowing=(true|false)\b", policy)
+    return {
+        "wakefulness": wakefulness.group(1) if wakefulness else "unknown",
+        "interactiveState": interactive.group(1) if interactive else "unknown",
+        "keyguardShowing": keyguard.group(1) == "true" if keyguard else None,
+    }
+
+
+def prepare_interactive_display(adb: Adb, timeout_seconds: int = 10) -> dict[str, Any]:
+    """Acquire a reversible, bounded display lease for a physical Chrome gate."""
+
+    before = interactive_display_snapshot(adb)
+    previous_stay_awake = namespaced_setting(adb, "global", "stay_on_while_plugged_in")
+    try:
+        adb.shell("settings", "put", "global", "stay_on_while_plugged_in", "3")
+        adb.shell("input", "keyevent", "224")
+        adb.shell("wm", "dismiss-keyguard", check=False)
+        deadline = time.monotonic() + timeout_seconds
+        current = interactive_display_snapshot(adb)
+        while time.monotonic() < deadline:
+            if (
+                current["wakefulness"] == "Awake"
+                and current["interactiveState"] == "INTERACTIVE_STATE_AWAKE"
+                and current["keyguardShowing"] is False
+            ):
+                return {
+                    "before": before,
+                    "current": current,
+                    "previousStayOnWhilePluggedIn": previous_stay_awake,
+                    "currentStayOnWhilePluggedIn": namespaced_setting(
+                        adb,
+                        "global",
+                        "stay_on_while_plugged_in",
+                    ),
+                    "restoreSleep": before["wakefulness"] != "Awake",
+                }
+            time.sleep(0.2)
+            current = interactive_display_snapshot(adb)
+    except BaseException:
+        restore_namespaced_setting(adb, "global", "stay_on_while_plugged_in", previous_stay_awake)
+        raise
+    restore_namespaced_setting(adb, "global", "stay_on_while_plugged_in", previous_stay_awake)
+    raise HarnessError(f"A23 display did not become interactive and unlocked: {current}")
+
+
+def restore_interactive_display(adb: Adb, lease: dict[str, Any]) -> dict[str, Any]:
+    restore_namespaced_setting(
+        adb,
+        "global",
+        "stay_on_while_plugged_in",
+        lease.get("previousStayOnWhilePluggedIn"),
+    )
+    if lease.get("restoreSleep") is True:
+        adb.shell("input", "keyevent", "223", check=False)
+    return {
+        "display": interactive_display_snapshot(adb),
+        "stayOnWhilePluggedIn": namespaced_setting(adb, "global", "stay_on_while_plugged_in"),
+    }
+
+
 def package_info(adb: Adb, package_name: str) -> dict[str, str]:
     output = adb.shell("dumpsys", "package", package_name)
     version_code = re.search(r"\bversionCode=(\d+)", output)

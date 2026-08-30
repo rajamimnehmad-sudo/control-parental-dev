@@ -44,7 +44,9 @@ from h19_device import (
     navigate,
     observed_display_rotation,
     package_info,
+    prepare_interactive_display,
     restore_setting,
+    restore_interactive_display,
     set_and_verify_orientation,
     setting,
     sha256_text,
@@ -607,14 +609,13 @@ def main() -> int:
     chrome_major = preflight["chrome"]["versionName"].split(".", 1)[0]
     if not chrome_major.isdigit() or int(chrome_major) < int(plan.get("minimumChromeMajor", 146)):
         raise HarnessError(f"Chrome version is below required major: {preflight['chrome']['versionName']}")
-    write_json(args.output / "preflight.json", preflight)
     if adb.path_exists(REMOTE_ROOT):
         raise HarnessError(f"refuse to reuse existing device evidence path: {REMOTE_ROOT}")
-    adb.shell("mkdir", "-p", REMOTE_ROOT)
     state_results: list[dict[str, Any]] = []
     visual_review_entries: list[dict[str, Any]] = []
     active = False
     last_phase_since = run_since
+    display_lease: dict[str, Any] | None = None
 
     def stop_for_signal(_signal: int, _frame: Any) -> None:
         raise KeyboardInterrupt
@@ -622,6 +623,10 @@ def main() -> int:
     signal.signal(signal.SIGINT, stop_for_signal)
     signal.signal(signal.SIGTERM, stop_for_signal)
     try:
+        display_lease = prepare_interactive_display(adb)
+        preflight["interactiveDisplayLease"] = display_lease
+        write_json(args.output / "preflight.json", preflight)
+        adb.shell("mkdir", "-p", REMOTE_ROOT)
         for phase in plan["phases"]:
             if active:
                 stop_phase(adb)
@@ -705,6 +710,11 @@ def main() -> int:
                 cleanup_error = error
         restore_setting(adb, "accelerometer_rotation", rotation["accelerometer_rotation"])
         restore_setting(adb, "user_rotation", rotation["user_rotation"])
+        display_restore = (
+            restore_interactive_display(adb, display_lease)
+            if display_lease is not None
+            else {"display": "lease_not_acquired", "stayOnWhilePluggedIn": "unchanged"}
+        )
         adb.shell("rm", "-rf", REMOTE_ROOT, check=False)
         adb.broadcast(ACTION_PREFIX + "TRANSPORT_STATUS")
         time.sleep(0.25)
@@ -740,6 +750,7 @@ def main() -> int:
                 "exitInfo": post_exit,
                 "exitInfoDelta": exit_deltas,
                 "rotationRestored": {name: setting(adb, name) for name in rotation},
+                "interactiveDisplayRestored": display_restore,
                 "labServicePresent": not rollback_invariants["labServiceStopped"],
                 "rollbackInvariants": rollback_invariants,
                 "terminalLogcat": post_log_summary,
