@@ -33,7 +33,12 @@ class ChromeStockMediaAuthorityFixtureTest {
     @Test
     fun `controlled matrix includes network local normality and explicit out of scope cases`() {
         val html = fixture.responseFor(request("GET", "/web19/controlled"))!!.text()
+        val firstOriginal = fixture.responseFor(request("GET", "/web20/first-original.js"))!!.text()
         val script = fixture.responseFor(request("GET", "/web19/site.js"))!!.text()
+
+        assertTrue(html.indexOf("/web20/first-original.js") < html.indexOf("GLOSH H19 CONTROLLED"))
+        assertTrue(firstOriginal.contains(ChromeMediaShieldBootstrap.SelfShieldOriginalScriptStartedName))
+        assertTrue(fixture.state().contains("FIRST_ORIGINAL_SCRIPTS=1"))
 
         listOf(
             "picture-srcset",

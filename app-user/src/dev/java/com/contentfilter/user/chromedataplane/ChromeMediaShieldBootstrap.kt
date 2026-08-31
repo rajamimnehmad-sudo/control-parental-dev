@@ -12,6 +12,8 @@ internal object ChromeMediaShieldBootstrap {
     const val ParserBarrierGuardName = "__gloshH19ParserBarrierGuard__"
     const val ParserBarrierFailClosedName = "__gloshH19ParserBarrierFailClosed__"
     const val SubdocumentGuardName = "__gloshH19SubdocumentGuard__"
+    const val SelfShieldParserContinuationName = "__gloshH20ParserContinuation__"
+    const val SelfShieldOriginalScriptStartedName = "__gloshH20OriginalScriptStarted__"
 
     val css: String =
         "canvas,video,object,embed,frame,fencedframe,[srcdoc],img[src^='data:' i],img[src^='blob:' i]," +
@@ -44,6 +46,7 @@ internal object ChromeMediaShieldBootstrap {
             .replace(CurtainReleaseAttributePlaceholder, CurtainReleaseAttribute)
             .replace(ReadyUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldReadyUrl)
             .replace(SelfReadyUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyUrl)
+            .replace(SelfShieldTraceUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTraceUrl)
             .replace(ParserBarrierUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl)
             .replace(TopLevelPlaceholder, topLevel.toString())
             .replace(SelfShieldPlaceholder, (selfShieldIdentity != null).toString())
@@ -55,6 +58,14 @@ internal object ChromeMediaShieldBootstrap {
     fun parserBarrierGuardScript(): String = completionGuardScript(ParserBarrierGuardName)
 
     fun subdocumentGuardScript(): String = completionGuardScript(SubdocumentGuardName)
+
+    fun selfShieldParserContinuationScript(): String =
+        "(()=>{'use strict';const S=self;let ok=false;try{const f=S.$SelfShieldParserContinuationName;" +
+            "ok=typeof f==='function'&&f()===true}catch(_){}if(!ok)throw new Error('glosh_h20_parser_continuation_failed')})()"
+
+    fun selfShieldOriginalScriptStartedScript(): String =
+        "(()=>{'use strict';const f=self.$SelfShieldOriginalScriptStartedName;" +
+            "if(typeof f!=='function'||f()!==true)throw new Error('glosh_h20_original_script_trace_failed')})()"
 
     private fun completionGuardScript(callbackName: String): String =
         "(()=>{'use strict';const S=self;let fail=null,ok=false;try{fail=S.$ParserBarrierFailClosedName}catch(_){}" +
@@ -97,6 +108,7 @@ internal object ChromeMediaShieldBootstrap {
     private const val CurtainReleaseAttributePlaceholder = "__GLOSH_CURTAIN_RELEASE_ATTRIBUTE__"
     private const val ReadyUrlPlaceholder = "__GLOSH_READY_URL__"
     private const val SelfReadyUrlPlaceholder = "__GLOSH_SELF_READY_URL__"
+    private const val SelfShieldTraceUrlPlaceholder = "__GLOSH_SELF_SHIELD_TRACE_URL__"
     private const val ParserBarrierUrlPlaceholder = "__GLOSH_PARSER_BARRIER_URL__"
     private const val TopLevelPlaceholder = "__GLOSH_TOP_LEVEL__"
     private const val SelfShieldPlaceholder = "__GLOSH_SELF_SHIELD__"
@@ -107,8 +119,8 @@ internal object ChromeMediaShieldBootstrap {
     private val ScriptTemplate =
         """
         (()=>{'use strict';
-        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
-        const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD;
+        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',SELF_SHIELD_TRACE_URL='__GLOSH_SELF_SHIELD_TRACE_URL__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
+        const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD,USE_MODAL_CURTAIN=HAS_CURTAIN&&!SELF_SHIELD;
         const STYLE_ID='glosh-h19-media-shield',CURTAIN_ID='glosh-h19-document-curtain',CURTAIN_LAYER_ID='glosh-h19-document-curtain-layer';
         const CSS='__GLOSH_SHIELD_CSS__',CURTAIN_RELEASE_ATTRIBUTE='__GLOSH_CURTAIN_RELEASE_ATTRIBUTE__',FRAME_SANDBOX='allow-scripts allow-forms allow-popups-to-escape-sandbox';let installed=true;
         const SELF=self,DOC=document,NAV=navigator,IS_TOP_LEVEL=SELF===SELF.top,BOOTSTRAP_SCRIPT=DOC.currentScript,NativeObject=Object,NativeReflect=Reflect;
@@ -194,7 +206,8 @@ internal object ChromeMediaShieldBootstrap {
         const requiredPrimordials=[nodeText,nodeValue,nodeTypeProperty,localNameProperty,parentNodeProperty,firstChildProperty,isConnectedProperty,baseUriProperty,styleProperty,
         elementAttributesProperty,documentElementProperty,documentHeadProperty,visibilityProperty,eventTargetProperty,eventTrustedProperty,mutationTypeProperty,mutationTargetProperty,mutationAddedProperty,
         nodeListLength,namedMapLength,urlProtocolProperty,templateContentProperty,htmlHiddenProperty,htmlTitleProperty,currentScriptProperty,scriptSrcProperty];
-        if(TOP_LEVEL&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!xhrResponseTextProperty||!nativeHasFocus||!nativeElementFocus||!nativeLocationReload||!nativeDialogShowModal||!nativeDialogShow||!nativeDialogClose||!htmlHiddenProperty||!dialogOpenProperty))installed=false;
+        if((TOP_LEVEL||SELF_SHIELD)&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!xhrResponseTextProperty))installed=false;
+        if(TOP_LEVEL&&!SELF_SHIELD&&(!nativeHasFocus||!nativeElementFocus||!nativeLocationReload||!nativeDialogShowModal||!nativeDialogShow||!nativeDialogClose||!htmlHiddenProperty||!dialogOpenProperty))installed=false;
         for(let index=0;index<requiredPrimordials.length;index+=1)if(!requiredPrimordials[index])installed=false;
         if(self.Attr&&(!attrNameProperty||!attrValueProperty||!attrNamespaceProperty||!attrLocalNameProperty||!attrOwnerProperty))installed=false;
         if(NativePageTransitionEvent&&!pagePersistedProperty)installed=false;
@@ -276,9 +289,9 @@ internal object ChromeMediaShieldBootstrap {
         if(query){const nodes=copyList(query.call(root,'canvas,video,object,embed,frame,fencedframe,iframe,img,source,input[type="image" i],svg,[srcdoc],[style],[popover],[popovertarget],[popovertargetaction],[commandfor],[command]'),nodeListLength);
         for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}};
         const sanitizeContainer=(node)=>{if(!node||nodeTypeOf(node)!==1)return;sanitizeElement(node);const svg=elementClosest.call(node,'svg');if(svg&&svg!==node)sanitizeElement(svg)};
-        const shieldStyle=DOC.getElementById(STYLE_ID),curtainStyle=HAS_CURTAIN?DOC.getElementById(CURTAIN_ID):null,curtainLayer=HAS_CURTAIN?nativeCreateElement.call(DOC,'dialog'):null;
+        const shieldStyle=DOC.getElementById(STYLE_ID),curtainStyle=HAS_CURTAIN?DOC.getElementById(CURTAIN_ID):null,curtainLayer=USE_MODAL_CURTAIN?nativeCreateElement.call(DOC,'dialog'):null;
         if(curtainLayer){nativeSet.call(curtainLayer,'id',CURTAIN_LAYER_ID);nativeSet.call(curtainLayer,'tabindex','-1');nodeInsert.call(documentElement(),curtainLayer,firstChildOf(documentElement()))}
-        if(!shieldStyle||(TOP_LEVEL&&(!curtainStyle||!curtainLayer)))installed=false;else{watchStyle(shieldStyle);if(curtainStyle)watchStyle(curtainStyle);if(curtainLayer)watchStyle(curtainLayer)}
+        if(!shieldStyle||(HAS_CURTAIN&&!curtainStyle)||(USE_MODAL_CURTAIN&&!curtainLayer))installed=false;else{watchStyle(shieldStyle);if(curtainStyle)watchStyle(curtainStyle);if(curtainLayer)watchStyle(curtainLayer)}
         const styleSheetProperty=shieldStyle?propertyDescriptor(shieldStyle,'sheet'):null,styleNonceProperty=shieldStyle?propertyDescriptor(shieldStyle,'nonce'):null;
         const styleElementDisabledProperty=shieldStyle?propertyDescriptor(shieldStyle,'disabled'):null,styleElementMediaProperty=shieldStyle?propertyDescriptor(shieldStyle,'media'):null;
         const styleElementTypeProperty=shieldStyle?propertyDescriptor(shieldStyle,'type'):null;
@@ -301,7 +314,7 @@ internal object ChromeMediaShieldBootstrap {
         if(media)invoke(WeakSetAdd,protectedMedias,[media])}if(!cssRulesProperty||!cssRuleListLength||!ruleStyleMapProperty)return;
         const rules=copyList(read(cssRulesProperty,sheet),cssRuleListLength);for(let index=0;index<rules.length;index+=1){const map=read(ruleStyleMapProperty,rules[index]);
         if(map)invoke(WeakSetAdd,protectedStyleMaps,[map])}};
-        if(!styleSheetProperty||!shieldSheet||(TOP_LEVEL&&!curtainSheet)||!styleNonceProperty||!styleNonceProperty.get||!styleNonceProperty.set||
+        if(!styleSheetProperty||!shieldSheet||(HAS_CURTAIN&&!curtainSheet)||!styleNonceProperty||!styleNonceProperty.get||!styleNonceProperty.set||
         !styleElementDisabledProperty||!styleElementMediaProperty||!styleElementTypeProperty||!cssParentRuleProperty||!cssParentSheetProperty||
         !styleSheetDisabledProperty||!styleSheetMediaProperty||!mediaTextProperty||(self.CSSStyleRule&&!ruleStyleProperty)||(self.Range&&!rangeAncestorProperty))installed=false;
         const clearStyleNonce=(style)=>{try{invoke(styleNonceProperty.set,style,['']);nativeRemove.call(style,'nonce');
@@ -340,15 +353,18 @@ internal object ChromeMediaShieldBootstrap {
         ['mix-blend-mode','normal'],['animation','none'],['transition','none'],['contain','strict'],['overflow','hidden']];
         const curtainOpen=()=>!!curtainLayer&&read(dialogOpenProperty,curtainLayer)===true;
         const curtainVisibleByAttribute=()=>!!curtainLayer&&read(htmlHiddenProperty,curtainLayer)===false&&!nativeHas.call(curtainLayer,'hidden');
-        const ensureCurtain=()=>{if(!HAS_CURTAIN)return true;if(!curtainStyle||!curtainLayer||!connected(curtainStyle)||!connected(curtainLayer))return false;
-        try{if(!curtainVisibleByAttribute())invoke(htmlHiddenProperty.set,curtainLayer,[false]);
-        if(dialogClosedByProperty&&dialogClosedByProperty.set){invoke(dialogClosedByProperty.set,curtainLayer,['none']);
-        if(nativeGet.call(curtainLayer,'closedby')!=='none'||read(dialogClosedByProperty,curtainLayer)!=='none')return false}}catch(_){return false}
+        const ensureCurtain=()=>{if(!HAS_CURTAIN)return true;if(!curtainStyle||!connected(curtainStyle)||(USE_MODAL_CURTAIN&&(!curtainLayer||!connected(curtainLayer))))return false;
         const expectedCurtainCss=CURTAIN_CSS,root=documentElement();
         if(curtainRequired){if(nativeHas.call(root,CURTAIN_RELEASE_ATTRIBUTE))nativeRemove.call(root,CURTAIN_RELEASE_ATTRIBUTE)}
         else if(nativeGet.call(root,CURTAIN_RELEASE_ATTRIBUTE)!=='1')nativeSet.call(root,CURTAIN_RELEASE_ATTRIBUTE,'1');
         const currentCurtainSheet=read(styleSheetProperty,curtainStyle);registerProtectedSheet(currentCurtainSheet);
-        if(!ensureProtectedStyle(curtainStyle,currentCurtainSheet,''))return false;const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
+        if(!ensureProtectedStyle(curtainStyle,currentCurtainSheet,''))return false;
+        if(!USE_MODAL_CURTAIN)return connected(curtainStyle)&&read(nodeText,curtainStyle)===expectedCurtainCss&&
+        (curtainRequired?!nativeHas.call(root,CURTAIN_RELEASE_ATTRIBUTE):nativeGet.call(root,CURTAIN_RELEASE_ATTRIBUTE)==='1');
+        try{if(!curtainVisibleByAttribute())invoke(htmlHiddenProperty.set,curtainLayer,[false]);
+        if(dialogClosedByProperty&&dialogClosedByProperty.set){invoke(dialogClosedByProperty.set,curtainLayer,['none']);
+        if(nativeGet.call(curtainLayer,'closedby')!=='none'||read(dialogClosedByProperty,curtainLayer)!=='none')return false}}catch(_){return false}
+        const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
         for(let index=0;index<CURTAIN_RULES.length;index+=1){const rule=CURTAIN_RULES[index],value=rule[0]==='display'?(curtainRequired?'block':'none'):rule[1];
         if(nativeStyleGet.call(layerStyle,rule[0])!==value||nativeStylePriority.call(layerStyle,rule[0])!=='important')nativeStyleSet.call(layerStyle,rule[0],value,'important')}
         try{if(curtainRequired&&!curtainOpen()){nodeAppend.call(documentElement(),curtainLayer);nativeDialogShowModal.call(curtainLayer)}
@@ -671,11 +687,29 @@ internal object ChromeMediaShieldBootstrap {
         if(!installed){failClosedDocument();return}if(!retireBootstrapSecrets()){failClosedDocument();return}if(SELF_SHIELD){
         const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
         if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||!ensureCurtain()){failClosedDocument();return}
-        const selfReadyBody='v3|SELF_READY|'+READY+'|'+SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
+        const selfShieldIdentity=SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
+        const selfReadyBody='v3|SELF_READY|'+READY+'|'+selfShieldIdentity,selfShieldTraceBody=(phase)=>'v1|SELF_SHIELD_TRACE|'+READY+'|'+selfShieldIdentity+'|'+phase;
+        const requestSelfShieldTrace=(phase)=>{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',SELF_SHIELD_TRACE_URL,false);
+        xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');xhrSend.call(xhr,selfShieldTraceBody(phase));
+        return read(xhrResponseUrlProperty,xhr)===SELF_SHIELD_TRACE_URL&&read(xhrStatusProperty,xhr)===204};
+        let selfShieldStage=0,parserContinuationConsumed=false,originalScriptConsumed=false;
+        const originalScriptStarted=()=>{if(originalScriptConsumed||selfShieldStage!==6)return false;originalScriptConsumed=true;
+        const callbackDeleted=ReflectDelete(SELF,'__gloshH20OriginalScriptStarted__')&&!descriptor(SELF,'__gloshH20OriginalScriptStarted__');
+        if(!callbackDeleted){failClosedDocument();return false}selfShieldStage=7;if(!requestSelfShieldTrace('ORIGINAL_SCRIPT_STARTED')){failClosedDocument();return false}return true};
+        const parserContinuation=()=>{if(parserContinuationConsumed||selfShieldStage!==4)return false;parserContinuationConsumed=true;
+        const script=read(currentScriptProperty,DOC),callbackDeleted=ReflectDelete(SELF,'__gloshH20ParserContinuation__')&&!descriptor(SELF,'__gloshH20ParserContinuation__');
+        if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''){failClosedDocument();return false}selfShieldStage=5;
+        if(!requestSelfShieldTrace('PARSER_CONTINUED')){failClosedDocument();return false}selfShieldStage=6;
+        try{if(descriptor(SELF,'__gloshH20OriginalScriptStarted__'))throw 0;ObjectDefine(SELF,'__gloshH20OriginalScriptStarted__',
+        {value:originalScriptStarted,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument();return false}
+        if(!retireScript(script)){failClosedDocument();return false}return true};
         try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',SELF_READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');xhrSend.call(xhr,selfReadyBody);
-        if(read(xhrResponseUrlProperty,xhr)!==SELF_READY_URL||read(xhrStatusProperty,xhr)!==204){failClosedDocument();return}
-        if(invoke(parserFailClosedRetire.value,parserFailClosed,[])!==true||!ReflectDelete(SELF,'__gloshH19ParserBarrierFailClosed__')||descriptor(SELF,'__gloshH19ParserBarrierFailClosed__')){failClosedDocument();return}
-        curtainRequired=false;if(!ensureCurtain()){failClosedDocument();return}}
+        if(read(xhrResponseUrlProperty,xhr)!==SELF_READY_URL||read(xhrStatusProperty,xhr)!==204){failClosedDocument();return}selfShieldStage=1;
+        if(invoke(parserFailClosedRetire.value,parserFailClosed,[])!==true||!ReflectDelete(SELF,'__gloshH19ParserBarrierFailClosed__')||descriptor(SELF,'__gloshH19ParserBarrierFailClosed__')){failClosedDocument();return}selfShieldStage=2;
+        curtainRequired=false;if(!ensureCurtain()){failClosedDocument();return}selfShieldStage=3;
+        if(curtainLayer||nativeGet.call(documentElement(),CURTAIN_RELEASE_ATTRIBUTE)!=='1'){failClosedDocument();return}selfShieldStage=4;
+        if(!requestSelfShieldTrace('RELEASE_COMPLETED')||descriptor(SELF,'__gloshH20ParserContinuation__')){failClosedDocument();return}
+        ObjectDefine(SELF,'__gloshH20ParserContinuation__',{value:parserContinuation,writable:false,enumerable:false,configurable:true})}
         catch(_){failClosedDocument()}return}if(!TOP_LEVEL){
         const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
         try{if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||descriptor(SELF,'__gloshH19SubdocumentGuard__')){failClosedDocument();return}

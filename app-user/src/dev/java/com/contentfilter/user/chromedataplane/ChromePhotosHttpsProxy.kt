@@ -447,6 +447,7 @@ internal class ChromePhotosHttpsProxy(
             if (
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldReadyPath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath ||
+                request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierPath
             ) {
                 null

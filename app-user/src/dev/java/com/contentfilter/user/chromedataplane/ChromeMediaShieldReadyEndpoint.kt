@@ -34,12 +34,18 @@ internal data class ChromeMediaShieldReadyEndpointMetrics(
     val selfReadyRequests: Long = 0L,
     val selfReadyAccepted: Long = 0L,
     val selfReadyRejected: Long = 0L,
+    val selfShieldReleaseCompleted: Long = 0L,
+    val selfShieldParserContinued: Long = 0L,
+    val selfShieldOriginalScriptStarted: Long = 0L,
+    val selfShieldTraceRejected: Long = 0L,
+    val selfShieldTraceOutstanding: Int = 0,
 )
 
 /** Fixed-origin, capability-authenticated DEV endpoint. It never forwards READY traffic upstream. */
 internal class ChromeMediaShieldReadyEndpoint(
     private val documentSelfShieldEnabled: Boolean = false,
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
+    private val selfShieldLiveness: ChromeMediaShieldSelfShieldLiveness = ChromeMediaShieldSelfShieldLiveness(),
 ) {
     private val requests = AtomicLong()
     private val preflights = AtomicLong()
@@ -58,6 +64,13 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val selfReadyRejected = AtomicLong()
 
     fun handle(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse? {
+        if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath) {
+            return if (documentSelfShieldEnabled) {
+                handleSelfShieldTrace(request)
+            } else {
+                reject("self_shield_trace_disabled")
+            }
+        }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath) {
             return if (documentSelfShieldEnabled) handleSelfReady(request) else reject("self_ready_disabled")
         }
@@ -82,8 +95,9 @@ internal class ChromeMediaShieldReadyEndpoint(
         }
     }
 
-    fun metrics(): ChromeMediaShieldReadyEndpointMetrics =
-        ChromeMediaShieldReadyEndpointMetrics(
+    fun metrics(): ChromeMediaShieldReadyEndpointMetrics {
+        val liveness = selfShieldLiveness.metrics()
+        return ChromeMediaShieldReadyEndpointMetrics(
             requests = requests.get(),
             preflights = preflights.get(),
             accepted = accepted.get(),
@@ -99,7 +113,13 @@ internal class ChromeMediaShieldReadyEndpoint(
             selfReadyRequests = selfReadyRequests.get(),
             selfReadyAccepted = selfReadyAccepted.get(),
             selfReadyRejected = selfReadyRejected.get(),
+            selfShieldReleaseCompleted = liveness.releaseCompleted,
+            selfShieldParserContinued = liveness.parserContinued,
+            selfShieldOriginalScriptStarted = liveness.originalScriptStarted,
+            selfShieldTraceRejected = liveness.rejected,
+            selfShieldTraceOutstanding = liveness.outstanding,
         )
+    }
 
     private fun handleSelfReady(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {
         selfReadyRequests.incrementAndGet()
@@ -122,11 +142,43 @@ internal class ChromeMediaShieldReadyEndpoint(
                     )
             ) {
                 is ChromeMediaShieldReadyClaimResult.Claimed -> {
+                    selfShieldLiveness.arm(parsed.token, parsed.identity)
                     selfReadyAccepted.incrementAndGet()
                     acceptNoContent(origin)
                 }
                 is ChromeMediaShieldReadyClaimResult.Invalid -> rejectSelfReady(result.reason)
             }
+        } finally {
+            body.fill(0)
+        }
+    }
+
+    private fun handleSelfShieldTrace(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {
+        requests.incrementAndGet()
+        val body = request.body
+        return try {
+            val origin = request.exactReadyOriginOrNull() ?: return reject("self_shield_trace_origin_invalid")
+            if (origin == NullOrigin) return reject("self_shield_trace_origin_not_network")
+            if (request.method == OptionsMethod) return preflight(request, origin)
+            if (request.method != PostMethod) return reject("self_shield_trace_method_invalid", 405)
+            if (!request.hasExactReadyContentType()) return reject("self_shield_trace_content_type_invalid")
+            if (!request.hasReadyFetchMetadata()) return reject("self_shield_trace_fetch_metadata_invalid")
+            val parsed = body.parseSelfShieldTraceBody() ?: return reject("self_shield_trace_body_invalid")
+            if (!runtimeAdmits(parsed.identity)) return reject("self_shield_trace_runtime_unavailable")
+            if (
+                !selfShieldLiveness.claim(
+                    token = parsed.token,
+                    identity = parsed.identity,
+                    phase = parsed.phase,
+                    expectOriginalScript =
+                        parsed.phase == ChromeMediaShieldSelfShieldLivenessPhase.ParserContinued &&
+                            parsed.identity.topLevel &&
+                            origin == FixtureOrigin,
+                )
+            ) {
+                return reject("self_shield_trace_stale_or_out_of_order")
+            }
+            traceNoContent(origin)
         } finally {
             body.fill(0)
         }
@@ -254,6 +306,16 @@ internal class ChromeMediaShieldReadyEndpoint(
         )
     }
 
+    private fun traceNoContent(origin: String): ChromePhotosSanitizedResponse =
+        response(
+            statusCode = 204,
+            statusText = "No Content",
+            headers =
+                BaseHeaders +
+                    ChromeHttpHeader("Access-Control-Allow-Origin", origin) +
+                    ChromeHttpHeader("Vary", "Origin"),
+        )
+
     private fun acceptChallenge(
         origin: String,
         challenge: ChromeMediaShieldActiveDocumentChallenge,
@@ -363,11 +425,18 @@ internal class ChromeMediaShieldReadyEndpoint(
         val identity: ChromeMediaShieldSelfReadyIdentity,
     )
 
+    private data class ParsedSelfShieldTraceBody(
+        val token: String,
+        val identity: ChromeMediaShieldSelfReadyIdentity,
+        val phase: ChromeMediaShieldSelfShieldLivenessPhase,
+    )
+
     private companion object {
         const val PostMethod = "POST"
         const val GetMethod = "GET"
         const val OptionsMethod = "OPTIONS"
         const val NullOrigin = "null"
+        const val FixtureOrigin = "https://glosh-photos.test"
         const val ReadyContentType = "text/plain;charset=UTF-8"
         const val MaximumReadyBodyBytes = 256
         const val MaximumReadyHeartbeatAgeMillis = 2_000L
@@ -461,6 +530,36 @@ internal class ChromeMediaShieldReadyEndpoint(
                         },
                 )
             return ParsedSelfReadyBody(parts[2], identity)
+        }
+
+        fun ByteArray.parseSelfShieldTraceBody(): ParsedSelfShieldTraceBody? {
+            if (isEmpty() || size > MaximumReadyBodyBytes || any { it.toInt() !in 0x20..0x7e }) return null
+            val parts = toString(StandardCharsets.US_ASCII).split('|')
+            if (parts.size != 10 || parts[0] != "v1" || parts[1] != "SELF_SHIELD_TRACE") return null
+            val token = parts[2]
+            if (token.length !in 22..64 || token.any { !it.isLetterOrDigit() && it != '-' && it != '_' }) return null
+            val identity =
+                ChromeMediaShieldSelfReadyIdentity(
+                    protectionSessionId = parts[3].takeIf(String::isNotBlank) ?: return null,
+                    policyEpoch = parts[4].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    navigationSequence = parts[5].toLongOrNull()?.takeIf { it >= 0L } ?: return null,
+                    documentSequence = parts[6].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    lifecycleSequence = parts[7].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    topLevel =
+                        when (parts[8]) {
+                            "T" -> true
+                            "S" -> false
+                            else -> return null
+                        },
+                )
+            val phase =
+                when (parts[9]) {
+                    "RELEASE_COMPLETED" -> ChromeMediaShieldSelfShieldLivenessPhase.ReleaseCompleted
+                    "PARSER_CONTINUED" -> ChromeMediaShieldSelfShieldLivenessPhase.ParserContinued
+                    "ORIGINAL_SCRIPT_STARTED" -> ChromeMediaShieldSelfShieldLivenessPhase.OriginalScriptStarted
+                    else -> return null
+                }
+            return ParsedSelfShieldTraceBody(token, identity, phase)
         }
     }
 }

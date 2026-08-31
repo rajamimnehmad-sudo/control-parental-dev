@@ -45,6 +45,9 @@ object ChromePhotosDataPlaneLabContract {
     const val MediaShieldReadyUrl = "https://glosh-photos.test/.well-known/glosh-h19-ready"
     const val MediaShieldSelfReadyPath = "/.well-known/glosh-h20-self-ready"
     const val MediaShieldSelfReadyUrl = "https://glosh-photos.test/.well-known/glosh-h20-self-ready"
+    const val MediaShieldSelfShieldTracePath = "/.well-known/glosh-h20-self-shield-trace"
+    const val MediaShieldSelfShieldTraceUrl =
+        "https://glosh-photos.test/.well-known/glosh-h20-self-shield-trace"
     const val MediaShieldParserBarrierPath = "/.well-known/glosh-h19-parser-barrier.js"
     const val MediaShieldParserBarrierUrl =
         "https://glosh-photos.test/.well-known/glosh-h19-parser-barrier.js"

@@ -19,6 +19,7 @@ internal class ChromeStockMediaAuthorityFixture(
     private val documents = AtomicLong()
     private val frames = AtomicLong()
     private val scripts = AtomicLong()
+    private val firstOriginalScripts = AtomicLong()
     private val styles = AtomicLong()
     private val workers = AtomicLong()
     private val serviceWorkers = AtomicLong()
@@ -43,6 +44,14 @@ internal class ChromeStockMediaAuthorityFixture(
             ControlledPath -> counted(documents) { html("h19-controlled", controlledDocument()) }
             FramePath -> counted(frames) { html("h19-frame", frameDocument()) }
             ScriptPath -> counted(scripts) { response("h19-script", JavaScript, siteScript().toByteArray()) }
+            FirstOriginalScriptPath ->
+                counted(firstOriginalScripts) {
+                    response(
+                        "h20-first-original-script",
+                        JavaScript,
+                        ChromeMediaShieldBootstrap.selfShieldOriginalScriptStartedScript().toByteArray(),
+                    )
+                }
             StylePath -> counted(styles) { response("h19-style", Css, siteStyle().toByteArray()) }
             WorkerPath -> counted(workers) { response("h19-worker", JavaScript, WorkerScript.toByteArray()) }
             ServiceWorkerPath ->
@@ -63,7 +72,8 @@ internal class ChromeStockMediaAuthorityFixture(
 
     fun state(): String =
         "REPORT=${report.get()},DOCUMENTS=${documents.get()},FRAMES=${frames.get()}," +
-            "SCRIPTS=${scripts.get()},STYLES=${styles.get()},WORKERS=${workers.get()}," +
+            "SCRIPTS=${scripts.get()},FIRST_ORIGINAL_SCRIPTS=${firstOriginalScripts.get()}," +
+            "STYLES=${styles.get()},WORKERS=${workers.get()}," +
             "SERVICE_WORKERS=${serviceWorkers.get()},FRAME_REPORTS=${frameReports.get()}," +
             "FRAME_REPORT_REJECTS=${frameReportRejects.get()},FRAME_REPORT=${frameReport.get()}," +
             "FRAME_REPORT_SHA=${frameReportSha256.get()},FRAME_CHALLENGE_SHA=${frameChallengeSha256.get()}," +
@@ -75,7 +85,7 @@ internal class ChromeStockMediaAuthorityFixture(
     internal fun controlledDocument(): String =
         """
         <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-        <title>GLOSH H19 CONTROLLED</title><link rel="stylesheet" href="$StylePath"></head><body><h1>CHROME STOCK MEDIA AUTHORITY 19</h1>
+        <script src="$FirstOriginalScriptPath"></script><title>GLOSH H19 CONTROLLED</title><link rel="stylesheet" href="$StylePath"></head><body><h1>CHROME STOCK MEDIA AUTHORITY 19</h1>
         <section id="network"><h2>Network authority</h2>
         <img id="safe-png" src="${ChromePhotosRealWebLabConfig.SafePngUrl}"><img id="block-webp" src="${ChromePhotosRealWebLabConfig.BlockWebpUrl}"><img id="block-jpeg" src="${ChromeVisualShieldFixtureSample.Block.sourceUrl}">
         <img id="jpeg-candidate" src="${ChromePhotosRealWebLabConfig.UnknownJpegUrl}"><img id="webp-candidate" src="${ChromePhotosRealWebLabConfig.UnknownWebpUrl}"><img id="avif-candidate" src="${ChromePhotosRealWebLabConfig.UnknownAvifUrl}">
@@ -379,6 +389,7 @@ internal class ChromeStockMediaAuthorityFixture(
         const val ControlledPath = "/web19/controlled"
         const val FramePath = "/web19/frame"
         const val ScriptPath = "/web19/site.js"
+        const val FirstOriginalScriptPath = "/web20/first-original.js"
         const val StylePath = "/web19/site.css"
         const val WorkerPath = "/web19/worker.js"
         const val ServiceWorkerPath = "/web19/service-worker.js"

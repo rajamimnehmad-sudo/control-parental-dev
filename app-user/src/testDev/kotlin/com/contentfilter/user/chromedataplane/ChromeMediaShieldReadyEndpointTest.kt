@@ -27,11 +27,32 @@ class ChromeMediaShieldReadyEndpointTest {
         attestH20()
         val endpoint = ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled = true, elapsedRealtime = { Now })
 
-        assertEquals(204, endpoint.handle(selfReadyRequest(Token, identity))?.statusCode)
+        assertEquals(204, endpoint.handle(selfReadyRequest(Token, identity).withOrigin(FixtureOrigin))?.statusCode)
         assertEquals(503, endpoint.handle(selfReadyRequest(Token, identity))?.statusCode)
         assertEquals(1L, endpoint.metrics().selfReadyAccepted)
         assertEquals(1L, endpoint.metrics().selfReadyRejected)
         assertEquals(0L, endpoint.metrics().activeHello)
+    }
+
+    @Test
+    fun `H20 liveness trace proves release parser continuation and original script in order`() {
+        val identity = issueH20(Token, topLevel = true)
+        attestH20()
+        val endpoint = ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled = true, elapsedRealtime = { Now })
+
+        assertEquals(204, endpoint.handle(selfReadyRequest(Token, identity).withOrigin(FixtureOrigin))?.statusCode)
+        assertEquals(503, endpoint.handle(livenessRequest(Token, identity, "PARSER_CONTINUED"))?.statusCode)
+        assertEquals(204, endpoint.handle(livenessRequest(Token, identity, "RELEASE_COMPLETED"))?.statusCode)
+        assertEquals(204, endpoint.handle(livenessRequest(Token, identity, "PARSER_CONTINUED"))?.statusCode)
+        assertEquals(204, endpoint.handle(livenessRequest(Token, identity, "ORIGINAL_SCRIPT_STARTED"))?.statusCode)
+        assertEquals(503, endpoint.handle(livenessRequest(Token, identity, "ORIGINAL_SCRIPT_STARTED"))?.statusCode)
+
+        val metrics = endpoint.metrics()
+        assertEquals(1L, metrics.selfShieldReleaseCompleted)
+        assertEquals(1L, metrics.selfShieldParserContinued)
+        assertEquals(1L, metrics.selfShieldOriginalScriptStarted)
+        assertEquals(2L, metrics.selfShieldTraceRejected)
+        assertEquals(0, metrics.selfShieldTraceOutstanding)
     }
 
     @Test
@@ -320,6 +341,28 @@ class ChromeMediaShieldReadyEndpointTest {
             ).toByteArray(Charsets.US_ASCII),
     )
 
+    private fun livenessRequest(
+        token: String,
+        identity: com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity,
+        phase: String,
+    ) = request("HELLO", token, 1L).withOrigin(FixtureOrigin).copy(
+        target = ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath,
+        body =
+            (
+                "v1|SELF_SHIELD_TRACE|$token|${identity.protectionSessionId}|${identity.policyEpoch}|" +
+                    "${identity.navigationSequence}|${identity.documentSequence}|1|" +
+                    (if (identity.topLevel) "T" else "S") + "|$phase"
+            ).toByteArray(Charsets.US_ASCII),
+    )
+
+    private fun ChromePhotosProxyRequest.withOrigin(origin: String) =
+        copy(
+            headers =
+                headers.map { header ->
+                    if (header.name.equals("Origin", ignoreCase = true)) header.copy(value = origin) else header
+                },
+        )
+
     private fun request(
         phase: String,
         token: String,
@@ -372,6 +415,7 @@ class ChromeMediaShieldReadyEndpointTest {
         const val H20PolicyEpoch = 20L
         const val Now = 5_000L
         const val Origin = "https://shop.example"
+        const val FixtureOrigin = "https://glosh-photos.test"
         const val Token = "AAAAAAAAAAAAAAAAAAAAAA"
         const val FrameToken = "BBBBBBBBBBBBBBBBBBBBBB"
         val Challenge = "c".repeat(43)

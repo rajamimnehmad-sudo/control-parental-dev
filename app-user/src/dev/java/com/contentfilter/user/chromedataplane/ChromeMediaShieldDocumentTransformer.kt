@@ -86,7 +86,8 @@ internal class ChromeMediaShieldDocumentTransformer(
             val failClosedInstaller = ChromeMediaShieldBootstrap.parserBarrierFailClosedInstallerScript()
             val parserTail =
                 if (documentSelfShieldEnabled) {
-                    ""
+                    "<script nonce=\"$scriptNonce\">" +
+                        "${ChromeMediaShieldBootstrap.selfShieldParserContinuationScript()}</script>"
                 } else if (topLevel) {
                     val guardScript = ChromeMediaShieldBootstrap.parserBarrierGuardScript()
                     "<script nonce=\"$scriptNonce\" src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\" " +
