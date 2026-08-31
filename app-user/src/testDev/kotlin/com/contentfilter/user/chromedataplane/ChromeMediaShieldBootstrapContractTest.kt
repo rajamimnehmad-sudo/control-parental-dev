@@ -134,7 +134,8 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "retireBootstrapSecrets()")
         assertContains(
             ChromeMediaShieldBootstrap.curtainCss,
-            "body>*{visibility:hidden!important;opacity:0!important}",
+            "html:not([${ChromeMediaShieldBootstrap.CurtainReleaseAttribute}='1']) body>*{" +
+                "visibility:hidden!important;opacity:0!important}",
         )
         assertContains(script, "StringCharCodeAt=String.prototype.charCodeAt")
         assertContains(script, "const code=charCode(value,index)")
@@ -171,7 +172,10 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "curtainOpen()===curtainRequired")
         assertContains(script, "const hideCurtain=()=>{curtainRequired=false;return ensureCurtain()}")
         assertFalse(script.contains("nodeRemove.call(parent,curtainStyle)"))
-        assertContains(script, "nativeSet.call(curtainStyle,'media','not all')")
+        assertContains(script, "CURTAIN_RELEASE_ATTRIBUTE='${ChromeMediaShieldBootstrap.CurtainReleaseAttribute}'")
+        assertContains(script, "nativeSet.call(root,CURTAIN_RELEASE_ATTRIBUTE,'1')")
+        assertContains(script, "nativeRemove.call(root,CURTAIN_RELEASE_ATTRIBUTE)")
+        assertFalse(script.contains("nativeSet.call(curtainStyle,'media','not all')"))
     }
 
     @Test
@@ -199,12 +203,8 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(selfShield, "xhrOpen.call(xhr,'POST',SELF_READY_URL,false)")
         assertContains(selfShield, "read(xhrStatusProperty,xhr)!==204")
         assertContains(selfShield, "curtainRequired=false;if(!ensureCurtain())")
-        assertContains(selfShield, "const expectedCurtainCss=curtainRequired?CURTAIN_CSS:''")
-        assertContains(
-            selfShield,
-            "if(read(nodeText,curtainStyle)!==expectedCurtainCss)" +
-                "invoke(nodeText.set,curtainStyle,[expectedCurtainCss])",
-        )
+        assertContains(selfShield, "const expectedCurtainCss=CURTAIN_CSS,root=documentElement()")
+        assertFalse(selfShield.contains("invoke(nodeText.set,curtainStyle,[expectedCurtainCss])"))
         assertContains(selfShield, "read(nodeText,curtainStyle)===expectedCurtainCss")
         assertContains(
             selfShield,
@@ -213,7 +213,12 @@ class ChromeMediaShieldBootstrapContractTest {
         )
         assertContains(
             selfShield,
-            "ensureProtectedStyle(curtainStyle,currentCurtainSheet,curtainRequired?'':'not all')",
+            "ensureProtectedStyle(curtainStyle,currentCurtainSheet,'')",
+        )
+        assertContains(
+            selfShield,
+            "curtainRequired?!nativeHas.call(root,CURTAIN_RELEASE_ATTRIBUTE):" +
+                "nativeGet.call(root,CURTAIN_RELEASE_ATTRIBUTE)==='1'",
         )
         assertTrue(
             selfShield.indexOf("if(!installed){failClosedDocument();return}") <
@@ -272,8 +277,12 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "ensureProtectedStyle(shieldStyle,shieldSheet,'')")
         assertContains(
             script,
-            "ensureProtectedStyle(curtainStyle,currentCurtainSheet,curtainRequired?'':'not all')",
+            "ensureProtectedStyle(curtainStyle,currentCurtainSheet,'')",
         )
+        assertContains(script, "const protectedCurtainAttribute=(element,key)=>")
+        assertContains(script, "protectedCurtainAttribute(this,key))deny()")
+        assertContains(script, "'ry',CURTAIN_RELEASE_ATTRIBUTE]")
+        assertEquals(5, Regex("protectedCurtainAttribute\\(this,key\\)\\)deny\\(\\)").findAll(script).count())
         assertContains(script, "invoke(htmlTitleProperty.set,style,[''])")
         assertContains(script, "nativeRemove.call(style,'title')")
         assertContains(

@@ -7,6 +7,7 @@ internal object ChromeMediaShieldBootstrap {
     const val StyleElementId = "glosh-h19-media-shield"
     const val CurtainStyleElementId = "glosh-h19-document-curtain"
     const val CurtainElementId = "glosh-h19-document-curtain-layer"
+    const val CurtainReleaseAttribute = "data-glosh-h20-curtain-released"
     const val ParserBarrierCallbackName = "__gloshH19ParserBarrierCommit__"
     const val ParserBarrierGuardName = "__gloshH19ParserBarrierGuard__"
     const val ParserBarrierFailClosedName = "__gloshH19ParserBarrierFailClosed__"
@@ -22,9 +23,13 @@ internal object ChromeMediaShieldBootstrap {
             "svg[data-glosh-icon-safe='1']{max-width:96px!important;max-height:96px!important;overflow:hidden!important;" +
             "transform:none!important;filter:none!important;mask:none!important;clip-path:none!important}"
 
+    // Keep the nonce-authorized sheet immutable. H20 releases by changing only document-owned
+    // state; mutating the sheet after clearing its CSP nonce can leave Chrome applying old rules.
     val curtainCss: String =
-        "html,body{background:#202124!important}" +
-            "body>*{visibility:hidden!important;opacity:0!important}"
+        "html:not([$CurtainReleaseAttribute='1'])," +
+            "html:not([$CurtainReleaseAttribute='1']) body{background:#202124!important}" +
+            "html:not([$CurtainReleaseAttribute='1']) body>*{" +
+            "visibility:hidden!important;opacity:0!important}"
 
     fun script(
         readyToken: String,
@@ -36,6 +41,7 @@ internal object ChromeMediaShieldBootstrap {
             .replace(ReadyTokenPlaceholder, readyToken)
             .replace(NoncePlaceholder, styleNonce)
             .replace(ShieldCssPlaceholder, jsString(css))
+            .replace(CurtainReleaseAttributePlaceholder, CurtainReleaseAttribute)
             .replace(ReadyUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldReadyUrl)
             .replace(SelfReadyUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyUrl)
             .replace(ParserBarrierUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl)
@@ -88,6 +94,7 @@ internal object ChromeMediaShieldBootstrap {
     private const val ReadyTokenPlaceholder = "__GLOSH_READY_TOKEN__"
     private const val NoncePlaceholder = "__GLOSH_NONCE__"
     private const val ShieldCssPlaceholder = "__GLOSH_SHIELD_CSS__"
+    private const val CurtainReleaseAttributePlaceholder = "__GLOSH_CURTAIN_RELEASE_ATTRIBUTE__"
     private const val ReadyUrlPlaceholder = "__GLOSH_READY_URL__"
     private const val SelfReadyUrlPlaceholder = "__GLOSH_SELF_READY_URL__"
     private const val ParserBarrierUrlPlaceholder = "__GLOSH_PARSER_BARRIER_URL__"
@@ -103,7 +110,7 @@ internal object ChromeMediaShieldBootstrap {
         const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
         const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD;
         const STYLE_ID='glosh-h19-media-shield',CURTAIN_ID='glosh-h19-document-curtain',CURTAIN_LAYER_ID='glosh-h19-document-curtain-layer';
-        const CSS='__GLOSH_SHIELD_CSS__',FRAME_SANDBOX='allow-scripts allow-forms allow-popups-to-escape-sandbox';let installed=true;
+        const CSS='__GLOSH_SHIELD_CSS__',CURTAIN_RELEASE_ATTRIBUTE='__GLOSH_CURTAIN_RELEASE_ATTRIBUTE__',FRAME_SANDBOX='allow-scripts allow-forms allow-popups-to-escape-sandbox';let installed=true;
         const SELF=self,DOC=document,NAV=navigator,IS_TOP_LEVEL=SELF===SELF.top,BOOTSTRAP_SCRIPT=DOC.currentScript,NativeObject=Object,NativeReflect=Reflect;
         const ReflectApply=NativeReflect.apply,ReflectDefine=NativeReflect.defineProperty,ReflectDelete=NativeReflect.deleteProperty,ReflectSet=NativeReflect.set,ReflectSetPrototype=NativeReflect.setPrototypeOf,ReflectPreventExtensions=NativeReflect.preventExtensions;
         const ObjectDefine=NativeObject.defineProperty,ObjectDefineProperties=NativeObject.defineProperties,ObjectAssign=NativeObject.assign,ObjectDescribe=NativeObject.getOwnPropertyDescriptor;
@@ -337,18 +344,17 @@ internal object ChromeMediaShieldBootstrap {
         try{if(!curtainVisibleByAttribute())invoke(htmlHiddenProperty.set,curtainLayer,[false]);
         if(dialogClosedByProperty&&dialogClosedByProperty.set){invoke(dialogClosedByProperty.set,curtainLayer,['none']);
         if(nativeGet.call(curtainLayer,'closedby')!=='none'||read(dialogClosedByProperty,curtainLayer)!=='none')return false}}catch(_){return false}
-        const expectedCurtainCss=curtainRequired?CURTAIN_CSS:'';
-        if(read(nodeText,curtainStyle)!==expectedCurtainCss)invoke(nodeText.set,curtainStyle,[expectedCurtainCss]);
-        if(curtainRequired){if(nativeHas.call(curtainStyle,'media'))nativeRemove.call(curtainStyle,'media')}
-        else if(nativeGet.call(curtainStyle,'media')!=='not all')nativeSet.call(curtainStyle,'media','not all');
+        const expectedCurtainCss=CURTAIN_CSS,root=documentElement();
+        if(curtainRequired){if(nativeHas.call(root,CURTAIN_RELEASE_ATTRIBUTE))nativeRemove.call(root,CURTAIN_RELEASE_ATTRIBUTE)}
+        else if(nativeGet.call(root,CURTAIN_RELEASE_ATTRIBUTE)!=='1')nativeSet.call(root,CURTAIN_RELEASE_ATTRIBUTE,'1');
         const currentCurtainSheet=read(styleSheetProperty,curtainStyle);registerProtectedSheet(currentCurtainSheet);
-        if(!ensureProtectedStyle(curtainStyle,currentCurtainSheet,curtainRequired?'':'not all'))return false;const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
+        if(!ensureProtectedStyle(curtainStyle,currentCurtainSheet,''))return false;const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
         for(let index=0;index<CURTAIN_RULES.length;index+=1){const rule=CURTAIN_RULES[index],value=rule[0]==='display'?(curtainRequired?'block':'none'):rule[1];
         if(nativeStyleGet.call(layerStyle,rule[0])!==value||nativeStylePriority.call(layerStyle,rule[0])!=='important')nativeStyleSet.call(layerStyle,rule[0],value,'important')}
         try{if(curtainRequired&&!curtainOpen()){nodeAppend.call(documentElement(),curtainLayer);nativeDialogShowModal.call(curtainLayer)}
         else if(!curtainRequired&&curtainOpen())nativeDialogClose.call(curtainLayer)}catch(_){return false}
         return connected(curtainStyle)&&connected(curtainLayer)&&read(nodeText,curtainStyle)===expectedCurtainCss&&
-        (curtainRequired?!nativeHas.call(curtainStyle,'media'):nativeGet.call(curtainStyle,'media')==='not all')&&
+        (curtainRequired?!nativeHas.call(root,CURTAIN_RELEASE_ATTRIBUTE):nativeGet.call(root,CURTAIN_RELEASE_ATTRIBUTE)==='1')&&
         curtainOpen()===curtainRequired&&curtainVisibleByAttribute()&&(!dialogClosedByProperty||(nativeGet.call(curtainLayer,'closedby')==='none'&&read(dialogClosedByProperty,curtainLayer)==='none'))&&
         nativeStyleGet.call(layerStyle,'display')===(curtainRequired?'block':'none')&&nativeStylePriority.call(layerStyle,'display')==='important'};
         if(shieldStyle)invoke(WeakSetAdd,protectedNodes,[shieldStyle]);if(curtainStyle)invoke(WeakSetAdd,protectedNodes,[curtainStyle]);if(curtainLayer)invoke(WeakSetAdd,protectedNodes,[curtainLayer]);
@@ -408,32 +414,33 @@ internal object ChromeMediaShieldBootstrap {
         if(self.Selection&&Selection.prototype.deleteFromDocument){const deleteFromDocument=Selection.prototype.deleteFromDocument;
         installed=seal(Selection.prototype,'deleteFromDocument',function(){if(selectionTouchesProtected(this))deny();return invoke(deleteFromDocument,this,[])})&&installed}
         const adopt=Document.prototype.adoptNode;installed=seal(Document.prototype,'adoptNode',function(node){if(containsProtected(node))deny();const result=invoke(adopt,this,[node]);scan(result);return result})&&installed;
+        const protectedCurtainAttribute=(element,key)=>element===documentElement()&&key===CURTAIN_RELEASE_ATTRIBUTE;
         installed=seal(Element.prototype,'setAttribute',function(name,value){const attributeName=stringOf(name),attributeValue=stringOf(value),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key]))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
+        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
         if(oneOf(tag,['button','input'])&&key==='formtarget')return nativeSet.call(this,'formtarget','_self');
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);nativeSet.call(this,'src','about:blank');hide(this);return}
         const result=nativeSet.call(this,attributeName,attributeValue);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'removeAttribute',function(name){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this]))deny();
+        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
         const result=nativeRemove.call(this,attributeName);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'toggleAttribute',function(name,force){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key]))deny();
+        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&(key==='sandbox'||key==='srcdoc')){sanitizeElement(this);return nativeHas.call(this,key)}
         const result=nativeToggle.call(this,attributeName,force);sanitizeContainer(this);return result})&&installed;
         const nativeSetNS=method(Element.prototype.setAttributeNS),nativeRemoveNS=method(Element.prototype.removeAttributeNS);
         installed=seal(Element.prototype,'setAttributeNS',function(namespace,name,value){const namespaceValue=namespace===null?null:stringOf(namespace),attributeName=stringOf(name),attributeValue=stringOf(value);
         const colon=lastIndex(attributeName,':'),key=lower(colon>=0?slice(attributeName,colon+1):attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key]))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
+        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
         if(oneOf(tag,['button','input'])&&key==='formtarget')return nativeSet.call(this,'formtarget','_self');
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);
         nativeSet.call(this,'src','about:blank');hide(this);return}const result=nativeSetNS.call(this,namespaceValue,attributeName,attributeValue);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'removeAttributeNS',function(namespace,name){const namespaceValue=namespace===null?null:stringOf(namespace),attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this]))deny();if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
+        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
         const result=nativeRemoveNS.call(this,namespaceValue,attributeName);sanitizeContainer(this);return result})&&installed;
         const guardedSetAttribute=Element.prototype.setAttribute,guardedSetAttributeNS=Element.prototype.setAttributeNS;
         const guardedRemoveAttribute=Element.prototype.removeAttribute,guardedRemoveAttributeNS=Element.prototype.removeAttributeNS;
@@ -646,7 +653,7 @@ internal object ChromeMediaShieldBootstrap {
         if(NAV.serviceWorker&&NAV.serviceWorker.register){const serviceWorkerOwner=propertyOwner(NAV.serviceWorker,'register');
         installed=!!serviceWorkerOwner&&seal(serviceWorkerOwner,'register',deny)&&installed}
         const WATCHED_ATTRIBUTES=['src','srcset','style','href','xlink:href','srcdoc','sandbox','target','formtarget','popover','popovertarget','popovertargetaction','commandfor','command','data-glosh-media-blocked','data-glosh-icon-safe',
-        'd','points','viewBox','width','height','fill','stroke','transform','filter','mask','clip-path','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry'];
+        'd','points','viewBox','width','height','fill','stroke','transform','filter','mask','clip-path','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry',CURTAIN_RELEASE_ATTRIBUTE];
         const observer=new NativeMutationObserver(records=>{ensureStyle();ensureCurtain();for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
         if(type==='childList'){const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1)scan(added[addedIndex])}
         else{const target=read(mutationTargetProperty,record);if(target){sanitizeContainer(target);scan(target)}}}});

@@ -93,7 +93,8 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
         val source =
             "<svg data-glosh-icon-safe='1' DATA-GLOSH-MEDIA-BLOCKED=0><foreignObject></foreignObject></svg>" +
                 "<iframe data-glosh-network-frame=1 src='about:blank'></iframe>" +
-                "<div data-glosh-h19-ready=true></div>"
+                "<html ${ChromeMediaShieldBootstrap.CurtainReleaseAttribute}='1'>" +
+                "<div data-glosh-h19-ready=true></div></html>"
 
         val output = ChromeMediaShieldStaticMarkupNeutralizer.neutralize(source)
 
@@ -102,6 +103,7 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
         assertEquals(2, "data-glosh-media-blocked=\"1\"".toRegex().findAll(output).count())
         assertFalse(output.contains("data-glosh-network-frame", ignoreCase = true))
         assertFalse(output.contains("data-glosh-h19-ready", ignoreCase = true))
+        assertFalse(output.contains(ChromeMediaShieldBootstrap.CurtainReleaseAttribute, ignoreCase = true))
         assertContains(output, "sandbox=\"allow-scripts allow-forms allow-popups-to-escape-sandbox\"")
     }
 
