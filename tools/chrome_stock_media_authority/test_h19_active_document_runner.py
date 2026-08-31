@@ -735,6 +735,68 @@ class ActiveDocumentRunnerTest(unittest.TestCase):
         self.assertNotIn("release", device.actions)
         self.assertIn("cancel", device.actions)
 
+    def test_early_switch_failure_restores_tab_without_masking_causal_error(self):
+        device = FakeActiveDocumentDevice(emit_b_hello=False)
+        clock = FakeClock()
+        selected = tuple(
+            spec
+            for spec in CASE_SPECS
+            if spec.case_id in ("cold_foreground_release", "switch_during_hello")
+        )
+        runner = ActiveDocumentA23GateRunner(
+            device,
+            config=RunnerConfig(
+                case_timeout_seconds=1.0,
+                hold_timeout_seconds=0.5,
+                poll_interval_seconds=0.1,
+            ),
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
+            nonce_factory=lambda: HOLD_NONCE,
+            case_specs=selected,
+        )
+
+        with self.assertRaisesRegex(
+            FocusedActiveDocumentGateError,
+            "foreground_claim_supersession_not_observed",
+        ):
+            runner.run(RUN_NONCE)
+
+        self.assertEqual(1, device.actions.count("restore_tab_a"))
+
+    def test_rapid_switch_failure_restores_every_opened_tab(self):
+        class RapidFailureDevice(FakeActiveDocumentDevice):
+            def supported_case_actions(self):
+                return frozenset({"controlled_navigation", "rapid_tab_switching"})
+
+        device = RapidFailureDevice(emit_b_hello=False)
+        clock = FakeClock()
+        selected = tuple(
+            spec
+            for spec in CASE_SPECS
+            if spec.case_id in ("cold_foreground_release", "rapid_tab_switching")
+        )
+        runner = ActiveDocumentA23GateRunner(
+            device,
+            config=RunnerConfig(
+                case_timeout_seconds=1.0,
+                hold_timeout_seconds=0.5,
+                poll_interval_seconds=0.1,
+            ),
+            monotonic=clock.monotonic,
+            sleep=clock.sleep,
+            nonce_factory=lambda: HOLD_NONCE,
+            case_specs=selected,
+        )
+
+        with self.assertRaisesRegex(
+            FocusedActiveDocumentGateError,
+            "rapid_claim_supersession_not_observed",
+        ):
+            runner.run(RUN_NONCE)
+
+        self.assertEqual(1, device.actions.count("restore_tab_a"))
+
     def test_causal_invalidation_must_be_newer_than_pre_switch_snapshot(self):
         device = FakeActiveDocumentDevice(causal_event_after_snapshot=False)
 

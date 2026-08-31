@@ -35,6 +35,7 @@ class ActiveDocumentTabCases:
         completed = False
         switched = False
         exposure_open = False
+        causal_event: Mapping[str, Any] | None = None
         try:
             if "result=active_document_hold_armed" not in self._device.send_hold(arm):
                 raise FocusedActiveDocumentGateError("hold_arm_rejected")
@@ -112,12 +113,17 @@ class ActiveDocumentTabCases:
                 self._current_release = None
                 self._device.restore_previous_tab()
                 try:
+                    restore_after_sequence = (
+                        int(causal_event.get("eventSequence", 0))
+                        if causal_event is not None
+                        else before_switch
+                    )
                     restored, restored_claim = self._wait_for_reactivated_document_release(
                         since,
                         spec.case_id,
                         document_sequence,
                         a_claim,
-                        int(causal_event.get("eventSequence", 0)),
+                        restore_after_sequence,
                         timeout_code="switch_restore_terminal_timeout",
                     )
                     restored = self._summary_with_current_release(
@@ -243,6 +249,8 @@ class ActiveDocumentTabCases:
         forbidden: list[int] = []
         forbidden_claims: list[tuple[str, int, int, int, int, str]] = []
         exposure_open = False
+        opened_tabs = 0
+        passed = False
         try:
             self._begin_critical_exposure(spec.case_id)
             exposure_open = True
@@ -264,6 +272,7 @@ class ActiveDocumentTabCases:
                     forbidden_claims.append(held_claim)
                     self._current_release = None
                     self._device.open_switch_tab(self._target(run_nonce))
+                    opened_tabs += 1
                     _, _, b_hello, b_claim = self._wait_for_claim_supersession(
                         since,
                         spec,
@@ -294,42 +303,47 @@ class ActiveDocumentTabCases:
                         self._device.send_hold(cancel)
             self._end_critical_exposure(spec.case_id)
             exposure_open = False
+            self._label_case(spec)
+            self._device.navigate_controlled(self._target(run_nonce))
+            observed = self._wait_for_case_release_count(
+                since,
+                spec.case_id,
+                1,
+                "rapid_final_release_timeout",
+            )
+            final_document, _ = self._release_event_identity(observed, spec.case_id)
+            final_claim = _event_claim(_last_event(observed, spec.case_id, "active_document_released"))
+            if final_claim is None:
+                raise FocusedActiveDocumentGateError("rapid_final_claim_missing")
+            summary = self._wait_for_stable_terminal(
+                since,
+                expected_release_current=1,
+                timeout_code="rapid_terminal_timeout",
+            )
+            verification = self._verify(
+                spec,
+                summary,
+                baseline,
+                expected_document_sequence=final_document,
+                forbidden_document_sequences=tuple(forbidden),
+                expected_claim=final_claim,
+                forbidden_claims=tuple(forbidden_claims),
+                error_code="rapid_switch_verification_failed",
+            )
+            passed = True
+            return {
+                "caseId": spec.case_id,
+                "pass": True,
+                "claimSupersessions": claim_supersessions,
+                "verification": verification,
+            }
         finally:
             if exposure_open:
                 self._end_critical_exposure(spec.case_id)
-        self._label_case(spec)
-        self._device.navigate_controlled(self._target(run_nonce))
-        observed = self._wait_for_case_release_count(
-            since,
-            spec.case_id,
-            1,
-            "rapid_final_release_timeout",
-        )
-        final_document, _ = self._release_event_identity(observed, spec.case_id)
-        final_claim = _event_claim(_last_event(observed, spec.case_id, "active_document_released"))
-        if final_claim is None:
-            raise FocusedActiveDocumentGateError("rapid_final_claim_missing")
-        summary = self._wait_for_stable_terminal(
-            since,
-            expected_release_current=1,
-            timeout_code="rapid_terminal_timeout",
-        )
-        verification = self._verify(
-            spec,
-            summary,
-            baseline,
-            expected_document_sequence=final_document,
-            forbidden_document_sequences=tuple(forbidden),
-            expected_claim=final_claim,
-            forbidden_claims=tuple(forbidden_claims),
-            error_code="rapid_switch_verification_failed",
-        )
-        return {
-            "caseId": spec.case_id,
-            "pass": True,
-            "claimSupersessions": claim_supersessions,
-            "verification": verification,
-        }
+            if not passed:
+                self._current_release = None
+                for _ in range(opened_tabs):
+                    self._device.restore_previous_tab()
 
 
     def _run_present_postcommit_race(self, spec: CaseSpec, run_nonce: str) -> dict[str, Any]:

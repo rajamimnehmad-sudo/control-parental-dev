@@ -200,12 +200,12 @@ class ActiveDocumentA23GateRunner(ActiveDocumentPhysicalCases, ActiveDocumentTab
         raise FocusedActiveDocumentGateError(timeout_code)
 
     def _summary_with_current_release(self, summary: Mapping[str, Any]) -> dict[str, Any]:
-        """Bind releaseCurrent to an exactly observed release and Chrome root.
+        """Bind releaseCurrent to an exactly observed cryptographic claim and native root.
 
         A log marker starts a fresh evidence window, so focus/rotation cases may
         legitimately contain no new release event.  The runner may carry the
         last physically observed release across cases, but only while its
-        window/root/web-root triple still exactly matches current typed status.
+        current claim still matches the typed native window/root status.
         """
 
         result = dict(summary)
