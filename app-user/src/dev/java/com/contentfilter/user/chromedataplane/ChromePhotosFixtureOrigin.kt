@@ -56,6 +56,7 @@ internal class ChromePhotosFixtureOrigin(
             auditPlaceholderBytes = auditPlaceholderImageBytes,
         )
     private val stockMediaAuthorityFixture = ChromeStockMediaAuthorityFixture(sentinelImageBytes)
+    private val serviceWorkerBoundaryFixture = ChromeServiceWorkerBoundaryFixture()
 
     override fun webSemanticsReport(): String = report.get()
 
@@ -63,10 +64,12 @@ internal class ChromePhotosFixtureOrigin(
 
     override fun preRenderShieldReport(): String = preRenderShieldFixture.state()
 
-    override fun mediaShieldReport(): String = stockMediaAuthorityFixture.state()
+    override fun mediaShieldReport(): String =
+        stockMediaAuthorityFixture.state() + ",SW_BOUNDARY={" + serviceWorkerBoundaryFixture.state() + "}"
 
     override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse {
         ChromeVisualShieldFixture.responseFor(request)?.let { return it }
+        serviceWorkerBoundaryFixture.responseFor(request)?.let { return it }
         stockMediaAuthorityFixture.responseFor(request)?.let { return it }
         preRenderShieldFixture.responseFor(request)?.let { return it }
         imageAuthorityFixture.responseFor(request)?.let { return it }
