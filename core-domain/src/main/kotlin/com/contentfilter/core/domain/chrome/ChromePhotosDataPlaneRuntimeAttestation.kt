@@ -19,6 +19,7 @@ data class ChromePhotosDataPlaneRuntimeSnapshot(
     val accessibilityBound: Boolean = false,
     val mediaAuthorityEnabled: Boolean = false,
     val mediaPolicyEpoch: Long = 0L,
+    val documentSelfShieldEnabled: Boolean = false,
 )
 
 object ChromePhotosDataPlaneRuntimeAttestation {
@@ -30,6 +31,7 @@ object ChromePhotosDataPlaneRuntimeAttestation {
         sessionId: String,
         mediaAuthorityEnabled: Boolean = false,
         mediaPolicyEpoch: Long = 0L,
+        documentSelfShieldEnabled: Boolean = false,
     ) {
         state =
             ChromePhotosDataPlaneRuntimeSnapshot(
@@ -37,6 +39,7 @@ object ChromePhotosDataPlaneRuntimeAttestation {
                 accessibilityBound = accessibilityBound,
                 mediaAuthorityEnabled = mediaAuthorityEnabled,
                 mediaPolicyEpoch = if (mediaAuthorityEnabled) mediaPolicyEpoch else 0L,
+                documentSelfShieldEnabled = mediaAuthorityEnabled && documentSelfShieldEnabled,
             )
     }
 

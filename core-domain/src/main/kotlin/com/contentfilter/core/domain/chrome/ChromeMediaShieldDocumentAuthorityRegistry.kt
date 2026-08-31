@@ -25,6 +25,16 @@ data class ChromeMediaShieldReadyClaim(
     val lifecycleSequence: Long,
 )
 
+/** Exact document-owned capability presented by the H20 parser-first bootstrap. */
+data class ChromeMediaShieldSelfReadyIdentity(
+    val protectionSessionId: String,
+    val policyEpoch: Long,
+    val navigationSequence: Long,
+    val documentSequence: Long,
+    val lifecycleSequence: Long,
+    val topLevel: Boolean,
+)
+
 sealed interface ChromeMediaShieldReadyClaimResult {
     data class Claimed(
         val claim: ChromeMediaShieldReadyClaim,
@@ -115,6 +125,16 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         return identity
     }
 
+    /** Removes only an exact undelivered transformer capability. */
+    @Synchronized
+    fun revokeIssued(identity: ChromeMediaShieldDocumentIdentity): Boolean {
+        if (issuedByDigest[identity.tokenDigest] != identity) return false
+        issuedByDigest.remove(identity.tokenDigest)
+        readyLifecycleByDigest.remove(identity.tokenDigest)
+        if (foregroundActivation?.claim?.identity == identity) foregroundActivation = null
+        return true
+    }
+
     /**
      * Consumes one strictly newer document-owned visibility lifecycle. Network cancellation may
      * prevent an earlier lifecycle from reaching the proxy, so gaps are allowed; equality and
@@ -132,6 +152,45 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         readyToken: String,
         lifecycleSequence: Long,
     ): ChromeMediaShieldReadyClaimResult = claimReadyLocked(readyToken, lifecycleSequence, requireTopLevel = true)
+
+    /**
+     * Claims only the exact document that owns [readyToken]. Unlike the H19 foreground path this
+     * grants no Android presentation capability: the accepted response is useful solely to the
+     * requesting document closure, which may then remove its own parser-first curtain.
+     */
+    @Synchronized
+    fun claimSelfReady(
+        readyToken: String,
+        expected: ChromeMediaShieldSelfReadyIdentity,
+    ): ChromeMediaShieldReadyClaimResult {
+        if (!readyToken.isStrictReadyToken() || expected.lifecycleSequence <= 0L) {
+            return ChromeMediaShieldReadyClaimResult.Invalid("self_ready_malformed")
+        }
+        val tokenDigest = digestReadyToken(readyToken)
+        val identity =
+            issuedByDigest[tokenDigest]
+                ?: return ChromeMediaShieldReadyClaimResult.Invalid("self_ready_not_issued")
+        if (
+            identity.protectionSessionId != expected.protectionSessionId ||
+            identity.policyEpoch != expected.policyEpoch ||
+            identity.navigationSequence != expected.navigationSequence ||
+            identity.documentSequence != expected.documentSequence ||
+            identity.topLevel != expected.topLevel
+        ) {
+            return ChromeMediaShieldReadyClaimResult.Invalid("self_ready_identity_mismatch")
+        }
+        if (!matchesSession(identity.protectionSessionId, identity.policyEpoch)) {
+            return ChromeMediaShieldReadyClaimResult.Invalid("self_ready_session_stale")
+        }
+        val previousLifecycle = readyLifecycleByDigest[tokenDigest] ?: 0L
+        if (expected.lifecycleSequence <= previousLifecycle) {
+            return ChromeMediaShieldReadyClaimResult.Invalid("self_ready_replay")
+        }
+        readyLifecycleByDigest[tokenDigest] = expected.lifecycleSequence
+        return ChromeMediaShieldReadyClaimResult.Claimed(
+            ChromeMediaShieldReadyClaim(identity, expected.lifecycleSequence),
+        )
+    }
 
     /**
      * Resolves an already claimed top-level lifecycle without consuming a second lifecycle.

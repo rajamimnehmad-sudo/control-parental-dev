@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 
 internal object ChromeMediaShieldBootstrap {
@@ -29,14 +30,21 @@ internal object ChromeMediaShieldBootstrap {
         readyToken: String,
         styleNonce: String,
         topLevel: Boolean = true,
+        selfShieldIdentity: ChromeMediaShieldDocumentIdentity? = null,
     ): String =
         ScriptTemplate
             .replace(ReadyTokenPlaceholder, readyToken)
             .replace(NoncePlaceholder, styleNonce)
             .replace(ShieldCssPlaceholder, jsString(css))
             .replace(ReadyUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldReadyUrl)
+            .replace(SelfReadyUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyUrl)
             .replace(ParserBarrierUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl)
             .replace(TopLevelPlaceholder, topLevel.toString())
+            .replace(SelfShieldPlaceholder, (selfShieldIdentity != null).toString())
+            .replace(SessionPlaceholder, selfShieldIdentity?.protectionSessionId.orEmpty())
+            .replace(PolicyEpochPlaceholder, selfShieldIdentity?.policyEpoch?.toString() ?: "0")
+            .replace(NavigationSequencePlaceholder, selfShieldIdentity?.navigationSequence?.toString() ?: "0")
+            .replace(DocumentSequencePlaceholder, selfShieldIdentity?.documentSequence?.toString() ?: "0")
 
     fun parserBarrierGuardScript(): String = completionGuardScript(ParserBarrierGuardName)
 
@@ -81,12 +89,19 @@ internal object ChromeMediaShieldBootstrap {
     private const val NoncePlaceholder = "__GLOSH_NONCE__"
     private const val ShieldCssPlaceholder = "__GLOSH_SHIELD_CSS__"
     private const val ReadyUrlPlaceholder = "__GLOSH_READY_URL__"
+    private const val SelfReadyUrlPlaceholder = "__GLOSH_SELF_READY_URL__"
     private const val ParserBarrierUrlPlaceholder = "__GLOSH_PARSER_BARRIER_URL__"
     private const val TopLevelPlaceholder = "__GLOSH_TOP_LEVEL__"
+    private const val SelfShieldPlaceholder = "__GLOSH_SELF_SHIELD__"
+    private const val SessionPlaceholder = "__GLOSH_SESSION__"
+    private const val PolicyEpochPlaceholder = "__GLOSH_POLICY_EPOCH__"
+    private const val NavigationSequencePlaceholder = "__GLOSH_NAVIGATION_SEQUENCE__"
+    private const val DocumentSequencePlaceholder = "__GLOSH_DOCUMENT_SEQUENCE__"
     private val ScriptTemplate =
         """
         (()=>{'use strict';
-        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,READY_URL='__GLOSH_READY_URL__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
+        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
+        const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD;
         const STYLE_ID='glosh-h19-media-shield',CURTAIN_ID='glosh-h19-document-curtain',CURTAIN_LAYER_ID='glosh-h19-document-curtain-layer';
         const CSS='__GLOSH_SHIELD_CSS__',FRAME_SANDBOX='allow-scripts allow-forms allow-popups-to-escape-sandbox';let installed=true;
         const SELF=self,DOC=document,NAV=navigator,IS_TOP_LEVEL=SELF===SELF.top,BOOTSTRAP_SCRIPT=DOC.currentScript,NativeObject=Object,NativeReflect=Reflect;
@@ -254,7 +269,7 @@ internal object ChromeMediaShieldBootstrap {
         if(query){const nodes=copyList(query.call(root,'canvas,video,object,embed,frame,fencedframe,iframe,img,source,input[type="image" i],svg,[srcdoc],[style],[popover],[popovertarget],[popovertargetaction],[commandfor],[command]'),nodeListLength);
         for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}};
         const sanitizeContainer=(node)=>{if(!node||nodeTypeOf(node)!==1)return;sanitizeElement(node);const svg=elementClosest.call(node,'svg');if(svg&&svg!==node)sanitizeElement(svg)};
-        const shieldStyle=DOC.getElementById(STYLE_ID),curtainStyle=TOP_LEVEL?DOC.getElementById(CURTAIN_ID):null,curtainLayer=TOP_LEVEL?nativeCreateElement.call(DOC,'dialog'):null;
+        const shieldStyle=DOC.getElementById(STYLE_ID),curtainStyle=HAS_CURTAIN?DOC.getElementById(CURTAIN_ID):null,curtainLayer=HAS_CURTAIN?nativeCreateElement.call(DOC,'dialog'):null;
         if(curtainLayer){nativeSet.call(curtainLayer,'id',CURTAIN_LAYER_ID);nativeSet.call(curtainLayer,'tabindex','-1');nodeInsert.call(documentElement(),curtainLayer,firstChildOf(documentElement()))}
         if(!shieldStyle||(TOP_LEVEL&&(!curtainStyle||!curtainLayer)))installed=false;else{watchStyle(shieldStyle);if(curtainStyle)watchStyle(curtainStyle);if(curtainLayer)watchStyle(curtainLayer)}
         const styleSheetProperty=shieldStyle?propertyDescriptor(shieldStyle,'sheet'):null,styleNonceProperty=shieldStyle?propertyDescriptor(shieldStyle,'nonce'):null;
@@ -283,7 +298,7 @@ internal object ChromeMediaShieldBootstrap {
         !styleSheetDisabledProperty||!styleSheetMediaProperty||!mediaTextProperty||(self.CSSStyleRule&&!ruleStyleProperty)||(self.Range&&!rangeAncestorProperty))installed=false;
         const clearStyleNonce=(style)=>{try{invoke(styleNonceProperty.set,style,['']);nativeRemove.call(style,'nonce');
         return read(styleNonceProperty,style)===''&&!nativeHas.call(style,'nonce')}catch(_){return false}};
-        let curtainRequired=TOP_LEVEL;
+        let curtainRequired=HAS_CURTAIN;
         const protectedNode=(node)=>!!node&&invoke(WeakSetHas,protectedNodes,[node]);
         const protectedInlineStyle=(element)=>protectedNode(element)||invoke(WeakSetHas,protectedIconNodes,[element])||invoke(WeakSetHas,protectedMediaNodes,[element])||nativeGet.call(element,'data-glosh-media-blocked')==='1'||nativeGet.call(element,'data-glosh-icon-safe')==='1';
         const guardInlineStyleOwner=(prototype)=>{if(!prototype)return true;const owner=propertyOwner(prototype,'style');if(!owner)return false;
@@ -317,7 +332,7 @@ internal object ChromeMediaShieldBootstrap {
         ['mix-blend-mode','normal'],['animation','none'],['transition','none'],['contain','strict'],['overflow','hidden']];
         const curtainOpen=()=>!!curtainLayer&&read(dialogOpenProperty,curtainLayer)===true;
         const curtainVisibleByAttribute=()=>!!curtainLayer&&read(htmlHiddenProperty,curtainLayer)===false&&!nativeHas.call(curtainLayer,'hidden');
-        const ensureCurtain=()=>{if(!TOP_LEVEL)return true;if(!curtainStyle||!curtainLayer||!connected(curtainStyle)||!connected(curtainLayer))return false;
+        const ensureCurtain=()=>{if(!HAS_CURTAIN)return true;if(!curtainStyle||!curtainLayer||!connected(curtainStyle)||!connected(curtainLayer))return false;
         try{if(!curtainVisibleByAttribute())invoke(htmlHiddenProperty.set,curtainLayer,[false]);
         if(dialogClosedByProperty&&dialogClosedByProperty.set){invoke(dialogClosedByProperty.set,curtainLayer,['none']);
         if(nativeGet.call(curtainLayer,'closedby')!=='none'||read(dialogClosedByProperty,curtainLayer)!=='none')return false}}catch(_){return false}
@@ -641,7 +656,15 @@ internal object ChromeMediaShieldBootstrap {
         let subdocumentGuardConsumed=false;const subdocumentGuard=()=>{if(subdocumentGuardConsumed)return false;subdocumentGuardConsumed=true;
         const guardScript=read(currentScriptProperty,DOC),callbackDeleted=ReflectDelete(SELF,'__gloshH19SubdocumentGuard__')&&!descriptor(SELF,'__gloshH19SubdocumentGuard__');
         if(!callbackDeleted||!guardScript||read(scriptSrcProperty,guardScript)!==''||!retireScript(guardScript)){failClosedDocument();return false}return true};
-        if(!installed){failClosedDocument();return}if(!retireBootstrapSecrets()){failClosedDocument();return}if(!TOP_LEVEL){
+        if(!installed){failClosedDocument();return}if(!retireBootstrapSecrets()){failClosedDocument();return}if(SELF_SHIELD){
+        const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
+        if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||!ensureCurtain()){failClosedDocument();return}
+        const selfReadyBody='v3|SELF_READY|'+READY+'|'+SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
+        try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',SELF_READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');xhrSend.call(xhr,selfReadyBody);
+        if(read(xhrResponseUrlProperty,xhr)!==SELF_READY_URL||read(xhrStatusProperty,xhr)!==204){failClosedDocument();return}
+        if(invoke(parserFailClosedRetire.value,parserFailClosed,[])!==true||!ReflectDelete(SELF,'__gloshH19ParserBarrierFailClosed__')||descriptor(SELF,'__gloshH19ParserBarrierFailClosed__')){failClosedDocument();return}
+        curtainRequired=false;if(!ensureCurtain()){failClosedDocument();return}}
+        catch(_){failClosedDocument()}return}if(!TOP_LEVEL){
         const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
         try{if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||descriptor(SELF,'__gloshH19SubdocumentGuard__')){failClosedDocument();return}
         ObjectDefine(SELF,'__gloshH19SubdocumentGuard__',{value:subdocumentGuard,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument()}return}

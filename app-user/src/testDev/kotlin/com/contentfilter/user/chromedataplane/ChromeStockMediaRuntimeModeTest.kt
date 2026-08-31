@@ -20,6 +20,36 @@ class ChromeStockMediaRuntimeModeTest {
         assertTrue(mode.replaceAllNetworkVisuals)
     }
 
+    @Test
+    fun `explicit H20 requires stock authority and survives restart`() {
+        val explicit =
+            resolve(
+                hasExplicitMode = true,
+                explicitStock = true,
+                explicitFullTunnel = true,
+                explicitSelfShield = true,
+            )
+        val restored =
+            resolve(
+                hasExplicitMode = false,
+                persistedStock = true,
+                persistedFullTunnel = true,
+                persistedSelfShield = true,
+            )
+
+        assertTrue(explicit.documentSelfShieldEnabled)
+        assertTrue(restored.documentSelfShieldEnabled)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `H20 without stock authority fails closed`() {
+        resolve(
+            hasExplicitMode = true,
+            explicitFullTunnel = true,
+            explicitSelfShield = true,
+        )
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun `explicit H19 without full tunnel fails closed`() {
         resolve(
@@ -95,17 +125,21 @@ class ChromeStockMediaRuntimeModeTest {
         explicitStock: Boolean = false,
         explicitFullTunnel: Boolean = false,
         explicitReplaceAll: Boolean = false,
+        explicitSelfShield: Boolean = false,
         persistedStock: Boolean = false,
         persistedFullTunnel: Boolean = false,
         persistedReplaceAll: Boolean = false,
+        persistedSelfShield: Boolean = false,
     ): ChromeStockMediaRuntimeMode =
         ChromeStockMediaRuntimeModeResolver.resolve(
             hasExplicitMode = hasExplicitMode,
             explicitStockMediaAuthorityEnabled = explicitStock,
             explicitFullTunnelDevGateEnabled = explicitFullTunnel,
             explicitReplaceAllNetworkVisuals = explicitReplaceAll,
+            explicitDocumentSelfShieldEnabled = explicitSelfShield,
             persistedStockMediaAuthorityEnabled = persistedStock,
             persistedFullTunnelDevGateEnabled = persistedFullTunnel,
             persistedReplaceAllNetworkVisuals = persistedReplaceAll,
+            persistedDocumentSelfShieldEnabled = persistedSelfShield,
         )
 }

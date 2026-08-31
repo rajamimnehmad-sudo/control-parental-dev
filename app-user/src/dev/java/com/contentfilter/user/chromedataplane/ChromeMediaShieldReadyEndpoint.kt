@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import android.os.SystemClock
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldActiveDocumentChallenge
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldActiveDocumentHandshakeBridge
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldActiveDocumentHandshakeResult
@@ -10,7 +11,9 @@ import com.contentfilter.core.domain.chrome.ChromeMediaShieldParserBarrierBridge
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldParserBarrierResult
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyClaim
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyClaimResult
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldSelfReadyIdentity
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicLong
@@ -28,10 +31,16 @@ internal data class ChromeMediaShieldReadyEndpointMetrics(
     val parserBarrierRequests: Long = 0L,
     val parserBarrierReady: Long = 0L,
     val parserBarrierFailClosed: Long = 0L,
+    val selfReadyRequests: Long = 0L,
+    val selfReadyAccepted: Long = 0L,
+    val selfReadyRejected: Long = 0L,
 )
 
 /** Fixed-origin, capability-authenticated DEV endpoint. It never forwards READY traffic upstream. */
-internal class ChromeMediaShieldReadyEndpoint {
+internal class ChromeMediaShieldReadyEndpoint(
+    private val documentSelfShieldEnabled: Boolean = false,
+    private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
+) {
     private val requests = AtomicLong()
     private val preflights = AtomicLong()
     private val accepted = AtomicLong()
@@ -44,12 +53,19 @@ internal class ChromeMediaShieldReadyEndpoint {
     private val parserBarrierRequests = AtomicLong()
     private val parserBarrierReady = AtomicLong()
     private val parserBarrierFailClosed = AtomicLong()
+    private val selfReadyRequests = AtomicLong()
+    private val selfReadyAccepted = AtomicLong()
+    private val selfReadyRejected = AtomicLong()
 
     fun handle(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse? {
+        if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath) {
+            return if (documentSelfShieldEnabled) handleSelfReady(request) else reject("self_ready_disabled")
+        }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierPath) {
-            return handleParserBarrier(request)
+            return if (documentSelfShieldEnabled) reject("parser_barrier_disabled") else handleParserBarrier(request)
         }
         if (request.target != ChromePhotosDataPlaneLabContract.MediaShieldReadyPath) return null
+        if (documentSelfShieldEnabled) return reject("active_document_ready_disabled")
         requests.incrementAndGet()
         val body = request.body
         return try {
@@ -80,7 +96,72 @@ internal class ChromeMediaShieldReadyEndpoint {
             parserBarrierRequests = parserBarrierRequests.get(),
             parserBarrierReady = parserBarrierReady.get(),
             parserBarrierFailClosed = parserBarrierFailClosed.get(),
+            selfReadyRequests = selfReadyRequests.get(),
+            selfReadyAccepted = selfReadyAccepted.get(),
+            selfReadyRejected = selfReadyRejected.get(),
         )
+
+    private fun handleSelfReady(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {
+        selfReadyRequests.incrementAndGet()
+        requests.incrementAndGet()
+        val body = request.body
+        return try {
+            val origin = request.exactReadyOriginOrNull() ?: return rejectSelfReady("self_ready_origin_invalid")
+            if (origin == NullOrigin) return rejectSelfReady("self_ready_origin_not_network")
+            if (request.method == OptionsMethod) return preflight(request, origin)
+            if (request.method != PostMethod) return rejectSelfReady("self_ready_method_invalid", 405)
+            if (!request.hasExactReadyContentType()) return rejectSelfReady("self_ready_content_type_invalid")
+            if (!request.hasReadyFetchMetadata()) return rejectSelfReady("self_ready_fetch_metadata_invalid")
+            val parsed = body.parseSelfReadyBody() ?: return rejectSelfReady("self_ready_body_invalid")
+            if (!runtimeAdmits(parsed.identity)) return rejectSelfReady("self_ready_runtime_unavailable")
+            when (
+                val result =
+                    ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(
+                        parsed.token,
+                        parsed.identity,
+                    )
+            ) {
+                is ChromeMediaShieldReadyClaimResult.Claimed -> {
+                    selfReadyAccepted.incrementAndGet()
+                    acceptNoContent(origin)
+                }
+                is ChromeMediaShieldReadyClaimResult.Invalid -> rejectSelfReady(result.reason)
+            }
+        } finally {
+            body.fill(0)
+        }
+    }
+
+    private fun runtimeAdmits(identity: ChromeMediaShieldSelfReadyIdentity): Boolean {
+        val runtime = ChromePhotosDataPlaneRuntimeAttestation.snapshot()
+        val now = elapsedRealtime()
+        val scopeHeartbeat =
+            when {
+                runtime.fixtureConfirmed -> runtime.fixtureHeartbeatElapsed
+                runtime.realWebScopeConfirmed -> runtime.realWebScopeHeartbeatElapsed
+                else -> 0L
+            }
+        return runtime.documentSelfShieldEnabled &&
+            runtime.mediaAuthorityEnabled &&
+            runtime.sessionId == identity.protectionSessionId &&
+            runtime.mediaPolicyEpoch == identity.policyEpoch &&
+            runtime.proxyHealthy &&
+            runtime.policyConfirmed &&
+            runtime.vpnConfirmed &&
+            runtime.vpnSessionId == runtime.sessionId &&
+            runtime.heartbeatElapsed in 1..now &&
+            runtime.validUntilElapsed > now &&
+            scopeHeartbeat in 1..now &&
+            now - scopeHeartbeat <= MaximumReadyHeartbeatAgeMillis
+    }
+
+    private fun rejectSelfReady(
+        reason: String,
+        statusCode: Int = 503,
+    ): ChromePhotosSanitizedResponse {
+        selfReadyRejected.incrementAndGet()
+        return reject(reason, statusCode)
+    }
 
     private fun handleParserBarrier(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {
         parserBarrierRequests.incrementAndGet()
@@ -277,6 +358,11 @@ internal class ChromeMediaShieldReadyEndpoint {
             }
     }
 
+    private data class ParsedSelfReadyBody(
+        val token: String,
+        val identity: ChromeMediaShieldSelfReadyIdentity,
+    )
+
     private companion object {
         const val PostMethod = "POST"
         const val GetMethod = "GET"
@@ -284,6 +370,7 @@ internal class ChromeMediaShieldReadyEndpoint {
         const val NullOrigin = "null"
         const val ReadyContentType = "text/plain;charset=UTF-8"
         const val MaximumReadyBodyBytes = 256
+        const val MaximumReadyHeartbeatAgeMillis = 2_000L
         val BaseHeaders =
             listOf(
                 ChromeHttpHeader("Cache-Control", "no-store"),
@@ -353,6 +440,27 @@ internal class ChromeMediaShieldReadyEndpoint {
                         ?: return null
                 }
             return ParsedReadyBody(phase, token, lifecycle, challenge)
+        }
+
+        fun ByteArray.parseSelfReadyBody(): ParsedSelfReadyBody? {
+            if (isEmpty() || size > MaximumReadyBodyBytes || any { it.toInt() !in 0x20..0x7e }) return null
+            val parts = toString(StandardCharsets.US_ASCII).split('|')
+            if (parts.size != 9 || parts[0] != "v3" || parts[1] != "SELF_READY") return null
+            val identity =
+                ChromeMediaShieldSelfReadyIdentity(
+                    protectionSessionId = parts[3].takeIf(String::isNotBlank) ?: return null,
+                    policyEpoch = parts[4].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    navigationSequence = parts[5].toLongOrNull()?.takeIf { it >= 0L } ?: return null,
+                    documentSequence = parts[6].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    lifecycleSequence = parts[7].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    topLevel =
+                        when (parts[8]) {
+                            "T" -> true
+                            "S" -> false
+                            else -> return null
+                        },
+                )
+            return ParsedSelfReadyBody(parts[2], identity)
         }
     }
 }

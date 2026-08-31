@@ -36,6 +36,7 @@ internal sealed interface ChromeMediaShieldDocumentResult {
 internal class ChromeMediaShieldDocumentTransformer(
     private val sessionId: String,
     private val policyEpoch: Long,
+    private val documentSelfShieldEnabled: Boolean = false,
     private val cspPolicy: ChromeMediaShieldCspPolicy = ChromeMediaShieldCspPolicy(),
     private val randomBytes: (Int) -> ByteArray = ::secureRandomBytes,
 ) {
@@ -54,6 +55,8 @@ internal class ChromeMediaShieldDocumentTransformer(
         disposition: ChromeMediaShieldDocumentDisposition.Transform,
     ): ChromeMediaShieldDocumentResult {
         outstanding.incrementAndGet()
+        var issuedIdentity: ChromeMediaShieldDocumentIdentity? = null
+        var delivered = false
         return try {
             if (sourceBytes.size > MaximumDocumentBytes) return failClosed("document_too_large")
             if (sourceBytes.containsNul()) return failClosed("document_contains_nul")
@@ -65,10 +68,26 @@ internal class ChromeMediaShieldDocumentTransformer(
             val styleNonce = randomToken()
             val readyToken = randomToken()
             val topLevel = disposition.kind == ChromeMediaShieldDocumentKind.TopLevel
-            val script = ChromeMediaShieldBootstrap.script(readyToken, styleNonce, topLevel)
+            val identity =
+                ChromeMediaShieldDocumentAuthorityRegistry.issue(
+                    sessionId = sessionId,
+                    epoch = policyEpoch,
+                    readyToken = readyToken,
+                    topLevel = topLevel,
+                ) ?: return failClosed("document_authority_issue_failed")
+            issuedIdentity = identity
+            val script =
+                ChromeMediaShieldBootstrap.script(
+                    readyToken = readyToken,
+                    styleNonce = styleNonce,
+                    topLevel = topLevel,
+                    selfShieldIdentity = identity.takeIf { documentSelfShieldEnabled },
+                )
             val failClosedInstaller = ChromeMediaShieldBootstrap.parserBarrierFailClosedInstallerScript()
             val parserTail =
-                if (topLevel) {
+                if (documentSelfShieldEnabled) {
+                    ""
+                } else if (topLevel) {
                     val guardScript = ChromeMediaShieldBootstrap.parserBarrierGuardScript()
                     "<script nonce=\"$scriptNonce\" src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\" " +
                         "referrerpolicy=\"no-referrer\"></script><script nonce=\"$scriptNonce\">" +
@@ -78,7 +97,7 @@ internal class ChromeMediaShieldDocumentTransformer(
                 }
             val injection =
                 (
-                    if (topLevel) {
+                    if (topLevel || documentSelfShieldEnabled) {
                         "<style id=\"${ChromeMediaShieldBootstrap.CurtainStyleElementId}\" nonce=\"$styleNonce\">" +
                             ChromeMediaShieldBootstrap.curtainCss +
                             "</style>"
@@ -101,14 +120,8 @@ internal class ChromeMediaShieldDocumentTransformer(
                     source = injected,
                     metaCspRewriter = cspPolicy::rewriteMetaPolicy,
                 )
-            val identity =
-                ChromeMediaShieldDocumentAuthorityRegistry.issue(
-                    sessionId = sessionId,
-                    epoch = policyEpoch,
-                    readyToken = readyToken,
-                    topLevel = topLevel,
-                ) ?: return failClosed("document_authority_issue_failed")
             transformed.incrementAndGet()
+            delivered = true
             ChromeMediaShieldDocumentResult.Transformed(
                 ChromeMediaShieldTransformedDocument(
                     bytes = output.toByteArray(Charsets.ISO_8859_1),
@@ -130,6 +143,7 @@ internal class ChromeMediaShieldDocumentTransformer(
         } catch (_: Throwable) {
             failClosed("document_transform_exception")
         } finally {
+            if (!delivered) issuedIdentity?.let(ChromeMediaShieldDocumentAuthorityRegistry::revokeIssued)
             outstanding.decrementAndGet()
         }
     }

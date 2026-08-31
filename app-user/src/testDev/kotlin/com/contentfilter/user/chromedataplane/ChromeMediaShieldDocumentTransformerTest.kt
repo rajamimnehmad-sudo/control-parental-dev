@@ -116,6 +116,42 @@ class ChromeMediaShieldDocumentTransformerTest {
     }
 
     @Test
+    fun `H20 top-level and subdocument own parser-first curtains and no external release tail`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, 20L)
+        var call = 0
+        val selfShieldTransformer =
+            ChromeMediaShieldDocumentTransformer(
+                sessionId = Session,
+                policyEpoch = 20L,
+                documentSelfShieldEnabled = true,
+                randomBytes = { size -> ByteArray(size) { index -> (++call + index).toByte() } },
+            )
+
+        val top =
+            assertIs<ChromeMediaShieldDocumentResult.Transformed>(
+                selfShieldTransformer.transform(Source.toByteArray(), emptyList(), transformDisposition()),
+            ).document.bytes.toString(Charsets.UTF_8)
+        val frame =
+            assertIs<ChromeMediaShieldDocumentResult.Transformed>(
+                selfShieldTransformer.transform(
+                    Source.toByteArray(),
+                    emptyList(),
+                    transformDisposition(ChromeMediaShieldDocumentKind.Subdocument),
+                ),
+            ).document.bytes.toString(Charsets.UTF_8)
+
+        for (html in listOf(top, frame)) {
+            assertContains(html, "<style id=\"${ChromeMediaShieldBootstrap.CurtainStyleElementId}\"")
+            assertContains(html, "SELF_SHIELD=true")
+            assertContains(html, ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyUrl)
+            assertFalse(html.contains("src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\""))
+            assertTrue(html.indexOf("SELF_SHIELD=true") < html.indexOf("site-original"))
+        }
+        assertContains(top, "TOP_LEVEL=true")
+        assertContains(frame, "TOP_LEVEL=false")
+    }
+
+    @Test
     fun `declarative shadow and static iframe are structurally neutralized without authorizing iframe`() {
         val source =
             "<!doctype html><html><head></head><body>" +

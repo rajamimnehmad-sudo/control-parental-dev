@@ -156,6 +156,10 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                     ExtraStockMediaAuthorityEnabled,
                     intent.getBooleanExtra(ExtraStockMediaAuthorityEnabled, false),
                 )
+                .putExtra(
+                    ExtraDocumentSelfShieldEnabled,
+                    intent.getBooleanExtra(ExtraDocumentSelfShieldEnabled, false),
+                )
         }
         if (intent.action == ActionAuditMark) {
             serviceIntent
@@ -207,6 +211,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ExtraFullTunnelDevGateEnabled = "full_tunnel_dev_gate_enabled"
         const val ExtraReplaceAllNetworkVisuals = "replace_all_network_visuals"
         const val ExtraStockMediaAuthorityEnabled = ChromePhotosDataPlaneLabContract.KeyStockMediaAuthorityEnabled
+        const val ExtraDocumentSelfShieldEnabled = ChromePhotosDataPlaneLabContract.KeyDocumentSelfShieldEnabled
         private const val DefaultTransportStressCycles = 100
         private const val ActiveDocumentLogTag = "ChromeMediaShieldActiveDocument"
         private val ActiveDocumentHoldActions =

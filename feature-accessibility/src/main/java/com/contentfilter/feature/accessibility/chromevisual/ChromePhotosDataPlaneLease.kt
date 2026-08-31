@@ -28,6 +28,7 @@ internal data class ChromePhotosDataPlaneAttestation(
     val accessibilityBound: Boolean = false,
     val mediaAuthorityEnabled: Boolean = false,
     val mediaPolicyEpoch: Long = 0L,
+    val documentSelfShieldEnabled: Boolean = false,
 )
 
 internal data class ChromePhotosDataPlaneLeaseContext(
@@ -225,6 +226,7 @@ internal class ChromePhotosDataPlaneAttestationReader(
             accessibilityBound = runtime.accessibilityBound,
             mediaAuthorityEnabled = runtime.mediaAuthorityEnabled,
             mediaPolicyEpoch = runtime.mediaPolicyEpoch,
+            documentSelfShieldEnabled = runtime.documentSelfShieldEnabled,
         )
     }
 }

@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -139,7 +140,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "const code=charCode(value,index)")
         assertFalse(script.contains("value.charCodeAt(index)"))
         assertContains(script, "CURTAIN_LAYER_ID='${ChromeMediaShieldBootstrap.CurtainElementId}'")
-        assertContains(script, "curtainLayer=TOP_LEVEL?nativeCreateElement.call(DOC,'dialog'):null")
+        assertContains(script, "curtainLayer=HAS_CURTAIN?nativeCreateElement.call(DOC,'dialog'):null")
         assertContains(script, "nativeStyleSet.call(layerStyle,rule[0],value,'important')")
         assertContains(script, "['z-index','2147483647']")
         assertContains(script, "['pointer-events','auto']")
@@ -174,11 +175,45 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
+    fun `H20 self shield installs before one shot ACK and releases only its own curtain`() {
+        val identity =
+            ChromeMediaShieldDocumentIdentity(
+                protectionSessionId = "session-h20",
+                policyEpoch = 20L,
+                navigationSequence = 7L,
+                documentSequence = 9L,
+                tokenDigest = "a".repeat(64),
+                topLevel = true,
+            )
+        val selfShield =
+            ChromeMediaShieldBootstrap.script(
+                readyToken = ReadyToken,
+                styleNonce = StyleNonce,
+                selfShieldIdentity = identity,
+            )
+
+        assertContains(selfShield, "SELF_SHIELD=true")
+        assertContains(selfShield, "HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD")
+        assertContains(selfShield, "v3|SELF_READY|")
+        assertContains(selfShield, "SESSION='session-h20',POLICY_EPOCH=20,NAVIGATION_SEQUENCE=7,DOCUMENT_SEQUENCE=9")
+        assertContains(selfShield, "xhrOpen.call(xhr,'POST',SELF_READY_URL,false)")
+        assertContains(selfShield, "read(xhrStatusProperty,xhr)!==204")
+        assertContains(selfShield, "curtainRequired=false;if(!ensureCurtain())")
+        assertTrue(
+            selfShield.indexOf("if(!installed){failClosedDocument();return}") <
+                selfShield.indexOf("v3|SELF_READY|"),
+        )
+        assertTrue(selfShield.indexOf("v3|SELF_READY|") < selfShield.indexOf("curtainRequired=false"))
+        assertTrue(selfShield.indexOf("if(SELF_SHIELD){") < selfShield.indexOf("if(!TOP_LEVEL){"))
+        assertContains(selfShield, "catch(_){failClosedDocument()}return}if(!TOP_LEVEL){")
+    }
+
+    @Test
     fun `subdocuments install the shield without exposing a foreground authority marker`() {
         val subdocumentScript = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce, topLevel = false)
 
         assertContains(subdocumentScript, "TOP_LEVEL=false")
-        assertContains(subdocumentScript, "if(!TOP_LEVEL)return")
+        assertContains(subdocumentScript, "if(!TOP_LEVEL){")
     }
 
     @Test

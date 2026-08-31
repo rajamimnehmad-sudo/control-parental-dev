@@ -446,6 +446,7 @@ internal class ChromePhotosHttpsProxy(
         val coverageToken =
             if (
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldReadyPath ||
+                request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierPath
             ) {
                 null

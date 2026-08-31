@@ -4,6 +4,7 @@ internal data class ChromeStockMediaRuntimeMode(
     val stockMediaAuthorityEnabled: Boolean,
     val fullTunnelDevGateEnabled: Boolean,
     val replaceAllNetworkVisuals: Boolean,
+    val documentSelfShieldEnabled: Boolean,
 ) {
     init {
         require(!stockMediaAuthorityEnabled || fullTunnelDevGateEnabled) {
@@ -11,6 +12,9 @@ internal data class ChromeStockMediaRuntimeMode(
         }
         require(!replaceAllNetworkVisuals || stockMediaAuthorityEnabled) {
             "replace_all_requires_stock_media_authority"
+        }
+        require(!documentSelfShieldEnabled || stockMediaAuthorityEnabled) {
+            "document_self_shield_requires_stock_media_authority"
         }
     }
 }
@@ -22,21 +26,25 @@ internal object ChromeStockMediaRuntimeModeResolver {
         explicitStockMediaAuthorityEnabled: Boolean,
         explicitFullTunnelDevGateEnabled: Boolean,
         explicitReplaceAllNetworkVisuals: Boolean,
+        explicitDocumentSelfShieldEnabled: Boolean,
         persistedStockMediaAuthorityEnabled: Boolean,
         persistedFullTunnelDevGateEnabled: Boolean,
         persistedReplaceAllNetworkVisuals: Boolean,
+        persistedDocumentSelfShieldEnabled: Boolean,
     ): ChromeStockMediaRuntimeMode =
         if (hasExplicitMode) {
             ChromeStockMediaRuntimeMode(
                 stockMediaAuthorityEnabled = explicitStockMediaAuthorityEnabled,
                 fullTunnelDevGateEnabled = explicitFullTunnelDevGateEnabled,
                 replaceAllNetworkVisuals = explicitReplaceAllNetworkVisuals,
+                documentSelfShieldEnabled = explicitDocumentSelfShieldEnabled,
             )
         } else {
             ChromeStockMediaRuntimeMode(
                 stockMediaAuthorityEnabled = persistedStockMediaAuthorityEnabled,
                 fullTunnelDevGateEnabled = persistedFullTunnelDevGateEnabled,
                 replaceAllNetworkVisuals = persistedReplaceAllNetworkVisuals,
+                documentSelfShieldEnabled = persistedDocumentSelfShieldEnabled,
             )
         }
 }

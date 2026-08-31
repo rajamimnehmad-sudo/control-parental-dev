@@ -107,6 +107,13 @@ class ChromePhotosDataPlaneLabService : Service() {
                     val fullTunnelDevGateEnabled = mode.fullTunnelDevGateEnabled
                     val replaceAllNetworkVisuals = mode.replaceAllNetworkVisuals
                     val stockMediaAuthorityEnabled = mode.stockMediaAuthorityEnabled
+                    val documentSelfShieldEnabled = mode.documentSelfShieldEnabled
+                    val mediaPolicyEpoch =
+                        if (documentSelfShieldEnabled) {
+                            ChromePhotosDataPlaneLabContract.DocumentSelfShieldPolicyEpoch
+                        } else {
+                            ChromePhotosDataPlaneLabContract.StockMediaPolicyEpoch
+                        }
                     persistRequestedRuntimeMode(preferences, mode)
                     if (udpFixtureGate.enabled) {
                         require(
@@ -127,12 +134,13 @@ class ChromePhotosDataPlaneLabService : Service() {
                     ChromePhotosDataPlaneRuntimeAttestation.beginSession(
                         sessionId = sessionId,
                         mediaAuthorityEnabled = stockMediaAuthorityEnabled,
-                        mediaPolicyEpoch = ChromePhotosDataPlaneLabContract.StockMediaPolicyEpoch,
+                        mediaPolicyEpoch = mediaPolicyEpoch,
+                        documentSelfShieldEnabled = documentSelfShieldEnabled,
                     )
                     if (stockMediaAuthorityEnabled) {
                         ChromeMediaShieldDocumentAuthorityRegistry.beginSession(
                             sessionId,
-                            ChromePhotosDataPlaneLabContract.StockMediaPolicyEpoch,
+                            mediaPolicyEpoch,
                         )
                     } else {
                         ChromeMediaShieldDocumentAuthorityRegistry.clear()
@@ -158,6 +166,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                             stockMediaAuthorityEnabled,
                         )
                         .putBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyDocumentSelfShieldEnabled,
+                            documentSelfShieldEnabled,
+                        )
+                        .putBoolean(
                             ChromePhotosDataPlaneLabContract.KeyRequestedStockMediaAuthorityEnabled,
                             stockMediaAuthorityEnabled,
                         )
@@ -168,6 +180,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                         .putBoolean(
                             ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals,
                             replaceAllNetworkVisuals,
+                        )
+                        .putBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyRequestedDocumentSelfShieldEnabled,
+                            documentSelfShieldEnabled,
                         )
                         .putBoolean(KeyVpnWasRunningBeforeLab, vpnWasRunningBeforeLab)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyUdpFixtureGateEnabled, udpFixtureGate.enabled)
@@ -228,7 +244,8 @@ class ChromePhotosDataPlaneLabService : Service() {
                                 transformer =
                                     ChromeMediaShieldDocumentTransformer(
                                         sessionId = sessionId,
-                                        policyEpoch = ChromePhotosDataPlaneLabContract.StockMediaPolicyEpoch,
+                                        policyEpoch = mediaPolicyEpoch,
+                                        documentSelfShieldEnabled = documentSelfShieldEnabled,
                                     ),
                             )
                         } else {
@@ -250,7 +267,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             documentAuthority = documentAuthority,
                             readyEndpoint =
                                 if (stockMediaAuthorityEnabled) {
-                                    ChromeMediaShieldReadyEndpoint()
+                                    ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled)
                                 } else {
                                     null
                                 },
@@ -295,6 +312,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             "transport=${if (fullTunnelDevGateEnabled) "full_tunnel_dev" else "controlled"} " +
                             "networkVisualMode=${if (replaceAllNetworkVisuals) "replace_all" else "selective"} " +
                             "stockMediaAuthority=$stockMediaAuthorityEnabled " +
+                            "documentSelfShield=$documentSelfShieldEnabled " +
                             "privacy=public_only_memory_only",
                     )
                 } catch (error: Throwable) {
@@ -629,7 +647,13 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "readyAccepted=${readyEndpoint.accepted} readyRejected=${readyEndpoint.rejected} " +
                 "parserBarrierRequests=${readyEndpoint.parserBarrierRequests} " +
                 "parserBarrierReady=${readyEndpoint.parserBarrierReady} " +
-                "parserBarrierFailClosed=${readyEndpoint.parserBarrierFailClosed}",
+                "parserBarrierFailClosed=${readyEndpoint.parserBarrierFailClosed} " +
+                "selfShield=${preferences.getBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyDocumentSelfShieldEnabled,
+                    false,
+                )} selfReadyRequests=${readyEndpoint.selfReadyRequests} " +
+                "selfReadyAccepted=${readyEndpoint.selfReadyAccepted} " +
+                "selfReadyRejected=${readyEndpoint.selfReadyRejected}",
         )
         Log.i(
             StatusLogTag,
@@ -669,7 +693,8 @@ class ChromePhotosDataPlaneLabService : Service() {
     ): ChromeStockMediaRuntimeMode =
         ChromeStockMediaRuntimeModeResolver.resolve(
             hasExplicitMode =
-                intent?.hasExtra(ChromePhotosDataPlaneLabReceiver.ExtraStockMediaAuthorityEnabled) == true,
+                intent?.hasExtra(ChromePhotosDataPlaneLabReceiver.ExtraStockMediaAuthorityEnabled) == true ||
+                    intent?.hasExtra(ChromePhotosDataPlaneLabReceiver.ExtraDocumentSelfShieldEnabled) == true,
             explicitStockMediaAuthorityEnabled =
                 intent?.getBooleanExtra(
                     ChromePhotosDataPlaneLabReceiver.ExtraStockMediaAuthorityEnabled,
@@ -685,6 +710,11 @@ class ChromePhotosDataPlaneLabService : Service() {
                     ChromePhotosDataPlaneLabReceiver.ExtraReplaceAllNetworkVisuals,
                     false,
                 ) == true,
+            explicitDocumentSelfShieldEnabled =
+                intent?.getBooleanExtra(
+                    ChromePhotosDataPlaneLabReceiver.ExtraDocumentSelfShieldEnabled,
+                    false,
+                ) == true,
             persistedStockMediaAuthorityEnabled =
                 preferences.getBoolean(
                     ChromePhotosDataPlaneLabContract.KeyRequestedStockMediaAuthorityEnabled,
@@ -698,6 +728,11 @@ class ChromePhotosDataPlaneLabService : Service() {
             persistedReplaceAllNetworkVisuals =
                 preferences.getBoolean(
                     ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals,
+                    false,
+                ),
+            persistedDocumentSelfShieldEnabled =
+                preferences.getBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedDocumentSelfShieldEnabled,
                     false,
                 ),
         )
@@ -720,6 +755,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                     ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals,
                     mode.replaceAllNetworkVisuals,
                 )
+                .putBoolean(
+                    ChromePhotosDataPlaneLabContract.KeyRequestedDocumentSelfShieldEnabled,
+                    mode.documentSelfShieldEnabled,
+                )
                 .commit(),
         ) { "runtime_mode_not_persisted" }
     }
@@ -729,6 +768,7 @@ class ChromePhotosDataPlaneLabService : Service() {
             .remove(ChromePhotosDataPlaneLabContract.KeyRequestedStockMediaAuthorityEnabled)
             .remove(ChromePhotosDataPlaneLabContract.KeyRequestedFullTunnelDevGateEnabled)
             .remove(ChromePhotosDataPlaneLabContract.KeyRequestedReplaceAllNetworkVisuals)
+            .remove(ChromePhotosDataPlaneLabContract.KeyRequestedDocumentSelfShieldEnabled)
             .commit()
     }
 

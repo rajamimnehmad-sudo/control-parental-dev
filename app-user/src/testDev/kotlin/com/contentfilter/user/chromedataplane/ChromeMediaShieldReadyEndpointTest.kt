@@ -6,6 +6,7 @@ import com.contentfilter.core.domain.chrome.ChromeMediaShieldActiveDocumentReque
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentAuthorityRegistry
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldParserBarrierBridge
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,7 +16,39 @@ import kotlin.test.assertTrue
 
 class ChromeMediaShieldReadyEndpointTest {
     @AfterTest
-    fun tearDown() = ChromeMediaShieldDocumentAuthorityRegistry.clear()
+    fun tearDown() {
+        ChromeMediaShieldDocumentAuthorityRegistry.clear()
+        ChromePhotosDataPlaneRuntimeAttestation.clear()
+    }
+
+    @Test
+    fun `H20 self ready accepts exact document once without active document owner`() {
+        val identity = issueH20(Token, topLevel = true)
+        attestH20()
+        val endpoint = ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled = true, elapsedRealtime = { Now })
+
+        assertEquals(204, endpoint.handle(selfReadyRequest(Token, identity))?.statusCode)
+        assertEquals(503, endpoint.handle(selfReadyRequest(Token, identity))?.statusCode)
+        assertEquals(1L, endpoint.metrics().selfReadyAccepted)
+        assertEquals(1L, endpoint.metrics().selfReadyRejected)
+        assertEquals(0L, endpoint.metrics().activeHello)
+    }
+
+    @Test
+    fun `H20 identity mismatch and health loss retain document curtain authority`() {
+        val identity = issueH20(Token, topLevel = true)
+        attestH20()
+        val endpoint = ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled = true, elapsedRealtime = { Now })
+
+        assertEquals(
+            503,
+            endpoint.handle(selfReadyRequest(Token, identity.copy(documentSequence = identity.documentSequence + 1L)))
+                ?.statusCode,
+        )
+        ChromePhotosDataPlaneRuntimeAttestation.failClosed(Session)
+        assertEquals(503, endpoint.handle(selfReadyRequest(Token, identity))?.statusCode)
+        assertEquals(0L, endpoint.metrics().selfReadyAccepted)
+    }
 
     @Test
     fun `active document phases are exact one shot and PRESENT ACK follows native acceptance`() {
@@ -250,6 +283,43 @@ class ChromeMediaShieldReadyEndpointTest {
         )
     }
 
+    private fun issueH20(
+        token: String,
+        topLevel: Boolean,
+    ) = run {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, H20PolicyEpoch)
+        requireNotNull(
+            ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, H20PolicyEpoch, token, topLevel),
+        )
+    }
+
+    private fun attestH20() {
+        ChromePhotosDataPlaneRuntimeAttestation.beginSession(
+            sessionId = Session,
+            mediaAuthorityEnabled = true,
+            mediaPolicyEpoch = H20PolicyEpoch,
+            documentSelfShieldEnabled = true,
+        )
+        ChromePhotosDataPlaneRuntimeAttestation.markProxyHealthy(Session, true)
+        ChromePhotosDataPlaneRuntimeAttestation.markPolicyConfirmed(Session, true)
+        ChromePhotosDataPlaneRuntimeAttestation.markVpnConfirmed(Session, true)
+        ChromePhotosDataPlaneRuntimeAttestation.markFixtureConfirmed(Session, true, Now - 10L)
+        ChromePhotosDataPlaneRuntimeAttestation.publishHeartbeat(Session, Now - 10L, Now + 500L)
+    }
+
+    private fun selfReadyRequest(
+        token: String,
+        identity: com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity,
+    ) = request("HELLO", token, 1L).copy(
+        target = ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath,
+        body =
+            (
+                "v3|SELF_READY|$token|${identity.protectionSessionId}|${identity.policyEpoch}|" +
+                    "${identity.navigationSequence}|${identity.documentSequence}|1|" +
+                    if (identity.topLevel) "T" else "S"
+            ).toByteArray(Charsets.US_ASCII),
+    )
+
     private fun request(
         phase: String,
         token: String,
@@ -299,6 +369,8 @@ class ChromeMediaShieldReadyEndpointTest {
     private companion object {
         const val Session = "h19-ready-session"
         const val PolicyEpoch = 19L
+        const val H20PolicyEpoch = 20L
+        const val Now = 5_000L
         const val Origin = "https://shop.example"
         const val Token = "AAAAAAAAAAAAAAAAAAAAAA"
         const val FrameToken = "BBBBBBBBBBBBBBBBBBBBBB"

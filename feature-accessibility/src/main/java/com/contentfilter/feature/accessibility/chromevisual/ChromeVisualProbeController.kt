@@ -68,6 +68,10 @@ internal class ChromeVisualProbeController(
 
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!enabled) return
+        if (attestationReader.read().documentSelfShieldEnabled) {
+            scope.launch(Dispatchers.Main.immediate) { deactivateOnMain("document_self_shield_owned") }
+            return
+        }
         // Events may revoke structural continuity, but they never create active-document authority.
         mediaReadyCoordinator?.onAccessibilityEvent(event)
         if (

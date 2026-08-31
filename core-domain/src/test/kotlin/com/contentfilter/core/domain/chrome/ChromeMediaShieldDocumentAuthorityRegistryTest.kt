@@ -33,6 +33,53 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
     }
 
     @Test
+    fun `self ready accepts only exact owning document and rejects replay`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        val issued =
+            requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true))
+        val expected = issued.selfReady(lifecycle = 1L)
+
+        assertEquals(
+            ChromeMediaShieldReadyClaimResult.Claimed(ChromeMediaShieldReadyClaim(issued, 1L)),
+            ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(TopToken, expected),
+        )
+        assertInvalid(ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(TopToken, expected))
+        assertInvalid(
+            ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(
+                TopToken,
+                expected.copy(documentSequence = expected.documentSequence + 1L, lifecycleSequence = 2L),
+            ),
+        )
+        assertEquals(
+            ChromeMediaShieldReadyClaimResult.Claimed(ChromeMediaShieldReadyClaim(issued, 2L)),
+            ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(
+                TopToken,
+                expected.copy(lifecycleSequence = 2L),
+            ),
+        )
+    }
+
+    @Test
+    fun `independent documents can self ready but neither token can claim the other`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        val first =
+            requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true))
+        val second =
+            requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, NextToken, true))
+
+        assertInvalid(ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(TopToken, second.selfReady()))
+        assertInvalid(ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(NextToken, first.selfReady()))
+        assertEquals(
+            ChromeMediaShieldReadyClaimResult.Claimed(ChromeMediaShieldReadyClaim(first, 1L)),
+            ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(TopToken, first.selfReady()),
+        )
+        assertEquals(
+            ChromeMediaShieldReadyClaimResult.Claimed(ChromeMediaShieldReadyClaim(second, 1L)),
+            ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(NextToken, second.selfReady()),
+        )
+    }
+
+    @Test
     fun `subdocument can claim its boot but can never resolve foreground authority`() {
         ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
         val frame =
@@ -393,6 +440,16 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
         )
 
     private fun digest(value: String): String = ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(value)
+
+    private fun ChromeMediaShieldDocumentIdentity.selfReady(lifecycle: Long = 1L) =
+        ChromeMediaShieldSelfReadyIdentity(
+            protectionSessionId = protectionSessionId,
+            policyEpoch = policyEpoch,
+            navigationSequence = navigationSequence,
+            documentSequence = documentSequence,
+            lifecycleSequence = lifecycle,
+            topLevel = topLevel,
+        )
 
     private fun token(index: Int): String = "AAAAAAAAAAAAAAAAAAAAAA${index.toString().padStart(4, '0')}"
 
