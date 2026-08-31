@@ -37,7 +37,7 @@ internal class ChromeMediaShieldDocumentTransformer(
     private val sessionId: String,
     private val policyEpoch: Long,
     private val documentSelfShieldEnabled: Boolean = false,
-    private val cspPolicy: ChromeMediaShieldCspPolicy = ChromeMediaShieldCspPolicy(),
+    private val cspPolicy: ChromeMediaShieldCspPolicy = ChromeMediaShieldCspPolicy(documentSelfShieldEnabled),
     private val randomBytes: (Int) -> ByteArray = ::secureRandomBytes,
 ) {
     private val transformed = AtomicLong()

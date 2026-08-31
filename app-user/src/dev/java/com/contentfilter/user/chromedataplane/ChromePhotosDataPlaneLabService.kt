@@ -654,11 +654,18 @@ class ChromePhotosDataPlaneLabService : Service() {
                 )} selfReadyRequests=${readyEndpoint.selfReadyRequests} " +
                 "selfReadyAccepted=${readyEndpoint.selfReadyAccepted} " +
                 "selfReadyRejected=${readyEndpoint.selfReadyRejected} " +
+                "selfReadyRejectReason=${readyEndpoint.selfReadyLastRejectReason} " +
                 "selfShieldReleaseCompleted=${readyEndpoint.selfShieldReleaseCompleted} " +
                 "selfShieldParserContinued=${readyEndpoint.selfShieldParserContinued} " +
                 "selfShieldOriginalScriptStarted=${readyEndpoint.selfShieldOriginalScriptStarted} " +
                 "selfShieldTraceRejected=${readyEndpoint.selfShieldTraceRejected} " +
-                "selfShieldTraceOutstanding=${readyEndpoint.selfShieldTraceOutstanding}",
+                "selfShieldTraceOutstanding=${readyEndpoint.selfShieldTraceOutstanding} " +
+                "bootstrapDiagnosticAccepted=${readyEndpoint.bootstrapDiagnosticAccepted} " +
+                "bootstrapDiagnosticRejected=${readyEndpoint.bootstrapDiagnosticRejected} " +
+                "bootstrapDiagnosticRejectReason=${readyEndpoint.bootstrapDiagnosticLastRejectReason} " +
+                "bootstrapDiagnosticStage=${readyEndpoint.bootstrapDiagnosticLastStage} " +
+                "bootstrapDiagnosticReason=${readyEndpoint.bootstrapDiagnosticLastReason} " +
+                "bootstrapDiagnosticOutstanding=${readyEndpoint.bootstrapDiagnosticOutstanding}",
         )
         Log.i(
             StatusLogTag,

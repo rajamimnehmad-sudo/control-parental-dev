@@ -448,6 +448,7 @@ internal class ChromePhotosHttpsProxy(
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldReadyPath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath ||
+                request.target == ChromePhotosDataPlaneLabContract.MediaShieldBootstrapDiagnosticPath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierPath
             ) {
                 null
@@ -571,6 +572,14 @@ internal class ChromePhotosHttpsProxy(
         val started = System.nanoTime()
         var responseStarted = false
         var upstreamExchangeReady = false
+        readyEndpoint?.handle(request)?.let { readyResponse ->
+            requests.incrementAndGet()
+            responseStarted = true
+            val result = responseWriter.writeBuffered(output, request, readyResponse)
+            deliveredBytes.addAndGet(result.bytesWritten)
+            infoLog("phase=media_shield_ready origin=same_origin result=${readyResponse.statusCode} bytesOut=${result.bytesWritten}")
+            return request.successDisposition()
+        }
         val coverageToken = coverageLedger?.beginRequest(host, request, correlationId)
         return try {
             val upstreamRequest = normalizeUpstreamRequest(request)

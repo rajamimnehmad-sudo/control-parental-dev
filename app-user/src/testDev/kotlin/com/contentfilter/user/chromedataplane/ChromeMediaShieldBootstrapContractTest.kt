@@ -128,7 +128,7 @@ class ChromeMediaShieldBootstrapContractTest {
             script.indexOf("invoke(dialogClosedByProperty.set,curtainLayer,['none'])") <
                 script.indexOf("nativeDialogShowModal.call(curtainLayer)"),
         )
-        assertContains(script, "if(!installed){failClosedDocument();return}")
+        assertContains(script, "if(!installed){failClosedDocument('INSTALL',installFailure);return}")
         assertContains(script, "nativeDocOpen.call(DOC)")
         assertContains(script, "Glosh protected this document.")
         assertContains(script, "retireBootstrapSecrets()")
@@ -202,8 +202,11 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(selfShield, "curtainLayer=USE_MODAL_CURTAIN?nativeCreateElement.call(DOC,'dialog'):null")
         assertContains(selfShield, "v3|SELF_READY|")
         assertContains(selfShield, "v1|SELF_SHIELD_TRACE|")
+        assertContains(selfShield, "v1|BOOTSTRAP_FAIL|")
         assertContains(selfShield, "SESSION='session-h20',POLICY_EPOCH=20,NAVIGATION_SEQUENCE=7,DOCUMENT_SEQUENCE=9")
         assertContains(selfShield, "xhrOpen.call(xhr,'POST',SELF_READY_URL,false)")
+        assertContains(selfShield, "SELF_READY_RESPONSE_URL=resolvedEndpoint(SELF_READY_URL)")
+        assertContains(selfShield, "read(xhrResponseUrlProperty,xhr)!==SELF_READY_RESPONSE_URL")
         assertContains(selfShield, "read(xhrStatusProperty,xhr)!==204")
         assertContains(selfShield, "curtainRequired=false;if(!ensureCurtain())")
         assertContains(selfShield, "selfShieldStage=1")
@@ -239,12 +242,16 @@ class ChromeMediaShieldBootstrapContractTest {
                 "nativeGet.call(root,CURTAIN_RELEASE_ATTRIBUTE)==='1'",
         )
         assertTrue(
-            selfShield.indexOf("if(!installed){failClosedDocument();return}") <
+            selfShield.indexOf("if(!installed){failClosedDocument('INSTALL',installFailure);return}") <
                 selfShield.indexOf("v3|SELF_READY|"),
         )
         assertTrue(selfShield.indexOf("v3|SELF_READY|") < selfShield.indexOf("curtainRequired=false"))
         assertTrue(selfShield.indexOf("if(SELF_SHIELD){") < selfShield.indexOf("if(!TOP_LEVEL){"))
-        assertContains(selfShield, "catch(_){failClosedDocument()}return}if(!TOP_LEVEL){")
+        assertContains(selfShield, "selfShieldOperation='SELF_READY_SEND';xhrSend.call(xhr,selfReadyBody)")
+        assertContains(
+            selfShield,
+            "catch(_){failClosedDocument('SELF_SHIELD_SEQUENCE',selfShieldOperation)}return}if(!TOP_LEVEL){",
+        )
     }
 
     @Test
@@ -464,7 +471,7 @@ class ChromeMediaShieldBootstrapContractTest {
     @Test
     fun `bootstrap source and secrets stay in closure and leave no DOM beacon`() {
         assertContains(script, "BOOTSTRAP_SCRIPT=DOC.currentScript")
-        assertContains(script, "if(!BOOTSTRAP_SCRIPT)installed=false")
+        assertContains(script, "if(!BOOTSTRAP_SCRIPT)failInstall('CURRENT_SCRIPT_MISSING')")
         assertContains(script, "const retireScript=(script)=>")
         assertContains(script, "nodeRemove.call(parent,script);return !connected(script)")
         assertContains(
@@ -478,7 +485,8 @@ class ChromeMediaShieldBootstrapContractTest {
         )
         assertContains(
             script,
-            "if(!installed){failClosedDocument();return}if(!retireBootstrapSecrets()){failClosedDocument();return}",
+            "if(!installed){failClosedDocument('INSTALL',installFailure);return}" +
+                "if(!retireBootstrapSecrets()){failClosedDocument('BOOTSTRAP_SECRET_RETIREMENT','RETIRE_FAILED');return}",
         )
         assertContains(script, "if(!clearStyleNonce(style)){nodeRemove.call(root,style);failClosedDocument();deny()}")
         assertEquals(1, Regex(Regex.escape(ReadyToken)).findAll(script).count())

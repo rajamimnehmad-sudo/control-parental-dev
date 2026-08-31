@@ -3,7 +3,9 @@ package com.contentfilter.user.chromedataplane
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import java.util.Locale
 
-internal class ChromeMediaShieldCspPolicy {
+internal class ChromeMediaShieldCspPolicy(
+    private val sameOriginReady: Boolean = false,
+) {
     fun apply(
         sourceHeaders: List<ChromeHttpHeader>,
         scriptNonce: String,
@@ -69,7 +71,8 @@ internal class ChromeMediaShieldCspPolicy {
                 ?: directives["default-src"]?.sources
                 ?: return
         val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
-        if (ReadyOrigin !in sources) sources += ReadyOrigin
+        val readySource = if (sameOriginReady) SelfSource else ReadyOrigin
+        if (readySource !in sources) sources += readySource
         directives[targetKey] = Directive(directives[targetKey]?.name ?: targetKey, sources)
     }
 
@@ -121,6 +124,7 @@ internal class ChromeMediaShieldCspPolicy {
         const val ContentSecurityPolicyReportOnly = "Content-Security-Policy-Report-Only"
         const val EmptyFailClosedPolicy = "default-src 'none'"
         const val ReadyOrigin = "https://${ChromePhotosDataPlaneLabContract.FixtureHost}"
+        const val SelfSource = "'self'"
         const val MediaEnvelope =
             "img-src https: http:; media-src 'none'; object-src 'none'; worker-src https: http:; " +
                 "frame-src https: http:; child-src https: http:; fenced-frame-src 'none'"

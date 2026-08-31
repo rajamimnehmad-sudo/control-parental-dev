@@ -17,6 +17,7 @@ import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestat
 import java.net.URI
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 internal data class ChromeMediaShieldReadyEndpointMetrics(
     val requests: Long = 0L,
@@ -34,11 +35,18 @@ internal data class ChromeMediaShieldReadyEndpointMetrics(
     val selfReadyRequests: Long = 0L,
     val selfReadyAccepted: Long = 0L,
     val selfReadyRejected: Long = 0L,
+    val selfReadyLastRejectReason: String = "none",
     val selfShieldReleaseCompleted: Long = 0L,
     val selfShieldParserContinued: Long = 0L,
     val selfShieldOriginalScriptStarted: Long = 0L,
     val selfShieldTraceRejected: Long = 0L,
     val selfShieldTraceOutstanding: Int = 0,
+    val bootstrapDiagnosticAccepted: Long = 0L,
+    val bootstrapDiagnosticRejected: Long = 0L,
+    val bootstrapDiagnosticLastRejectReason: String = "none",
+    val bootstrapDiagnosticLastStage: String = "none",
+    val bootstrapDiagnosticLastReason: String = "none",
+    val bootstrapDiagnosticOutstanding: Int = 0,
 )
 
 /** Fixed-origin, capability-authenticated DEV endpoint. It never forwards READY traffic upstream. */
@@ -46,6 +54,7 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val documentSelfShieldEnabled: Boolean = false,
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val selfShieldLiveness: ChromeMediaShieldSelfShieldLiveness = ChromeMediaShieldSelfShieldLiveness(),
+    private val bootstrapDiagnostics: ChromeMediaShieldBootstrapDiagnostics = ChromeMediaShieldBootstrapDiagnostics(),
 ) {
     private val requests = AtomicLong()
     private val preflights = AtomicLong()
@@ -62,8 +71,17 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val selfReadyRequests = AtomicLong()
     private val selfReadyAccepted = AtomicLong()
     private val selfReadyRejected = AtomicLong()
+    private val selfReadyLastRejectReason = AtomicReference("none")
+    private val bootstrapDiagnosticLastRejectReason = AtomicReference("none")
 
     fun handle(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse? {
+        if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldBootstrapDiagnosticPath) {
+            return if (documentSelfShieldEnabled) {
+                handleBootstrapDiagnostic(request)
+            } else {
+                reject("bootstrap_diagnostic_disabled")
+            }
+        }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath) {
             return if (documentSelfShieldEnabled) {
                 handleSelfShieldTrace(request)
@@ -97,6 +115,7 @@ internal class ChromeMediaShieldReadyEndpoint(
 
     fun metrics(): ChromeMediaShieldReadyEndpointMetrics {
         val liveness = selfShieldLiveness.metrics()
+        val diagnostics = bootstrapDiagnostics.metrics()
         return ChromeMediaShieldReadyEndpointMetrics(
             requests = requests.get(),
             preflights = preflights.get(),
@@ -113,12 +132,52 @@ internal class ChromeMediaShieldReadyEndpoint(
             selfReadyRequests = selfReadyRequests.get(),
             selfReadyAccepted = selfReadyAccepted.get(),
             selfReadyRejected = selfReadyRejected.get(),
+            selfReadyLastRejectReason = selfReadyLastRejectReason.get(),
             selfShieldReleaseCompleted = liveness.releaseCompleted,
             selfShieldParserContinued = liveness.parserContinued,
             selfShieldOriginalScriptStarted = liveness.originalScriptStarted,
             selfShieldTraceRejected = liveness.rejected,
             selfShieldTraceOutstanding = liveness.outstanding,
+            bootstrapDiagnosticAccepted = diagnostics.accepted,
+            bootstrapDiagnosticRejected = diagnostics.rejected,
+            bootstrapDiagnosticLastRejectReason = bootstrapDiagnosticLastRejectReason.get(),
+            bootstrapDiagnosticLastStage = diagnostics.lastStage,
+            bootstrapDiagnosticLastReason = diagnostics.lastReason,
+            bootstrapDiagnosticOutstanding = diagnostics.outstanding,
         )
+    }
+
+    private fun handleBootstrapDiagnostic(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {
+        requests.incrementAndGet()
+        val body = request.body
+        return try {
+            val origin =
+                request.exactReadyOriginOrNull()
+                    ?: return rejectBootstrapDiagnostic("bootstrap_diagnostic_origin_invalid")
+            if (origin == NullOrigin) return rejectBootstrapDiagnostic("bootstrap_diagnostic_origin_not_network")
+            if (request.method == OptionsMethod) return preflight(request, origin)
+            if (request.method != PostMethod) {
+                return rejectBootstrapDiagnostic("bootstrap_diagnostic_method_invalid", 405)
+            }
+            if (!request.hasExactReadyContentType()) {
+                return rejectBootstrapDiagnostic("bootstrap_diagnostic_content_type_invalid")
+            }
+            if (!request.hasReadyFetchMetadata()) {
+                return rejectBootstrapDiagnostic("bootstrap_diagnostic_fetch_metadata_invalid")
+            }
+            val parsed =
+                body.parseBootstrapDiagnosticBody()
+                    ?: return rejectBootstrapDiagnostic("bootstrap_diagnostic_body_invalid")
+            if (!runtimeAdmits(parsed.identity)) {
+                return rejectBootstrapDiagnostic("bootstrap_diagnostic_runtime_unavailable")
+            }
+            if (!bootstrapDiagnostics.record(parsed.token, parsed.identity, parsed.stage, parsed.reason)) {
+                return rejectBootstrapDiagnostic("bootstrap_diagnostic_stale_or_replayed")
+            }
+            traceNoContent(origin)
+        } finally {
+            body.fill(0)
+        }
     }
 
     private fun handleSelfReady(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {
@@ -212,6 +271,15 @@ internal class ChromeMediaShieldReadyEndpoint(
         statusCode: Int = 503,
     ): ChromePhotosSanitizedResponse {
         selfReadyRejected.incrementAndGet()
+        selfReadyLastRejectReason.set(reason)
+        return reject(reason, statusCode)
+    }
+
+    private fun rejectBootstrapDiagnostic(
+        reason: String,
+        statusCode: Int = 503,
+    ): ChromePhotosSanitizedResponse {
+        bootstrapDiagnosticLastRejectReason.set(reason)
         return reject(reason, statusCode)
     }
 
@@ -431,6 +499,13 @@ internal class ChromeMediaShieldReadyEndpoint(
         val phase: ChromeMediaShieldSelfShieldLivenessPhase,
     )
 
+    private data class ParsedBootstrapDiagnosticBody(
+        val token: String,
+        val identity: ChromeMediaShieldSelfReadyIdentity,
+        val stage: String,
+        val reason: String,
+    )
+
     private companion object {
         const val PostMethod = "POST"
         const val GetMethod = "GET"
@@ -560,6 +635,30 @@ internal class ChromeMediaShieldReadyEndpoint(
                     else -> return null
                 }
             return ParsedSelfShieldTraceBody(token, identity, phase)
+        }
+
+        fun ByteArray.parseBootstrapDiagnosticBody(): ParsedBootstrapDiagnosticBody? {
+            if (isEmpty() || size > MaximumReadyBodyBytes || any { it.toInt() !in 0x20..0x7e }) return null
+            val parts = toString(StandardCharsets.US_ASCII).split('|')
+            if (parts.size != 12 || parts[0] != "v1" || parts[1] != "BOOTSTRAP_FAIL") return null
+            val token = parts[2]
+            if (token.length !in 22..64 || token.any { !it.isLetterOrDigit() && it != '-' && it != '_' }) return null
+            val identity =
+                ChromeMediaShieldSelfReadyIdentity(
+                    protectionSessionId = parts[3].takeIf(String::isNotBlank) ?: return null,
+                    policyEpoch = parts[4].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    navigationSequence = parts[5].toLongOrNull()?.takeIf { it >= 0L } ?: return null,
+                    documentSequence = parts[6].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    lifecycleSequence = parts[7].toLongOrNull()?.takeIf { it > 0L } ?: return null,
+                    topLevel =
+                        when (parts[8]) {
+                            "T" -> true
+                            "S" -> false
+                            else -> return null
+                        },
+                )
+            if (parts[9] != "INSTALL") return null
+            return ParsedBootstrapDiagnosticBody(token, identity, parts[10], parts[11])
         }
     }
 }

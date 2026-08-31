@@ -60,6 +60,27 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
     }
 
     @Test
+    fun `bootstrap diagnostic validates exact unclaimed document without consuming authority`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        val issued = requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true))
+        val expected = issued.selfReady()
+
+        assertTrue(ChromeMediaShieldDocumentAuthorityRegistry.validatesUnclaimedSelfReady(TopToken, expected))
+        assertFalse(
+            ChromeMediaShieldDocumentAuthorityRegistry.validatesUnclaimedSelfReady(
+                TopToken,
+                expected.copy(documentSequence = expected.documentSequence + 1L),
+            ),
+        )
+        assertEquals(0, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().readyClaims)
+        assertEquals(
+            ChromeMediaShieldReadyClaimResult.Claimed(ChromeMediaShieldReadyClaim(issued, 1L)),
+            ChromeMediaShieldDocumentAuthorityRegistry.claimSelfReady(TopToken, expected),
+        )
+        assertFalse(ChromeMediaShieldDocumentAuthorityRegistry.validatesUnclaimedSelfReady(TopToken, expected))
+    }
+
+    @Test
     fun `independent documents can self ready but neither token can claim the other`() {
         ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
         val first =

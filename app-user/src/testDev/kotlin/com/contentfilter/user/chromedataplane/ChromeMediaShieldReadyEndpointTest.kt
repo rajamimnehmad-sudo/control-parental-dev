@@ -56,6 +56,33 @@ class ChromeMediaShieldReadyEndpointTest {
     }
 
     @Test
+    fun `H20 bootstrap diagnostic is one shot generation bound and grants no ready authority`() {
+        val identity = issueH20(Token, topLevel = true)
+        attestH20()
+        val endpoint = ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled = true, elapsedRealtime = { Now })
+
+        assertEquals(204, endpoint.handle(diagnosticRequest(Token, identity, "INSTALL", "CSSOM_GUARDS"))?.statusCode)
+        assertEquals(503, endpoint.handle(diagnosticRequest(Token, identity, "INSTALL", "SHADOW_GUARDS"))?.statusCode)
+        assertEquals(
+            503,
+            endpoint.handle(
+                diagnosticRequest(
+                    Token,
+                    identity.copy(documentSequence = identity.documentSequence + 1L),
+                    "INSTALL",
+                    "SHADOW_GUARDS",
+                ),
+            )?.statusCode,
+        )
+        assertEquals(0, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().readyClaims)
+        val metrics = endpoint.metrics()
+        assertEquals(1L, metrics.bootstrapDiagnosticAccepted)
+        assertEquals(2L, metrics.bootstrapDiagnosticRejected)
+        assertEquals("INSTALL", metrics.bootstrapDiagnosticLastStage)
+        assertEquals("CSSOM_GUARDS", metrics.bootstrapDiagnosticLastReason)
+    }
+
+    @Test
     fun `H20 identity mismatch and health loss retain document curtain authority`() {
         val identity = issueH20(Token, topLevel = true)
         attestH20()
@@ -352,6 +379,21 @@ class ChromeMediaShieldReadyEndpointTest {
                 "v1|SELF_SHIELD_TRACE|$token|${identity.protectionSessionId}|${identity.policyEpoch}|" +
                     "${identity.navigationSequence}|${identity.documentSequence}|1|" +
                     (if (identity.topLevel) "T" else "S") + "|$phase"
+            ).toByteArray(Charsets.US_ASCII),
+    )
+
+    private fun diagnosticRequest(
+        token: String,
+        identity: com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity,
+        stage: String,
+        reason: String,
+    ) = request("HELLO", token, 1L).withOrigin(FixtureOrigin).copy(
+        target = ChromePhotosDataPlaneLabContract.MediaShieldBootstrapDiagnosticPath,
+        body =
+            (
+                "v1|BOOTSTRAP_FAIL|$token|${identity.protectionSessionId}|${identity.policyEpoch}|" +
+                    "${identity.navigationSequence}|${identity.documentSequence}|1|" +
+                    (if (identity.topLevel) "T" else "S") + "|INSTALL|$stage|$reason"
             ).toByteArray(Charsets.US_ASCII),
     )
 

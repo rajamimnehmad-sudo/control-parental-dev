@@ -9,6 +9,19 @@ class ChromeMediaShieldCspPolicyTest {
     private val policy = ChromeMediaShieldCspPolicy()
 
     @Test
+    fun `self shield admits same-origin capability channel without fixed fixture origin`() {
+        val rewritten =
+            ChromeMediaShieldCspPolicy(sameOriginReady = true).admitBootstrap(
+                "default-src 'none'; connect-src 'none'",
+                ScriptNonce,
+                StyleNonce,
+            )
+
+        assertTrue(rewritten.contains("connect-src 'self'"))
+        assertFalse(rewritten.contains("https://glosh-photos.test"))
+    }
+
+    @Test
     fun `absent site policy receives a separate bounded media envelope`() {
         val output = policy.apply(emptyList(), ScriptNonce, StyleNonce)
         val policies = output.values("Content-Security-Policy")

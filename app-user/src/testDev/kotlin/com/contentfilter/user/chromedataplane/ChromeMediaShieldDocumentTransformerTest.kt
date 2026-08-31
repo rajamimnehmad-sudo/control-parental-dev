@@ -143,8 +143,9 @@ class ChromeMediaShieldDocumentTransformerTest {
         for (html in listOf(top, frame)) {
             assertContains(html, "<style id=\"${ChromeMediaShieldBootstrap.CurtainStyleElementId}\"")
             assertContains(html, "SELF_SHIELD=true")
-            assertContains(html, ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyUrl)
-            assertContains(html, ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTraceUrl)
+            assertContains(html, ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath)
+            assertContains(html, ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath)
+            assertFalse(html.contains(ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyUrl))
             assertContains(html, ChromeMediaShieldBootstrap.SelfShieldParserContinuationName)
             assertFalse(html.contains("src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\""))
             assertTrue(
