@@ -8,6 +8,7 @@ import java.util.concurrent.atomic.AtomicReference
 internal class ChromeServiceWorkerBoundaryFixture {
     private val installDocuments = AtomicLong()
     private val workerScripts = AtomicLong()
+    private val workerProbeScripts = AtomicLong()
     private val probeDocuments = AtomicLong()
     private val cleanupDocuments = AtomicLong()
     private val reportsAccepted = AtomicLong()
@@ -23,6 +24,10 @@ internal class ChromeServiceWorkerBoundaryFixture {
     private val resetBaselineDirty = AtomicLong()
     private val registerBlocked = AtomicLong()
     private val registerSucceeded = AtomicLong()
+    private val workerRegisterBlocked = AtomicLong()
+    private val workerRegisterSucceeded = AtomicLong()
+    private val workerRegisterUnsupported = AtomicLong()
+    private val workerRegisterError = AtomicLong()
     private val lastCase = AtomicReference(None)
     private val lastEvent = AtomicReference(None)
     private val lastValue = AtomicReference(None)
@@ -32,12 +37,24 @@ internal class ChromeServiceWorkerBoundaryFixture {
         return when (path) {
             InstallPath -> counted(installDocuments) { html("h20-sw-install", installDocument()) }
             WorkerPath ->
-                counted(workerScripts) {
+                if (ChromeServiceWorkerScriptGate.blocks(request)) {
+                    response("h20-sw-worker-blocked", PlainText, ByteArray(0), 403)
+                } else {
+                    counted(workerScripts) {
+                        response(
+                            id = "h20-sw-worker",
+                            contentType = JavaScript,
+                            bytes = workerScript().toByteArray(),
+                            headers = listOf(ChromeHttpHeader("Service-Worker-Allowed", "/")),
+                        )
+                    }
+                }
+            WorkerRegisterProbePath ->
+                counted(workerProbeScripts) {
                     response(
-                        id = "h20-sw-worker",
+                        id = "h20-sw-worker-register-probe",
                         contentType = JavaScript,
-                        bytes = workerScript().toByteArray(),
-                        headers = listOf(ChromeHttpHeader("Service-Worker-Allowed", "/")),
+                        bytes = workerRegisterProbeScript().toByteArray(),
                     )
                 }
             ProbePath -> counted(probeDocuments) { html("h20-sw-probe", probeDocument()) }
@@ -56,15 +73,18 @@ internal class ChromeServiceWorkerBoundaryFixture {
 
     fun state(): String =
         "INSTALL_DOCS=${installDocuments.get()},WORKER_SCRIPTS=${workerScripts.get()}," +
-            "PROBE_DOCS=${probeDocuments.get()},CLEANUP_DOCS=${cleanupDocuments.get()}," +
-            "REPORTS_ACCEPTED=${reportsAccepted.get()},REPORTS_REJECTED=${reportsRejected.get()}," +
-            "CONTROLLER_PRESENT=${controllerPresent.get()},CONTROLLER_MISSING=${controllerMissing.get()}," +
-            "NAV_FETCHES=${navigationFetches.get()},SELF_READY_FETCHES=${selfReadyFetches.get()}," +
-            "SELF_READY_PASS_THROUGH=${passThroughSelfReady.get()}," +
-            "SELF_READY_SYNTHETIC=${syntheticSelfReady.get()}," +
-            "NAV_SYNTHETIC=${syntheticNavigation.get()},RESET_BASELINE_CLEAN=${resetBaselineClean.get()}," +
-            "RESET_BASELINE_DIRTY=${resetBaselineDirty.get()},REGISTER_BLOCKED=${registerBlocked.get()}," +
-            "REGISTER_SUCCEEDED=${registerSucceeded.get()},LAST_CASE=${lastCase.get()}," +
+            "WORKER_PROBE_SCRIPTS=${workerProbeScripts.get()},PROBE_DOCS=${probeDocuments.get()}," +
+            "CLEANUP_DOCS=${cleanupDocuments.get()},REPORTS_ACCEPTED=${reportsAccepted.get()}," +
+            "REPORTS_REJECTED=${reportsRejected.get()},CONTROLLER_PRESENT=${controllerPresent.get()}," +
+            "CONTROLLER_MISSING=${controllerMissing.get()},NAV_FETCHES=${navigationFetches.get()}," +
+            "SELF_READY_FETCHES=${selfReadyFetches.get()},SELF_READY_PASS_THROUGH=${passThroughSelfReady.get()}," +
+            "SELF_READY_SYNTHETIC=${syntheticSelfReady.get()},NAV_SYNTHETIC=${syntheticNavigation.get()}," +
+            "RESET_BASELINE_CLEAN=${resetBaselineClean.get()},RESET_BASELINE_DIRTY=${resetBaselineDirty.get()}," +
+            "REGISTER_BLOCKED=${registerBlocked.get()},REGISTER_SUCCEEDED=${registerSucceeded.get()}," +
+            "WORKER_REGISTER_BLOCKED=${workerRegisterBlocked.get()}," +
+            "WORKER_REGISTER_SUCCEEDED=${workerRegisterSucceeded.get()}," +
+            "WORKER_REGISTER_UNSUPPORTED=${workerRegisterUnsupported.get()}," +
+            "WORKER_REGISTER_ERROR=${workerRegisterError.get()},LAST_CASE=${lastCase.get()}," +
             "LAST_EVENT=${lastEvent.get()},LAST_VALUE=${lastValue.get()}"
 
     internal fun workerScript(): String =
@@ -88,6 +108,14 @@ internal class ChromeServiceWorkerBoundaryFixture {
             event.respondWith((async()=>{const caseId=await readMode(),synthetic=caseId==='SYNTHETIC_SELF_READY';await report(caseId,'FETCH_SELF_READY',synthetic?'SYNTHETIC':'PASSTHROUGH');
             return synthetic?new Response(null,{status:204,headers:{'Cache-Control':'no-store'}}):fetch(event.request)})());return}
         });
+        """.trimIndent().replace("\n", "")
+
+    internal fun workerRegisterProbeScript(): String =
+        """
+        'use strict';
+        self.onmessage=async()=>{let result='UNSUPPORTED';try{const container=navigator.serviceWorker;
+        if(container&&typeof container.register==='function'){try{await container.register('$WorkerPath',{scope:'/',updateViaCache:'none'});result='SUCCEEDED'}catch(_){result='BLOCKED'}}}
+        catch(_){result='ERROR'}self.postMessage(result)};
         """.trimIndent().replace("\n", "")
 
     internal fun canonicalEventOrNull(bytes: ByteArray): String? {
@@ -126,6 +154,13 @@ internal class ChromeServiceWorkerBoundaryFixture {
             }
             "RESET_BASELINE" -> if (value == "CLEAN") resetBaselineClean.incrementAndGet() else resetBaselineDirty.incrementAndGet()
             "REGISTER_RESULT" -> if (value == "BLOCKED") registerBlocked.incrementAndGet() else registerSucceeded.incrementAndGet()
+            "WORKER_REGISTER_RESULT" ->
+                when (value) {
+                    "BLOCKED" -> workerRegisterBlocked.incrementAndGet()
+                    "SUCCEEDED" -> workerRegisterSucceeded.incrementAndGet()
+                    "UNSUPPORTED" -> workerRegisterUnsupported.incrementAndGet()
+                    else -> workerRegisterError.incrementAndGet()
+                }
         }
         return response("h20-sw-event", PlainText, ByteArray(0), 204)
     }
@@ -134,13 +169,17 @@ internal class ChromeServiceWorkerBoundaryFixture {
         """
         <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>H20 SW INSTALL</title></head>
         <body><h1 id="status">SW_INSTALLING</h1><script>
-        (async()=>{const existing=await navigator.serviceWorker.getRegistrations(),controlledBefore=!!navigator.serviceWorker.controller,clean=existing.length===0&&!controlledBefore;
-        await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|RESET_VERIFY|RESET_BASELINE|'+(clean?'CLEAN':'DIRTY')});
-        try{const registration=await navigator.serviceWorker.register('$WorkerPath',{scope:'/',updateViaCache:'none'});await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|RESET_VERIFY|REGISTER_RESULT|SUCCEEDED'});await navigator.serviceWorker.ready;
-        if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));
-        const controlled=!!navigator.serviceWorker.controller;document.getElementById('status').textContent=controlled?'SW_CONTROLLER=YES':'SW_CONTROLLER=NO';
-        await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|PROVISION|CLIENT_CONTROLLER|'+(controlled?'YES':'NO')})}
-        catch(_){await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|RESET_VERIFY|REGISTER_RESULT|BLOCKED'});document.getElementById('status').textContent='SW_REGISTER_BLOCKED'}})();
+        (async()=>{const report=body=>fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body});
+        const existing=await navigator.serviceWorker.getRegistrations(),controlledBefore=!!navigator.serviceWorker.controller,clean=existing.length===0&&!controlledBefore;
+        await report('v1|RESET_VERIFY|RESET_BASELINE|'+(clean?'CLEAN':'DIRTY'));
+        let windowResult='BLOCKED';try{const registration=await navigator.serviceWorker.register('$WorkerPath',{scope:'/',updateViaCache:'none'});windowResult='SUCCEEDED';await navigator.serviceWorker.ready;
+        if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));}
+        catch(_){}await report('v1|RESET_VERIFY|REGISTER_RESULT|'+windowResult);
+        const workerResult=await new Promise(resolve=>{let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value)};let worker=null;
+        try{worker=new Worker('$WorkerRegisterProbePath');worker.onmessage=event=>finish(['BLOCKED','SUCCEEDED','UNSUPPORTED','ERROR'].includes(event.data)?event.data:'ERROR');worker.onerror=()=>finish('ERROR');worker.postMessage('REGISTER')}
+        catch(_){finish('ERROR')}const timer=setTimeout(()=>finish('ERROR'),4000)});
+        await report('v1|RESET_VERIFY|WORKER_REGISTER_RESULT|'+workerResult);
+        document.getElementById('status').textContent='WINDOW_REGISTER='+windowResult+' WORKER_REGISTER='+workerResult})();
         </script></body></html>
         """.trimIndent()
 
@@ -182,6 +221,7 @@ internal class ChromeServiceWorkerBoundaryFixture {
                 200 -> "OK"
                 204 -> "No Content"
                 400 -> "Bad Request"
+                403 -> "Forbidden"
                 else -> "Method Not Allowed"
             },
     )
@@ -197,6 +237,7 @@ internal class ChromeServiceWorkerBoundaryFixture {
     private companion object {
         const val InstallPath = "/web20sw/install"
         const val WorkerPath = "/web20sw/sw.js"
+        const val WorkerRegisterProbePath = "/web20sw/worker-register-probe.js"
         const val ProbePath = "/web20sw/probe"
         const val CleanupPath = "/web20sw/cleanup"
         const val FirstOriginalScriptPath = "/web20sw/first-original.js"
@@ -213,7 +254,15 @@ internal class ChromeServiceWorkerBoundaryFixture {
         val PrintableAscii = 0x20..0x7e
         val EventCases = setOf("PROVISION", "RESET_VERIFY", "PASS_THROUGH", "SYNTHETIC_SELF_READY", "SYNTHETIC_NAVIGATION")
         val EventTypes =
-            setOf("ACTIVATED", "CLIENT_CONTROLLER", "FETCH_NAVIGATION", "FETCH_SELF_READY", "RESET_BASELINE", "REGISTER_RESULT")
+            setOf(
+                "ACTIVATED",
+                "CLIENT_CONTROLLER",
+                "FETCH_NAVIGATION",
+                "FETCH_SELF_READY",
+                "RESET_BASELINE",
+                "REGISTER_RESULT",
+                "WORKER_REGISTER_RESULT",
+            )
         val EventValues =
             mapOf(
                 "ACTIVATED" to setOf("YES"),
@@ -222,6 +271,7 @@ internal class ChromeServiceWorkerBoundaryFixture {
                 "FETCH_SELF_READY" to setOf("PASSTHROUGH", "SYNTHETIC"),
                 "RESET_BASELINE" to setOf("CLEAN", "DIRTY"),
                 "REGISTER_RESULT" to setOf("BLOCKED", "SUCCEEDED"),
+                "WORKER_REGISTER_RESULT" to setOf("BLOCKED", "SUCCEEDED", "UNSUPPORTED", "ERROR"),
             )
         val SyntheticNavigationDocument =
             "<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>" +
