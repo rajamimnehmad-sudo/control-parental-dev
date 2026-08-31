@@ -199,6 +199,13 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(selfShield, "xhrOpen.call(xhr,'POST',SELF_READY_URL,false)")
         assertContains(selfShield, "read(xhrStatusProperty,xhr)!==204")
         assertContains(selfShield, "curtainRequired=false;if(!ensureCurtain())")
+        assertContains(selfShield, "const expectedCurtainCss=curtainRequired?CURTAIN_CSS:''")
+        assertContains(
+            selfShield,
+            "if(read(nodeText,curtainStyle)!==expectedCurtainCss)" +
+                "invoke(nodeText.set,curtainStyle,[expectedCurtainCss])",
+        )
+        assertContains(selfShield, "read(nodeText,curtainStyle)===expectedCurtainCss")
         assertTrue(
             selfShield.indexOf("if(!installed){failClosedDocument();return}") <
                 selfShield.indexOf("v3|SELF_READY|"),

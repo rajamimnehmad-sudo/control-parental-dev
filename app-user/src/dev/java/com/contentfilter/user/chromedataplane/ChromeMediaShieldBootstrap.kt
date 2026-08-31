@@ -289,6 +289,7 @@ internal object ChromeMediaShieldBootstrap {
         const selectionGetRangeAt=self.Selection&&Selection.prototype.getRangeAt?method(Selection.prototype.getRangeAt):null;
         const documentGetSelection=Document.prototype.getSelection?method(Document.prototype.getSelection):null;
         const shieldSheet=shieldStyle?read(styleSheetProperty,shieldStyle):null,curtainSheet=curtainStyle?read(styleSheetProperty,curtainStyle):null;
+        const CURTAIN_CSS=curtainStyle?stringOf(read(nodeText,curtainStyle)||''):'';
         const registerProtectedSheet=(sheet)=>{if(!sheet)return;invoke(WeakSetAdd,protectedSheets,[sheet]);if(styleSheetMediaProperty){const media=read(styleSheetMediaProperty,sheet);
         if(media)invoke(WeakSetAdd,protectedMedias,[media])}if(!cssRulesProperty||!cssRuleListLength||!ruleStyleMapProperty)return;
         const rules=copyList(read(cssRulesProperty,sheet),cssRuleListLength);for(let index=0;index<rules.length;index+=1){const map=read(ruleStyleMapProperty,rules[index]);
@@ -336,6 +337,8 @@ internal object ChromeMediaShieldBootstrap {
         try{if(!curtainVisibleByAttribute())invoke(htmlHiddenProperty.set,curtainLayer,[false]);
         if(dialogClosedByProperty&&dialogClosedByProperty.set){invoke(dialogClosedByProperty.set,curtainLayer,['none']);
         if(nativeGet.call(curtainLayer,'closedby')!=='none'||read(dialogClosedByProperty,curtainLayer)!=='none')return false}}catch(_){return false}
+        const expectedCurtainCss=curtainRequired?CURTAIN_CSS:'';
+        if(read(nodeText,curtainStyle)!==expectedCurtainCss)invoke(nodeText.set,curtainStyle,[expectedCurtainCss]);
         if(curtainRequired){if(nativeHas.call(curtainStyle,'media'))nativeRemove.call(curtainStyle,'media')}
         else if(nativeGet.call(curtainStyle,'media')!=='not all')nativeSet.call(curtainStyle,'media','not all');
         if(!ensureProtectedStyle(curtainStyle,curtainSheet,curtainRequired?'':'not all'))return false;const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
@@ -343,7 +346,8 @@ internal object ChromeMediaShieldBootstrap {
         if(nativeStyleGet.call(layerStyle,rule[0])!==value||nativeStylePriority.call(layerStyle,rule[0])!=='important')nativeStyleSet.call(layerStyle,rule[0],value,'important')}
         try{if(curtainRequired&&!curtainOpen()){nodeAppend.call(documentElement(),curtainLayer);nativeDialogShowModal.call(curtainLayer)}
         else if(!curtainRequired&&curtainOpen())nativeDialogClose.call(curtainLayer)}catch(_){return false}
-        return connected(curtainStyle)&&connected(curtainLayer)&&(curtainRequired?!nativeHas.call(curtainStyle,'media'):nativeGet.call(curtainStyle,'media')==='not all')&&
+        return connected(curtainStyle)&&connected(curtainLayer)&&read(nodeText,curtainStyle)===expectedCurtainCss&&
+        (curtainRequired?!nativeHas.call(curtainStyle,'media'):nativeGet.call(curtainStyle,'media')==='not all')&&
         curtainOpen()===curtainRequired&&curtainVisibleByAttribute()&&(!dialogClosedByProperty||(nativeGet.call(curtainLayer,'closedby')==='none'&&read(dialogClosedByProperty,curtainLayer)==='none'))&&
         nativeStyleGet.call(layerStyle,'display')===(curtainRequired?'block':'none')&&nativeStylePriority.call(layerStyle,'display')==='important'};
         if(shieldStyle)invoke(WeakSetAdd,protectedNodes,[shieldStyle]);if(curtainStyle)invoke(WeakSetAdd,protectedNodes,[curtainStyle]);if(curtainLayer)invoke(WeakSetAdd,protectedNodes,[curtainLayer]);
