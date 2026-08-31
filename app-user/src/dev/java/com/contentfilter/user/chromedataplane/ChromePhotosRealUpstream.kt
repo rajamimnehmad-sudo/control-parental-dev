@@ -117,6 +117,7 @@ internal class ChromePhotosRealUpstream(
         endpoint: ChromePhotosUpstreamEndpoint,
         request: ChromePhotosProxyRequest,
     ): ChromePhotosUpstreamExchange {
+        ChromeServiceWorkerScriptGate.enforce(request)
         val normalizedHost = normalizeDnsHost(endpoint.host)
         require(request.method in ChromePhotosProxyRequest.AllowedMethods)
         val upstreamRequest =
