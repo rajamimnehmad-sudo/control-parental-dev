@@ -206,6 +206,15 @@ class ChromeMediaShieldBootstrapContractTest {
                 "invoke(nodeText.set,curtainStyle,[expectedCurtainCss])",
         )
         assertContains(selfShield, "read(nodeText,curtainStyle)===expectedCurtainCss")
+        assertContains(
+            selfShield,
+            "const currentCurtainSheet=read(styleSheetProperty,curtainStyle);" +
+                "registerProtectedSheet(currentCurtainSheet)",
+        )
+        assertContains(
+            selfShield,
+            "ensureProtectedStyle(curtainStyle,currentCurtainSheet,curtainRequired?'':'not all')",
+        )
         assertTrue(
             selfShield.indexOf("if(!installed){failClosedDocument();return}") <
                 selfShield.indexOf("v3|SELF_READY|"),
@@ -263,7 +272,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "ensureProtectedStyle(shieldStyle,shieldSheet,'')")
         assertContains(
             script,
-            "ensureProtectedStyle(curtainStyle,curtainSheet,curtainRequired?'':'not all')",
+            "ensureProtectedStyle(curtainStyle,currentCurtainSheet,curtainRequired?'':'not all')",
         )
         assertContains(script, "invoke(htmlTitleProperty.set,style,[''])")
         assertContains(script, "nativeRemove.call(style,'title')")

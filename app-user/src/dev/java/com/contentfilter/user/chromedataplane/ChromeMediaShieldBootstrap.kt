@@ -341,7 +341,8 @@ internal object ChromeMediaShieldBootstrap {
         if(read(nodeText,curtainStyle)!==expectedCurtainCss)invoke(nodeText.set,curtainStyle,[expectedCurtainCss]);
         if(curtainRequired){if(nativeHas.call(curtainStyle,'media'))nativeRemove.call(curtainStyle,'media')}
         else if(nativeGet.call(curtainStyle,'media')!=='not all')nativeSet.call(curtainStyle,'media','not all');
-        if(!ensureProtectedStyle(curtainStyle,curtainSheet,curtainRequired?'':'not all'))return false;const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
+        const currentCurtainSheet=read(styleSheetProperty,curtainStyle);registerProtectedSheet(currentCurtainSheet);
+        if(!ensureProtectedStyle(curtainStyle,currentCurtainSheet,curtainRequired?'':'not all'))return false;const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
         for(let index=0;index<CURTAIN_RULES.length;index+=1){const rule=CURTAIN_RULES[index],value=rule[0]==='display'?(curtainRequired?'block':'none'):rule[1];
         if(nativeStyleGet.call(layerStyle,rule[0])!==value||nativeStylePriority.call(layerStyle,rule[0])!=='important')nativeStyleSet.call(layerStyle,rule[0],value,'important')}
         try{if(curtainRequired&&!curtainOpen()){nodeAppend.call(documentElement(),curtainLayer);nativeDialogShowModal.call(curtainLayer)}
