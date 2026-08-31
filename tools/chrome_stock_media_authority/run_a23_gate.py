@@ -183,17 +183,21 @@ def start_phase(
     timeout_seconds: int,
     previous_session: str = "",
 ) -> dict[str, Any]:
-    adb.broadcast(
-        ACTION_PREFIX + "START",
-        [
-            ("--ez", "stock_media_authority_enabled", "true"),
-            ("--ez", "full_tunnel_dev_gate_enabled", "true"),
-            ("--ez", "replace_all_network_visuals", "true" if mode == "replace-all" else "false"),
-        ],
-    )
+    def broadcast_start() -> None:
+        adb.broadcast(
+            ACTION_PREFIX + "START",
+            [
+                ("--ez", "stock_media_authority_enabled", "true"),
+                ("--ez", "full_tunnel_dev_gate_enabled", "true"),
+                ("--ez", "replace_all_network_visuals", "true" if mode == "replace-all" else "false"),
+            ],
+        )
+
+    broadcast_start()
     deadline = time.monotonic() + timeout_seconds
     last: dict[str, Any] = {}
     snapshot_requested = False
+    mode_replacement_attempted = False
     while time.monotonic() < deadline:
         value, last = observe_status(adb, since)
         if not snapshot_requested and _phase_presentation_ready_observed(value):
@@ -202,6 +206,33 @@ def start_phase(
         status = last.get("status", {}).get("fields", {})
         active = last.get("activeMode", {})
         expected_mode = "replace_all" if mode == "replace-all" else "selective"
+        structured_mode = (
+            last.get("structuredStatus", {})
+            .get("kinds", {})
+            .get("network", {})
+            .get("mode")
+        )
+        ready_wrong_or_unattributed_mode = (
+            status.get("active") == "true"
+            and status.get("lifecycle") == "PresentationReady"
+            and status.get("ready") == "true"
+            and isinstance(structured_mode, str)
+            and (
+                structured_mode != expected_mode
+                or not active
+            )
+        )
+        if ready_wrong_or_unattributed_mode:
+            if mode_replacement_attempted:
+                raise HarnessError(
+                    "H19 explicit mode remained stale after one state-driven replacement"
+                )
+            stop_phase(adb)
+            since = adb.shell("date", "+%m-%d %H:%M:%S.000").strip()
+            broadcast_start()
+            snapshot_requested = False
+            mode_replacement_attempted = True
+            continue
         if (
             status.get("active") == "true"
             and status.get("lifecycle") == "PresentationReady"

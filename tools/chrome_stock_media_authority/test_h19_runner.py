@@ -80,9 +80,16 @@ class FakeProcessRestartAdb:
 class FakeStartAdb:
     def __init__(self) -> None:
         self.broadcasts: list[str] = []
+        self.extras: list[list[tuple[str, str, str]]] = []
 
-    def broadcast(self, action, _extras=None):
+    def broadcast(self, action, extras=None):
         self.broadcasts.append(action)
+        self.extras.append(list(extras or []))
+        return ""
+
+    def shell(self, *args, **_kwargs):
+        if args[:1] == ("date",):
+            return "08-31 12:00:00.000"
         return ""
 
 
@@ -327,6 +334,54 @@ class H19RunnerTest(unittest.TestCase):
         self.assertEqual(released, result)
         self.assertEqual(2, observe.call_count)
         refresh.assert_called_once_with(ANY, "since")
+
+    def test_phase_start_replaces_one_package_restart_mode_race_state_driven(self):
+        wrong = {
+            "status": {
+                "fields": {
+                    "active": "true",
+                    "lifecycle": "PresentationReady",
+                    "ready": "true",
+                    "chromeSuspended": "false",
+                },
+            },
+            "structuredStatus": {"kinds": {"network": {"mode": "selective"}}},
+            "activeMode": {},
+        }
+        current = {
+            "status": {
+                "fields": {
+                    "active": "true",
+                    "lifecycle": "PresentationReady",
+                    "ready": "true",
+                    "chromeSuspended": "false",
+                },
+            },
+            "structuredStatus": {"kinds": {"network": {"mode": "replace_all"}}},
+            "activeMode": {
+                "networkVisualMode": "replace_all",
+                "stockMediaAuthority": "true",
+                "transport": "full_tunnel_dev",
+                "session": "current",
+                "model": "R3.1",
+                "modelSha": "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48",
+                "policy": "dag-36",
+            },
+        }
+        adb = FakeStartAdb()
+        with (
+            patch("run_a23_gate.observe_status", side_effect=[("", wrong), ("", current)]),
+            patch("run_a23_gate.stop_phase") as stop,
+            patch("run_a23_gate.time.sleep"),
+        ):
+            result = start_phase(adb, "replace-all", "since", timeout_seconds=1)
+
+        self.assertEqual(current, result)
+        stop.assert_called_once_with(adb)
+        self.assertEqual(2, adb.broadcasts.count("com.contentfilter.user.chromedataplane.command.START"))
+        for extras in adb.extras:
+            self.assertIn(("--ez", "stock_media_authority_enabled", "true"), extras)
+            self.assertIn(("--ez", "replace_all_network_visuals", "true"), extras)
 
     def test_one_status_snapshot_broadcasts_once_and_transport_is_explicit(self):
         adb = FakeStartAdb()
