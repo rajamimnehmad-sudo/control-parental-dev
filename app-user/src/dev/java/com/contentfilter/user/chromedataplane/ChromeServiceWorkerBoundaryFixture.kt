@@ -175,9 +175,9 @@ internal class ChromeServiceWorkerBoundaryFixture {
         let windowResult='BLOCKED';try{const registration=await navigator.serviceWorker.register('$WorkerPath',{scope:'/',updateViaCache:'none'});windowResult='SUCCEEDED';await navigator.serviceWorker.ready;
         if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));}
         catch(_){}await report('v1|RESET_VERIFY|REGISTER_RESULT|'+windowResult);
-        const workerResult=await new Promise(resolve=>{let settled=false;const finish=value=>{if(settled)return;settled=true;clearTimeout(timer);resolve(value)};let worker=null;
-        try{worker=new Worker('$WorkerRegisterProbePath');worker.onmessage=event=>finish(['BLOCKED','SUCCEEDED','UNSUPPORTED','ERROR'].includes(event.data)?event.data:'ERROR');worker.onerror=()=>finish('ERROR');worker.postMessage('REGISTER')}
-        catch(_){finish('ERROR')}const timer=setTimeout(()=>finish('ERROR'),4000)});
+        const workerResult=await new Promise(resolve=>{let settled=false,worker=null,timer=0;const finish=value=>{if(settled)return;settled=true;if(timer)clearTimeout(timer);try{if(worker)worker.terminate()}catch(_){}resolve(value)};
+        try{worker=new Worker('$WorkerRegisterProbePath');worker.onmessage=event=>finish(['BLOCKED','SUCCEEDED','UNSUPPORTED','ERROR'].includes(event.data)?event.data:'ERROR');worker.onerror=()=>finish('ERROR');worker.postMessage('REGISTER');timer=setTimeout(()=>finish('ERROR'),4000)}
+        catch(_){finish('ERROR')}});
         await report('v1|RESET_VERIFY|WORKER_REGISTER_RESULT|'+workerResult);
         document.getElementById('status').textContent='WINDOW_REGISTER='+windowResult+' WORKER_REGISTER='+workerResult})();
         </script></body></html>
