@@ -40,6 +40,11 @@ internal data class ChromePhotosProxyRequest(
                 .flatMap { it.split(',') }
                 .any { it.trim().equals("upgrade", ignoreCase = true) }
 
+    /** Browser-owned request metadata for a Service Worker main script fetch. */
+    fun isServiceWorkerScriptRequest(): Boolean =
+        headerValues("Service-Worker").any { it.trim().equals("script", ignoreCase = true) } ||
+            headerValues("Sec-Fetch-Dest").any { it.trim().equals("serviceworker", ignoreCase = true) }
+
     fun authorityMatches(
         expectedHost: String,
         expectedPort: Int = HttpsPort,
