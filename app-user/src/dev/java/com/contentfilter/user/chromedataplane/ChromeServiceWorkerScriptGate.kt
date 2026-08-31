@@ -1,6 +1,5 @@
 package com.contentfilter.user.chromedataplane
 
-import android.util.Log
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
 import java.io.IOException
 
@@ -17,10 +16,6 @@ internal object ChromeServiceWorkerScriptGate {
 
     @Throws(IOException::class)
     fun enforce(request: ChromePhotosProxyRequest) {
-        if (!blocks(request)) return
-        Log.i(LogTag, "decision=fail_closed scope=service_worker_script")
-        throw IOException("service_worker_script_disabled")
+        if (blocks(request)) throw IOException("service_worker_script_disabled")
     }
-
-    private const val LogTag = "ChromePhotosDataPlane"
 }
