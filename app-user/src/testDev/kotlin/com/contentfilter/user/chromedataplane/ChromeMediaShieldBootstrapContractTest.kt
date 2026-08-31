@@ -17,6 +17,8 @@ class ChromeMediaShieldBootstrapContractTest {
         assertFalse(script.contains("requestAnimationFrame"))
         assertContains(script, "NativeHasFocusFunction=Document.prototype.hasFocus")
         assertContains(script, "nativeHasFocus=NativeHasFocusFunction?method(NativeHasFocusFunction):null")
+        assertContains(script, "NativeElementFocusFunction=SELF.HTMLElement&&HTMLElement.prototype.focus")
+        assertContains(script, "nativeElementFocus=NativeElementFocusFunction?method(NativeElementFocusFunction):null")
         assertContains(script, "NativeLocationReloadFunction=NativeLocation&&NativeLocation.reload")
         assertContains(
             script,
@@ -27,6 +29,12 @@ class ChromeMediaShieldBootstrapContractTest {
             script,
             "const activeDocument=()=>TOP_LEVEL&&IS_TOP_LEVEL&&visibilityState()==='visible'&&hasNativeFocus()",
         )
+        assertContains(
+            script,
+            "const acquireActiveDocument=()=>{if(!showCurtain()||!curtainLayer)return false;if(activeDocument())return true",
+        )
+        assertContains(script, "nativeElementFocus.call(curtainLayer,{preventScroll:true})")
+        assertContains(script, "return activeDocument()}")
         assertFalse(script.contains("activeElement"))
         assertFalse(script.contains("new NativePageTransitionEvent"))
         assertContains(script, "propertyDescriptor(NativePageTransitionEvent.prototype,'persisted')")
@@ -78,6 +86,23 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "const parserBarrierGuard=()=>")
         assertContains(script, "!retireScript(script)||!firstAuthorityComplete")
         assertContains(script, "nativeLocationReload.call(NativeLocation)")
+        assertContains(script, "nativeSet.call(curtainLayer,'tabindex','-1')")
+        assertTrue(
+            script.indexOf("showCurtain()||!curtainLayer") <
+                script.indexOf("nativeElementFocus.call(curtainLayer,{preventScroll:true})"),
+        )
+        assertTrue(
+            script.indexOf("nativeElementFocus.call(curtainLayer,{preventScroll:true})") <
+                script.indexOf("if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}"),
+        )
+        assertTrue(
+            script.indexOf("nativeElementFocus.call(curtainLayer,{preventScroll:true})") <
+                script.indexOf("authorityArmed=true;beginReadyLifecycle()"),
+        )
+        assertEquals(
+            1,
+            Regex(Regex.escape("nativeElementFocus.call(curtainLayer,{preventScroll:true})")).findAll(script).count(),
+        )
         assertTrue(
             script.indexOf("const parserBarrierCommit=(ready)=>") >
                 script.indexOf("nativeAddEvent.call(DOC,'visibilitychange'"),
@@ -388,8 +413,9 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "ReflectDelete(SELF,'${ChromeMediaShieldBootstrap.ParserBarrierGuardName}')")
         assertContains(script, "authorityArmed=false")
         assertContains(script, "if(!authorityArmed||activePhase!=='idle'||!activeDocument())return")
-        val callbackFocusGate = "if(!activeDocument()){parkDocument();return}"
-        assertContains(script, "authorityArmed=true;$callbackFocusGate")
+        val callbackFocusGate =
+            "if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}authorityArmed=true;beginReadyLifecycle()"
+        assertContains(script, callbackFocusGate)
         assertEquals(
             1,
             Regex(Regex.escape(callbackFocusGate)).findAll(script).count(),

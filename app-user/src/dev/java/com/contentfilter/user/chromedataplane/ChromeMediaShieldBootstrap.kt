@@ -98,7 +98,7 @@ internal object ChromeMediaShieldBootstrap {
         const NativeString=String,NativeNumber=Number,NativeURL=URL,NativeDOMException=DOMException,NativeArray=Array,NativeEvent=Event,NativePageTransitionEvent=SELF.PageTransitionEvent;
         const NativePageSwapEvent=SELF.PageSwapEvent,NativePageRevealEvent=SELF.PageRevealEvent,NativeViewTransition=SELF.ViewTransition,NativeMutationObserver=MutationObserver;
         const NativeLocation=SELF.location,NativeLocationReloadFunction=NativeLocation&&NativeLocation.reload;
-        const NativeXMLHttpRequest=SELF.XMLHttpRequest,NativeHasFocusFunction=Document.prototype.hasFocus;
+        const NativeXMLHttpRequest=SELF.XMLHttpRequest,NativeHasFocusFunction=Document.prototype.hasFocus,NativeElementFocusFunction=SELF.HTMLElement&&HTMLElement.prototype.focus;
         const NumberIsSafeInteger=Number.isSafeInteger;
         const StringLower=String.prototype.toLowerCase,StringIncludes=String.prototype.includes,StringTrim=String.prototype.trim,StringLastIndex=String.prototype.lastIndexOf,StringSlice=String.prototype.slice,StringCharCodeAt=String.prototype.charCodeAt;
         const SetHas=Set.prototype.has,SetAdd=Set.prototype.add,WeakSetHas=WeakSet.prototype.has,WeakSetAdd=WeakSet.prototype.add,WeakSetDelete=WeakSet.prototype.delete;
@@ -106,6 +106,7 @@ internal object ChromeMediaShieldBootstrap {
         const invoke=(fn,owner,args)=>ReflectApply(fn,owner,args),method=(fn)=>({call:(owner,...args)=>invoke(fn,owner,args),apply:(owner,args)=>invoke(fn,owner,args)});
         const nativeLocationReload=NativeLocationReloadFunction?method(NativeLocationReloadFunction):null;
         const nativeHasFocus=NativeHasFocusFunction?method(NativeHasFocusFunction):null;
+        const nativeElementFocus=NativeElementFocusFunction?method(NativeElementFocusFunction):null;
         const nativeDialogShowModal=SELF.HTMLDialogElement&&HTMLDialogElement.prototype.showModal?method(HTMLDialogElement.prototype.showModal):null;
         const nativeDialogShow=SELF.HTMLDialogElement&&HTMLDialogElement.prototype.show?method(HTMLDialogElement.prototype.show):null;
         const nativeDialogClose=SELF.HTMLDialogElement&&HTMLDialogElement.prototype.close?method(HTMLDialogElement.prototype.close):null;
@@ -171,7 +172,7 @@ internal object ChromeMediaShieldBootstrap {
         const requiredPrimordials=[nodeText,nodeValue,nodeTypeProperty,localNameProperty,parentNodeProperty,firstChildProperty,isConnectedProperty,baseUriProperty,styleProperty,
         elementAttributesProperty,documentElementProperty,documentHeadProperty,visibilityProperty,eventTargetProperty,eventTrustedProperty,mutationTypeProperty,mutationTargetProperty,mutationAddedProperty,
         nodeListLength,namedMapLength,urlProtocolProperty,templateContentProperty,htmlHiddenProperty,htmlTitleProperty,currentScriptProperty,scriptSrcProperty];
-        if(TOP_LEVEL&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!xhrResponseTextProperty||!nativeHasFocus||!nativeLocationReload||!nativeDialogShowModal||!nativeDialogShow||!nativeDialogClose||!htmlHiddenProperty||!dialogOpenProperty))installed=false;
+        if(TOP_LEVEL&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!xhrResponseTextProperty||!nativeHasFocus||!nativeElementFocus||!nativeLocationReload||!nativeDialogShowModal||!nativeDialogShow||!nativeDialogClose||!htmlHiddenProperty||!dialogOpenProperty))installed=false;
         for(let index=0;index<requiredPrimordials.length;index+=1)if(!requiredPrimordials[index])installed=false;
         if(self.Attr&&(!attrNameProperty||!attrValueProperty||!attrNamespaceProperty||!attrLocalNameProperty||!attrOwnerProperty))installed=false;
         if(NativePageTransitionEvent&&!pagePersistedProperty)installed=false;
@@ -254,7 +255,7 @@ internal object ChromeMediaShieldBootstrap {
         for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}};
         const sanitizeContainer=(node)=>{if(!node||nodeTypeOf(node)!==1)return;sanitizeElement(node);const svg=elementClosest.call(node,'svg');if(svg&&svg!==node)sanitizeElement(svg)};
         const shieldStyle=DOC.getElementById(STYLE_ID),curtainStyle=TOP_LEVEL?DOC.getElementById(CURTAIN_ID):null,curtainLayer=TOP_LEVEL?nativeCreateElement.call(DOC,'dialog'):null;
-        if(curtainLayer){nativeSet.call(curtainLayer,'id',CURTAIN_LAYER_ID);nodeInsert.call(documentElement(),curtainLayer,firstChildOf(documentElement()))}
+        if(curtainLayer){nativeSet.call(curtainLayer,'id',CURTAIN_LAYER_ID);nativeSet.call(curtainLayer,'tabindex','-1');nodeInsert.call(documentElement(),curtainLayer,firstChildOf(documentElement()))}
         if(!shieldStyle||(TOP_LEVEL&&(!curtainStyle||!curtainLayer)))installed=false;else{watchStyle(shieldStyle);if(curtainStyle)watchStyle(curtainStyle);if(curtainLayer)watchStyle(curtainLayer)}
         const styleSheetProperty=shieldStyle?propertyDescriptor(shieldStyle,'sheet'):null,styleNonceProperty=shieldStyle?propertyDescriptor(shieldStyle,'nonce'):null;
         const styleElementDisabledProperty=shieldStyle?propertyDescriptor(shieldStyle,'disabled'):null,styleElementMediaProperty=shieldStyle?propertyDescriptor(shieldStyle,'media'):null;
@@ -647,6 +648,8 @@ internal object ChromeMediaShieldBootstrap {
         let lifecycle=0,currentLifecycle=0,activePhase='idle',challenge='',authorityArmed=false;
         const showCurtain=()=>{curtainRequired=true;if(ensureCurtain())return true;failClosedDocument();return false};
         const hideCurtain=()=>{curtainRequired=false;return ensureCurtain()};
+        const acquireActiveDocument=()=>{if(!showCurtain()||!curtainLayer)return false;if(activeDocument())return true;try{
+        nativeElementFocus.call(curtainLayer,{preventScroll:true})}catch(_){return false}return activeDocument()};
         const stopCrossDocumentTransition=(event,entry)=>{if(!entry)return true;try{const transition=read(entry,event);if(transition)nativeSkipViewTransition.call(transition);return true}
         catch(_){showCurtain();failClosedDocument();return false}};
         const validChallenge=(value)=>{if(value.length<22||value.length>128)return false;for(let index=0;index<value.length;index+=1){const code=charCode(value,index);
@@ -681,8 +684,8 @@ internal object ChromeMediaShieldBootstrap {
         let firstAuthorityComplete=false,parserBarrierConsumed=false,parserGuardConsumed=false;
         const parserBarrierCommit=(ready)=>{if(parserBarrierConsumed)return;parserBarrierConsumed=true;const script=read(currentScriptProperty,DOC);
         const exactScript=!!script&&read(scriptSrcProperty,script)===BARRIER_URL;const callbackDeleted=ReflectDelete(SELF,'__gloshH19ParserBarrierCommit__')&&!descriptor(SELF,'__gloshH19ParserBarrierCommit__');
-        if(!callbackDeleted||!exactScript||ready!==true||!retireScript(script)){failClosedDocument();return}authorityArmed=true;if(!activeDocument()){parkDocument();return}
-        beginReadyLifecycle();firstAuthorityComplete=activePhase==='released';if(!firstAuthorityComplete)failClosedDocument()};
+        if(!callbackDeleted||!exactScript||ready!==true||!retireScript(script)){failClosedDocument();return}if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}
+        authorityArmed=true;beginReadyLifecycle();firstAuthorityComplete=activePhase==='released';if(!firstAuthorityComplete)failClosedDocument()};
         const parserBarrierGuard=()=>{if(parserGuardConsumed)return false;parserGuardConsumed=true;const script=read(currentScriptProperty,DOC);
         const callbackDeleted=ReflectDelete(SELF,'__gloshH19ParserBarrierGuard__')&&!descriptor(SELF,'__gloshH19ParserBarrierGuard__');
         if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''||!retireScript(script)||!firstAuthorityComplete){failClosedDocument();return false}return true};
