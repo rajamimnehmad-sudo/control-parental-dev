@@ -6,8 +6,10 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
+import android.util.Log
 import androidx.core.content.ContextCompat
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
+import com.contentfilter.feature.accessibility.chromevisual.ChromeMediaShieldActiveDocumentLabControl
 import com.contentfilter.feature.accessibility.chromevisual.ChromePhotosProtectedSurfaceDiagnostics
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.chromeguard.ChromeGuardService
@@ -18,6 +20,38 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (!context.packageName.endsWith(".dev")) return
+        if (intent.action == ActionActiveDocumentReplay) {
+            val result = ChromeMediaShieldActiveDocumentLabControl.replayConsumedPresent()
+            setResultData(result)
+            Log.i(ActiveDocumentLogTag, "action=ACTIVE_DOCUMENT_REPLAY $result")
+            return
+        }
+        if (intent.action in ActiveDocumentHoldActions) {
+            val result =
+                when (intent.action) {
+                    ActionActiveDocumentHoldArm ->
+                        ChromeMediaShieldActiveDocumentLabControl.arm(
+                            intent.getStringExtra(ExtraActiveDocumentCaseId),
+                            intent.getStringExtra(ExtraActiveDocumentHoldStage),
+                            intent.getStringExtra(ExtraActiveDocumentHoldNonce),
+                        )
+                    ActionActiveDocumentHoldRelease ->
+                        ChromeMediaShieldActiveDocumentLabControl.release(
+                            intent.getStringExtra(ExtraActiveDocumentCaseId),
+                            intent.getStringExtra(ExtraActiveDocumentHoldStage),
+                            intent.getStringExtra(ExtraActiveDocumentHoldNonce),
+                        )
+                    else ->
+                        ChromeMediaShieldActiveDocumentLabControl.cancel(
+                            intent.getStringExtra(ExtraActiveDocumentCaseId),
+                            intent.getStringExtra(ExtraActiveDocumentHoldStage),
+                            intent.getStringExtra(ExtraActiveDocumentHoldNonce),
+                        )
+                }
+            setResultData(result)
+            Log.i(ActiveDocumentLogTag, "action=${intent.action?.substringAfterLast('.')} $result")
+            return
+        }
         when (intent.action) {
             ActionMainProcessKill -> {
                 Process.killProcess(Process.myPid())
@@ -61,6 +95,9 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         if (intent.action == ActionTransportStatus) {
             VpnController.logDevTransportStatus(context)
             return
+        }
+        if (intent.action == ActionStatus) {
+            Log.i(ActiveDocumentLogTag, ChromeMediaShieldActiveDocumentLabControl.status())
         }
         if (intent.action == ActionTransportStress) {
             VpnController.runDevTransportStress(
@@ -148,6 +185,16 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ActionGuardProcessKill = "com.contentfilter.user.chromedataplane.command.GUARD_PROCESS_KILL"
         const val ActionGuardStatus = "com.contentfilter.user.chromedataplane.command.GUARD_STATUS"
         const val ActionPrepareUpdate = "com.contentfilter.user.chromedataplane.command.PREPARE_UPDATE"
+        const val ActionActiveDocumentHoldArm =
+            "com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_ARM"
+        const val ActionActiveDocumentHoldRelease =
+            "com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_RELEASE"
+        const val ActionActiveDocumentHoldCancel =
+            "com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_CANCEL"
+        const val ActionActiveDocumentReplay = ChromePhotosDataPlaneLabContract.ActionActiveDocumentReplay
+        const val ExtraActiveDocumentCaseId = "active_document_case_id"
+        const val ExtraActiveDocumentHoldStage = "active_document_hold_stage"
+        const val ExtraActiveDocumentHoldNonce = "active_document_hold_nonce"
         const val ExtraSurfaceMarkerEnabled = "chrome_photos_surface_marker_enabled"
         const val ExtraAuditStateLabel = "chrome_coverage_audit_state_label"
         const val ExtraAuditNewNavigation = "chrome_coverage_audit_new_navigation"
@@ -161,5 +208,12 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ExtraReplaceAllNetworkVisuals = "replace_all_network_visuals"
         const val ExtraStockMediaAuthorityEnabled = ChromePhotosDataPlaneLabContract.KeyStockMediaAuthorityEnabled
         private const val DefaultTransportStressCycles = 100
+        private const val ActiveDocumentLogTag = "ChromeMediaShieldActiveDocument"
+        private val ActiveDocumentHoldActions =
+            setOf(
+                ActionActiveDocumentHoldArm,
+                ActionActiveDocumentHoldRelease,
+                ActionActiveDocumentHoldCancel,
+            )
     }
 }

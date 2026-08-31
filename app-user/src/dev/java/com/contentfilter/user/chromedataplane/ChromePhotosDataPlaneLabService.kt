@@ -626,7 +626,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "documentSequence=${documentRegistry.currentTopLevel?.documentSequence ?: 0L} " +
                 "navigationSequence=${documentRegistry.currentTopLevel?.navigationSequence ?: 0L} " +
                 "readyRequests=${readyEndpoint.requests} readyPreflights=${readyEndpoint.preflights} " +
-                "readyAccepted=${readyEndpoint.accepted} readyRejected=${readyEndpoint.rejected}",
+                "readyAccepted=${readyEndpoint.accepted} readyRejected=${readyEndpoint.rejected} " +
+                "parserBarrierRequests=${readyEndpoint.parserBarrierRequests} " +
+                "parserBarrierReady=${readyEndpoint.parserBarrierReady} " +
+                "parserBarrierFailClosed=${readyEndpoint.parserBarrierFailClosed}",
         )
         Log.i(
             StatusLogTag,

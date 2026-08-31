@@ -19,13 +19,13 @@ class ChromeStockMediaAuthorityFixtureTest {
         val scenarios = fixture.scenarios
 
         assertEquals(scenarios.size, scenarios.map { it.id }.toSet().size)
-        assertEquals(49, scenarios.size)
+        assertEquals(50, scenarios.size)
         assertEquals(
             ChromeStockMediaScenarioCategory.entries.toSet(),
             scenarios.mapTo(linkedSetOf()) { it.category },
         )
         assertEquals(17, scenarios.count { it.category == ChromeStockMediaScenarioCategory.Network })
-        assertEquals(24, scenarios.count { it.category == ChromeStockMediaScenarioCategory.Local })
+        assertEquals(25, scenarios.count { it.category == ChromeStockMediaScenarioCategory.Local })
         assertEquals(7, scenarios.count { it.category == ChromeStockMediaScenarioCategory.Normality })
         assertEquals(1, scenarios.count { it.category == ChromeStockMediaScenarioCategory.OutOfScope })
     }
@@ -58,9 +58,27 @@ class ChromeStockMediaAuthorityFixtureTest {
             "serviceWorker.controller===null",
             "history.pushState",
             "local-hostile-prototype-fresh-frame",
+            "local-protected-primordial-bypass",
             "Define(String.prototype,'toLowerCase'",
             "Define(Array.prototype,'0'",
             "allow-scripts allow-same-origin",
+            "shield.style='display:none!important'",
+            "descriptorChain(CSSStyleSheet.prototype,'disabled',true)",
+            "descriptorChain(CSSStyleSheet.prototype,'media',true)",
+            "descriptorChain(CSSStyleRule.prototype,'style',true)",
+            "descriptorChain(CSSStyleRule.prototype,'insertRule',false)",
+            "descriptorChain(CSSStyleRule.prototype,'deleteRule',false)",
+            "descriptorChain(HTMLIFrameElement.prototype,'sandbox',true)",
+            "error.name==='SecurityError'",
+            "scratchSheet.disabled=true",
+            "scratchRule.style='color:rgb(7,8,9)'",
+            "Define(retainedStyle,'opacity'",
+            "DefineReflect(retainedStyle,'visibility'",
+            "SetReflect(retainedStyle,'display','block')",
+            "Assign(retainedStyle,{opacity:'1'})",
+            "SetPrototype(retainedStyle,null)",
+            "protectedMediaRead=securityDenied(()=>sheet.media)",
+            "retainedNeutral=call(ElementGet,retained,['src'])===null",
             "out-of-scope-css-synthesis",
         ).forEach { assertTrue(script.contains(it), it) }
         val style = fixture.responseFor(request("GET", "/web19/site.css"))!!.text()

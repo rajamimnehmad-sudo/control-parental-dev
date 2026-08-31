@@ -14,6 +14,7 @@ internal class ChromeMediaShieldCspPolicy {
         val output = mutableListOf<ChromeHttpHeader>()
         sanitized.forEach { header ->
             when {
+                header.name.equals(ContentSecurityPolicyReportOnly, ignoreCase = true) -> Unit
                 header.name.equals(ContentSecurityPolicy, ignoreCase = true) -> {
                     splitEffectivePolicies(header.value).forEach { effectivePolicy ->
                         output +=
@@ -117,6 +118,7 @@ internal class ChromeMediaShieldCspPolicy {
 
     private companion object {
         const val ContentSecurityPolicy = "Content-Security-Policy"
+        const val ContentSecurityPolicyReportOnly = "Content-Security-Policy-Report-Only"
         const val EmptyFailClosedPolicy = "default-src 'none'"
         const val ReadyOrigin = "https://${ChromePhotosDataPlaneLabContract.FixtureHost}"
         const val MediaEnvelope =

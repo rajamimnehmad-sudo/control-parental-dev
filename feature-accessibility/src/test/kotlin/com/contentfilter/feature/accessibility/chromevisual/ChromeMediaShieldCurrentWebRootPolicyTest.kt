@@ -6,6 +6,90 @@ import org.junit.Test
 
 class ChromeMediaShieldCurrentWebRootPolicyTest {
     @Test
+    fun `opaque active handshake accepts one exact attached WebView without trusting visibility`() {
+        listOf(true, false).forEach { visible ->
+            assertTrue(
+                ChromeMediaShieldAttachedWebRootPolicy.verifies(
+                    attachedEvidence(candidateVisibleToUser = visible),
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `opaque active handshake rejects detached or structurally invalid WebView`() {
+        assertFalse(
+            ChromeMediaShieldAttachedWebRootPolicy.verifies(
+                attachedEvidence(candidateAttachedToWindowRoot = false),
+            ),
+        )
+        assertFalse(
+            ChromeMediaShieldAttachedWebRootPolicy.verifies(
+                attachedEvidence(
+                    candidate = candidateEvidence(candidateUniqueId = NativeRootUniqueId),
+                ),
+            ),
+        )
+        assertFalse(
+            ChromeMediaShieldAttachedWebRootPolicy.verifies(
+                attachedEvidence(
+                    candidate = candidateEvidence(candidateWindowId = WindowId + 1),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun `active handshake web root evidence is structural and exact`() {
+        assertTrue(
+            ChromeMediaShieldWebRootCandidatePolicy.verifies(
+                ChromeMediaShieldWebRootCandidateEvidence(
+                    expectedWindowId = WindowId,
+                    nativeRootUniqueId = NativeRootUniqueId,
+                    candidatePackageName = ChromePackageName,
+                    candidateClassName = ChromeMediaShieldWebRootContract.ClassName,
+                    candidateWindowId = WindowId,
+                    candidateUniqueId = WebRootUniqueId,
+                ),
+            ),
+        )
+        listOf(
+            ChromeMediaShieldWebRootCandidateEvidence(
+                WindowId,
+                NativeRootUniqueId,
+                "example.hostile",
+                ChromeMediaShieldWebRootContract.ClassName,
+                WindowId,
+                WebRootUniqueId,
+            ),
+            ChromeMediaShieldWebRootCandidateEvidence(
+                WindowId,
+                NativeRootUniqueId,
+                ChromePackageName,
+                "android.widget.ImageView",
+                WindowId,
+                WebRootUniqueId,
+            ),
+            ChromeMediaShieldWebRootCandidateEvidence(
+                WindowId,
+                NativeRootUniqueId,
+                ChromePackageName,
+                ChromeMediaShieldWebRootContract.ClassName,
+                WindowId + 1,
+                WebRootUniqueId,
+            ),
+            ChromeMediaShieldWebRootCandidateEvidence(
+                WindowId,
+                NativeRootUniqueId,
+                ChromePackageName,
+                ChromeMediaShieldWebRootContract.ClassName,
+                WindowId,
+                NativeRootUniqueId,
+            ),
+        ).forEach { assertFalse(ChromeMediaShieldWebRootCandidatePolicy.verifies(it)) }
+    }
+
+    @Test
     fun `exact browser issued web root can continue an already event bound document`() {
         assertTrue(
             ChromeMediaShieldCurrentWebRootPolicy.verifies(
@@ -68,6 +152,28 @@ class ChromeMediaShieldCurrentWebRootPolicyTest {
         candidateClassName = candidateClassName,
         candidateWindowId = candidateWindowId,
         candidateUniqueId = candidateUniqueId,
+        candidateVisibleToUser = candidateVisibleToUser,
+        candidateAttachedToWindowRoot = candidateAttachedToWindowRoot,
+    )
+
+    private fun candidateEvidence(
+        candidateWindowId: Int = WindowId,
+        candidateUniqueId: String? = WebRootUniqueId,
+    ) = ChromeMediaShieldWebRootCandidateEvidence(
+        expectedWindowId = WindowId,
+        nativeRootUniqueId = NativeRootUniqueId,
+        candidatePackageName = ChromePackageName,
+        candidateClassName = ChromeMediaShieldWebRootContract.ClassName,
+        candidateWindowId = candidateWindowId,
+        candidateUniqueId = candidateUniqueId,
+    )
+
+    private fun attachedEvidence(
+        candidate: ChromeMediaShieldWebRootCandidateEvidence = candidateEvidence(),
+        candidateVisibleToUser: Boolean = false,
+        candidateAttachedToWindowRoot: Boolean = true,
+    ) = ChromeMediaShieldAttachedWebRootEvidence(
+        candidate = candidate,
         candidateVisibleToUser = candidateVisibleToUser,
         candidateAttachedToWindowRoot = candidateAttachedToWindowRoot,
     )

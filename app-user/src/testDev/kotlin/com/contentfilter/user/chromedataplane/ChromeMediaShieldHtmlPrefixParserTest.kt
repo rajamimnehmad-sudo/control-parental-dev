@@ -50,6 +50,30 @@ class ChromeMediaShieldHtmlPrefixParserTest {
                 32 * 1024,
             ),
         )
+        assertNull(
+            ChromeMediaShieldHtmlPrefixParser.insertionPoint(
+                "<!doctype html><html onfocus=\"bad()\"><head></head>",
+                32 * 1024,
+            ),
+        )
+        assertNull(
+            ChromeMediaShieldHtmlPrefixParser.insertionPoint(
+                "<!doctype html><html><head ONLOAD='bad()'></head>",
+                32 * 1024,
+            ),
+        )
+        assertNull(
+            ChromeMediaShieldHtmlPrefixParser.insertionPoint(
+                "<!doctype html><html / onfocus=bad()><head></head>",
+                32 * 1024,
+            ),
+        )
+        assertNull(
+            ChromeMediaShieldHtmlPrefixParser.insertionPoint(
+                "<!doctype html><html><head / onload=bad()></head>",
+                32 * 1024,
+            ),
+        )
     }
 
     @Test

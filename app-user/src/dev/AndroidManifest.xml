@@ -51,6 +51,10 @@
                 <action android:name="com.contentfilter.user.chromedataplane.command.GUARD_PROCESS_KILL" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.GUARD_STATUS" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.PREPARE_UPDATE" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_ARM" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_RELEASE" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_CANCEL" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_REPLAY" />
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />

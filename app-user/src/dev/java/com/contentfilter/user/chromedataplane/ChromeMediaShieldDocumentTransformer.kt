@@ -2,6 +2,7 @@ package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentAuthorityRegistry
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicLong
@@ -65,6 +66,16 @@ internal class ChromeMediaShieldDocumentTransformer(
             val readyToken = randomToken()
             val topLevel = disposition.kind == ChromeMediaShieldDocumentKind.TopLevel
             val script = ChromeMediaShieldBootstrap.script(readyToken, styleNonce, topLevel)
+            val failClosedInstaller = ChromeMediaShieldBootstrap.parserBarrierFailClosedInstallerScript()
+            val parserTail =
+                if (topLevel) {
+                    val guardScript = ChromeMediaShieldBootstrap.parserBarrierGuardScript()
+                    "<script nonce=\"$scriptNonce\" src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\" " +
+                        "referrerpolicy=\"no-referrer\"></script><script nonce=\"$scriptNonce\">" +
+                        "$guardScript</script>"
+                } else {
+                    "<script nonce=\"$scriptNonce\">${ChromeMediaShieldBootstrap.subdocumentGuardScript()}</script>"
+                }
             val injection =
                 (
                     if (topLevel) {
@@ -76,8 +87,9 @@ internal class ChromeMediaShieldDocumentTransformer(
                     }
                 ) +
                     "<style id=\"${ChromeMediaShieldBootstrap.StyleElementId}\" nonce=\"$styleNonce\">" +
-                    ChromeMediaShieldBootstrap.css +
-                    "</style><script nonce=\"$scriptNonce\">$script</script>"
+                    ChromeMediaShieldBootstrap.css + "</style>" +
+                    "<script nonce=\"$scriptNonce\">$failClosedInstaller</script>" +
+                    "<script nonce=\"$scriptNonce\">$script</script>$parserTail"
             val injected =
                 source.substring(0, insertion.offset) +
                     insertion.prefix +
@@ -108,7 +120,11 @@ internal class ChromeMediaShieldDocumentTransformer(
                             charset = disposition.charset,
                         ),
                     identity = identity,
-                    bootstrapSha256 = sha256(script.toByteArray(Charsets.US_ASCII)),
+                    bootstrapSha256 =
+                        sha256(
+                            (failClosedInstaller + script + parserTail)
+                                .toByteArray(Charsets.US_ASCII),
+                        ),
                 ),
             )
         } catch (_: Throwable) {

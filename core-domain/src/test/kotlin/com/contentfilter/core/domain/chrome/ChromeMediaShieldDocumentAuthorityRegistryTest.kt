@@ -67,6 +67,53 @@ class ChromeMediaShieldDocumentAuthorityRegistryTest {
     }
 
     @Test
+    fun `prove and present resolve only the exact already claimed top-level lifecycle`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        val issued =
+            requireNotNull(ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true))
+        val first = claimTopLevel(TopToken, 1L)
+
+        assertEquals(first, ChromeMediaShieldDocumentAuthorityRegistry.resolveTopLevelReady(TopToken, 1L))
+        assertNull(ChromeMediaShieldDocumentAuthorityRegistry.resolveTopLevelReady(TopToken, 2L))
+        assertNull(ChromeMediaShieldDocumentAuthorityRegistry.resolveTopLevelReady(FrameToken, 1L))
+
+        val second = claimTopLevel(TopToken, 2L)
+        assertEquals(issued, second.identity)
+        assertNull(ChromeMediaShieldDocumentAuthorityRegistry.resolveTopLevelReady(TopToken, 1L))
+        assertEquals(second, ChromeMediaShieldDocumentAuthorityRegistry.resolveTopLevelReady(TopToken, 2L))
+    }
+
+    @Test
+    fun `active document commit is atomic with lifecycle replacement and session invalidation`() {
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
+        ChromeMediaShieldDocumentAuthorityRegistry.issue(Session, PolicyEpoch, TopToken, true)
+        val claim = claimTopLevel(TopToken, 1L)
+        var commits = 0
+
+        assertTrue(
+            ChromeMediaShieldDocumentAuthorityRegistry.commitIfTopLevelReadyCurrent(claim) {
+                commits += 1
+                true
+            },
+        )
+        claimTopLevel(TopToken, 2L)
+        assertFalse(
+            ChromeMediaShieldDocumentAuthorityRegistry.commitIfTopLevelReadyCurrent(claim) {
+                commits += 1
+                true
+            },
+        )
+        ChromeMediaShieldDocumentAuthorityRegistry.beginSession("replacement", PolicyEpoch + 1L)
+        assertFalse(
+            ChromeMediaShieldDocumentAuthorityRegistry.commitIfTopLevelReadyCurrent(claim) {
+                commits += 1
+                true
+            },
+        )
+        assertEquals(1, commits)
+    }
+
+    @Test
     fun `network claim alone has no foreground authority and exact AX activation is required`() {
         ChromeMediaShieldDocumentAuthorityRegistry.beginSession(Session, PolicyEpoch)
         val issued =

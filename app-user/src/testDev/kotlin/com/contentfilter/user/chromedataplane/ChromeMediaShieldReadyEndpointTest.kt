@@ -1,11 +1,13 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldActiveDocumentChallenge
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldActiveDocumentHandshakeBridge
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldActiveDocumentRequest
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentAuthorityRegistry
-import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyHandshakeBridge
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldParserBarrierBridge
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import kotlin.test.AfterTest
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -16,33 +18,107 @@ class ChromeMediaShieldReadyEndpointTest {
     fun tearDown() = ChromeMediaShieldDocumentAuthorityRegistry.clear()
 
     @Test
-    fun `exact issued top-level claim ACKs only after native presentation accepts`() {
+    fun `active document phases are exact one shot and PRESENT ACK follows native acceptance`() {
         issue(Token, topLevel = true)
         val registration =
-            ChromeMediaShieldReadyHandshakeBridge.register { claim, completion ->
-                assertEquals(1L, claim.lifecycleSequence)
+            ChromeMediaShieldActiveDocumentHandshakeBridge.register { request, completion ->
+                assertEquals(1L, request.claim.lifecycleSequence)
                 assertEquals(
                     ChromeMediaShieldDocumentAuthorityRegistry.digestReadyToken(Token),
-                    claim.identity.tokenDigest,
+                    request.claim.identity.tokenDigest,
                 )
-                completion.acceptAfterOpaqueCommit()
+                when (request) {
+                    is ChromeMediaShieldActiveDocumentRequest.Hello ->
+                        completion.issueChallenge(challenge())
+                    is ChromeMediaShieldActiveDocumentRequest.Prove -> {
+                        assertEquals(challenge(), request.challenge)
+                        completion.acceptProof()
+                    }
+                    is ChromeMediaShieldActiveDocumentRequest.Present -> {
+                        assertEquals(challenge(), request.challenge)
+                        completion.acceptPresentation()
+                    }
+                    is ChromeMediaShieldActiveDocumentRequest.Revoke -> {
+                        assertEquals(challenge(), request.challenge)
+                        completion.acceptRevocation()
+                    }
+                }
             }
         try {
-            val response = assertNotNull(ChromeMediaShieldReadyEndpoint().handle(request(Token, 1L)))
-
-            assertEquals(204, response.statusCode)
-            assertEquals(Origin, response.headers.firstValue("Access-Control-Allow-Origin"))
-            assertEquals("no-store", response.headers.firstValue("Cache-Control"))
-            assertContentEquals(ByteArray(0), response.bytes)
+            val endpoint = ChromeMediaShieldReadyEndpoint()
+            val hello = assertNotNull(endpoint.handle(request("HELLO", Token, 1L)))
+            assertEquals(200, hello.statusCode)
+            assertEquals("v2|CHALLENGE|$Challenge", hello.bytes.toString(Charsets.US_ASCII))
+            assertEquals(204, endpoint.handle(request("PROVE", Token, 1L, Challenge))?.statusCode)
+            assertEquals(204, endpoint.handle(request("PRESENT", Token, 1L, Challenge))?.statusCode)
+            assertEquals(204, endpoint.handle(request("REVOKE", Token, 1L, Challenge))?.statusCode)
+            assertEquals(Origin, hello.headers.firstValue("Access-Control-Allow-Origin"))
+            assertEquals("no-store", hello.headers.firstValue("Cache-Control"))
+            val metrics = endpoint.metrics()
+            assertEquals(1L, metrics.activeHello)
+            assertEquals(1L, metrics.challengeIssued)
+            assertEquals(1L, metrics.proofAccepted)
+            assertEquals(1L, metrics.presentAccepted)
+            assertEquals(1L, metrics.revokeAccepted)
         } finally {
             registration.close()
         }
     }
 
     @Test
-    fun `unavailable native owner rejects and consumes no raw token outside request buffer`() {
+    fun `parser barrier is fixed tokenless no-store JS and grants no document claim`() {
+        val registration = ChromeMediaShieldParserBarrierBridge.register { completion -> completion.ready() }
+        try {
+            val endpoint = ChromeMediaShieldReadyEndpoint()
+            val response = assertNotNull(endpoint.handle(parserBarrierRequest()))
+
+            assertEquals(200, response.statusCode)
+            assertEquals(
+                "self.__gloshH19ParserBarrierCommit__&&self.__gloshH19ParserBarrierCommit__(true);",
+                response.bytes.toString(Charsets.US_ASCII),
+            )
+            assertTrue(response.bytes.toString(Charsets.US_ASCII).contains(Token).not())
+            assertEquals("no-store", response.headers.firstValue("Cache-Control"))
+            assertEquals("nosniff", response.headers.firstValue("X-Content-Type-Options"))
+            assertEquals("cross-origin", response.headers.firstValue("Cross-Origin-Resource-Policy"))
+            assertEquals("application/javascript; charset=us-ascii", response.headers.firstValue("Content-Type"))
+            assertEquals(null, response.headers.firstValue("Access-Control-Allow-Origin"))
+            assertEquals(0, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().readyClaims)
+            assertEquals(1L, endpoint.metrics().parserBarrierRequests)
+            assertEquals(1L, endpoint.metrics().parserBarrierReady)
+            assertEquals(0L, endpoint.metrics().parserBarrierFailClosed)
+        } finally {
+            registration.close()
+        }
+    }
+
+    @Test
+    fun `parser barrier unavailable or malformed returns executable fail-closed guard signal`() {
+        val endpoint = ChromeMediaShieldReadyEndpoint()
+        val unavailable = assertNotNull(endpoint.handle(parserBarrierRequest()))
+        val wrongDestination =
+            assertNotNull(
+                endpoint.handle(
+                    parserBarrierRequest().copy(
+                        headers =
+                            listOf(
+                                ChromeHttpHeader("Sec-Fetch-Mode", "no-cors"),
+                                ChromeHttpHeader("Sec-Fetch-Dest", "document"),
+                            ),
+                    ),
+                ),
+            )
+
+        assertEquals(200, unavailable.statusCode)
+        assertTrue(unavailable.bytes.toString(Charsets.US_ASCII).contains("ParserBarrierCommit__(false)"))
+        assertTrue(wrongDestination.bytes.toString(Charsets.US_ASCII).contains("ParserBarrierCommit__(false)"))
+        assertEquals(2L, endpoint.metrics().parserBarrierFailClosed)
+    }
+
+    @Test
+    fun `unavailable native owner rejects and zeroes the raw request token`() {
         issue(Token, topLevel = true)
-        val request = request(Token, 1L)
+        val request = request("HELLO", Token, 1L)
 
         val response = assertNotNull(ChromeMediaShieldReadyEndpoint().handle(request))
 
@@ -52,20 +128,27 @@ class ChromeMediaShieldReadyEndpointTest {
     }
 
     @Test
-    fun `duplicate lifecycle malformed metadata and subdocument stay fail closed`() {
+    fun `duplicate lifecycle malformed challenge and subdocument stay fail closed`() {
         issue(Token, topLevel = true)
         issue(FrameToken, topLevel = false)
         val registration =
-            ChromeMediaShieldReadyHandshakeBridge.register { _, completion -> completion.acceptAfterOpaqueCommit() }
+            ChromeMediaShieldActiveDocumentHandshakeBridge.register { request, completion ->
+                when (request) {
+                    is ChromeMediaShieldActiveDocumentRequest.Hello -> completion.issueChallenge(challenge())
+                    else -> completion.reject()
+                }
+            }
         try {
             val endpoint = ChromeMediaShieldReadyEndpoint()
-            assertEquals(204, endpoint.handle(request(Token, 1L))?.statusCode)
-            assertEquals(503, endpoint.handle(request(Token, 1L))?.statusCode)
-            assertEquals(503, endpoint.handle(request(FrameToken, 1L))?.statusCode)
-            assertEquals(204, endpoint.handle(request(Token, 3L))?.statusCode)
-            assertEquals(503, endpoint.handle(request(Token, 2L))?.statusCode)
+            assertEquals(200, endpoint.handle(request("HELLO", Token, 1L))?.statusCode)
+            assertEquals(503, endpoint.handle(request("HELLO", Token, 1L))?.statusCode)
+            assertEquals(503, endpoint.handle(request("HELLO", FrameToken, 1L))?.statusCode)
+            assertEquals(200, endpoint.handle(request("HELLO", Token, 3L))?.statusCode)
+            assertEquals(503, endpoint.handle(request("HELLO", Token, 2L))?.statusCode)
+            assertEquals(503, endpoint.handle(request("PROVE", Token, 3L, "bad challenge"))?.statusCode)
 
-            val malformed = request(Token, 4L).copy(headers = listOf(ChromeHttpHeader("Origin", Origin)))
+            val malformed =
+                request("HELLO", Token, 4L).copy(headers = listOf(ChromeHttpHeader("Origin", Origin)))
             assertEquals(503, endpoint.handle(malformed)?.statusCode)
         } finally {
             registration.close()
@@ -73,10 +156,15 @@ class ChromeMediaShieldReadyEndpointTest {
     }
 
     @Test
-    fun `only fixed path is intercepted and wrong method is rejected`() {
+    fun `only fixed path and strict v2 grammar are accepted`() {
         val endpoint = ChromeMediaShieldReadyEndpoint()
-        assertNull(endpoint.handle(request(Token, 1L).copy(target = "/other")))
-        assertEquals(405, endpoint.handle(request(Token, 1L).copy(method = "GET"))?.statusCode)
+        assertNull(endpoint.handle(request("HELLO", Token, 1L).copy(target = "/other")))
+        assertEquals(405, endpoint.handle(request("HELLO", Token, 1L).copy(method = "GET"))?.statusCode)
+        assertEquals(
+            503,
+            endpoint.handle(request("HELLO", Token, 1L).copy(body = "v1|$Token|1".toByteArray()))?.statusCode,
+        )
+        assertEquals(503, endpoint.handle(request("UNKNOWN", Token, 1L))?.statusCode)
     }
 
     @Test
@@ -84,12 +172,14 @@ class ChromeMediaShieldReadyEndpointTest {
         issue(Token, topLevel = true)
         val endpoint = ChromeMediaShieldReadyEndpoint()
         val registration =
-            ChromeMediaShieldReadyHandshakeBridge.register { _, completion -> completion.acceptAfterOpaqueCommit() }
+            ChromeMediaShieldActiveDocumentHandshakeBridge.register { _, completion ->
+                completion.issueChallenge(challenge())
+            }
         try {
             val nullOrigin =
-                request(Token, 1L).copy(
+                request("HELLO", Token, 1L).copy(
                     headers =
-                        request(Token, 1L).headers.map { header ->
+                        request("HELLO", Token, 1L).headers.map { header ->
                             if (header.name.equals("Origin", ignoreCase = true)) {
                                 header.copy(value = "null")
                             } else {
@@ -100,9 +190,9 @@ class ChromeMediaShieldReadyEndpointTest {
             assertEquals(503, endpoint.handle(nullOrigin)?.statusCode)
 
             val broadContentType =
-                request(Token, 1L).copy(
+                request("HELLO", Token, 1L).copy(
                     headers =
-                        request(Token, 1L).headers.map { header ->
+                        request("HELLO", Token, 1L).headers.map { header ->
                             if (header.name.equals("Content-Type", ignoreCase = true)) {
                                 header.copy(value = "text/plain; charset=us-ascii")
                             } else {
@@ -111,8 +201,7 @@ class ChromeMediaShieldReadyEndpointTest {
                         },
                 )
             assertEquals(503, endpoint.handle(broadContentType)?.statusCode)
-
-            assertEquals(204, endpoint.handle(request(Token, 1L))?.statusCode)
+            assertEquals(200, endpoint.handle(request("HELLO", Token, 1L))?.statusCode)
         } finally {
             registration.close()
         }
@@ -122,7 +211,7 @@ class ChromeMediaShieldReadyEndpointTest {
     fun `exact CORS private-network preflight is local and carries no authority`() {
         val endpoint = ChromeMediaShieldReadyEndpoint()
         val request =
-            request(Token, 1L).copy(
+            request("HELLO", Token, 1L).copy(
                 method = "OPTIONS",
                 headers =
                     listOf(
@@ -162,8 +251,10 @@ class ChromeMediaShieldReadyEndpointTest {
     }
 
     private fun request(
+        phase: String,
         token: String,
         lifecycle: Long,
+        challenge: String? = null,
     ) = ChromePhotosProxyRequest(
         method = "POST",
         target = ChromePhotosDataPlaneLabContract.MediaShieldReadyPath,
@@ -174,9 +265,36 @@ class ChromeMediaShieldReadyEndpointTest {
                 ChromeHttpHeader("Sec-Fetch-Mode", "cors"),
                 ChromeHttpHeader("Sec-Fetch-Dest", "empty"),
             ),
-        body = "v1|$token|$lifecycle".toByteArray(Charsets.US_ASCII),
+        body =
+            buildString {
+                append("v2|")
+                append(phase)
+                append('|')
+                append(token)
+                append('|')
+                append(lifecycle)
+                if (challenge != null) {
+                    append('|')
+                    append(challenge)
+                }
+            }.toByteArray(Charsets.US_ASCII),
         bodyFraming = ChromeHttpBodyFraming.ContentLength,
     )
+
+    private fun challenge() = ChromeMediaShieldActiveDocumentChallenge.fromEncoded(Challenge)
+
+    private fun parserBarrierRequest() =
+        ChromePhotosProxyRequest(
+            method = "GET",
+            target = ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierPath,
+            headers =
+                listOf(
+                    ChromeHttpHeader("Sec-Fetch-Mode", "no-cors"),
+                    ChromeHttpHeader("Sec-Fetch-Dest", "script"),
+                ),
+            body = ByteArray(0),
+            bodyFraming = ChromeHttpBodyFraming.None,
+        )
 
     private companion object {
         const val Session = "h19-ready-session"
@@ -184,5 +302,6 @@ class ChromeMediaShieldReadyEndpointTest {
         const val Origin = "https://shop.example"
         const val Token = "AAAAAAAAAAAAAAAAAAAAAA"
         const val FrameToken = "BBBBBBBBBBBBBBBBBBBBBB"
+        val Challenge = "c".repeat(43)
     }
 }

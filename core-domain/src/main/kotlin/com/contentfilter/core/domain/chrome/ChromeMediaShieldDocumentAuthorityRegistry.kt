@@ -133,6 +133,32 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         lifecycleSequence: Long,
     ): ChromeMediaShieldReadyClaimResult = claimReadyLocked(readyToken, lifecycleSequence, requireTopLevel = true)
 
+    /**
+     * Resolves an already claimed top-level lifecycle without consuming a second lifecycle.
+     *
+     * The active-document handshake uses this for PROVE/PRESENT. It authenticates the document
+     * capability only; the Accessibility boundary must still prove the current Chrome
+     * window/root/surface independently before presentation.
+     */
+    @Synchronized
+    fun resolveTopLevelReady(
+        readyToken: String,
+        lifecycleSequence: Long,
+    ): ChromeMediaShieldReadyClaim? {
+        if (!readyToken.isStrictReadyToken() || lifecycleSequence <= 0L) return null
+        val tokenDigest = digestReadyToken(readyToken)
+        val identity = issuedByDigest[tokenDigest] ?: return null
+        return ChromeMediaShieldReadyClaim(identity, lifecycleSequence)
+            .takeIf(::isCurrentTopLevelClaimLocked)
+    }
+
+    /** Executes [commit] under the registry monitor only while [claim] remains current. */
+    @Synchronized
+    fun commitIfTopLevelReadyCurrent(
+        claim: ChromeMediaShieldReadyClaim,
+        commit: () -> Boolean,
+    ): Boolean = isCurrentTopLevelClaimLocked(claim) && commit()
+
     private fun claimReadyLocked(
         readyToken: String,
         lifecycleSequence: Long,
@@ -159,6 +185,14 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
         return ChromeMediaShieldReadyClaimResult.Claimed(
             ChromeMediaShieldReadyClaim(identity, lifecycleSequence),
         )
+    }
+
+    private fun isCurrentTopLevelClaimLocked(claim: ChromeMediaShieldReadyClaim): Boolean {
+        val identity = issuedByDigest[claim.identity.tokenDigest] ?: return false
+        return identity == claim.identity &&
+            identity.topLevel &&
+            matchesSession(identity.protectionSessionId, identity.policyEpoch) &&
+            readyLifecycleByDigest[identity.tokenDigest] == claim.lifecycleSequence
     }
 
     /**

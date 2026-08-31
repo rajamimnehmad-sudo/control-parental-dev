@@ -2,6 +2,7 @@ package com.contentfilter.feature.accessibility.chromevisual
 
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldAccessibilityContext
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyClaim
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import kotlin.test.Test
 import kotlin.test.assertFalse
@@ -164,18 +165,49 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
         )
     }
 
+    @Test
+    fun `H19 active document authority is mutually exclusive exact and native-root bound`() {
+        val protectedAttestation = attestation(mediaAuthorityEnabled = true, mediaPolicyEpoch = PolicyEpoch)
+        val active = activeDocument()
+        val currentContext = context(activeDocument = active)
+        val lease = assertNotNull(authority.mint(protectedAttestation, currentContext))
+
+        assertTrue(authority.isValid(lease, protectedAttestation, currentContext))
+        assertFalse(
+            authority.isValid(
+                lease,
+                protectedAttestation,
+                currentContext.copy(activeDocument = active.copy(nativeRootDigest = "d".repeat(64))),
+            ),
+        )
+        assertNull(
+            authority.mint(
+                protectedAttestation,
+                currentContext.copy(foregroundDocument = foregroundDocument()),
+            ),
+        )
+        assertNull(
+            authority.mint(
+                protectedAttestation,
+                currentContext.copy(activeDocument = active.copy(nativeRootDigest = "invalid")),
+            ),
+        )
+    }
+
     private fun context(
         packageName: String = ChromePhotosDataPlaneLabContract.ChromePackage,
         windowId: Int = 17,
         epoch: Long = 7L,
         viewport: ChromeVisualViewport = ChromeVisualViewport(0, 0, 1080, 2200),
         foregroundDocument: ChromeMediaShieldForegroundDocument? = null,
+        activeDocument: ChromeMediaShieldActiveDocumentAuthority? = null,
     ) = ChromePhotosDataPlaneLeaseContext(
         packageName = packageName,
         windowId = windowId,
         epoch = epoch,
         viewport = viewport,
         foregroundDocument = foregroundDocument,
+        activeDocument = activeDocument,
     )
 
     private fun attestation(
@@ -234,6 +266,23 @@ class ChromePhotosDataPlaneLeaseAuthorityTest {
                     webRootUniqueId = "web-root:ready",
                 ),
         )
+
+    private fun activeDocument(documentSequence: Long = 1L): ChromeMediaShieldActiveDocumentAuthority {
+        val identity =
+            ChromeMediaShieldDocumentIdentity(
+                protectionSessionId = SessionId,
+                policyEpoch = PolicyEpoch,
+                navigationSequence = 1L,
+                documentSequence = documentSequence,
+                tokenDigest = "a".repeat(64),
+                topLevel = true,
+            )
+        return ChromeMediaShieldActiveDocumentAuthority(
+            claim = ChromeMediaShieldReadyClaim(identity, lifecycleSequence = 1L),
+            windowId = 17,
+            nativeRootDigest = "b".repeat(64),
+        )
+    }
 
     private companion object {
         const val SessionId = "lab-session-a"

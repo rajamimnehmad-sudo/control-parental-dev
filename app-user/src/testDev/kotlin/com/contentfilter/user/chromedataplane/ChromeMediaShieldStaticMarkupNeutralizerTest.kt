@@ -59,6 +59,21 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
     }
 
     @Test
+    fun `declarative top layer activation is inert before bootstrap execution`() {
+        val source =
+            "<div id='p' popover></div>" +
+                "<button popovertarget=p popovertargetaction=show></button>" +
+                "<button commandfor='glosh-h19-document-curtain-layer' command=close></button>"
+
+        val output = ChromeMediaShieldStaticMarkupNeutralizer.neutralize(source)
+
+        for (attribute in listOf("popover", "popovertarget", "popovertargetaction", "commandfor", "command")) {
+            assertFalse(Regex("\\s$attribute(?:\\s|=|>)", RegexOption.IGNORE_CASE).containsMatchIn(output))
+            assertContains(output, "data-glosh-blocked-$attribute")
+        }
+    }
+
+    @Test
     fun `popup targets are forced into the transformed current browsing context`() {
         val source =
             "<base target='_blank'><a target=popup href='/a'>A</a>" +

@@ -2,8 +2,16 @@ package com.contentfilter.feature.accessibility.chromevisual
 
 import android.content.Context
 import android.os.SystemClock
+import com.contentfilter.core.domain.chrome.ChromeMediaShieldReadyClaim
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestation
+
+/** Non-raster H19 authority bound to one claim and one browser-owned native context. */
+internal data class ChromeMediaShieldActiveDocumentAuthority(
+    val claim: ChromeMediaShieldReadyClaim,
+    val windowId: Int,
+    val nativeRootDigest: String,
+)
 
 internal data class ChromePhotosDataPlaneAttestation(
     val devBuild: Boolean,
@@ -28,6 +36,7 @@ internal data class ChromePhotosDataPlaneLeaseContext(
     val epoch: Long,
     val viewport: ChromeVisualViewport,
     val foregroundDocument: ChromeMediaShieldForegroundDocument? = null,
+    val activeDocument: ChromeMediaShieldActiveDocumentAuthority? = null,
 )
 
 /** An in-memory, one-session capability. It is never persisted or reused after revocation. */
@@ -39,6 +48,7 @@ internal data class ChromePhotosDataPlaneLease(
     val viewport: ChromeVisualViewport,
     val validUntilElapsed: Long,
     val foregroundDocument: ChromeMediaShieldForegroundDocument? = null,
+    val activeDocument: ChromeMediaShieldActiveDocumentAuthority? = null,
 )
 
 internal class ChromePhotosDataPlanePresentationPolicy {
@@ -109,6 +119,7 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
             viewport = context.viewport,
             validUntilElapsed = minOf(attestation.validUntilElapsed, now + LeaseDurationMillis),
             foregroundDocument = context.foregroundDocument,
+            activeDocument = context.activeDocument,
         ).also { activeLease = it }
     }
 
@@ -128,6 +139,7 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
             lease.epoch == context.epoch &&
             lease.viewport == context.viewport &&
             lease.foregroundDocument == context.foregroundDocument &&
+            lease.activeDocument == context.activeDocument &&
             context.hasRequiredForegroundAuthority(attestation)
     }
 
@@ -146,18 +158,29 @@ internal class ChromePhotosDataPlaneLeaseAuthority(
     private fun ChromePhotosDataPlaneLeaseContext.hasRequiredForegroundAuthority(
         attestation: ChromePhotosDataPlaneAttestation,
     ): Boolean {
-        if (!attestation.mediaAuthorityEnabled) return foregroundDocument == null
-        val document = foregroundDocument ?: return false
-        return attestation.mediaPolicyEpoch > 0L &&
-            document.windowId == windowId &&
-            document.identity.topLevel &&
-            document.identity.protectionSessionId == attestation.sessionId &&
-            document.identity.policyEpoch == attestation.mediaPolicyEpoch
+        if (!attestation.mediaAuthorityEnabled) {
+            return foregroundDocument == null && activeDocument == null
+        }
+        if ((foregroundDocument == null) == (activeDocument == null)) return false
+        val identity = foregroundDocument?.identity ?: checkNotNull(activeDocument).claim.identity
+        val authorityWindowId = foregroundDocument?.windowId ?: checkNotNull(activeDocument).windowId
+        val activeBindingValid =
+            activeDocument?.let { active ->
+                active.nativeRootDigest.matches(Sha256Pattern) &&
+                    active.claim.lifecycleSequence > 0L
+            } ?: true
+        return activeBindingValid &&
+            attestation.mediaPolicyEpoch > 0L &&
+            authorityWindowId == windowId &&
+            identity.topLevel &&
+            identity.protectionSessionId == attestation.sessionId &&
+            identity.policyEpoch == attestation.mediaPolicyEpoch
     }
 
     internal companion object {
         const val LeaseDurationMillis = 500L
         const val MaximumHeartbeatAgeMillis = 500L
+        val Sha256Pattern = Regex("[0-9a-f]{64}")
     }
 }
 

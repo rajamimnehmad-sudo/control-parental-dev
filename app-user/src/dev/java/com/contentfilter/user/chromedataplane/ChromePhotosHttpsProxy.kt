@@ -444,7 +444,10 @@ internal class ChromePhotosHttpsProxy(
     ): ChromeHttpConnectionDisposition {
         var responseStarted = false
         val coverageToken =
-            if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldReadyPath) {
+            if (
+                request.target == ChromePhotosDataPlaneLabContract.MediaShieldReadyPath ||
+                request.target == ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierPath
+            ) {
                 null
             } else {
                 coverageLedger?.beginRequest(

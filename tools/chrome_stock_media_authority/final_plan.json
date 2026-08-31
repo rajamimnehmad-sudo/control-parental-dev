@@ -2,7 +2,7 @@
   "schema": "glosh-h19-a23-plan-v1",
   "expectedModel": "SM-A235M",
   "expectedSdk": 34,
-  "expectedAppVersionCode": 393,
+  "expectedAppVersionCode": 398,
   "minimumChromeMajor": 146,
   "expectedGloshiaModelVersion": "R3.1",
   "expectedGloshiaModelSha256": "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48",

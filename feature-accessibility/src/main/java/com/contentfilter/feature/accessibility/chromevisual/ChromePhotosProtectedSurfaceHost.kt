@@ -33,6 +33,13 @@ internal interface ChromePhotosProtectedSurfaceHost : AutoCloseable {
     fun presentOpaque(onCommitted: () -> Unit): Boolean
 
     fun presentTransparent(): Boolean
+
+    /**
+     * Submits the transparent transaction and invokes [onCommitted] only from Android's
+     * transaction-committed callback. The historical no-argument overload intentionally keeps
+     * its existing submit-only semantics.
+     */
+    fun presentTransparent(onCommitted: () -> Unit): Boolean
 }
 
 internal object ChromePhotosProtectedSurfaceHostFactory {
@@ -113,6 +120,8 @@ private class ChromePhotosWindowAttachedSurfaceHost private constructor(
     override fun presentOpaque(onCommitted: () -> Unit): Boolean = applyAlpha(OpaqueAlpha, onCommitted)
 
     override fun presentTransparent(): Boolean = applyAlpha(TransparentAlpha, onCommitted = null)
+
+    override fun presentTransparent(onCommitted: () -> Unit): Boolean = applyAlpha(TransparentAlpha, onCommitted)
 
     override fun close() {
         closed = true

@@ -23,9 +23,23 @@ internal object ChromeMediaShieldHtmlPrefixParser {
         val headEnd = source.startTagEndOrNull(offset, limit, "head")
         return if (headEnd != null) {
             ChromeMediaShieldInsertionPoint(headEnd, prefix = "", suffix = "")
+        } else if (source.hasStartTagNameAt(offset, "head")) {
+            // A present but unsafe/malformed head must not be mistaken for an omitted head.
+            null
         } else {
             ChromeMediaShieldInsertionPoint(htmlEnd, prefix = "<head>", suffix = "</head>")
         }
+    }
+
+    private fun String.hasStartTagNameAt(
+        start: Int,
+        expectedName: String,
+    ): Boolean {
+        if (getOrNull(start) != '<') return false
+        val nameStart = start + 1
+        if (!regionMatches(nameStart, expectedName, 0, expectedName.length, ignoreCase = true)) return false
+        val afterName = getOrNull(nameStart + expectedName.length)
+        return afterName == null || afterName.isHtmlSpace() || afterName in setOf('>', '/')
     }
 
     private fun String.skipBomAndTrivia(
@@ -78,7 +92,49 @@ internal object ChromeMediaShieldHtmlPrefixParser {
         while (offset < limit && this[offset].isHtmlNameCharacter()) offset += 1
         if (!substring(nameStart, offset).lowercase(Locale.US).equals(expectedName)) return null
         if (getOrNull(offset)?.let { !it.isHtmlSpace() && it !in setOf('>', '/') } != false) return null
-        return tagEndOrNull(offset, limit)
+        val end = tagEndOrNull(offset, limit) ?: return null
+        return end.takeIf { !hasExecutableEventAttribute(offset, end) }
+    }
+
+    /** The html/head prefix is parsed before our injection, so inline event handlers are unsafe. */
+    private fun String.hasExecutableEventAttribute(
+        attributesStart: Int,
+        tagEnd: Int,
+    ): Boolean {
+        var offset = attributesStart
+        while (offset < tagEnd - 1) {
+            while (offset < tagEnd - 1 && this[offset].isHtmlSpace()) offset += 1
+            // html/head self-closing syntax is neither useful nor safe here. HTML may reconsume
+            // attributes after a stray solidus, so treating '/' as the end of attributes can hide
+            // an executable on* handler from this conservative prefix gate.
+            if (offset >= tagEnd - 1) break
+            if (this[offset] == '/') return true
+            val nameStart = offset
+            while (
+                offset < tagEnd - 1 &&
+                !this[offset].isHtmlSpace() &&
+                this[offset] !in setOf('=', '>', '/', '\u0000')
+            ) {
+                offset += 1
+            }
+            if (offset == nameStart) return true
+            val name = substring(nameStart, offset).lowercase(Locale.US)
+            if (name.length > 2 && name.startsWith("on")) return true
+            while (offset < tagEnd - 1 && this[offset].isHtmlSpace()) offset += 1
+            if (getOrNull(offset) != '=') continue
+            offset += 1
+            while (offset < tagEnd - 1 && this[offset].isHtmlSpace()) offset += 1
+            val quote = getOrNull(offset)
+            if (quote == '\'' || quote == '"') {
+                offset += 1
+                while (offset < tagEnd - 1 && this[offset] != quote) offset += 1
+                if (offset >= tagEnd - 1) return true
+                offset += 1
+            } else {
+                while (offset < tagEnd - 1 && !this[offset].isHtmlSpace() && this[offset] != '>') offset += 1
+            }
+        }
+        return false
     }
 
     private fun String.tagEndOrNull(

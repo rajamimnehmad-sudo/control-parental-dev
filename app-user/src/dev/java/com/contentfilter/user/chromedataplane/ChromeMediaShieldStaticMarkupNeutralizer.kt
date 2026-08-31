@@ -41,7 +41,10 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
                 offset = tagEnd
                 continue
             }
-            val authorityNeutralizedTag = tag.removeAuthorGloshAttributes()
+            val authorityNeutralizedTag =
+                tag
+                    .removeAuthorGloshAttributes()
+                    .neutralizeDeclarativeTopLayer()
             output.append(
                 when (tagName) {
                     "iframe" -> authorityNeutralizedTag.neutralizeIframe().protectInitialMedia()
@@ -341,6 +344,11 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
         return renameAllAttributes("shadowrootmode", "data-glosh-blocked-shadowrootmode")
     }
 
+    private fun String.neutralizeDeclarativeTopLayer(): String =
+        DeclarativeTopLayerAttributes.fold(this) { value, attribute ->
+            value.renameAllAttributes(attribute, "data-glosh-blocked-$attribute")
+        }
+
     private fun String.removeAuthorGloshAttributes(): String =
         attributeNameRanges()
             .filter { range -> substring(range).startsWith("data-glosh-", ignoreCase = true) }
@@ -431,6 +439,14 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
     private const val IframeSandbox = "allow-scripts allow-forms allow-popups-to-escape-sandbox"
     private const val MediaBlockedAttribute = "data-glosh-media-blocked"
     private val MediaSourceAttributes = setOf("src", "srcset")
+    private val DeclarativeTopLayerAttributes =
+        setOf(
+            "popover",
+            "popovertarget",
+            "popovertargetaction",
+            "commandfor",
+            "command",
+        )
     private val BlockedVoidMediaElements = setOf("embed", "frame", "fencedframe")
     private val HtmlSpaces = setOf('\t', '\n', '\u000c', '\r', ' ')
 }

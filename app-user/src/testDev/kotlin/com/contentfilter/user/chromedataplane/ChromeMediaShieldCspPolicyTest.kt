@@ -149,6 +149,24 @@ class ChromeMediaShieldCspPolicyTest {
     }
 
     @Test
+    fun `report-only policy is removed so bootstrap source and capability cannot be sampled`() {
+        val output =
+            policy.apply(
+                sourceHeaders =
+                    listOf(
+                        ChromeHttpHeader(
+                            "Content-Security-Policy-Report-Only",
+                            "script-src 'none' 'report-sample'; report-uri https://report.example",
+                        ),
+                    ),
+                scriptNonce = ScriptNonce,
+                styleNonce = StyleNonce,
+            )
+
+        assertFalse(output.any { it.name.equals("Content-Security-Policy-Report-Only", true) })
+    }
+
+    @Test
     fun `document headers remove alt svc and canonicalize hostile nosniff duplicates`() {
         val output =
             policy.apply(

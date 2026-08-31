@@ -51,12 +51,11 @@ internal class ChromeVisualProbeController(
     private val leaseWatchdog = Runnable(::verifyLeaseOnMain)
     private val mediaReadyCoordinator =
         if (enabled) {
-            ChromeMediaShieldReadyPresentationCoordinator(
+            ChromeMediaShieldActiveDocumentPresentationCoordinator(
                 service = service,
                 state = state,
                 surface = surface,
                 windowInspector = windowInspector,
-                tokenScanner = ChromeMediaShieldAccessibilityTokenScanner(),
                 attestationReader = attestationReader,
                 onLegacyWorkCancelled = ::cancelLegacyWorkForReady,
             )
@@ -69,9 +68,7 @@ internal class ChromeVisualProbeController(
 
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!enabled) return
-        // H19 consumes the exact focused source synchronously before reducing the event. The
-        // The authority scanner consumes the exact event source and owns any retained
-        // AccessibilityNodeInfo copies until invalidation/STOP.
+        // Events may revoke structural continuity, but they never create active-document authority.
         mediaReadyCoordinator?.onAccessibilityEvent(event)
         if (
             mediaReadyCoordinator?.hasCurrentClaim() == true &&
@@ -105,11 +102,9 @@ internal class ChromeVisualProbeController(
     fun onAccessibilityUnavailable() {
         if (!enabled) return
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            mediaReadyCoordinator?.revokePresentation("accessibility_unavailable", forgetClaim = true)
             deactivateOnMain("accessibility_unavailable")
         } else {
             service.mainExecutor.execute {
-                mediaReadyCoordinator?.revokePresentation("accessibility_unavailable", forgetClaim = true)
                 deactivateOnMain("accessibility_unavailable")
             }
         }
@@ -121,12 +116,12 @@ internal class ChromeVisualProbeController(
             activeJob = null
         }
         if (Looper.myLooper() == Looper.getMainLooper()) {
-            mediaReadyCoordinator?.close()
             deactivateOnMain("service_closed")
+            mediaReadyCoordinator?.close()
         } else {
             service.mainExecutor.execute {
-                mediaReadyCoordinator?.close()
                 deactivateOnMain("service_closed")
+                mediaReadyCoordinator?.close()
             }
         }
     }
@@ -160,10 +155,16 @@ internal class ChromeVisualProbeController(
                 return
             }
         val viewport =
-            rawViewport.clippedAt(inputMethodTop) ?: run {
-                revokeLeaseOnMain("geometry_fully_clipped")
-                log("geometry", window.id, "fully_clipped")
-                return
+            if (attestationReader.read().mediaAuthorityEnabled) {
+                // H19 identity is content-bound. A keyboard/omnibox IME must not change the
+                // document viewport or gray an otherwise-current foreground document.
+                rawViewport
+            } else {
+                rawViewport.clippedAt(inputMethodTop) ?: run {
+                    revokeLeaseOnMain("geometry_fully_clipped")
+                    log("geometry", window.id, "fully_clipped")
+                    return
+                }
             }
         val contextChanged =
             !current.isActive ||
@@ -400,7 +401,6 @@ internal class ChromeVisualProbeController(
             activeJob = null
         }
         val wasActive = state.snapshot().isActive || surface.stats().attached
-        mediaReadyCoordinator?.revokePresentation(reason, forgetClaim = true)
         revokeLeaseOnMain(reason)
         state.disarm()
         surface.close()
@@ -610,13 +610,14 @@ internal class ChromeVisualProbeController(
         reason: String,
         retainMediaReadyDocument: Boolean = false,
     ) {
-        if (!retainMediaReadyDocument) mediaReadyCoordinator?.revokePresentation(reason)
+        val mediaReadyOwnedSurface =
+            !retainMediaReadyDocument && mediaReadyCoordinator?.revokePresentation(reason) == true
         mainHandler.removeCallbacks(leaseWatchdog)
         val lease = activeLease
         val wasTransparent = surface.stats().transparent
         activeLease = null
         leaseAuthority.revoke()
-        surface.revokeTransparency()
+        if (!mediaReadyOwnedSurface) surface.revokeTransparency()
         if (lease != null || wasTransparent) {
             val snapshot = state.snapshot()
             logLease("revoked", snapshot, reason)

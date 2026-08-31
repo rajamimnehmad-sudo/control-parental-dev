@@ -108,7 +108,8 @@ internal class ChromeStockMediaAuthorityFixture(
         return """
             (async()=>{'use strict';
             const expected=[$ids],allowed=new Set(['BLOCKED','HIDDEN','SAFE','OUT_OF_SCOPE_VISIBLE','ERROR']),results=new Map(),tasks=[];
-            const Apply=Reflect.apply,Define=Object.defineProperty,Describe=Object.getOwnPropertyDescriptor,Delete=Reflect.deleteProperty,GetComputedStyle=getComputedStyle,SetTimer=setTimeout,ClearTimer=clearTimeout;
+            const Apply=Reflect.apply,Define=Object.defineProperty,DefineReflect=Reflect.defineProperty,Describe=Object.getOwnPropertyDescriptor,Delete=Reflect.deleteProperty,SetReflect=Reflect.set;
+            const Assign=Object.assign,SetPrototype=Object.setPrototypeOf,GetPrototype=Object.getPrototypeOf,GetComputedStyle=getComputedStyle,SetTimer=setTimeout,ClearTimer=clearTimeout;
             const ElementGet=Element.prototype.getAttribute,ElementAppend=Element.prototype.append,ElementRemove=Element.prototype.remove,AddEvent=EventTarget.prototype.addEventListener;
             const LocalName=Describe(Element.prototype,'localName'),NaturalWidth=Describe(HTMLImageElement.prototype,'naturalWidth'),NaturalHeight=Describe(HTMLImageElement.prototype,'naturalHeight');
             const call=(fn,owner,args)=>Apply(fn,owner,args),read=(descriptor,owner)=>descriptor&&descriptor.get?call(descriptor.get,owner,[]):undefined;
@@ -172,6 +173,36 @@ internal class ChromeStockMediaAuthorityFixture(
             catch(_){} }catch(_){return 'BLOCKED'}finally{if(originalString)try{Define(String.prototype,'toLowerCase',originalString)}catch(_){}if(originalArray)try{Define(Array.prototype,'0',originalArray)}catch(_){}
             else try{Delete(Array.prototype,'0')}catch(_){} }
             await frame();const sandbox=iframe?call(ElementGet,iframe,['sandbox'])||'':'';const outcome=iframe&&hidden(iframe)&&sandbox.indexOf('allow-same-origin')<0&&!escaped?'HIDDEN':tampered&&!escaped?'BLOCKED':'ERROR';if(host)try{call(ElementRemove,host,[])}catch(_){}return outcome};
+            const descriptorChain=(value,name,accessor)=>{const output=[];let owner=value;while(owner){const entry=Describe(owner,name);if(entry&&(!accessor||entry.get||entry.set))Define(output,output.length,{value:entry,writable:true,enumerable:true,configurable:true});owner=GetPrototype(owner)}return output};
+            const securityDenied=(operation)=>{try{operation();return false}catch(error){return !!error&&error.name==='SecurityError'}};
+            const settersDenied=(entries,target,value)=>{if(!entries.length)return false;for(const entry of entries)if(!entry.set||!securityDenied(()=>call(entry.set,target,[value])))return false;return true};
+            const accessorsDenied=(entries,target,value)=>{if(!settersDenied(entries,target,value))return false;for(const entry of entries)if(!entry.get||!securityDenied(()=>call(entry.get,target,[])))return false;return true};
+            const methodsDenied=(entries,target,args)=>{if(!entries.length)return false;for(const entry of entries)if(typeof entry.value!=='function'||!securityDenied(()=>call(entry.value,target,args)))return false;return true};
+            const canonicalSandbox=(element)=>{const value=call(ElementGet,element,['sandbox'])||'';return value.indexOf('allow-same-origin')<0&&value.indexOf('allow-scripts')>=0};
+            const protectedPrimordialProbe=async()=>{const shield=document.getElementById('glosh-h19-media-shield'),sheet=shield&&shield.sheet,rule=sheet&&sheet.cssRules&&sheet.cssRules[0];
+            if(!shield||!sheet||!rule)return 'ERROR';const inlineEntries=descriptorChain(HTMLElement.prototype,'style',true),disabledEntries=descriptorChain(CSSStyleSheet.prototype,'disabled',true);
+            const mediaEntries=descriptorChain(CSSStyleSheet.prototype,'media',true),ruleStyleEntries=descriptorChain(CSSStyleRule.prototype,'style',true);
+            const insertEntries=descriptorChain(CSSStyleRule.prototype,'insertRule',false),deleteEntries=descriptorChain(CSSStyleRule.prototype,'deleteRule',false);
+            const directStyle=securityDenied(()=>{shield.style='display:none!important'}),reflectedStyle=settersDenied(inlineEntries,shield,'display:none!important');
+            const disabled=settersDenied(disabledEntries,sheet,true),media=settersDenied(mediaEntries,sheet,'not all'),ruleAccess=accessorsDenied(ruleStyleEntries,rule,'visibility:visible!important');
+            const nestedInsert=methodsDenied(insertEntries,rule,['&{visibility:visible!important}']),nestedDelete=methodsDenied(deleteEntries,rule,[0]);let frameElement=null,sandboxDirect=false,sandboxReflected=false;
+            try{frameElement=document.createElement('iframe');document.body.append(frameElement);frameElement.sandbox='allow-scripts allow-same-origin';sandboxDirect=canonicalSandbox(frameElement);
+            const sandboxEntries=descriptorChain(HTMLIFrameElement.prototype,'sandbox',true);if(!sandboxEntries.length)return 'ERROR';sandboxReflected=true;for(const entry of sandboxEntries){if(!entry.set){sandboxReflected=false;break}
+            try{call(entry.set,frameElement,['allow-scripts allow-same-origin'])}catch(_){sandboxReflected=false;break}if(!canonicalSandbox(frameElement)){sandboxReflected=false;break}}}catch(_){}
+            let ordinary=null,scratch=null,ordinaryWorks=false;try{ordinary=document.createElement('div');scratch=document.createElement('style');scratch.textContent='.glosh-normal-primordial{color:rgb(1,2,3)}';document.head.append(scratch);
+            ordinary.className='glosh-normal-primordial';ordinary.style='background-color:rgb(4,5,6)';document.body.append(ordinary);const scratchSheet=scratch.sheet,scratchRule=scratchSheet.cssRules[0];scratchSheet.disabled=true;
+            const disabledTrue=scratchSheet.disabled===true;scratchSheet.disabled=false;scratchSheet.media='screen';const mediaScreen=scratchSheet.media.mediaText==='screen';scratchSheet.media='';scratchRule.style='color:rgb(7,8,9)';
+            let nestedWorks=true;if(typeof scratchRule.insertRule==='function'&&typeof scratchRule.deleteRule==='function'){scratchRule.insertRule('&{outline-color:rgb(10,11,12)}');scratchRule.deleteRule(0)}
+            ordinaryWorks=disabledTrue&&scratchSheet.disabled===false&&mediaScreen&&scratchSheet.media.mediaText===''&&scratchRule.style.color!==''&&ordinary.style.backgroundColor!==''&&nestedWorks}catch(_){}
+            if(frameElement)try{call(ElementRemove,frameElement,[])}catch(_){}if(ordinary)try{call(ElementRemove,ordinary,[])}catch(_){}if(scratch)try{call(ElementRemove,scratch,[])}catch(_){}await frame();
+            let retained=null,retainedStyle=null,retainedReflective=false,retainedNeutral=false;try{retained=document.createElement('img');retainedStyle=retained.style;document.body.append(retained);
+            retained.src='data:image/png;base64,$encoded';await frame();const operations=[()=>Define(retainedStyle,'opacity',{value:'1',writable:true,configurable:true}),
+            ()=>DefineReflect(retainedStyle,'visibility',{value:'visible',writable:true,configurable:true}),()=>SetReflect(retainedStyle,'display','block'),()=>Assign(retainedStyle,{opacity:'1'}),()=>SetPrototype(retainedStyle,null)];
+            retainedReflective=true;for(const operation of operations)if(!securityDenied(operation)){retainedReflective=false;break}
+            retainedNeutral=call(ElementGet,retained,['src'])===null&&call(ElementGet,retained,['srcset'])===null&&hidden(retained)}catch(_){}
+            if(retained)try{call(ElementRemove,retained,[])}catch(_){}await frame();const protectedMediaRead=securityDenied(()=>sheet.media);
+            const intact=sheet.disabled===false&&call(ElementGet,shield,['media'])===null;
+            return directStyle&&reflectedStyle&&disabled&&media&&ruleAccess&&nestedInsert&&nestedDelete&&sandboxDirect&&sandboxReflected&&ordinaryWorks&&retainedReflective&&retainedNeutral&&protectedMediaRead&&intact?'BLOCKED':'ERROR'};
 
             run('normal-css',async()=>{await frame();return GetComputedStyle(document.body).fontFamily&&GetComputedStyle(document.body).backgroundColor!=='rgba(0, 0, 0, 0)'?'SAFE':'ERROR'});
             run('normal-layout',async()=>{await frame();return GetComputedStyle(document.getElementById('normal-layout')).display==='grid'?'SAFE':'ERROR'});
@@ -183,6 +214,7 @@ internal class ChromeStockMediaAuthorityFixture(
             run('out-of-scope-css-synthesis',async()=>{const raster=document.getElementById('css-synthesis');await frame();return visible(raster)&&raster.querySelectorAll('span').length===64?'OUT_OF_SCOPE_VISIBLE':'ERROR'});
 
             await Promise.allSettled(tasks);try{record('local-hostile-prototype-fresh-frame',await prototypeProbe())}catch(_){record('local-hostile-prototype-fresh-frame','ERROR')}
+            try{record('local-protected-primordial-bypass',await protectedPrimordialProbe())}catch(_){record('local-protected-primordial-bypass','ERROR')}
             for(const id of expected)if(!results.has(id))results.set(id,'ERROR');
             const body=[...results].sort((a,b)=>a[0].localeCompare(b[0])).map(entry=>entry[0]+'='+entry[1]).join(',');
             try{await fetch('$ReportPath',{method:'POST',headers:{'Content-Type':'text/plain'},body})}catch(_){}})();
@@ -387,7 +419,7 @@ internal class ChromeStockMediaAuthorityFixture(
                     vararg ids: String,
                 ) = ids.forEach { add(ChromeStockMediaScenario(it, category)) }
                 group(ChromeStockMediaScenarioCategory.Network, "network-safe-png", "network-block-webp", "network-block-jpeg", "network-jpeg-candidate", "network-webp-candidate", "network-avif-candidate", "network-picture-srcset", "network-css-url", "network-mislabeled", "network-octet-magic", "network-same-url-first", "network-same-url-second", "network-same-body-first", "network-same-body-second", "network-dynamic-replace", "network-lazy", "network-shadow")
-                group(ChromeStockMediaScenarioCategory.Local, "local-data-img", "local-blob-img", "local-css-data", "local-css-blob", "local-canvas-2d", "local-put-image-data", "local-canvas-draw-image", "local-image-bitmap", "local-offscreen-canvas", "local-webgl", "local-webgpu", "local-svg-image", "local-svg-foreign-object", "local-svg-fe-image", "local-svg-external", "local-svg-icon-safe", "local-svg-media", "local-shadow-open", "local-shadow-closed", "local-iframe-transformed", "local-iframe-srcdoc", "local-service-worker", "local-spa-data-replace", "local-hostile-prototype-fresh-frame")
+                group(ChromeStockMediaScenarioCategory.Local, "local-data-img", "local-blob-img", "local-css-data", "local-css-blob", "local-canvas-2d", "local-put-image-data", "local-canvas-draw-image", "local-image-bitmap", "local-offscreen-canvas", "local-webgl", "local-webgpu", "local-svg-image", "local-svg-foreign-object", "local-svg-fe-image", "local-svg-external", "local-svg-icon-safe", "local-svg-media", "local-shadow-open", "local-shadow-closed", "local-iframe-transformed", "local-iframe-srcdoc", "local-service-worker", "local-spa-data-replace", "local-hostile-prototype-fresh-frame", "local-protected-primordial-bypass")
                 group(
                     ChromeStockMediaScenarioCategory.Normality,
                     "normal-css",

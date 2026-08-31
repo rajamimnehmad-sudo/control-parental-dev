@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -10,58 +11,97 @@ class ChromeMediaShieldBootstrapContractTest {
     private val script = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce)
 
     @Test
-    fun `boot is synchronous parser-first and ready host is protected and lifecycle bound`() {
+    fun `boot is parser-first and active document handshake keeps one barrier at every phase`() {
         assertFalse(script.contains("setTimeout"))
         assertFalse(script.contains("setInterval"))
         assertFalse(script.contains("requestAnimationFrame"))
-        assertContains(script, "readyRoot=invoke(originalAttach,readyHost,[{mode:'closed'}])")
-        assertContains(script, "readyMarker=create.call(DOC,'button')")
-        assertContains(script, "nativeSet.call(readyMarker,'id',READY_ID)")
-        assertContains(script, "nativeSet.call(readyMarker,'role','button')")
-        assertContains(script, "nativeSet.call(readyMarker,'tabindex','-1')")
-        assertContains(script, "nativeSet.call(readyHost,'id',READY_HOST_ID)")
-        assertFalse(script.contains("nativeSet.call(readyHost,'aria-label'"))
-        assertFalse(script.contains("invoke(nodeText.set,readyHost"))
-        assertFalse(script.contains("invoke(nodeText.set,readyMarker,[readyValue])"))
-        assertContains(script, "nativeStyleSet.call(readyStyle,'width','1px','important')")
-        assertContains(script, "nativeStyleSet.call(readyStyle,'height','1px','important')")
-        assertContains(script, "nativeStyleSet.call(readyStyle,'overflow','hidden','important')")
-        assertContains(script, "nativeStyleSet.call(readyStyle,'color','transparent','important')")
-        assertContains(script, "nativeStyleSet.call(readyStyle,'font-size','1px','important')")
-        assertContains(script, "nativeStyleSet.call(readyStyle,'pointer-events','none','important')")
-        assertContains(script, "const readyValue='glosh-shield-ready:'+READY+':'+currentLifecycle")
-        assertContains(script, "nativeSet.call(readyMarker,'aria-label',readyValue)")
-        assertContains(script, "nativeFocus.call(readyMarker,{preventScroll:true})")
-        assertContains(script, "xhrOpen.call(xhr,'POST',READY_URL,false)")
-        assertContains(script, "xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)")
-        assertContains(script, "read(xhrStatusProperty,xhr)!==204")
-        assertContains(script, "read(xhrResponseUrlProperty,xhr)!==READY_URL")
-        assertTrue(
-            script.indexOf("xhrSend.call(xhr,'v1|'+READY+'|'+currentLifecycle)") <
-                script.indexOf("nativeSet.call(readyMarker,'aria-label',readyValue)"),
-        )
-        assertTrue(
-            script.indexOf("nativeSet.call(readyMarker,'aria-label',readyValue)") <
-                script.indexOf("nodeAppend.call(documentElement(),readyHost)"),
-        )
-        assertTrue(
-            script.indexOf("nodeAppend.call(documentElement(),readyHost)") <
-                script.indexOf("nativeFocus.call(readyMarker,{preventScroll:true})"),
-        )
-        assertTrue(
-            script.indexOf("nativeFocus.call(readyMarker,{preventScroll:true})") <
-                script.indexOf("if(!hideCurtain())revokeReady()"),
-        )
-        assertContains(script, "const revokeReady=()=>{showCurtain();clearReadyLabel();detachMarker()")
-        assertContains(script, "catch(_){revokeReady()}")
-        assertContains(script, "nodeAppend.call(documentElement(),readyHost)")
+        assertContains(script, "NativeHasFocusFunction=Document.prototype.hasFocus")
+        assertContains(script, "nativeHasFocus=NativeHasFocusFunction?method(NativeHasFocusFunction):null")
+        assertContains(script, "NativeLocationReloadFunction=NativeLocation&&NativeLocation.reload")
         assertContains(
             script,
-            "visibilityState()!=='visible'){revokeReady();return}nativeSet.call(readyMarker,'aria-label',readyValue);nodeAppend.call(documentElement(),readyHost);nativeFocus.call(readyMarker,{preventScroll:true})",
+            "nativeLocationReload=NativeLocationReloadFunction?method(NativeLocationReloadFunction):null",
+        )
+        assertContains(script, "IS_TOP_LEVEL=SELF===SELF.top")
+        assertContains(
+            script,
+            "const activeDocument=()=>TOP_LEVEL&&IS_TOP_LEVEL&&visibilityState()==='visible'&&hasNativeFocus()",
+        )
+        assertFalse(script.contains("activeElement"))
+        assertFalse(script.contains("new NativePageTransitionEvent"))
+        assertContains(script, "propertyDescriptor(NativePageTransitionEvent.prototype,'persisted')")
+        assertFalse(script.contains("readyMarker"))
+        assertFalse(script.contains("readyHost"))
+        assertContains(script, "xhrOpen.call(xhr,'POST',READY_URL,false)")
+        assertContains(script, "requestReady('v2|HELLO|'+READY+'|'+currentLifecycle)")
+        assertContains(script, "const prefix='v2|CHALLENGE|'")
+        assertContains(script, "requestReady('v2|PROVE|'+READY+'|'+currentLifecycle+'|'+challenge)")
+        assertContains(script, "requestReady('v2|PRESENT|'+READY+'|'+currentLifecycle+'|'+challenge)")
+        assertContains(script, "requestReady('v2|REVOKE|'+READY+'|'+oldLifecycle+'|'+oldChallenge)")
+        assertContains(script, "read(xhrResponseUrlProperty,xhr)!==READY_URL")
+        assertTrue(
+            script.indexOf("requestReady('v2|HELLO|'+READY+'|'+currentLifecycle)") <
+                script.indexOf("requestReady('v2|PROVE|'+READY+'|'+currentLifecycle+'|'+challenge)"),
+        )
+        assertTrue(
+            script.indexOf("requestReady('v2|PROVE|'+READY+'|'+currentLifecycle+'|'+challenge)") <
+                script.indexOf("if(!hideCurtain()||!activeDocument()){rejectCurrent();return}activePhase='present'"),
+        )
+        assertTrue(
+            script.indexOf("if(!hideCurtain()||!activeDocument()){rejectCurrent();return}activePhase='present'") <
+                script.indexOf("requestReady('v2|PRESENT|'+READY+'|'+currentLifecycle+'|'+challenge)"),
+        )
+        assertTrue(
+            script.indexOf("requestReady('v2|PRESENT|'+READY+'|'+currentLifecycle+'|'+challenge)") <
+                script.indexOf("if(!present||present[0]!==204||!activeDocument()){rejectCurrent();return}"),
+        )
+        assertContains(script, "if(!present||present[0]!==204||!activeDocument()){rejectCurrent();return}")
+        assertTrue(
+            script.substringBefore("requestReady('v2|PRESENT|'+READY+'|'+currentLifecycle+'|'+challenge)")
+                .contains("hideCurtain()"),
+        )
+        assertContains(
+            script,
+            "const rejectCurrent=()=>{showCurtain();const oldLifecycle=currentLifecycle,oldChallenge=challenge;" +
+                "activePhase='rejected';challenge='';remoteRevoke(oldLifecycle,oldChallenge);parkDocument()}",
+        )
+        assertContains(script, "catch(_){rejectCurrent()}")
+        assertContains(script, "const revokeReady=()=>{if(!authorityArmed)return;showCurtain()")
+        assertContains(script, "catch(_){rejectCurrent()}")
+        assertContains(
+            script,
+            "const parkDocument=()=>{activePhase='parked';challenge='';showCurtain();failClosedDocument()",
+        )
+        assertContains(script, "const parserBarrierCommit=(ready)=>")
+        assertContains(script, "read(scriptSrcProperty,script)===BARRIER_URL")
+        assertContains(script, "beginReadyLifecycle();firstAuthorityComplete=activePhase==='released'")
+        assertContains(script, "const parserBarrierGuard=()=>")
+        assertContains(script, "!retireScript(script)||!firstAuthorityComplete")
+        assertContains(script, "nativeLocationReload.call(NativeLocation)")
+        assertTrue(
+            script.indexOf("const parserBarrierCommit=(ready)=>") >
+                script.indexOf("nativeAddEvent.call(DOC,'visibilitychange'"),
         )
         assertContains(script, "nativeAddEvent.call(SELF,'beforeunload',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(SELF,'pagehide',revokeReady,true)")
+        assertContains(script, "nativeAddEvent.call(DOC,'freeze',revokeReady,true)")
+        assertContains(script, "nativeAddEvent.call(SELF,'focus'")
+        assertContains(script, "activePhase==='rejected'||activePhase==='revoked'")
+        assertContains(script, "nativeAddEvent.call(SELF,'orientationchange'")
         assertContains(script, "nativeAddEvent.call(DOC,'visibilitychange'")
+        assertContains(
+            script,
+            "if(dialogClosedByProperty&&dialogClosedByProperty.set){invoke(dialogClosedByProperty.set,curtainLayer,['none'])",
+        )
+        assertContains(script, "nativeGet.call(curtainLayer,'closedby')!=='none'")
+        assertContains(
+            script,
+            "nativeGet.call(curtainLayer,'closedby')==='none'&&read(dialogClosedByProperty,curtainLayer)==='none'",
+        )
+        assertTrue(
+            script.indexOf("invoke(dialogClosedByProperty.set,curtainLayer,['none'])") <
+                script.indexOf("nativeDialogShowModal.call(curtainLayer)"),
+        )
         assertContains(script, "if(!installed){failClosedDocument();return}")
         assertContains(script, "nativeDocOpen.call(DOC)")
         assertContains(script, "Glosh protected this document.")
@@ -70,6 +110,39 @@ class ChromeMediaShieldBootstrapContractTest {
             ChromeMediaShieldBootstrap.curtainCss,
             "body>*{visibility:hidden!important;opacity:0!important}",
         )
+        assertContains(script, "StringCharCodeAt=String.prototype.charCodeAt")
+        assertContains(script, "const code=charCode(value,index)")
+        assertFalse(script.contains("value.charCodeAt(index)"))
+        assertContains(script, "CURTAIN_LAYER_ID='${ChromeMediaShieldBootstrap.CurtainElementId}'")
+        assertContains(script, "curtainLayer=TOP_LEVEL?nativeCreateElement.call(DOC,'dialog'):null")
+        assertContains(script, "nativeStyleSet.call(layerStyle,rule[0],value,'important')")
+        assertContains(script, "['z-index','2147483647']")
+        assertContains(script, "['pointer-events','auto']")
+        assertContains(script, "['max-width','none']")
+        assertContains(script, "['transition','none']")
+        assertContains(script, "['animation','none']")
+        assertContains(script, "['zoom','1']")
+        assertContains(script, "['scale','1']")
+        assertContains(script, "['rotate','none']")
+        assertContains(script, "['translate','none']")
+        assertContains(script, "['transform-origin','50% 50%']")
+        assertContains(script, "['offset-path','none']")
+        assertContains(script, "['offset-distance','0']")
+        assertContains(script, "['offset-position','normal']")
+        assertContains(script, "['offset-anchor','auto']")
+        assertContains(script, "['offset-rotate','auto']")
+        assertContains(script, "['border-radius','0']")
+        assertContains(script, "invoke(WeakSetAdd,protectedNodes,[curtainLayer])")
+        assertContains(
+            script,
+            "if(curtainRequired&&!curtainOpen()){nodeAppend.call(documentElement(),curtainLayer)",
+        )
+        assertContains(
+            script,
+            "nodeAppend.call(documentElement(),curtainLayer);nativeDialogShowModal.call(curtainLayer)",
+        )
+        assertContains(script, "else if(!curtainRequired&&curtainOpen())nativeDialogClose.call(curtainLayer)")
+        assertContains(script, "curtainOpen()===curtainRequired")
         assertContains(script, "const hideCurtain=()=>{curtainRequired=false;return ensureCurtain()}")
         assertFalse(script.contains("nodeRemove.call(parent,curtainStyle)"))
         assertContains(script, "nativeSet.call(curtainStyle,'media','not all')")
@@ -100,15 +173,106 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
+    fun `internal curtain owns the top layer before a site can create competing presentation`() {
+        assertContains(script, "nativeDialogShowModal=SELF.HTMLDialogElement")
+        assertContains(script, "nativeDialogClose=SELF.HTMLDialogElement")
+        assertContains(script, "nativeAddEvent.call(curtainLayer,'cancel'")
+        assertContains(script, "seal(HTMLDialogElement.prototype,'showModal'")
+        assertContains(script, "seal(HTMLDialogElement.prototype,'show'")
+        assertContains(script, "seal(HTMLDialogElement.prototype,'close'")
+        assertContains(script, "HTMLDialogElement.prototype.requestClose")
+        assertContains(script, "seal(HTMLDialogElement.prototype,'requestClose'")
+        assertContains(script, "seal(HTMLDialogElement.prototype,'showModal',deny)")
+        assertContains(script, "ObjectDefine(HTMLDialogElement.prototype,'open'")
+        assertContains(script, "propertyDescriptor(HTMLElement.prototype,'hidden')")
+        assertContains(script, "curtainVisibleByAttribute()")
+        assertContains(script, "invoke(htmlHiddenProperty.set,curtainLayer,[false])")
+        assertContains(
+            script,
+            "guardAccessorProperty(HTMLElement.prototype,'hidden',htmlHiddenProperty,protectedNode,false)",
+        )
+        assertContains(script, "const guardedSet=function(value){if(blocked(this))deny()")
+        assertContains(script, "propertyDescriptor(HTMLElement.prototype,'title')")
+        assertContains(script, "ensureProtectedStyle(shieldStyle,shieldSheet,'')")
+        assertContains(
+            script,
+            "ensureProtectedStyle(curtainStyle,curtainSheet,curtainRequired?'':'not all')",
+        )
+        assertContains(script, "invoke(htmlTitleProperty.set,style,[''])")
+        assertContains(script, "nativeRemove.call(style,'title')")
+        assertContains(
+            script,
+            "guardAccessorProperty(HTMLElement.prototype,'title',htmlTitleProperty,protectedNode,false)",
+        )
+        assertContains(script, "propertyDescriptor(HTMLDialogElement.prototype,'closedBy')")
+        assertContains(script, "invoke(dialogClosedByProperty.set,curtainLayer,['none'])")
+        assertContains(
+            script,
+            "guardAccessorProperty(HTMLDialogElement.prototype,'closedBy',dialogClosedByProperty,protectedNode,false)",
+        )
+        assertContains(script, "seal(HTMLElement.prototype,'showPopover',deny)")
+        assertContains(script, "seal(HTMLElement.prototype,'togglePopover',deny)")
+        assertContains(script, "denyPropertySetter(HTMLElement.prototype,'popover')")
+        assertContains(script, "denyPropertySetter(owner,'popoverTargetElement')")
+        assertContains(script, "denyPropertySetter(owner,'popoverTargetAction')")
+        assertContains(script, "denyPropertySetter(HTMLButtonElement.prototype,'commandForElement')")
+        assertContains(script, "denyPropertySetter(HTMLButtonElement.prototype,'command')")
+        assertContains(script, "TOP_LAYER_ATTRIBUTES=new Set(TOP_LAYER_ATTRIBUTE_NAMES)")
+        assertContains(script, "removeDeclarativeTopLayer(element)")
+        assertContains(script, "[popover],[popovertarget],[popovertargetaction],[commandfor],[command]")
+        assertContains(script, "const protectedInlineStyle=(element)=>protectedNode(element)")
+        assertContains(script, "WeakSetDelete=WeakSet.prototype.delete")
+        assertContains(script, "invoke(WeakSetAdd,protectedMediaNodes,[element])")
+        assertContains(script, "invoke(WeakSetDelete,protectedMediaNodes,[element])")
+        assertContains(script, "invoke(WeakSetHas,protectedMediaNodes,[element])")
+        assertContains(script, "guardInlineStyleOwner(prototype)")
+        assertContains(script, "SELF.HTMLElement&&HTMLElement.prototype")
+        assertContains(script, "SELF.SVGElement&&SVGElement.prototype")
+        assertContains(script, "SELF.MathMLElement&&MathMLElement.prototype")
+        assertContains(script, "if(protectedInlineStyle(this))deny()")
+        assertContains(script, "const guardedSet=function(value){if(protectedInlineStyle(this))deny()")
+        assertContains(script, "ObjectDefine(owner,'style',{get:guardedGet")
+        assertContains(script, "seal(EventTarget.prototype,'dispatchEvent'")
+        assertContains(script, "if(protectedNode(this))deny();return nativeDispatchEvent.call(this,event)")
+        assertContains(script, "seal(Element.prototype,'requestFullscreen',deny)")
+        assertContains(script, "seal(Document.prototype,'startViewTransition',deny)")
+        assertContains(script, "NativePageSwapEvent=SELF.PageSwapEvent")
+        assertContains(script, "NativePageRevealEvent=SELF.PageRevealEvent")
+        assertContains(script, "nativeSkipViewTransition=NativeViewTransition")
+        assertContains(script, "nativeAddEvent.call(SELF,'pageswap'")
+        assertContains(script, "stopCrossDocumentTransition(event,pageSwapTransitionProperty)")
+        assertContains(script, "nativeAddEvent.call(SELF,'pagereveal'")
+        assertContains(script, "stopCrossDocumentTransition(event,pageRevealTransitionProperty)")
+        assertContains(script, "if(protectedNode(this))deny();const root=invoke(originalAttach,this,[init])")
+    }
+
+    @Test
     fun `every ordinary insertion seam sanitizes before a fresh iframe realm becomes usable`() {
         assertContains(script, "for(const owner of [Element.prototype,Document.prototype,DocumentFragment.prototype])")
         assertContains(script, "for(const name of ['append','prepend'])")
         assertContains(script, "sealInsertion(owner,'replaceChildren',true)")
         assertContains(script, "function(node){if(insideProtected(this))deny();rejectProtectedMove(node,this)")
-        assertContains(script, "for(const name of ['before','after','replaceWith'])")
+        assertContains(script, "for(const name of ['before','after'])")
+        assertContains(script, "sealInsertion(owner,'replaceWith',false,true)")
+        assertContains(script, "removesTarget?containsProtected(this)")
         assertContains(script, "seal(Element.prototype,'insertAdjacentElement'")
         assertContains(script, "seal(Element.prototype,'insertAdjacentText'")
         assertContains(script, "seal(Range.prototype,'insertNode'")
+        assertContains(script, "const container=rangeElement(ancestor);if(container)sanitizeContainer(container)")
+        assertTrue(
+            script.indexOf("const result=invoke(rangeInsert,this,[node])") <
+                script.indexOf("const container=rangeElement(ancestor);if(container)sanitizeContainer(container)"),
+        )
+        val surroundStart = script.indexOf("seal(Range.prototype,'surroundContents'")
+        val surroundMutation = script.indexOf("const result=invoke(surround,this,[node])", surroundStart)
+        val surroundPostScan = script.indexOf("scan(node);", surroundMutation)
+        assertTrue(surroundStart >= 0)
+        assertTrue(surroundMutation > surroundStart)
+        assertTrue(surroundPostScan > surroundMutation)
+        assertTrue(
+            surroundPostScan <
+                script.indexOf("const container=rangeElement(ancestor);if(container)sanitizeContainer(container)", surroundStart),
+        )
         assertContains(script, "owner.moveBefore")
         assertContains(script, "ObjectDefine(ShadowRoot.prototype,'innerHTML'")
         assertContains(script, "if(!mappedProtected(this))deny()")
@@ -116,6 +280,10 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "invoke(outer.set,this,[safeMarkup(value)])")
         assertContains(script, "put(args,1,safeMarkup")
         assertContains(script, "nativeSet.call(element,'sandbox',FRAME_SANDBOX)")
+        assertContains(script, "const guardFrameSandbox=()=>")
+        assertContains(script, "const guardedSet=function(){invoke(entry.set,this,[FRAME_SANDBOX])")
+        assertContains(script, "ObjectDefine(owner,'sandbox',{get:guardedGet,set:guardedSet")
+        assertContains(script, "installed=guardFrameSandbox()&&installed")
         assertFalse(script.contains("allow-same-origin"))
     }
 
@@ -134,7 +302,8 @@ class ChromeMediaShieldBootstrapContractTest {
 
     @Test
     fun `dynamic security paths use captured primordials rather than mutable page prototypes`() {
-        assertContains(script, "ReflectApply=Reflect.apply")
+        assertContains(script, "NativeObject=Object,NativeReflect=Reflect")
+        assertContains(script, "ReflectApply=NativeReflect.apply")
         assertContains(script, "const invoke=(fn,owner,args)=>ReflectApply(fn,owner,args)")
         assertContains(script, "method=(fn)=>({call:(owner,...args)=>invoke(fn,owner,args)")
         assertContains(script, "NativeString=String")
@@ -142,7 +311,8 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "StringLower=String.prototype.toLowerCase")
         assertContains(script, "StringSlice=String.prototype.slice")
         assertContains(script, "nativeSet=method(Element.prototype.setAttribute)")
-        assertContains(script, "create=method(Document.prototype.createElement)")
+        assertContains(script, "nativeCreateElement=method(Document.prototype.createElement)")
+        assertContains(script, "const create=nativeCreateElement")
         assertContains(script, "return invoke(original,this,args)")
         assertFalse(script.contains("String(name).toLowerCase()"))
         assertFalse(script.contains("(this.localName||'').toLowerCase()"))
@@ -189,14 +359,11 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
-    fun `bootstrap source and complete ready token leave the light DOM before site scripts`() {
+    fun `bootstrap source and secrets stay in closure and leave no DOM beacon`() {
         assertContains(script, "BOOTSTRAP_SCRIPT=DOC.currentScript")
         assertContains(script, "if(!BOOTSTRAP_SCRIPT)installed=false")
-        assertContains(
-            script,
-            "const removeCurrentScript=()=>{try{const parent=BOOTSTRAP_SCRIPT&&parentOf(BOOTSTRAP_SCRIPT);if(!parent)return false",
-        )
-        assertContains(script, "nodeRemove.call(parent,BOOTSTRAP_SCRIPT)")
+        assertContains(script, "const retireScript=(script)=>")
+        assertContains(script, "nodeRemove.call(parent,script);return !connected(script)")
         assertContains(
             script,
             "const clearStyleNonce=(style)=>{try{invoke(styleNonceProperty.set,style,['']);nativeRemove.call(style,'nonce')",
@@ -204,7 +371,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "return read(styleNonceProperty,style)===''&&!nativeHas.call(style,'nonce')")
         assertContains(
             script,
-            "const retireBootstrapSecrets=()=>clearStyleNonce(shieldStyle)&&(!curtainStyle||clearStyleNonce(curtainStyle))&&removeCurrentScript()",
+            "const retireBootstrapSecrets=()=>clearStyleNonce(shieldStyle)&&(!curtainStyle||clearStyleNonce(curtainStyle))&&retireScript(BOOTSTRAP_SCRIPT)",
         )
         assertContains(
             script,
@@ -215,18 +382,66 @@ class ChromeMediaShieldBootstrapContractTest {
         assertEquals(1, Regex(Regex.escape(StyleNonce)).findAll(script).count())
         assertFalse(script.contains("data-glosh-ready-token"))
         assertFalse(script.contains("internalsAriaLabelProperty"))
-        assertContains(script, "nativeSet.call(readyMarker,'aria-label',readyValue)")
-        assertContains(script, "nativeRemove.call(readyMarker,'aria-label')")
-        assertFalse(script.contains("READY_ID+'-'") || script.contains("'glosh-h19-ready-'+READY"))
+        assertFalse(script.contains("glosh-shield-ready:"))
+        assertFalse(script.contains("READY_ID") || script.contains("READY_HOST_ID"))
+        assertContains(script, "ReflectDelete(SELF,'${ChromeMediaShieldBootstrap.ParserBarrierCallbackName}')")
+        assertContains(script, "ReflectDelete(SELF,'${ChromeMediaShieldBootstrap.ParserBarrierGuardName}')")
+        assertContains(script, "authorityArmed=false")
+        assertContains(script, "if(!authorityArmed||activePhase!=='idle'||!activeDocument())return")
+        val callbackFocusGate = "if(!activeDocument()){parkDocument();return}"
+        assertContains(script, "authorityArmed=true;$callbackFocusGate")
+        assertEquals(
+            1,
+            Regex(Regex.escape(callbackFocusGate)).findAll(script).count(),
+        )
+        val guard = ChromeMediaShieldBootstrap.parserBarrierGuardScript()
+        val fallback = ChromeMediaShieldBootstrap.parserBarrierFailClosedInstallerScript()
+        assertContains(guard, "f()===true")
+        assertContains(guard, ChromeMediaShieldBootstrap.ParserBarrierFailClosedName)
+        assertContains(guard, "fail.retire()!==true")
+        assertContains(guard, "!delete S.${ChromeMediaShieldBootstrap.ParserBarrierFailClosedName}")
+        assertContains(guard, "Object.getOwnPropertyDescriptor")
+        assertContains(fallback, "SCRIPT=D.currentScript")
+        assertContains(fallback, "Element.prototype.removeAttribute")
+        assertContains(fallback, "Node.prototype.removeChild")
+        assertContains(fallback, "Object.defineProperty(fail,'retire'")
+        assertContains(fallback, "SCRIPT.isConnected===false")
+        assertContains(fallback, "Document.prototype")
+        assertContains(fallback, "Reflect.apply")
+        assertContains(fallback, "documentElement")
+        assertContains(script, "const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__")
+        assertContains(script, "typeof parserFailClosedRetire.value!=='function'")
+        assertFalse(guard.contains(ReadyToken))
+        assertFalse(fallback.contains(ReadyToken))
     }
 
     @Test
-    fun `ready host and shield style cannot be moved or rewritten through ordinary APIs`() {
-        assertContains(script, "readyHost=create.call(DOC,'span')")
-        assertContains(script, "invoke(WeakSetAdd,protectedNodes,[readyMarker])")
+    fun `subdocument completes bootstrap through one-shot inline guard and otherwise fails closed`() {
+        val subdocument = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce, topLevel = false)
+        val guard = ChromeMediaShieldBootstrap.subdocumentGuardScript()
+
+        assertContains(subdocument, "let subdocumentGuardConsumed=false")
+        assertContains(subdocument, "if(subdocumentGuardConsumed)return false")
+        assertContains(subdocument, "ReflectDelete(SELF,'${ChromeMediaShieldBootstrap.SubdocumentGuardName}')")
+        assertContains(subdocument, "read(scriptSrcProperty,guardScript)!==''")
+        assertContains(subdocument, "!retireScript(guardScript)")
+        assertTrue(
+            subdocument.indexOf("if(!retireBootstrapSecrets()){failClosedDocument();return}") <
+                subdocument.indexOf("ObjectDefine(SELF,'${ChromeMediaShieldBootstrap.SubdocumentGuardName}'"),
+        )
+        assertContains(guard, "const f=S.${ChromeMediaShieldBootstrap.SubdocumentGuardName}")
+        assertContains(guard, "f()===true")
+        assertContains(guard, "fail.retire()!==true")
+        assertContains(guard, "try{if(typeof fail==='function')fail()}")
+        assertFalse(guard.contains(ReadyToken))
+        assertFalse(guard.contains(ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl))
+    }
+
+    @Test
+    fun `shield and curtain cannot be moved or rewritten through ordinary APIs`() {
         assertContains(script, "rejectProtectedMove")
         assertContains(script, "if(containsProtected(node))deny()")
-        assertContains(script, "if(invoke(WeakSetHas,protectedSheets,[this]))deny()")
+        assertContains(script, "if(protectedSheet(this))deny()")
         assertContains(script, "if(containsProtected(this))deny()")
         assertContains(script, "ObjectDefine(HTMLStyleElement.prototype,name")
         assertContains(script, "ObjectDefine(CharacterData.prototype,'data'")
@@ -235,17 +450,50 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "ObjectDefine(HTMLElement.prototype,'innerText'")
         assertContains(script, "ObjectDefine(HTMLElement.prototype,'outerText'")
         assertContains(script, "ObjectDefine(CSSStyleRule.prototype,'selectorText'")
+        assertContains(
+            script,
+            "guardAccessorProperty(StyleSheet.prototype,'disabled',styleSheetDisabledProperty,protectedSheet,false)",
+        )
+        assertContains(
+            script,
+            "guardAccessorProperty(StyleSheet.prototype,'media',styleSheetMediaProperty,protectedSheet,true)",
+        )
+        assertContains(
+            script,
+            "guardAccessorProperty(CSSStyleRule.prototype,'style',ruleStyleProperty,protectedRule,true)",
+        )
+        assertContains(script, "sealProtectedRuleMethod(CSSStyleRule.prototype,name)")
+        assertContains(script, "sealProtectedRuleMethod(CSSGroupingRule.prototype,name)")
+        assertContains(script, "propertyOwner(prototype,name)")
         assertContains(script, "seal(MediaList.prototype,name")
         assertContains(script, "ObjectDefine(MediaList.prototype,'mediaText'")
         assertContains(script, "seal(StylePropertyMap.prototype,name")
         assertContains(script, "attributeStyleMapProperty")
         assertContains(script, "styleMapOwners")
         assertContains(script, "protectedStyleMap(this)")
+        assertContains(script, "const protectedReflectiveTarget=(value)=>!!value&&(")
+        assertContains(script, "installed=seal(NativeObject,'defineProperty'")
+        assertContains(script, "installed=seal(NativeObject,'defineProperties'")
+        assertContains(script, "installed=seal(NativeObject,'assign'")
+        assertContains(script, "installed=seal(NativeObject,'setPrototypeOf'")
+        assertContains(script, "installed=seal(NativeReflect,'defineProperty'")
+        assertContains(script, "installed=seal(NativeReflect,'deleteProperty'")
+        assertContains(script, "installed=seal(NativeReflect,'set'")
+        assertContains(script, "installed=seal(NativeReflect,'setPrototypeOf'")
+        assertContains(script, "denyReflectiveTarget(this);return invoke(ObjectDefineSetter")
+        assertContains(script, "ObjectDefine(ObjectPrototype,'__proto__'")
+        assertContains(
+            script,
+            "nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)",
+        )
         assertContains(script, "registerProtectedSheet(shadowSheet)")
         assertContains(script, "restoreMappedProtected(root)")
         assertContains(script, "protectedDescendants")
         assertContains(script, "oneOf(lower(canonical),['object','embed','frame','fencedframe'])")
-        assertContains(script, "const showCurtain=()=>{curtainRequired=true;return ensureCurtain()}")
+        assertContains(
+            script,
+            "const showCurtain=()=>{curtainRequired=true;if(ensureCurtain())return true;failClosedDocument();return false}",
+        )
         assertFalse(script.contains("data-glosh-curtain-released"))
     }
 
@@ -276,7 +524,10 @@ class ChromeMediaShieldBootstrapContractTest {
         assertFalse(ChromeMediaShieldBootstrap.css.contains("background-color"))
         assertFalse(script.contains("self.Worker"))
         assertFalse(script.contains("SharedWorker.prototype"))
-        assertContains(script, "if(removesChildren?(!mapped&&containsProtected(this)):insideProtected(this))deny()")
+        assertContains(
+            script,
+            "removesChildren?(!mapped&&containsProtected(this)):insideProtected(this)",
+        )
     }
 
     private companion object {

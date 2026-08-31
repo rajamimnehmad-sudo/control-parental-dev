@@ -22,11 +22,19 @@ internal data class ChromePhotosProtectedSurfaceStats(
     val discardedPendingFrameCount: Int,
     val transparent: Boolean,
     val transparencyGrantCount: Int,
+    val alphaTransitionsOutstanding: Int,
+    val alphaSubmitFailures: Long,
 )
 
 internal enum class ChromePhotosProtectedSurfaceCoverResult {
     Ready,
     Pending,
+    Failed,
+}
+
+internal enum class ChromePhotosProtectedSurfaceRevokeResult {
+    Submitted,
+    NoSurface,
     Failed,
 }
 
@@ -68,6 +76,8 @@ internal class ChromePhotosProtectedSurface(
     private var hostExtent = 0
     private var viewport: ChromeVisualViewport? = null
     private val presentationPolicy = ChromePhotosDataPlanePresentationPolicy()
+    private val transparentCommitGate = ChromePhotosTransparentCommitGate()
+    private val alphaTracker = ChromePhotosProtectedSurfaceAlphaTracker()
     private var transparencyGrantCount = 0
 
     fun cover(
@@ -77,6 +87,7 @@ internal class ChromePhotosProtectedSurface(
         onOpaqueCommitted: (Long) -> Unit = {},
     ): ChromePhotosProtectedSurfaceCoverResult {
         if (!isMainThread()) return ChromePhotosProtectedSurfaceCoverResult.Failed
+        transparentCommitGate.invalidate()
         val result = ensureAttached(targetWindowId, targetViewport)
         if (result == ChromePhotosProtectedSurfaceHostResult.Failed) {
             return ChromePhotosProtectedSurfaceCoverResult.Failed
@@ -85,42 +96,114 @@ internal class ChromePhotosProtectedSurface(
         presentationPolicy.cover(authorityEpoch)
         if (result == ChromePhotosProtectedSurfaceHostResult.Ready) {
             val currentHost = host ?: return ChromePhotosProtectedSurfaceCoverResult.Failed
+            val alphaToken = alphaTracker.begin(ChromePhotosProtectedSurfaceAlpha.Opaque)
             val accepted =
                 currentHost.presentOpaque {
+                    alphaTracker.commit(alphaToken)
                     if (view?.authorityEpoch() != authorityEpoch) return@presentOpaque
                     if (!presentationPolicy.markOpaqueCommitted(authorityEpoch)) return@presentOpaque
                     onOpaqueCommitted(authorityEpoch)
                 }
-            if (!accepted) return ChromePhotosProtectedSurfaceCoverResult.Failed
+            if (!accepted) {
+                alphaTracker.submissionFailed(alphaToken)
+                return ChromePhotosProtectedSurfaceCoverResult.Failed
+            }
         }
         return result.toCoverResult()
     }
 
     fun presentTransparent(lease: ChromePhotosDataPlaneLease): Boolean {
         if (!isMainThread() || !attached) return false
+        transparentCommitGate.invalidate()
         val hostedView = view ?: return false
         val currentHost = host ?: return false
-        if (
-            hostedView.authorityEpoch() != lease.epoch ||
-            currentHost.windowId != lease.windowId ||
-            viewport != lease.viewport ||
-            !presentationPolicy.canPresent(lease)
-        ) {
+        if (!isCurrentLeaseBoundary(lease, hostedView, currentHost)) {
             return false
         }
-        if (!currentHost.presentTransparent()) return false
+        val alphaToken = alphaTracker.begin(ChromePhotosProtectedSurfaceAlpha.Transparent)
+        if (!currentHost.presentTransparent()) {
+            alphaTracker.submissionFailed(alphaToken)
+            return false
+        }
+        alphaTracker.submittedWithoutCallback(alphaToken)
         if (!presentationPolicy.markTransparent(lease)) {
-            currentHost.presentOpaque {}
+            restoreOpaque()
             return false
         }
         transparencyGrantCount += 1
         return true
     }
 
-    fun revokeTransparency() {
-        if (!isMainThread()) return
+    /**
+     * Submits a transparent transaction but grants presentation authority only from Android's
+     * committed callback. [recheckCurrent] runs at that boundary so a replaced document/window
+     * can fail closed without receiving a successful completion.
+     *
+     * Returning `false` means no platform transaction was submitted and no callback will arrive.
+     * Once this method returns `true`, [onCommitted] receives exactly one terminal result unless
+     * the process itself dies.
+     */
+    fun presentTransparent(
+        lease: ChromePhotosDataPlaneLease,
+        recheckCurrent: () -> Boolean,
+        onCommitted: (Boolean) -> Unit,
+        onRejectedPlatformCommit: (ChromePhotosTransparentCommitOutcome) -> Unit = {},
+    ): Boolean {
+        if (!isMainThread() || !attached) return false
+        val hostedView = view ?: return false
+        val currentHost = host ?: return false
+        if (!isCurrentLeaseBoundary(lease, hostedView, currentHost)) return false
+        val token = transparentCommitGate.begin(onCommitted)
+        val alphaToken = alphaTracker.begin(ChromePhotosProtectedSurfaceAlpha.Transparent)
+        val submitted =
+            currentHost.presentTransparent {
+                alphaTracker.commit(alphaToken)
+                val outcome =
+                    transparentCommitGate.onTransactionCommitted(
+                        token = token,
+                        boundaryCurrent = {
+                            isMainThread() &&
+                                attached &&
+                                host === currentHost &&
+                                view === hostedView &&
+                                isCurrentLeaseBoundary(lease, hostedView, currentHost) &&
+                                recheckCurrent()
+                        },
+                        commitCurrent = {
+                            if (!presentationPolicy.markTransparent(lease)) {
+                                false
+                            } else {
+                                transparencyGrantCount += 1
+                                true
+                            }
+                        },
+                    )
+                if (outcome != ChromePhotosTransparentCommitOutcome.Committed) {
+                    onRejectedPlatformCommit(outcome)
+                    if (alphaTracker.snapshot().mayBeTransparent) restoreOpaque()
+                }
+            }
+        if (!submitted) {
+            alphaTracker.submissionFailed(alphaToken)
+            transparentCommitGate.reject(token)
+        }
+        return submitted
+    }
+
+    fun revokeTransparency(onOpaqueCommitted: (Boolean) -> Unit = {}): ChromePhotosProtectedSurfaceRevokeResult {
+        if (!isMainThread()) return ChromePhotosProtectedSurfaceRevokeResult.Failed
+        transparentCommitGate.invalidate()
         presentationPolicy.revoke()
-        host?.presentOpaque {}
+        if (!attached || host == null) {
+            alphaTracker.reset()
+            onOpaqueCommitted(true)
+            return ChromePhotosProtectedSurfaceRevokeResult.NoSurface
+        }
+        return if (restoreOpaque(onOpaqueCommitted)) {
+            ChromePhotosProtectedSurfaceRevokeResult.Submitted
+        } else {
+            ChromePhotosProtectedSurfaceRevokeResult.Failed
+        }
     }
 
     /** Takes ownership of [frame], including when the operation is rejected. */
@@ -145,8 +228,9 @@ internal class ChromePhotosProtectedSurface(
         return hostedView.stage(frame, token.epoch, token.sequence)
     }
 
-    fun stats(): ChromePhotosProtectedSurfaceStats =
-        ChromePhotosProtectedSurfaceStats(
+    fun stats(): ChromePhotosProtectedSurfaceStats {
+        val alpha = alphaTracker.snapshot()
+        return ChromePhotosProtectedSurfaceStats(
             attached = attached,
             attachmentCount = attachmentCount,
             layoutUpdateCount = layoutUpdateCount,
@@ -156,15 +240,20 @@ internal class ChromePhotosProtectedSurface(
             authorityEpoch = view?.authorityEpoch() ?: 0L,
             pendingEpoch = view?.pendingEpoch(),
             discardedPendingFrameCount = view?.discardedPendingFrameCount() ?: 0,
-            transparent = presentationPolicy.isTransparent,
+            transparent = alpha.mayBeTransparent,
             transparencyGrantCount = transparencyGrantCount,
+            alphaTransitionsOutstanding = alpha.pendingTransitions,
+            alphaSubmitFailures = alpha.submitFailures,
         )
+    }
 
     override fun close() {
         if (!isMainThread()) return
+        transparentCommitGate.invalidate()
         detachAndReleaseHost()
         viewport = null
         presentationPolicy.reset()
+        alphaTracker.reset()
     }
 
     private fun ensureAttached(
@@ -189,6 +278,16 @@ internal class ChromePhotosProtectedSurface(
         viewport = targetViewport
         return result
     }
+
+    private fun isCurrentLeaseBoundary(
+        lease: ChromePhotosDataPlaneLease,
+        hostedView: ProtectedSurfaceView,
+        currentHost: ChromePhotosProtectedSurfaceHost,
+    ): Boolean =
+        hostedView.authorityEpoch() == lease.epoch &&
+            currentHost.windowId == lease.windowId &&
+            viewport == lease.viewport &&
+            presentationPolicy.canPresent(lease)
 
     private fun createAndAttachHost(
         targetWindowId: Int,
@@ -229,6 +328,27 @@ internal class ChromePhotosProtectedSurface(
         attachedWindowId = null
         hostExtent = 0
         presentationPolicy.reset()
+        alphaTracker.reset()
+    }
+
+    private fun restoreOpaque(onOpaqueCommitted: (Boolean) -> Unit = {}): Boolean {
+        val currentHost = host
+        if (!attached || currentHost == null) {
+            alphaTracker.reset()
+            onOpaqueCommitted(true)
+            return true
+        }
+        val token = alphaTracker.begin(ChromePhotosProtectedSurfaceAlpha.Opaque)
+        val submitted =
+            currentHost.presentOpaque {
+                alphaTracker.commit(token)
+                onOpaqueCommitted(true)
+            }
+        if (!submitted) {
+            alphaTracker.submissionFailed(token)
+            onOpaqueCommitted(false)
+        }
+        return submitted
     }
 
     private fun isMainThread(): Boolean = Looper.myLooper() == Looper.getMainLooper()

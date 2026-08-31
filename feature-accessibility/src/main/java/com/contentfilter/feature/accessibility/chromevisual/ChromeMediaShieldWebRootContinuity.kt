@@ -297,6 +297,79 @@ internal object ChromeMediaShieldCurrentWebRootPolicy {
 
 /** Bounded, ownership-safe traversal of Chrome's virtual Accessibility tree. */
 internal object ChromeMediaShieldAccessibilityNodeTraversal {
+    /**
+     * Returns the single visible browser-issued WebView root in [windowRoot].
+     *
+     * This is structural continuity evidence only. It never reads page text, content
+     * descriptions, view IDs, or READY markers and cannot create document authority by itself.
+     */
+    @Suppress("DEPRECATION")
+    fun copyUniqueVisibleWebDocumentRoot(
+        windowRoot: AccessibilityNodeInfo,
+    ): ChromeMediaShieldOwnedNodeSearchResult<AccessibilityNodeInfo> {
+        val nativeRootUniqueId = uniqueIdOrNull(windowRoot)
+        return ChromeMediaShieldBoundedOwnedNodeSearch<AccessibilityNodeInfo>(MaximumCurrentTreeNodes)
+            .findUniqueDescendant(
+                borrowedRoot = windowRoot,
+                childCount = AccessibilityNodeInfo::getChildCount,
+                copyChild = AccessibilityNodeInfo::getChild,
+                isExactMatch = { node ->
+                    node.isVisibleToUser &&
+                        ChromeMediaShieldWebRootCandidatePolicy.verifies(
+                            ChromeMediaShieldWebRootCandidateEvidence(
+                                expectedWindowId = windowRoot.windowId,
+                                nativeRootUniqueId = nativeRootUniqueId,
+                                candidatePackageName = node.packageName?.toString().orEmpty(),
+                                candidateClassName = node.className?.toString().orEmpty(),
+                                candidateWindowId = node.windowId,
+                                candidateUniqueId = uniqueIdOrNull(node),
+                            ),
+                        ) &&
+                        belongsToWindowRoot(node, windowRoot)
+                },
+                close = ::recycle,
+            )
+    }
+
+    /**
+     * Returns the single browser-issued WebView root attached to [windowRoot].
+     *
+     * Unlike [copyUniqueVisibleWebDocumentRoot], this H19 active-document seam deliberately does
+     * not require `isVisibleToUser`: Chrome may clear that flag while Glosh's own opaque surface is
+     * covering the window. It still reads no page text, marker or view id and cannot grant release
+     * by itself.
+     */
+    @Suppress("DEPRECATION")
+    fun copyUniqueAttachedWebDocumentRoot(
+        windowRoot: AccessibilityNodeInfo,
+    ): ChromeMediaShieldOwnedNodeSearchResult<AccessibilityNodeInfo> {
+        val nativeRootUniqueId = uniqueIdOrNull(windowRoot)
+        return ChromeMediaShieldBoundedOwnedNodeSearch<AccessibilityNodeInfo>(MaximumCurrentTreeNodes)
+            .findUniqueDescendant(
+                borrowedRoot = windowRoot,
+                childCount = AccessibilityNodeInfo::getChildCount,
+                copyChild = AccessibilityNodeInfo::getChild,
+                isExactMatch = { node ->
+                    ChromeMediaShieldAttachedWebRootPolicy.verifies(
+                        ChromeMediaShieldAttachedWebRootEvidence(
+                            candidate =
+                                ChromeMediaShieldWebRootCandidateEvidence(
+                                    expectedWindowId = windowRoot.windowId,
+                                    nativeRootUniqueId = nativeRootUniqueId,
+                                    candidatePackageName = node.packageName?.toString().orEmpty(),
+                                    candidateClassName = node.className?.toString().orEmpty(),
+                                    candidateWindowId = node.windowId,
+                                    candidateUniqueId = uniqueIdOrNull(node),
+                                ),
+                            candidateVisibleToUser = node.isVisibleToUser,
+                            candidateAttachedToWindowRoot = belongsToWindowRoot(node, windowRoot),
+                        ),
+                    )
+                },
+                close = ::recycle,
+            )
+    }
+
     /** One-shot fallback awakened by a current browser content-change event; never passive scan. */
     @Suppress("DEPRECATION")
     fun copyUniqueReadyAnchorCandidate(

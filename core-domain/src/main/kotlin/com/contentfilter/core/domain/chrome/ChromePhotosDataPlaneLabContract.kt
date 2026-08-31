@@ -30,6 +30,9 @@ object ChromePhotosDataPlaneLabContract {
     const val KeyRequestedFullTunnelDevGateEnabled = "requested_full_tunnel_dev_gate_enabled"
     const val KeyRequestedReplaceAllNetworkVisuals = "requested_replace_all_network_visuals"
 
+    const val ActionActiveDocumentReplay =
+        "com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_REPLAY"
+
     const val TrustedBootstrapGeneration = 2
     const val StockMediaPolicyEpoch = 19L
 
@@ -37,6 +40,9 @@ object ChromePhotosDataPlaneLabContract {
     const val FixtureUrl = "https://glosh-photos.test/"
     const val MediaShieldReadyPath = "/.well-known/glosh-h19-ready"
     const val MediaShieldReadyUrl = "https://glosh-photos.test/.well-known/glosh-h19-ready"
+    const val MediaShieldParserBarrierPath = "/.well-known/glosh-h19-parser-barrier.js"
+    const val MediaShieldParserBarrierUrl =
+        "https://glosh-photos.test/.well-known/glosh-h19-parser-barrier.js"
     const val FixtureIpv4 = "198.18.0.1"
     const val ProxyHost = "127.0.0.1"
     const val ProxyPort = 8877
