@@ -53,6 +53,11 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
             return
         }
         when (intent.action) {
+            ActionTrustedBootstrapResetArm -> {
+                val armed = ChromePhotosTrustedBootstrapController(context).armOneTimeResetForExplicitDevGate()
+                setResultData(if (armed) "chrome_reset_armed" else "chrome_reset_already_armed")
+                return
+            }
             ActionMainProcessKill -> {
                 Process.killProcess(Process.myPid())
                 return
@@ -189,6 +194,8 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ActionGuardProcessKill = "com.contentfilter.user.chromedataplane.command.GUARD_PROCESS_KILL"
         const val ActionGuardStatus = "com.contentfilter.user.chromedataplane.command.GUARD_STATUS"
         const val ActionPrepareUpdate = "com.contentfilter.user.chromedataplane.command.PREPARE_UPDATE"
+        const val ActionTrustedBootstrapResetArm =
+            "com.contentfilter.user.chromedataplane.command.TRUSTED_BOOTSTRAP_RESET_ARM"
         const val ActionActiveDocumentHoldArm =
             "com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_ARM"
         const val ActionActiveDocumentHoldRelease =

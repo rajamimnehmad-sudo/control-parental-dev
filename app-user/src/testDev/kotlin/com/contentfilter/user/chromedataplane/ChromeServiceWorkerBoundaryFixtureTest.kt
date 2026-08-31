@@ -34,6 +34,10 @@ class ChromeServiceWorkerBoundaryFixtureTest {
 
         assertContains(install, "scope:'/'")
         assertContains(install, "navigator.serviceWorker.controller")
+        assertContains(install, "navigator.serviceWorker.getRegistrations()")
+        assertContains(install, "RESET_BASELINE")
+        assertContains(install, "REGISTER_RESULT")
+        assertContains(install, "SW_REGISTER_BLOCKED")
         assertContains(install, "SW_CONTROLLER=YES")
         assertContains(probe, "/web20sw/first-original.js")
         assertContains(probe, "CLIENT_CONTROLLER")
@@ -83,6 +87,18 @@ class ChromeServiceWorkerBoundaryFixtureTest {
         assertContains(state, "SELF_READY_FETCHES=1")
         assertContains(state, "SELF_READY_PASS_THROUGH=1")
         assertContains(state, "NAV_SYNTHETIC=1")
+    }
+
+    @Test
+    fun `reset verification distinguishes clean baseline and blocked future registration`() {
+        fixture.responseFor(request("POST", "/web20sw/event", "v1|RESET_VERIFY|RESET_BASELINE|CLEAN"))
+        fixture.responseFor(request("POST", "/web20sw/event", "v1|RESET_VERIFY|REGISTER_RESULT|BLOCKED"))
+
+        val state = fixture.state()
+        assertContains(state, "RESET_BASELINE_CLEAN=1")
+        assertContains(state, "RESET_BASELINE_DIRTY=0")
+        assertContains(state, "REGISTER_BLOCKED=1")
+        assertContains(state, "REGISTER_SUCCEEDED=0")
     }
 
     @Test

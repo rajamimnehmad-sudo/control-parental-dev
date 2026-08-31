@@ -88,6 +88,36 @@ internal class ChromePhotosTrustedBootstrapController(
         Log.i(LogTag, "bootstrap=chrome_blocked reason=${reason.take(MaxReasonLength)}")
     }
 
+    fun armOneTimeResetForExplicitDevGate(): Boolean {
+        check(appContext.packageName.endsWith(".dev")) { "DEV package required" }
+        check(devicePolicyManager.isDeviceOwnerApp(appContext.packageName)) { "Device Owner required" }
+        check(isChromeSuspended()) { "Chrome must remain suspended before arming reset" }
+        val current = state()
+        if (current.resetGeneration != ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration) {
+            Log.i(
+                LogTag,
+                "bootstrap=chrome_reset_arm_rejected resetGeneration=${current.resetGeneration} " +
+                    "resetCount=${current.resetCount}",
+            )
+            return false
+        }
+        check(
+            preferences.edit()
+                .putInt(
+                    ChromePhotosDataPlaneLabContract.KeyTrustedBootstrapResetGeneration,
+                    ExplicitDevGateArmedGeneration,
+                )
+                .putInt(ChromePhotosDataPlaneLabContract.KeyTrustedBootstrapCompleteGeneration, 0)
+                .commit(),
+        ) { "Chrome reset arm state did not persist" }
+        Log.i(
+            LogTag,
+            "bootstrap=chrome_reset_armed previousGeneration=${current.resetGeneration} " +
+                "resetCount=${current.resetCount}",
+        )
+        return true
+    }
+
     suspend fun ensureInitialReset() {
         val current = state()
         if (current.resetGeneration == ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration) {
@@ -187,6 +217,7 @@ internal class ChromePhotosTrustedBootstrapController(
 
     private companion object {
         const val ClearDataTimeoutMillis = 180_000L
+        const val ExplicitDevGateArmedGeneration = 0
         const val MaxReasonLength = 80
         const val LogTag = "ChromePhotosDataPlane"
     }

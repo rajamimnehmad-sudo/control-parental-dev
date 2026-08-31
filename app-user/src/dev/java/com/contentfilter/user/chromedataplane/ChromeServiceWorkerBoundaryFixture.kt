@@ -19,6 +19,10 @@ internal class ChromeServiceWorkerBoundaryFixture {
     private val passThroughSelfReady = AtomicLong()
     private val syntheticSelfReady = AtomicLong()
     private val syntheticNavigation = AtomicLong()
+    private val resetBaselineClean = AtomicLong()
+    private val resetBaselineDirty = AtomicLong()
+    private val registerBlocked = AtomicLong()
+    private val registerSucceeded = AtomicLong()
     private val lastCase = AtomicReference(None)
     private val lastEvent = AtomicReference(None)
     private val lastValue = AtomicReference(None)
@@ -58,7 +62,9 @@ internal class ChromeServiceWorkerBoundaryFixture {
             "NAV_FETCHES=${navigationFetches.get()},SELF_READY_FETCHES=${selfReadyFetches.get()}," +
             "SELF_READY_PASS_THROUGH=${passThroughSelfReady.get()}," +
             "SELF_READY_SYNTHETIC=${syntheticSelfReady.get()}," +
-            "NAV_SYNTHETIC=${syntheticNavigation.get()},LAST_CASE=${lastCase.get()}," +
+            "NAV_SYNTHETIC=${syntheticNavigation.get()},RESET_BASELINE_CLEAN=${resetBaselineClean.get()}," +
+            "RESET_BASELINE_DIRTY=${resetBaselineDirty.get()},REGISTER_BLOCKED=${registerBlocked.get()}," +
+            "REGISTER_SUCCEEDED=${registerSucceeded.get()},LAST_CASE=${lastCase.get()}," +
             "LAST_EVENT=${lastEvent.get()},LAST_VALUE=${lastValue.get()}"
 
     internal fun workerScript(): String =
@@ -118,6 +124,8 @@ internal class ChromeServiceWorkerBoundaryFixture {
                 selfReadyFetches.incrementAndGet()
                 if (value == "SYNTHETIC") syntheticSelfReady.incrementAndGet() else passThroughSelfReady.incrementAndGet()
             }
+            "RESET_BASELINE" -> if (value == "CLEAN") resetBaselineClean.incrementAndGet() else resetBaselineDirty.incrementAndGet()
+            "REGISTER_RESULT" -> if (value == "BLOCKED") registerBlocked.incrementAndGet() else registerSucceeded.incrementAndGet()
         }
         return response("h20-sw-event", PlainText, ByteArray(0), 204)
     }
@@ -126,11 +134,13 @@ internal class ChromeServiceWorkerBoundaryFixture {
         """
         <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>H20 SW INSTALL</title></head>
         <body><h1 id="status">SW_INSTALLING</h1><script>
-        (async()=>{try{const registration=await navigator.serviceWorker.register('$WorkerPath',{scope:'/',updateViaCache:'none'});await navigator.serviceWorker.ready;
+        (async()=>{const existing=await navigator.serviceWorker.getRegistrations(),controlledBefore=!!navigator.serviceWorker.controller,clean=existing.length===0&&!controlledBefore;
+        await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|RESET_VERIFY|RESET_BASELINE|'+(clean?'CLEAN':'DIRTY')});
+        try{const registration=await navigator.serviceWorker.register('$WorkerPath',{scope:'/',updateViaCache:'none'});await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|RESET_VERIFY|REGISTER_RESULT|SUCCEEDED'});await navigator.serviceWorker.ready;
         if(!navigator.serviceWorker.controller)await new Promise(resolve=>navigator.serviceWorker.addEventListener('controllerchange',resolve,{once:true}));
         const controlled=!!navigator.serviceWorker.controller;document.getElementById('status').textContent=controlled?'SW_CONTROLLER=YES':'SW_CONTROLLER=NO';
         await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|PROVISION|CLIENT_CONTROLLER|'+(controlled?'YES':'NO')})}
-        catch(_){document.getElementById('status').textContent='SW_INSTALL_FAILED'}})();
+        catch(_){await fetch('$EventPath',{method:'POST',cache:'no-store',headers:{'Content-Type':'text/plain'},body:'v1|RESET_VERIFY|REGISTER_RESULT|BLOCKED'});document.getElementById('status').textContent='SW_REGISTER_BLOCKED'}})();
         </script></body></html>
         """.trimIndent()
 
@@ -201,14 +211,17 @@ internal class ChromeServiceWorkerBoundaryFixture {
         const val PlainText = "text/plain; charset=utf-8"
         const val MaximumEventBytes = 128
         val PrintableAscii = 0x20..0x7e
-        val EventCases = setOf("PROVISION", "PASS_THROUGH", "SYNTHETIC_SELF_READY", "SYNTHETIC_NAVIGATION")
-        val EventTypes = setOf("ACTIVATED", "CLIENT_CONTROLLER", "FETCH_NAVIGATION", "FETCH_SELF_READY")
+        val EventCases = setOf("PROVISION", "RESET_VERIFY", "PASS_THROUGH", "SYNTHETIC_SELF_READY", "SYNTHETIC_NAVIGATION")
+        val EventTypes =
+            setOf("ACTIVATED", "CLIENT_CONTROLLER", "FETCH_NAVIGATION", "FETCH_SELF_READY", "RESET_BASELINE", "REGISTER_RESULT")
         val EventValues =
             mapOf(
                 "ACTIVATED" to setOf("YES"),
                 "CLIENT_CONTROLLER" to setOf("YES", "NO"),
                 "FETCH_NAVIGATION" to setOf("PASSTHROUGH", "SYNTHETIC"),
                 "FETCH_SELF_READY" to setOf("PASSTHROUGH", "SYNTHETIC"),
+                "RESET_BASELINE" to setOf("CLEAN", "DIRTY"),
+                "REGISTER_RESULT" to setOf("BLOCKED", "SUCCEEDED"),
             )
         val SyntheticNavigationDocument =
             "<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>" +
