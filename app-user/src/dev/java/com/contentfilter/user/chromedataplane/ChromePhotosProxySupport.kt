@@ -18,6 +18,7 @@ internal data class ChromePhotosProxyMetrics(
     val deliveredBytes: Long = 0,
     val streamedResponses: Long = 0,
     val queueRejected: Long = 0,
+    val serviceWorkerScriptBlocked: Long = 0,
     val activeConnectionsPeak: Int = 0,
     val latencyP50Millis: Double = 0.0,
     val latencyP95Millis: Double = 0.0,
