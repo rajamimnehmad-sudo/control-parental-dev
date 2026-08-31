@@ -2,7 +2,7 @@
 
 ## Status
 
-`BLOCKED / FOREGROUND_ACTIVE_DOCUMENT_FOCUS_UNAVAILABLE`
+`BLOCKED / FOREGROUND_DOCUMENT_BINDING_UNAVAILABLE_IN_STOCK_CHROME`
 
 The cryptographic HELLO → CHALLENGE → PROVE → PRESENT implementation remains
 fail-close, but stock Chrome 152 on the A23 did not grant
@@ -148,8 +148,16 @@ evidence and the current contract:
 - page title or address-bar text identity;
 - package/window/root identity without a tab/document identity;
 - URL/body/network-service correlation;
+- Android Activity/UsageStats and Chrome managed policy state;
 - screenshot/compositor/presentation-marker authority;
 - CDP/DevTools or Chrome extension dependency.
+
+The token and challenge authenticate a transformed document, but do not prove
+that this document is the active tab at the native release instant. Network
+socket, request, process, and renderer identities are also insufficient because
+Chrome multiplexes traffic and can reuse renderer/network processes across tab,
+cache, and Service Worker contexts. Managed policies configure Chrome but do
+not expose its runtime active tab/document identity.
 
 ## Health and rollback
 
@@ -191,6 +199,12 @@ not run, as required after the cold authority gate failed:
 Stock Chrome currently supplies no demonstrated non-raster, browser-side
 document/tab identifier that native Android can bind to the exact foreground
 window at PRESENT while keeping the parser blocked and Chrome UX normal.
+
+The missing primitive is an exact browser-side `tabId + documentId + lifecycle`
+identity with an atomic active-tab check at release. Equivalent authority is
+available only through browser-owned integration such as an extension API,
+CDP, an owned WebView/renderer, or modified Chromium; each is outside this
+ticket's allowed stock-Chrome architecture.
 
 Continuing this architecture requires one of:
 
