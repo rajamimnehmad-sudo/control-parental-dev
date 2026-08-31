@@ -48,9 +48,9 @@ class ChromeServiceWorkerScriptGateTest {
         val networkCalls = AtomicInteger()
         val client =
             OkHttpClient.Builder()
-                .addInterceptor { chain ->
+                .addInterceptor {
                     networkCalls.incrementAndGet()
-                    chain.proceed(chain.request())
+                    throw IOException("unexpected_network_call")
                 }
                 .build()
         val upstream = ChromePhotosRealUpstream(client = client)
