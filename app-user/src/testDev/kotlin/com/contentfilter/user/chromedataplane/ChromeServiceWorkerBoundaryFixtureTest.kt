@@ -20,6 +20,7 @@ class ChromeServiceWorkerBoundaryFixtureTest {
         assertEquals("/", response.headers.first { it.name == "Service-Worker-Allowed" }.value)
         assertContains(script, ChromePhotosDataPlaneLabContract.MediaShieldSelfReadyPath)
         assertContains(script, "PASS_THROUGH")
+        assertContains(script, "'PASSTHROUGH'")
         assertContains(script, "SYNTHETIC_SELF_READY")
         assertContains(script, "SYNTHETIC_NAVIGATION")
         assertContains(script, "new Response(null,{status:204")

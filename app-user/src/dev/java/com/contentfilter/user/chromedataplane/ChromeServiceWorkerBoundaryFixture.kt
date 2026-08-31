@@ -75,11 +75,11 @@ internal class ChromeServiceWorkerBoundaryFixture {
           const url=new URL(event.request.url);if(url.origin!==self.location.origin||url.pathname===REPORT)return;
           if(event.request.mode==='navigate'&&url.pathname==='$ProbePath'){
             event.respondWith((async()=>{const requested=url.searchParams.get('sw_case'),caseId=VALID.has(requested)?requested:'PASS_THROUGH';await writeMode(caseId);
-            await report(caseId,'FETCH_NAVIGATION',caseId==='SYNTHETIC_NAVIGATION'?'SYNTHETIC':'PASS_THROUGH');
+            await report(caseId,'FETCH_NAVIGATION',caseId==='SYNTHETIC_NAVIGATION'?'SYNTHETIC':'PASSTHROUGH');
             if(caseId==='SYNTHETIC_NAVIGATION')return new Response(`$SyntheticNavigationDocument`,{status:200,headers:{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}});
             return fetch(event.request)})());return}
           if(url.pathname===SELF_READY){
-            event.respondWith((async()=>{const caseId=await readMode(),synthetic=caseId==='SYNTHETIC_SELF_READY';await report(caseId,'FETCH_SELF_READY',synthetic?'SYNTHETIC':'PASS_THROUGH');
+            event.respondWith((async()=>{const caseId=await readMode(),synthetic=caseId==='SYNTHETIC_SELF_READY';await report(caseId,'FETCH_SELF_READY',synthetic?'SYNTHETIC':'PASSTHROUGH');
             return synthetic?new Response(null,{status:204,headers:{'Cache-Control':'no-store'}}):fetch(event.request)})());return}
         });
         """.trimIndent().replace("\n", "")
