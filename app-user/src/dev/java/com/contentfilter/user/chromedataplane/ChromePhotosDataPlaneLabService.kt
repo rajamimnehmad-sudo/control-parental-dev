@@ -38,6 +38,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     private var proxy: ChromePhotosHttpsProxy? = null
     private var modelLoadMs = 0.0
     private var gloshiaReady = false
+    private var benchmarkConfig = ChromePhotoDecisionBenchmarkConfig()
     private var currentSessionId = ""
     private var vpnRollbackCompleted = false
     private lateinit var policyController: ChromePhotosLabPolicyController
@@ -108,6 +109,20 @@ class ChromePhotosDataPlaneLabService : Service() {
                     val replaceAllNetworkVisuals = mode.replaceAllNetworkVisuals
                     val stockMediaAuthorityEnabled = mode.stockMediaAuthorityEnabled
                     val documentSelfShieldEnabled = mode.documentSelfShieldEnabled
+                    val requestedBenchmarkConfig =
+                        ChromePhotoDecisionBenchmarkConfig(
+                            maximumCacheEntries =
+                                intent?.getIntExtra(
+                                    ChromePhotosDataPlaneLabReceiver.ExtraDecisionCacheEntries,
+                                    ChromePhotoDecisionBenchmarkConfig.DefaultCacheEntries,
+                                ) ?: ChromePhotoDecisionBenchmarkConfig.DefaultCacheEntries,
+                            maximumConcurrentInferences =
+                                intent?.getIntExtra(
+                                    ChromePhotosDataPlaneLabReceiver.ExtraDecisionConcurrency,
+                                    ChromePhotoDecisionBenchmarkConfig.DefaultConcurrentInferences,
+                                ) ?: ChromePhotoDecisionBenchmarkConfig.DefaultConcurrentInferences,
+                        )
+                    benchmarkConfig = requestedBenchmarkConfig
                     val mediaPolicyEpoch =
                         if (documentSelfShieldEnabled) {
                             ChromePhotosDataPlaneLabContract.DocumentSelfShieldPolicyEpoch
@@ -221,6 +236,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                     val decisionSession =
                         ChromePhotosBoundedDecisionSession(
                             engine = gloshia.engine,
+                            maximumCacheEntries = requestedBenchmarkConfig.maximumCacheEntries,
+                            maximumQueueEntries = requestedBenchmarkConfig.maximumQueueEntries,
+                            maximumConcurrentInferences = requestedBenchmarkConfig.maximumConcurrentInferences,
+                            timeoutMillis = requestedBenchmarkConfig.timeoutMillis,
                             onSystemicFailure = { reason ->
                                 startedProxy.fatal(IllegalStateException("gloshia_$reason"))
                             },
@@ -578,13 +597,24 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "web11a=${metrics.webSemanticsReport} web11b=${metrics.imageAuthorityReport} " +
                 "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
                 "engineCalls=${decisions.engineCalls} dedupeHits=${decisions.dedupeHits} " +
+                "decisionCacheConfig=${benchmarkConfig.maximumCacheEntries} " +
+                "decisionConcurrencyConfig=${benchmarkConfig.maximumConcurrentInferences} " +
+                "decisionQueueConfig=${benchmarkConfig.maximumQueueEntries} " +
+                "decisionTimeoutMs=${benchmarkConfig.timeoutMillis} " +
+                "engineCallsPerRequest=${decisions.engineCallsPerRequest} " +
                 "inferencePeak=${decisions.inferencePeak} inFlightPeak=${decisions.inFlightPeak} " +
                 "queuePeak=${decisions.queuePeak} queueRejects=${decisions.queueRejects} " +
                 "timeouts=${decisions.timeouts} inferenceP50Ms=${decisions.inferenceP50Ms} " +
                 "inferenceP95Ms=${decisions.inferenceP95Ms} inferenceP99Ms=${decisions.inferenceP99Ms} " +
                 "decisionP50Ms=${decisions.decisionP50Ms} decisionP95Ms=${decisions.decisionP95Ms} " +
                 "decisionP99Ms=${decisions.decisionP99Ms} cacheHitP50Ms=${decisions.cacheHitP50Ms} " +
-                "cacheHitP95Ms=${decisions.cacheHitP95Ms} " +
+                "cacheHitP95Ms=${decisions.cacheHitP95Ms} cacheEntries=${decisions.cacheEntries} " +
+                "cacheEvictions=${decisions.cacheEvictions} preprocessP50Ms=${decisions.preprocessP50Ms} " +
+                "preprocessP95Ms=${decisions.preprocessP95Ms} preprocessP99Ms=${decisions.preprocessP99Ms} " +
+                "preparedCount1=${decisions.preparedImageCount1} preparedCount4=${decisions.preparedImageCount4} " +
+                "preparedCount5=${decisions.preparedImageCount5} " +
+                "preparedCountOther=${decisions.preparedImageCountOther} " +
+                "decisionBasis=${decisions.decisionBasisCounts.entries.joinToString(",") { "${it.key}:${it.value}" }} " +
                 "imageCandidates=${images.candidates} imagePrefixPeeks=${images.prefixPeeks} " +
                 "imageMagicCandidates=${images.magicCandidates} imageBodyAdmissionPeak=${images.bodyAdmissionPeak} " +
                 "imageBodyAdmissionRejects=${images.bodyAdmissionRejects} " +

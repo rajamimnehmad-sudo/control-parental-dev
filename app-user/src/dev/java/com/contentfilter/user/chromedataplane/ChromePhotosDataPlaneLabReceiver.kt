@@ -165,6 +165,18 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                     ExtraDocumentSelfShieldEnabled,
                     intent.getBooleanExtra(ExtraDocumentSelfShieldEnabled, false),
                 )
+            if (intent.hasExtra(ExtraDecisionCacheEntries)) {
+                serviceIntent.putExtra(
+                    ExtraDecisionCacheEntries,
+                    intent.getIntExtra(ExtraDecisionCacheEntries, 0),
+                )
+            }
+            if (intent.hasExtra(ExtraDecisionConcurrency)) {
+                serviceIntent.putExtra(
+                    ExtraDecisionConcurrency,
+                    intent.getIntExtra(ExtraDecisionConcurrency, 0),
+                )
+            }
         }
         if (intent.action == ActionAuditMark) {
             serviceIntent
@@ -219,6 +231,8 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ExtraReplaceAllNetworkVisuals = "replace_all_network_visuals"
         const val ExtraStockMediaAuthorityEnabled = ChromePhotosDataPlaneLabContract.KeyStockMediaAuthorityEnabled
         const val ExtraDocumentSelfShieldEnabled = ChromePhotosDataPlaneLabContract.KeyDocumentSelfShieldEnabled
+        const val ExtraDecisionCacheEntries = "chrome_photo_decision_cache_entries"
+        const val ExtraDecisionConcurrency = "chrome_photo_decision_concurrency"
         private const val DefaultTransportStressCycles = 100
         private const val ActiveDocumentLogTag = "ChromeMediaShieldActiveDocument"
         private val ActiveDocumentHoldActions =

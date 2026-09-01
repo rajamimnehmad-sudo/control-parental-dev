@@ -8,10 +8,62 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class ChromePhotoDecisionSessionTest {
+    @Test
+    fun `benchmark config accepts only the bounded DEV matrix`() {
+        assertEquals(64, ChromePhotoDecisionBenchmarkConfig().maximumCacheEntries)
+        assertEquals(1, ChromePhotoDecisionBenchmarkConfig().maximumConcurrentInferences)
+        assertEquals(2, ChromePhotoDecisionBenchmarkConfig().maximumQueueEntries)
+        assertEquals(5_000L, ChromePhotoDecisionBenchmarkConfig().timeoutMillis)
+        assertEquals(256, ChromePhotoDecisionBenchmarkConfig(256, 2).maximumCacheEntries)
+
+        assertFailsWith<IllegalArgumentException> { ChromePhotoDecisionBenchmarkConfig(65, 1) }
+        assertFailsWith<IllegalArgumentException> { ChromePhotoDecisionBenchmarkConfig(64, 3) }
+    }
+
+    @Test
+    fun `benchmark variants preserve decisions for the same corpus`() {
+        val expected =
+            listOf(
+                ChromePhotoDecision.Safe,
+                ChromePhotoDecision.Block,
+                ChromePhotoDecision.Unknown,
+                ChromePhotoDecision.Safe,
+            )
+        val variants =
+            listOf(
+                ChromePhotoDecisionBenchmarkConfig(64, 1),
+                ChromePhotoDecisionBenchmarkConfig(256, 1),
+                ChromePhotoDecisionBenchmarkConfig(256, 2),
+            )
+
+        variants.forEach { config ->
+            val decisions = expected.iterator()
+            val engine = FakeEngine { ChromePhotoDecisionResult(decisions.next(), "fixed_corpus") }
+            val session =
+                ChromePhotosBoundedDecisionSession(
+                    engine = engine,
+                    maximumCacheEntries = config.maximumCacheEntries,
+                    maximumQueueEntries = config.maximumQueueEntries,
+                    maximumConcurrentInferences = config.maximumConcurrentInferences,
+                    timeoutMillis = config.timeoutMillis,
+                )
+
+            val actual =
+                expected.indices.map { index ->
+                    val bytes = "corpus-$index".toByteArray()
+                    session.decide(sha256(bytes), bytes, "image/png").decision
+                }
+
+            assertEquals(expected, actual)
+            session.close()
+        }
+    }
+
     @Test
     fun `cache hit avoids a second inference and session identity scopes entries`() {
         val engine = FakeEngine { safeResult() }
@@ -191,9 +243,68 @@ class ChromePhotoDecisionSessionTest {
         }
 
         assertEquals(2, session.cacheSize())
+        assertEquals(1, session.metrics().cacheEvictions)
         session.clear()
         assertEquals(0, session.cacheSize())
         assertEquals(0, session.metrics().inFlightEntries)
+        session.close()
+    }
+
+    @Test
+    fun `engine metrics report preprocessing prepared image bins and decision basis`() {
+        val engine =
+            FakeEngine {
+                safeResult().copy(
+                    basis = "RegionalConsensus",
+                    preparedImageCount = 5,
+                    timings =
+                        ChromePhotoDecisionTimings(
+                            decodeAndPreprocessMs = 7.0,
+                            inferenceMs = 12.0,
+                            totalLocalMs = 20.0,
+                        ),
+                )
+            }
+        val session = session(engine)
+        val bytes = "metrics".toByteArray()
+
+        session.decide(sha256(bytes), bytes, "image/png")
+        session.decide(sha256(bytes), bytes, "image/png")
+        val metrics = session.metrics()
+
+        assertEquals(7.0, metrics.preprocessP50Ms)
+        assertEquals(7.0, metrics.preprocessP95Ms)
+        assertEquals(1, metrics.preparedImageCount5)
+        assertEquals(0, metrics.preparedImageCountOther)
+        assertEquals(mapOf("RegionalConsensus" to 1L), metrics.decisionBasisCounts)
+        assertEquals(0.5, metrics.engineCallsPerRequest)
+        session.close()
+    }
+
+    @Test
+    fun `concurrency two runs two distinct decisions without changing verdicts`() {
+        val bothEntered = CountDownLatch(2)
+        val release = CountDownLatch(1)
+        val engine =
+            FakeEngine {
+                bothEntered.countDown()
+                release.await()
+                safeResult()
+            }
+        val session = session(engine, maximumConcurrentInferences = 2, timeoutMillis = 2_000)
+        val callers = Executors.newFixedThreadPool(2)
+        val firstBytes = "parallel-one".toByteArray()
+        val secondBytes = "parallel-two".toByteArray()
+
+        val first = callers.submit(Callable { session.decide(sha256(firstBytes), firstBytes, "image/png") })
+        val second = callers.submit(Callable { session.decide(sha256(secondBytes), secondBytes, "image/png") })
+        assertTrue(bothEntered.await(1, TimeUnit.SECONDS))
+        release.countDown()
+
+        assertEquals(ChromePhotoDecision.Safe, first.get(1, TimeUnit.SECONDS).decision)
+        assertEquals(ChromePhotoDecision.Safe, second.get(1, TimeUnit.SECONDS).decision)
+        assertEquals(2, session.metrics().inferencePeak)
+        callers.shutdownNow()
         session.close()
     }
 
@@ -251,11 +362,13 @@ class ChromePhotoDecisionSessionTest {
         engine: ChromePhotoDecisionEngine,
         maximumCacheEntries: Int = 8,
         maximumQueueEntries: Int = 2,
+        maximumConcurrentInferences: Int = 1,
         timeoutMillis: Long = 500,
     ) = ChromePhotosBoundedDecisionSession(
         engine = engine,
         maximumCacheEntries = maximumCacheEntries,
         maximumQueueEntries = maximumQueueEntries,
+        maximumConcurrentInferences = maximumConcurrentInferences,
         timeoutMillis = timeoutMillis,
     )
 

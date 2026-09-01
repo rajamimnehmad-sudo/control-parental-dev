@@ -4,6 +4,7 @@ import java.util.LinkedHashMap
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Callable
 import java.util.concurrent.CancellationException
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.FutureTask
 import java.util.concurrent.RejectedExecutionException
@@ -29,7 +30,17 @@ internal data class ChromePhotoDecisionSessionMetrics(
     val block: Long = 0,
     val unknown: Long = 0,
     val cacheEntries: Int = 0,
+    val cacheEvictions: Long = 0,
     val inFlightEntries: Int = 0,
+    val preprocessP50Ms: Double = 0.0,
+    val preprocessP95Ms: Double = 0.0,
+    val preprocessP99Ms: Double = 0.0,
+    val preparedImageCount1: Long = 0,
+    val preparedImageCount4: Long = 0,
+    val preparedImageCount5: Long = 0,
+    val preparedImageCountOther: Long = 0,
+    val decisionBasisCounts: Map<String, Long> = emptyMap(),
+    val engineCallsPerRequest: Double = 0.0,
     val inferenceP50Ms: Double = 0.0,
     val inferenceP95Ms: Double = 0.0,
     val inferenceP99Ms: Double = 0.0,
@@ -68,13 +79,18 @@ internal class ChromePhotosBoundedDecisionSession(
     private val closed = AtomicBoolean(false)
     private val generation = AtomicLong()
     private val systemicFailureNotified = AtomicBoolean(false)
-    private val inFlight = java.util.concurrent.ConcurrentHashMap<DecisionKey, DecisionTask>()
+    private val inFlight = ConcurrentHashMap<DecisionKey, DecisionTask>()
     private val cacheLock = Any()
+    private val cacheEvictions = AtomicLong()
     private val cache =
         object : LinkedHashMap<DecisionKey, ChromePhotoDecisionResult>(maximumCacheEntries, LoadFactor, true) {
             override fun removeEldestEntry(
                 eldest: MutableMap.MutableEntry<DecisionKey, ChromePhotoDecisionResult>?,
-            ): Boolean = size > maximumCacheEntries
+            ): Boolean {
+                return (size > maximumCacheEntries).also { evicted ->
+                    if (evicted) cacheEvictions.incrementAndGet()
+                }
+            }
         }
     private val executor =
         ThreadPoolExecutor(
@@ -103,6 +119,12 @@ internal class ChromePhotosBoundedDecisionSession(
     private val inferenceSamples = BoundedTimingSamples()
     private val decisionSamples = BoundedTimingSamples()
     private val cacheHitSamples = BoundedTimingSamples()
+    private val preprocessSamples = BoundedTimingSamples()
+    private val preparedImageCount1 = AtomicLong()
+    private val preparedImageCount4 = AtomicLong()
+    private val preparedImageCount5 = AtomicLong()
+    private val preparedImageCountOther = AtomicLong()
+    private val decisionBasisCounts = ConcurrentHashMap<String, AtomicLong>()
 
     init {
         require(maximumCacheEntries > 0)
@@ -215,6 +237,7 @@ internal class ChromePhotosBoundedDecisionSession(
         val inference = inferenceSamples.snapshot()
         val decision = decisionSamples.snapshot()
         val cacheHit = cacheHitSamples.snapshot()
+        val preprocess = preprocessSamples.snapshot()
         return ChromePhotoDecisionSessionMetrics(
             requests = requests.get(),
             cacheHits = cacheHits.get(),
@@ -230,7 +253,17 @@ internal class ChromePhotosBoundedDecisionSession(
             block = block.get(),
             unknown = unknown.get(),
             cacheEntries = cacheSize(),
+            cacheEvictions = cacheEvictions.get(),
             inFlightEntries = inFlight.size,
+            preprocessP50Ms = preprocess.percentile(50),
+            preprocessP95Ms = preprocess.percentile(95),
+            preprocessP99Ms = preprocess.percentile(99),
+            preparedImageCount1 = preparedImageCount1.get(),
+            preparedImageCount4 = preparedImageCount4.get(),
+            preparedImageCount5 = preparedImageCount5.get(),
+            preparedImageCountOther = preparedImageCountOther.get(),
+            decisionBasisCounts = decisionBasisCounts.mapValues { it.value.get() }.toSortedMap(),
+            engineCallsPerRequest = engineCalls.get().toRate(requests.get()),
             inferenceP50Ms = inference.percentile(50),
             inferenceP95Ms = inference.percentile(95),
             inferenceP99Ms = inference.percentile(99),
@@ -252,6 +285,15 @@ internal class ChromePhotosBoundedDecisionSession(
         return try {
             engine.decide(bytes, mimeType).also { result ->
                 inferenceSamples.add(result.timings.inferenceMs)
+                preprocessSamples.add(result.timings.decodeAndPreprocessMs)
+                when (result.preparedImageCount) {
+                    1 -> preparedImageCount1.incrementAndGet()
+                    4 -> preparedImageCount4.incrementAndGet()
+                    5 -> preparedImageCount5.incrementAndGet()
+                    else -> preparedImageCountOther.incrementAndGet()
+                }
+                val basis = result.basis.takeIf(KnownDecisionBases::contains) ?: OtherBasis
+                decisionBasisCounts.computeIfAbsent(basis) { AtomicLong() }.incrementAndGet()
                 if (!engine.isHealthy() && systemicFailureNotified.compareAndSet(false, true)) {
                     onSystemicFailure(result.reason)
                 }
@@ -367,6 +409,16 @@ internal class ChromePhotosBoundedDecisionSession(
         const val EngineExceptionReason = "decision_engine_exception"
         const val InterruptedReason = "decision_interrupted"
         const val StaleGenerationReason = "decision_generation_stale"
+        const val OtherBasis = "Other"
+        val KnownDecisionBases =
+            setOf(
+                "None",
+                "FullThreshold",
+                "FullStrong",
+                "UncertainRegional",
+                "RegionalStrong",
+                "RegionalConsensus",
+            )
     }
 }
 
@@ -404,3 +456,5 @@ private fun updatePeak(
 }
 
 private fun Long.toMillis(): Double = this / 1_000_000.0
+
+private fun Long.toRate(denominator: Long): Double = if (denominator == 0L) 0.0 else toDouble() / denominator
