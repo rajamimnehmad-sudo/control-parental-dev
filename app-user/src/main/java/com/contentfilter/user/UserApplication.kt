@@ -17,6 +17,7 @@ import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import com.contentfilter.feature.activation.InstalledAppVersionProvider
 import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
+import com.contentfilter.user.apps.DeviceOwnerAppPolicyCoordinator
 import com.contentfilter.user.apps.InstalledAppPublisher
 import com.contentfilter.user.apps.ProtectedBrowserPackageNames
 import com.contentfilter.user.protection.ProtectionControlCoordinator
@@ -82,6 +83,10 @@ class UserApplication :
 
     @Inject
     lateinit var appFeedbackRepository: AppFeedbackRepository
+
+    @Inject
+    lateinit var deviceOwnerAppPolicyCoordinator: DeviceOwnerAppPolicyCoordinator
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun attachBaseContext(base: Context) {
@@ -103,6 +108,8 @@ class UserApplication :
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
             .logFailure("periodic-sync-schedule")
+        runCatching { deviceOwnerAppPolicyCoordinator.start(appScope) }
+            .logFailure("device-owner-app-policy-start")
         appScope.launch {
             deviceActivationRepository.currentActivation()?.let { activation ->
                 appFeedbackRepository.reportDeviceMetadata(
