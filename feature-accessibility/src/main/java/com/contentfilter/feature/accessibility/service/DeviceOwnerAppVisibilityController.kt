@@ -8,11 +8,13 @@ import android.os.Build
 import android.util.Log
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.repository.InstallApprovalStore
 import com.contentfilter.feature.accessibility.policy.AccessibilityAppPolicyEvaluator
 import com.contentfilter.feature.accessibility.policy.AccessibilityPolicyState
 
 /**
- * Applies the effective app policy through Device Owner visibility controls.
+ * Applies effective app policy through Device Owner visibility controls.
  *
  * Glosh only unhides packages it previously hid itself. This avoids undoing
  * package visibility decisions made by Android, the OEM, or another policy.
@@ -20,6 +22,7 @@ import com.contentfilter.feature.accessibility.policy.AccessibilityPolicyState
 class DeviceOwnerAppVisibilityController(
     context: Context,
     private val policyEvaluator: AccessibilityAppPolicyEvaluator,
+    private val installApprovalStore: InstallApprovalStore,
 ) {
     private val appContext = context.applicationContext
     private val devicePolicyManager = appContext.getSystemService(DevicePolicyManager::class.java)
@@ -35,19 +38,19 @@ class DeviceOwnerAppVisibilityController(
 
     fun reconcile(state: AccessibilityPolicyState) {
         if (!isDeviceOwner()) return
-        val managedPackages = managedPackageCandidates(state)
-        managedPackages.forEach { packageName ->
+        managedPackageCandidates(state).forEach { packageName ->
             val persistedMinutes =
                 state.snapshot.dailyUsage
                     .firstOrNull { it.packageName == packageName }
                     ?.usedMinutes ?: 0
             val shouldHide =
-                when (policyEvaluator.evaluate(packageName, persistedMinutes, state.snapshot, state.health)) {
-                    is PolicyDecision.Block,
-                    is PolicyDecision.RequestAuthorization,
-                    -> true
-                    else -> false
-                }
+                installApprovalStore.isPending(packageName) ||
+                    when (policyEvaluator.evaluate(packageName, persistedMinutes, state.snapshot, state.health)) {
+                        is PolicyDecision.Block,
+                        is PolicyDecision.RequestAuthorization,
+                        -> true
+                        else -> false
+                    }
             if (shouldHide) {
                 applyHidden(packageName, hidden = true)
             } else if (packageName in hiddenByGlosh()) {
@@ -56,37 +59,22 @@ class DeviceOwnerAppVisibilityController(
         }
     }
 
-    fun releaseAllManagedPackages() {
-        if (!isDeviceOwner()) return
-        hiddenByGlosh().toList().forEach { packageName ->
-            applyHidden(packageName, hidden = false)
-        }
-    }
-
-    private fun managedPackageCandidates(state: AccessibilityPolicyState): Set<String> {
-        val explicitTargets =
-            buildSet {
-                state.snapshot.rules
-                    .filter { it.enabled && it.scope.name == "App" && it.target != "*" }
-                    .mapTo(this) { it.target }
-                state.snapshot.dailyLimits
-                    .filter { it.enabled && it.targetType == PolicyTargetType.App }
-                    .mapTo(this) { it.target }
-                state.snapshot.appGroups
-                    .filter { it.enabled }
-                    .flatMap { it.apps }
-                    .filter { it.enabled }
-                    .mapTo(this) { it.packageName }
-                addAll(hiddenByGlosh())
-            }
-        val hasGlobalAppPolicy =
-            state.snapshot.rules.any { rule ->
-                rule.enabled &&
-                    (rule.scope.name == "Global" || (rule.scope.name == "App" && rule.target == "*"))
-            }
-        if (!hasGlobalAppPolicy) return explicitTargets.filterTo(mutableSetOf(), ::isEligiblePackage)
-        return installedThirdPartyPackages() + explicitTargets.filter(::isEligiblePackage)
-    }
+    private fun managedPackageCandidates(state: AccessibilityPolicyState): Set<String> =
+        buildSet {
+            addAll(installedThirdPartyPackages())
+            state.snapshot.rules
+                .filter { it.enabled && it.scope == RuleScope.App && it.target != "*" }
+                .mapTo(this) { it.target }
+            state.snapshot.dailyLimits
+                .filter { it.enabled && it.targetType == PolicyTargetType.App }
+                .mapTo(this) { it.target }
+            state.snapshot.appGroups
+                .filter { it.enabled }
+                .flatMap { it.apps }
+                .filter { it.enabled }
+                .mapTo(this) { it.packageName }
+            addAll(hiddenByGlosh())
+        }.filterTo(mutableSetOf(), ::isEligiblePackage)
 
     private fun installedThirdPartyPackages(): Set<String> =
         installedApplications()
