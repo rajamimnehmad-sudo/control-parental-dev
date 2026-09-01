@@ -314,6 +314,31 @@ class ChromeMediaShieldReadyEndpointTest {
         assertEquals(0L, endpoint.metrics().accepted)
     }
 
+    @Test
+    fun `renderer metrics endpoint accepts one claimed current document snapshot`() {
+        val identity = issueH20(Token, topLevel = true)
+        attestH20()
+        val endpoint = ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled = true, elapsedRealtime = { Now })
+        assertEquals(204, endpoint.handle(selfReadyRequest(Token, identity))?.statusCode)
+        val values = List(ChromeMediaShieldRendererMetricsSnapshot.FieldCount) { it.toLong() }
+        val metricsRequest =
+            request("HELLO", Token, 1L).copy(
+                target = ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath,
+                body =
+                    (
+                        "v1|RENDERER_METRICS|$Token|${identity.protectionSessionId}|${identity.policyEpoch}|" +
+                            "${identity.navigationSequence}|${identity.documentSequence}|1|T|" + values.joinToString(",")
+                    ).toByteArray(),
+            )
+
+        val replayRequest = metricsRequest.copy(body = metricsRequest.body.copyOf())
+        assertEquals(204, endpoint.handle(metricsRequest)?.statusCode)
+        assertEquals(503, endpoint.handle(replayRequest)?.statusCode)
+        assertEquals(1, endpoint.metrics().rendererMetrics.reports)
+        assertEquals(1, endpoint.metrics().rendererMetrics.rejected)
+        assertEquals(37, endpoint.metrics().rendererMetrics[37])
+    }
+
     private fun issue(
         token: String,
         topLevel: Boolean,

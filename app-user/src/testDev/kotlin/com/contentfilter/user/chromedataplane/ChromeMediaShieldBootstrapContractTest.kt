@@ -12,6 +12,25 @@ class ChromeMediaShieldBootstrapContractTest {
     private val script = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce)
 
     @Test
+    fun `renderer instrumentation is compact one-shot and observes current baseline scan origins`() {
+        val selfShield =
+            ChromeMediaShieldBootstrap.script(
+                ReadyToken,
+                StyleNonce,
+                selfShieldIdentity = identity(),
+            )
+        assertContains(selfShield, ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath)
+        assertContains(selfShield, "const RENDERER_METRICS=new NativeArray(38)")
+        assertContains(selfShield, "rendererMetric(0);rendererMetric(1,records.length)")
+        assertContains(selfShield, "scan(target,RM_OBSERVER_ATTRIBUTE)")
+        assertContains(selfShield, "scan(added[addedIndex],RM_OBSERVER_CHILD)")
+        assertContains(selfShield, "scan(target,RM_SHADOW)")
+        assertContains(selfShield, ChromeMediaShieldRendererMetricsScript.SnapshotEvent)
+        assertContains(selfShield, "if(rendererMetricsSent||!SELF_SHIELD||!selfReadyAccepted")
+        assertFalse(selfShield.contains("setInterval"))
+    }
+
+    @Test
     fun `boot is parser-first and active document handshake keeps one barrier at every phase`() {
         assertFalse(script.contains("setTimeout"))
         assertFalse(script.contains("setInterval"))
@@ -375,7 +394,7 @@ class ChromeMediaShieldBootstrapContractTest {
         )
         val surroundStart = script.indexOf("seal(Range.prototype,'surroundContents'")
         val surroundMutation = script.indexOf("const result=invoke(surround,this,[node])", surroundStart)
-        val surroundPostScan = script.indexOf("scan(node);", surroundMutation)
+        val surroundPostScan = script.indexOf("scan(node,RM_GUARDED);", surroundMutation)
         assertTrue(surroundStart >= 0)
         assertTrue(surroundMutation > surroundStart)
         assertTrue(surroundPostScan > surroundMutation)
@@ -386,7 +405,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "owner.moveBefore")
         assertContains(script, "ObjectDefine(ShadowRoot.prototype,'innerHTML'")
         assertContains(script, "if(!mappedProtected(this))deny()")
-        assertContains(script, "restoreMappedProtected(this);scan(this)")
+        assertContains(script, "restoreMappedProtected(this);scan(this,RM_MARKUP)")
         assertContains(script, "invoke(outer.set,this,[safeMarkup(value)])")
         assertContains(script, "put(args,1,safeMarkup")
         assertContains(script, "nativeSet.call(element,'sandbox',FRAME_SANDBOX)")
@@ -625,7 +644,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "let child=firstChildOf(element);while(child){nodeRemove.call(element,child)")
         assertContains(script, "const WATCHED_ATTRIBUTES=")
         assertContains(script, "'d','points','viewBox','width','height','fill','stroke','transform'")
-        assertContains(script, "if(target){sanitizeContainer(target);scan(target)}")
+        assertContains(script, "sanitizeContainer(target);scan(target,RM_OBSERVER_ATTRIBUTE)")
         assertContains(ChromeMediaShieldBootstrap.css, "svg:not([data-glosh-icon-safe='1'])")
     }
 
@@ -641,6 +660,16 @@ class ChromeMediaShieldBootstrapContractTest {
             "removesChildren?(!mapped&&containsProtected(this)):insideProtected(this)",
         )
     }
+
+    private fun identity() =
+        ChromeMediaShieldDocumentIdentity(
+            protectionSessionId = "session",
+            policyEpoch = 20,
+            navigationSequence = 1,
+            documentSequence = 1,
+            tokenDigest = "a".repeat(64),
+            topLevel = true,
+        )
 
     private companion object {
         const val ReadyToken = "AAAAAAAAAAAAAAAAAAAAAA"

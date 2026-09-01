@@ -47,6 +47,7 @@ internal data class ChromeMediaShieldReadyEndpointMetrics(
     val bootstrapDiagnosticLastStage: String = "none",
     val bootstrapDiagnosticLastReason: String = "none",
     val bootstrapDiagnosticOutstanding: Int = 0,
+    val rendererMetrics: ChromeMediaShieldRendererMetricsSnapshot = ChromeMediaShieldRendererMetricsSnapshot(),
 )
 
 /** Fixed-origin, capability-authenticated DEV endpoint. It never forwards READY traffic upstream. */
@@ -55,6 +56,7 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val elapsedRealtime: () -> Long = SystemClock::elapsedRealtime,
     private val selfShieldLiveness: ChromeMediaShieldSelfShieldLiveness = ChromeMediaShieldSelfShieldLiveness(),
     private val bootstrapDiagnostics: ChromeMediaShieldBootstrapDiagnostics = ChromeMediaShieldBootstrapDiagnostics(),
+    private val rendererMetrics: ChromeMediaShieldRendererMetrics = ChromeMediaShieldRendererMetrics(),
 ) {
     private val requests = AtomicLong()
     private val preflights = AtomicLong()
@@ -75,6 +77,9 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val bootstrapDiagnosticLastRejectReason = AtomicReference("none")
 
     fun handle(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse? {
+        if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath) {
+            return if (documentSelfShieldEnabled) handleRendererMetrics(request) else reject("renderer_metrics_disabled")
+        }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldBootstrapDiagnosticPath) {
             return if (documentSelfShieldEnabled) {
                 handleBootstrapDiagnostic(request)
@@ -144,7 +149,27 @@ internal class ChromeMediaShieldReadyEndpoint(
             bootstrapDiagnosticLastStage = diagnostics.lastStage,
             bootstrapDiagnosticLastReason = diagnostics.lastReason,
             bootstrapDiagnosticOutstanding = diagnostics.outstanding,
+            rendererMetrics = rendererMetrics.snapshot(),
         )
+    }
+
+    private fun handleRendererMetrics(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {
+        requests.incrementAndGet()
+        val body = request.body
+        return try {
+            val origin = request.exactReadyOriginOrNull() ?: return reject("renderer_metrics_origin_invalid")
+            if (origin == NullOrigin) return reject("renderer_metrics_origin_not_network")
+            if (request.method == OptionsMethod) return preflight(request, origin)
+            if (request.method != PostMethod) return reject("renderer_metrics_method_invalid", 405)
+            if (!request.hasExactReadyContentType()) return reject("renderer_metrics_content_type_invalid")
+            if (!request.hasReadyFetchMetadata()) return reject("renderer_metrics_fetch_metadata_invalid")
+            val report = ChromeMediaShieldRendererMetrics.parse(body) ?: return reject("renderer_metrics_body_invalid")
+            if (!runtimeAdmits(report.identity)) return reject("renderer_metrics_runtime_unavailable")
+            if (!rendererMetrics.record(report)) return reject("renderer_metrics_stale_or_replayed")
+            traceNoContent(origin)
+        } finally {
+            body.fill(0)
+        }
     }
 
     private fun handleBootstrapDiagnostic(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse {

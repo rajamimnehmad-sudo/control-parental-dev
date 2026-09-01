@@ -210,6 +210,24 @@ object ChromeMediaShieldDocumentAuthorityRegistry {
             tokenDigest !in readyLifecycleByDigest
     }
 
+    /** Read-only DEV diagnostic validation after SELF_READY; it grants no new authority. */
+    @Synchronized
+    fun validatesClaimedSelfReady(
+        readyToken: String,
+        expected: ChromeMediaShieldSelfReadyIdentity,
+    ): Boolean {
+        if (!readyToken.isStrictReadyToken() || expected.lifecycleSequence <= 0L) return false
+        val tokenDigest = digestReadyToken(readyToken)
+        val identity = issuedByDigest[tokenDigest] ?: return false
+        return identity.protectionSessionId == expected.protectionSessionId &&
+            identity.policyEpoch == expected.policyEpoch &&
+            identity.navigationSequence == expected.navigationSequence &&
+            identity.documentSequence == expected.documentSequence &&
+            identity.topLevel == expected.topLevel &&
+            matchesSession(identity.protectionSessionId, identity.policyEpoch) &&
+            readyLifecycleByDigest[tokenDigest] == expected.lifecycleSequence
+    }
+
     /**
      * Resolves an already claimed top-level lifecycle without consuming a second lifecycle.
      *

@@ -57,6 +57,7 @@ internal class ChromePhotosFixtureOrigin(
         )
     private val stockMediaAuthorityFixture = ChromeStockMediaAuthorityFixture(sentinelImageBytes)
     private val serviceWorkerBoundaryFixture = ChromeServiceWorkerBoundaryFixture()
+    private val rendererAmplificationFixture = ChromeH20RendererAmplificationFixture()
 
     override fun webSemanticsReport(): String = report.get()
 
@@ -69,6 +70,7 @@ internal class ChromePhotosFixtureOrigin(
 
     override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse {
         ChromeVisualShieldFixture.responseFor(request)?.let { return it }
+        rendererAmplificationFixture.responseFor(request)?.let { return it }
         serviceWorkerBoundaryFixture.responseFor(request)?.let { return it }
         stockMediaAuthorityFixture.responseFor(request)?.let { return it }
         preRenderShieldFixture.responseFor(request)?.let { return it }

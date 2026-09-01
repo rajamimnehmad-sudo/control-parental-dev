@@ -697,6 +697,24 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "bootstrapDiagnosticReason=${readyEndpoint.bootstrapDiagnosticLastReason} " +
                 "bootstrapDiagnosticOutstanding=${readyEndpoint.bootstrapDiagnosticOutstanding}",
         )
+        val renderer = readyEndpoint.rendererMetrics
+        Log.i(
+            StatusLogTag,
+            "v=1 seq=$sequence kind=renderer reports=${renderer.reports} rejected=${renderer.rejected} " +
+                "globalCallbacks=${renderer[0]} globalRecords=${renderer[1]} childRecords=${renderer[2]} " +
+                "attributeRecords=${renderer[3]} maxRecords=${renderer[4]} scanCalls=${renderer[5]} " +
+                "scanRoot=${renderer[6]} scanNodes=${renderer[7]} maxScanNodes=${renderer[8]} " +
+                "scanMicros=${renderer[9]} maxScanMicros=${renderer[10]} observerChildScans=${renderer[11]} " +
+                "observerAttributeScans=${renderer[12]} guardedScans=${renderer[13]} markupScans=${renderer[14]} " +
+                "shadowScans=${renderer[15]} initialScans=${renderer[16]} otherScans=${renderer[17]} " +
+                "sanitizeElement=${renderer[18]} sanitizeContainer=${renderer[19]} img=${renderer[20]} " +
+                "source=${renderer[21]} svg=${renderer[22]} iframe=${renderer[23]} canvas=${renderer[24]} " +
+                "video=${renderer[25]} safeIcon=${renderer[26]} lockIcon=${renderer[27]} " +
+                "geometryWrites=${renderer[28]} svgRecords=${renderer[29]} shadowRoots=${renderer[30]} " +
+                "shadowObservers=${renderer[31]} shadowCallbacks=${renderer[32]} shadowRecords=${renderer[33]} " +
+                "shadowScanCalls=${renderer[34]} ensureStyle=${renderer[35]} ensureCurtain=${renderer[36]} " +
+                "internalMutations=${renderer[37]}",
+        )
         Log.i(
             StatusLogTag,
             "v=1 seq=$sequence kind=health failures=${metrics.failures} proxyQueueRejects=${metrics.queueRejected} " +
