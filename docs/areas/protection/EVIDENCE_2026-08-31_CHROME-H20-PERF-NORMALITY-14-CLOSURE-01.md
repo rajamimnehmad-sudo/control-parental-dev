@@ -144,6 +144,11 @@ STOP explicito:
 - `resetCount=3` preservado;
 - Chrome quedo suspendido fail-close al terminar.
 
+El dialogo ANR reaparecio despues de seleccionar `Esperar`; se uso finalmente
+el boton normal `Cerrar app` del propio dialogo para terminar solo el proceso
+colgado. No se ejecuto clearApplicationUserData ni se alteraron los inodes de
+Chrome o Glosh.
+
 Salud del lote: crash/OOM `0/0`; ANR `1`. No se borro Chrome, no se genero
 otra APK y no se modificaron estadisticas de bateria.
 
