@@ -35,7 +35,7 @@ internal class ChromeH20RendererAmplificationFixture {
     internal fun document(mode: ChromeH20RendererAmplificationMode): String =
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>H20 RENDERER ${mode.name}</title>" +
             "<script defer src=\"$ScriptPath?mode=${mode.wireName()}\"></script></head><body>" +
-            "<h1>H20 renderer amplification ${mode.name}</h1><main id=\"fixture-root\"></main></body></html>"
+            "<h1>H20 renderer amplification ${mode.name}</h1><main id=\"fixture-root\">${staticTree()}</main></body></html>"
 
     internal fun script(mode: ChromeH20RendererAmplificationMode): String =
         ChromeMediaShieldBootstrap.selfShieldOriginalScriptStartedScript() +
@@ -45,7 +45,7 @@ internal class ChromeH20RendererAmplificationFixture {
             card.className='card';const text=document.createElement('span');text.textContent='item-'+i;card.append(text);if(i%4===0){const image=document.createElement('img');
             image.src='/safe-a.png?renderer='+i;card.append(image)}if(i%25===0){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('width','24');svg.setAttribute('height','24');
             const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M2 12L12 2l10 10-10 10z');svg.append(path);card.append(svg)}fragment.append(card)}owner.append(fragment)};
-            build(ROOT,600);const attr=()=>{for(let i=0;i<160;i+=1){ROOT.setAttribute('style','--glosh-fixture-tick:'+i);siteMutations+=1}};
+            const attr=()=>{for(let i=0;i<160;i+=1){ROOT.setAttribute('style','--glosh-fixture-tick:'+i);siteMutations+=1}};
             const child=()=>{for(let i=0;i<240;i+=1){const node=document.createElement('span');node.textContent='dynamic-'+i;ROOT.append(node);node.remove();siteMutations+=2}};
             const svg=()=>{for(let i=0;i<80;i+=1){const icon=document.createElementNS('http://www.w3.org/2000/svg','svg');icon.setAttribute('width','24');icon.setAttribute('height','24');
             const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','M2 12L12 2l10 10-10 10z');icon.append(path);ROOT.append(icon);siteMutations+=4}};
@@ -54,6 +54,18 @@ internal class ChromeH20RendererAmplificationFixture {
             if(MODE==='ATTR_STRESS')attr();else if(MODE==='CHILD_STRESS')child();else if(MODE==='SVG_STRESS')svg();else if(MODE==='SHADOW_STRESS')shadow();else{attr();child();svg();shadow()}
             queueMicrotask(async()=>{document.dispatchEvent(new Event('${ChromeMediaShieldRendererMetricsScript.SnapshotEvent}'));try{await fetch('$ReportPath',{method:'POST',headers:{'Content-Type':'text/plain'},body:'MODE='+MODE+',SITE_MUTATIONS='+siteMutations})}catch(_){}})})();
             """.trimIndent().replace("\n", "")
+
+    private fun staticTree(): String =
+        buildString {
+            repeat(600) { index ->
+                append("<article class=\"card\"><span>item-").append(index).append("</span>")
+                if (index % 4 == 0) append("<img src=\"/safe-a.png?renderer=").append(index).append("\">")
+                if (index % 25 == 0) {
+                    append("<svg width=\"24\" height=\"24\"><path d=\"M2 12L12 2l10 10-10 10z\"></path></svg>")
+                }
+                append("</article>")
+            }
+        }
 
     private fun acceptReport(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse {
         if (request.method != "POST") return response("h20-renderer-report-method", PlainText, ByteArray(0), 405)
