@@ -2,6 +2,7 @@ package com.contentfilter.feature.accessibility.service
 
 import android.app.admin.DevicePolicyManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
@@ -61,7 +62,7 @@ class DeviceOwnerAppVisibilityController(
 
     private fun managedPackageCandidates(state: AccessibilityPolicyState): Set<String> =
         buildSet {
-            addAll(installedThirdPartyPackages())
+            addAll(installedPackages())
             state.snapshot.rules
                 .filter { it.enabled && it.scope == RuleScope.App && it.target != "*" }
                 .mapTo(this) { it.target }
@@ -76,10 +77,9 @@ class DeviceOwnerAppVisibilityController(
             addAll(hiddenByGlosh())
         }.filterTo(mutableSetOf(), ::isEligiblePackage)
 
-    private fun installedThirdPartyPackages(): Set<String> =
+    private fun installedPackages(): Set<String> =
         installedApplications()
             .asSequence()
-            .filterNot { applicationInfo -> applicationInfo.isSystemApp() }
             .map { it.packageName }
             .filter(::isEligiblePackage)
             .toSet()
@@ -94,13 +94,23 @@ class DeviceOwnerAppVisibilityController(
             }
         }.getOrDefault(emptyList())
 
-    private fun ApplicationInfo.isSystemApp(): Boolean =
-        flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-
     private fun isEligiblePackage(packageName: String): Boolean =
         packageName.isNotBlank() &&
             packageName != appContext.packageName &&
-            !packageName.startsWith("com.contentfilter.admin")
+            !packageName.startsWith("com.contentfilter.admin") &&
+            packageName !in CriticalSystemPackages &&
+            packageName != defaultHomePackage()
+
+    private fun defaultHomePackage(): String? =
+        runCatching {
+            appContext.packageManager
+                .resolveActivity(
+                    Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+                    PackageManager.MATCH_DEFAULT_ONLY,
+                )
+                ?.activityInfo
+                ?.packageName
+        }.getOrNull()
 
     private fun applyHidden(
         packageName: String,
@@ -127,5 +137,15 @@ class DeviceOwnerAppVisibilityController(
         const val LogTag = "DeviceOwnerAppVisibility"
         const val PreferencesName = "device_owner_app_visibility"
         const val HiddenPackagesKey = "hidden_by_glosh"
+        val CriticalSystemPackages =
+            setOf(
+                "android",
+                "com.android.settings",
+                "com.android.systemui",
+                "com.android.permissioncontroller",
+                "com.google.android.permissioncontroller",
+                "com.android.packageinstaller",
+                "com.google.android.packageinstaller",
+            )
     }
 }
