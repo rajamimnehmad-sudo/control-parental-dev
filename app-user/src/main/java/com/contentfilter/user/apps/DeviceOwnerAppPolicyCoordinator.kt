@@ -22,6 +22,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -81,6 +83,20 @@ class DeviceOwnerAppPolicyCoordinator
                         systemStatusRepository.observeHealth().collect {
                             reconcileCurrent()
                         }
+                    }
+                    launch {
+                        deviceActivationRepository.observeActivation()
+                            .flatMapLatest { activation ->
+                                val day = localDayProvider.currentDay()
+                                usageSessionRepository.observeDailyUsage(
+                                    deviceId = activation?.deviceId ?: UsageSession.LOCAL_DEVICE_ID,
+                                    localDate = day.localDate,
+                                    dayStartEpochMillis = day.startEpochMillis,
+                                    dayEndEpochMillis = day.endEpochMillis,
+                                ).map { Unit }
+                            }.collect {
+                                reconcileCurrent()
+                            }
                     }
                     launch {
                         while (isActive) {
