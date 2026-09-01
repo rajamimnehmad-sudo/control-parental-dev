@@ -34,7 +34,7 @@ internal class ChromeH20RendererAmplificationFixture {
 
     internal fun document(mode: ChromeH20RendererAmplificationMode): String =
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>H20 RENDERER ${mode.name}</title>" +
-            "<script src=\"$ScriptPath?mode=${mode.wireName()}\"></script></head><body>" +
+            "<script defer src=\"$ScriptPath?mode=${mode.wireName()}\"></script></head><body>" +
             "<h1>H20 renderer amplification ${mode.name}</h1><main id=\"fixture-root\"></main></body></html>"
 
     internal fun script(mode: ChromeH20RendererAmplificationMode): String =

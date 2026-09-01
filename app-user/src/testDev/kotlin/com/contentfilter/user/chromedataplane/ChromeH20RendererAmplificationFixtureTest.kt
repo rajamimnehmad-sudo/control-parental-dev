@@ -13,6 +13,7 @@ class ChromeH20RendererAmplificationFixtureTest {
             val html = fixture.document(mode)
             val script = fixture.script(mode)
             assertContains(html, "mode=${mode.name.replace(Regex("([a-z])([A-Z])"), "${'$'}1_${'$'}2").uppercase()}")
+            assertContains(html, "<script defer src=")
             assertContains(script, ChromeMediaShieldBootstrap.SelfShieldOriginalScriptStartedName)
             assertContains(script, ChromeMediaShieldRendererMetricsScript.SnapshotEvent)
             assertContains(script, "SITE_MUTATIONS=")
