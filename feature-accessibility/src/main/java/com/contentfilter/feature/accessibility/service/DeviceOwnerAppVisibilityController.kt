@@ -29,17 +29,20 @@ class DeviceOwnerAppVisibilityController(
     private val devicePolicyManager = appContext.getSystemService(DevicePolicyManager::class.java)
     private val adminComponent = DeviceAdminController.component(appContext)
     private val preferences = appContext.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+    private val stateLock = Any()
 
     fun isDeviceOwner(): Boolean = devicePolicyManager.isDeviceOwnerApp(appContext.packageName)
 
     fun hideNow(packageName: String): Boolean {
         if (!isEligiblePackage(packageName) || !isDeviceOwner()) return false
+        if (packageName in hiddenByGlosh()) return true
         return applyHidden(packageName, hidden = true)
     }
 
     fun reconcile(state: AccessibilityPolicyState) {
         if (!isDeviceOwner()) return
-        managedPackageCandidates(state).forEach { packageName ->
+        val hiddenPackages = hiddenByGlosh()
+        managedPackageCandidates(state, hiddenPackages).forEach { packageName ->
             val persistedMinutes =
                 state.snapshot.dailyUsage
                     .firstOrNull { it.packageName == packageName }
@@ -52,15 +55,17 @@ class DeviceOwnerAppVisibilityController(
                         -> true
                         else -> false
                     }
-            if (shouldHide) {
-                applyHidden(packageName, hidden = true)
-            } else if (packageName in hiddenByGlosh()) {
-                applyHidden(packageName, hidden = false)
+            when {
+                shouldHide && packageName !in hiddenPackages -> applyHidden(packageName, hidden = true)
+                !shouldHide && packageName in hiddenPackages -> applyHidden(packageName, hidden = false)
             }
         }
     }
 
-    private fun managedPackageCandidates(state: AccessibilityPolicyState): Set<String> =
+    private fun managedPackageCandidates(
+        state: AccessibilityPolicyState,
+        hiddenPackages: Set<String>,
+    ): Set<String> =
         buildSet {
             addAll(installedPackages())
             state.snapshot.rules
@@ -74,7 +79,7 @@ class DeviceOwnerAppVisibilityController(
                 .flatMap { it.apps }
                 .filter { it.enabled }
                 .mapTo(this) { it.packageName }
-            addAll(hiddenByGlosh())
+            addAll(hiddenPackages)
         }.filterTo(mutableSetOf(), ::isEligiblePackage)
 
     private fun installedPackages(): Set<String> =
@@ -115,20 +120,23 @@ class DeviceOwnerAppVisibilityController(
     private fun applyHidden(
         packageName: String,
         hidden: Boolean,
-    ): Boolean {
-        val success =
-            runCatching {
-                devicePolicyManager.setApplicationHidden(adminComponent, packageName, hidden)
-            }.onFailure { error ->
-                Log.w(LogTag, "Device Owner visibility failed package=$packageName hidden=$hidden", error)
-            }.getOrDefault(false)
-        if (!success) return false
-        val next = hiddenByGlosh().toMutableSet()
-        if (hidden) next += packageName else next -= packageName
-        preferences.edit().putStringSet(HiddenPackagesKey, next).apply()
-        Log.i(LogTag, "Device Owner visibility applied package=$packageName hidden=$hidden")
-        return true
-    }
+    ): Boolean =
+        synchronized(stateLock) {
+            val currentHidden = hiddenByGlosh()
+            if (hidden == (packageName in currentHidden)) return@synchronized true
+            val success =
+                runCatching {
+                    devicePolicyManager.setApplicationHidden(adminComponent, packageName, hidden)
+                }.onFailure { error ->
+                    Log.w(LogTag, "Device Owner visibility failed package=$packageName hidden=$hidden", error)
+                }.getOrDefault(false)
+            if (!success) return@synchronized false
+            val next = currentHidden.toMutableSet()
+            if (hidden) next += packageName else next -= packageName
+            preferences.edit().putStringSet(HiddenPackagesKey, next).apply()
+            Log.i(LogTag, "Device Owner visibility applied package=$packageName hidden=$hidden")
+            true
+        }
 
     private fun hiddenByGlosh(): Set<String> =
         preferences.getStringSet(HiddenPackagesKey, emptySet()).orEmpty().toSet()
