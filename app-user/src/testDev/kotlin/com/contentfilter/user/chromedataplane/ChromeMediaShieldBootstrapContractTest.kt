@@ -12,7 +12,7 @@ class ChromeMediaShieldBootstrapContractTest {
     private val script = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce)
 
     @Test
-    fun `renderer instrumentation is compact one-shot and observes current baseline scan origins`() {
+    fun `renderer observer revalidates attribute targets without rescanning their subtrees`() {
         val selfShield =
             ChromeMediaShieldBootstrap.script(
                 ReadyToken,
@@ -22,9 +22,12 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(selfShield, ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath)
         assertContains(selfShield, "const RENDERER_METRICS=new NativeArray(38)")
         assertContains(selfShield, "rendererMetric(0);rendererMetric(1,records.length)")
-        assertContains(selfShield, "scan(target,RM_OBSERVER_ATTRIBUTE)")
+        assertContains(selfShield, "sanitizeContainer(target)")
+        assertFalse(selfShield.contains("scan(target,RM_OBSERVER_ATTRIBUTE)"))
         assertContains(selfShield, "scan(added[addedIndex],RM_OBSERVER_CHILD)")
-        assertContains(selfShield, "scan(target,RM_SHADOW)")
+        assertContains(selfShield, "scan(added[addedIndex],RM_SHADOW)")
+        assertFalse(selfShield.contains("scan(target,RM_SHADOW)"))
+        assertContains(selfShield, "rendererScanStarted(origin,root)")
         assertContains(selfShield, ChromeMediaShieldRendererMetricsScript.SnapshotEvent)
         assertContains(selfShield, "if(rendererMetricsSent||!SELF_SHIELD||!selfReadyAccepted")
         assertFalse(selfShield.contains("setInterval"))
@@ -644,7 +647,8 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "let child=firstChildOf(element);while(child){nodeRemove.call(element,child)")
         assertContains(script, "const WATCHED_ATTRIBUTES=")
         assertContains(script, "'d','points','viewBox','width','height','fill','stroke','transform'")
-        assertContains(script, "sanitizeContainer(target);scan(target,RM_OBSERVER_ATTRIBUTE)")
+        assertContains(script, "elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)")
+        assertFalse(script.contains("scan(target,RM_OBSERVER_ATTRIBUTE)"))
         assertContains(ChromeMediaShieldBootstrap.css, "svg:not([data-glosh-icon-safe='1'])")
     }
 

@@ -300,9 +300,9 @@ internal object ChromeMediaShieldBootstrap {
         const style=lower(nativeGet.call(element,'style')||'');if(includes(style,'url(data:')||includes(style,'url(blob:'))hide(element);
         if(tag==='svg'){if(safeIcon(element)&&lockIconGeometry(element)){}
         else{nativeRemove.call(element,'data-glosh-icon-safe');let child=firstChildOf(element);while(child){nodeRemove.call(element,child);child=firstChildOf(element)}hide(element)}}};
-        const scan=(root,origin=RM_OTHER)=>{if(!root)return;const started=rendererClock(),type=nodeTypeOf(root);let count=0;if(type===1){sanitizeElement(root);count=1}const query=type===1?elementQueryAll:fragmentQueryAll;
+        const scan=(root,origin=RM_OTHER)=>{if(!root)return;rendererScanStarted(origin,root);const started=rendererClock(),type=nodeTypeOf(root);let count=0;if(type===1){sanitizeElement(root);count=1}const query=type===1?elementQueryAll:fragmentQueryAll;
         if(query){const nodes=copyList(query.call(root,'canvas,video,object,embed,frame,fencedframe,iframe,img,source,input[type="image" i],svg,[srcdoc],[style],[popover],[popovertarget],[popovertargetaction],[commandfor],[command]'),nodeListLength);count+=nodes.length;
-        for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}rendererScanDone(origin,root,count,started)};
+        for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}rendererScanDone(count,started)};
         const sanitizeContainer=(node)=>{rendererMetric(19);if(!node||nodeTypeOf(node)!==1)return;sanitizeElement(node);const svg=elementClosest.call(node,'svg');if(svg&&svg!==node)sanitizeElement(svg)};
         const shieldStyle=DOC.getElementById(STYLE_ID),curtainStyle=HAS_CURTAIN?DOC.getElementById(CURTAIN_ID):null,curtainLayer=USE_MODAL_CURTAIN?nativeCreateElement.call(DOC,'dialog'):null;
         if(curtainLayer){nativeSet.call(curtainLayer,'id',CURTAIN_LAYER_ID);nativeSet.call(curtainLayer,'tabindex','-1');nodeInsert.call(documentElement(),curtainLayer,firstChildOf(documentElement()))}
@@ -628,7 +628,7 @@ internal object ChromeMediaShieldBootstrap {
         watchStyle(style);const shadowSheet=read(styleSheetProperty,style);if(!shadowSheet){nodeRemove.call(root,style);failClosedDocument();deny()}registerProtectedSheet(shadowSheet);
         rendererMetric(30);rendererMetric(31);const shadowObserver=new NativeMutationObserver(records=>{rendererMetric(32);rendererMetric(33,records.length);for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
         if(type==='childList'){const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1){rendererMetric(34);scan(added[addedIndex],RM_SHADOW)}}
-        else{const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target);rendererMetric(34);scan(target,RM_SHADOW)}}}restoreMappedProtected(root)});
+        else{const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}restoreMappedProtected(root)});
         mutationObserve.call(shadowObserver,root,{childList:true,subtree:true,attributes:true,attributeFilter:WATCHED_ATTRIBUTES});rendererMetric(34);scan(root,RM_SHADOW);return root})&&installed;
         if(self.ShadowRoot){const shadowInner=descriptor(ShadowRoot.prototype,'innerHTML');if(shadowInner&&shadowInner.get&&shadowInner.set){try{
         ObjectDefine(ShadowRoot.prototype,'innerHTML',{get:shadowInner.get,set:function(value){if(!mappedProtected(this))deny();invoke(shadowInner.set,this,[safeMarkup(value)]);
@@ -690,7 +690,7 @@ internal object ChromeMediaShieldBootstrap {
         'd','points','viewBox','width','height','fill','stroke','transform','filter','mask','clip-path','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry',CURTAIN_RELEASE_ATTRIBUTE];
         const observer=new NativeMutationObserver(records=>{rendererMetric(0);rendererMetric(1,records.length);rendererMax(4,records.length);ensureStyle();ensureCurtain();for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
         if(type==='childList'){rendererMetric(2);const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1)scan(added[addedIndex],RM_OBSERVER_CHILD)}
-        else{rendererMetric(3);const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target);scan(target,RM_OBSERVER_ATTRIBUTE)}}}});
+        else{rendererMetric(3);const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}});
         mutationObserve.call(observer,documentElement(),{childList:true,subtree:true,attributes:true,attributeFilter:WATCHED_ATTRIBUTES});scan(documentElement(),RM_INITIAL);
         const selfShieldIdentity=SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
         const RENDERER_METRICS_RESPONSE_URL=resolvedEndpoint(RENDERER_METRICS_URL);__GLOSH_RENDERER_METRICS_REPORTING__

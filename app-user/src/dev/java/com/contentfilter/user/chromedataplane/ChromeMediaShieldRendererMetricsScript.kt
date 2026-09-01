@@ -14,10 +14,11 @@ internal object ChromeMediaShieldRendererMetricsScript {
             "RENDERER_METRICS[index]=current>=9007199254740991-value?9007199254740991:current+value};" +
             "const rendererMax=(index,value)=>{if(value>RENDERER_METRICS[index])RENDERER_METRICS[index]=value};" +
             "const rendererClock=()=>rendererNow?rendererNow.call(NativePerformance):0;" +
-            "const rendererScanDone=(origin,root,count,started)=>{rendererMetric(5);" +
-            "if(root===documentElement())rendererMetric(6);rendererMetric(7,count);rendererMax(8,count);" +
+            "const rendererScanStarted=(origin,root)=>{rendererMetric(5);rendererMetric(origin);" +
+            "if(root===documentElement())rendererMetric(6)};const rendererScanDone=(count,started)=>{" +
+            "rendererMetric(7,count);rendererMax(8,count);" +
             "const micros=rendererNow?invoke(NativeMathFloor,NativeMath,[(rendererClock()-started)*1000]):0;" +
-            "rendererMetric(9,micros>0?micros:0);rendererMax(10,micros>0?micros:0);rendererMetric(origin)};" +
+            "rendererMetric(9,micros>0?micros:0);rendererMax(10,micros>0?micros:0)};" +
             "const rendererSanitized=(element)=>{rendererMetric(18);const tag=localNameOf(element);" +
             "if(tag==='img')rendererMetric(20);else if(tag==='source')rendererMetric(21);" +
             "else if(tag==='svg')rendererMetric(22);else if(tag==='iframe')rendererMetric(23);" +
