@@ -34,6 +34,43 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
+    fun `renderer metrics retries failures and seals one shot only after native 204`() {
+        val reporting = ChromeMediaShieldRendererMetricsScript.reporting
+
+        assertFalse(reporting.contains("rendererMetricsSent=true;try"))
+        assertContains(reporting, "catch(_){return false}")
+        assertContains(
+            reporting,
+            "const accepted=read(xhrResponseUrlProperty,xhr)===RENDERER_METRICS_RESPONSE_URL&&" +
+                "read(xhrStatusProperty,xhr)===204;if(accepted)rendererMetricsSent=true;return accepted",
+        )
+        assertTrue(reporting.indexOf("xhrSend.call") < reporting.indexOf("const accepted="))
+        assertTrue(reporting.indexOf("const accepted=") < reporting.indexOf("rendererMetricsSent=true"))
+        assertEquals(1, Regex(Regex.escape("rendererMetricsSent=true")).findAll(reporting).count())
+    }
+
+    @Test
+    fun `renderer metrics snapshots when hidden and keeps explicit and pagehide fallbacks`() {
+        val reporting = ChromeMediaShieldRendererMetricsScript.reporting
+
+        assertContains(
+            reporting,
+            "nativeAddEvent.call(DOC,'${ChromeMediaShieldRendererMetricsScript.SnapshotEvent}'," +
+                "reportRendererMetrics,true)",
+        )
+        assertContains(
+            reporting,
+            "const reportRendererMetricsWhenHidden=()=>{if(visibilityState()==='hidden')reportRendererMetrics()}",
+        )
+        assertContains(
+            reporting,
+            "nativeAddEvent.call(DOC,'visibilitychange',reportRendererMetricsWhenHidden,true)",
+        )
+        assertContains(reporting, "nativeAddEvent.call(SELF,'pagehide',reportRendererMetrics,true)")
+        assertTrue(reporting.indexOf("'visibilitychange'") < reporting.indexOf("'pagehide'"))
+    }
+
+    @Test
     fun `boot is parser-first and active document handshake keeps one barrier at every phase`() {
         assertFalse(script.contains("setTimeout"))
         assertFalse(script.contains("setInterval"))

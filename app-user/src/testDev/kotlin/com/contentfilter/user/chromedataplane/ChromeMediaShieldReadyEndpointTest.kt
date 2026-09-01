@@ -339,6 +339,31 @@ class ChromeMediaShieldReadyEndpointTest {
         assertEquals(37, endpoint.metrics().rendererMetrics[37])
     }
 
+    @Test
+    fun `renderer metrics endpoint rejects invalid token and document identity`() {
+        val identity = issueH20(Token, topLevel = true)
+        attestH20()
+        val endpoint = ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled = true, elapsedRealtime = { Now })
+        assertEquals(204, endpoint.handle(selfReadyRequest(Token, identity))?.statusCode)
+        val values = List(ChromeMediaShieldRendererMetricsSnapshot.FieldCount) { it.toLong() }.joinToString(",")
+
+        fun metricsRequest(
+            token: String,
+            documentSequence: Long,
+        ) = request("HELLO", Token, 1L).copy(
+                target = ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath,
+                body =
+                    (
+                        "v1|RENDERER_METRICS|$token|${identity.protectionSessionId}|${identity.policyEpoch}|" +
+                            "${identity.navigationSequence}|$documentSequence|1|T|$values"
+                    ).toByteArray(),
+            )
+
+        assertEquals(503, endpoint.handle(metricsRequest(WrongToken, identity.documentSequence))?.statusCode)
+        assertEquals(503, endpoint.handle(metricsRequest(Token, identity.documentSequence + 1L))?.statusCode)
+        assertEquals(0, endpoint.metrics().rendererMetrics.reports)
+    }
+
     private fun issue(
         token: String,
         topLevel: Boolean,
@@ -478,6 +503,7 @@ class ChromeMediaShieldReadyEndpointTest {
 
     private companion object {
         const val Session = "h19-ready-session"
+        const val WrongToken = "zyxwvutsrqponmlkjihgfe"
         const val PolicyEpoch = 19L
         const val H20PolicyEpoch = 20L
         const val Now = 5_000L

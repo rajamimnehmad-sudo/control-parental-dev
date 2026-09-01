@@ -26,11 +26,14 @@ internal object ChromeMediaShieldRendererMetricsScript {
 
     val reporting: String =
         "let rendererMetricsSent=false;const reportRendererMetrics=()=>{if(rendererMetricsSent||!SELF_SHIELD||" +
-            "!selfReadyAccepted||!NativeXMLHttpRequest)return false;rendererMetricsSent=true;try{" +
+            "!selfReadyAccepted||!NativeXMLHttpRequest)return false;try{" +
             "const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',RENDERER_METRICS_URL,false);" +
             "xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');" +
             "xhrSend.call(xhr,'v1|RENDERER_METRICS|'+READY+'|'+selfShieldIdentity+'|'+invoke(NativeArrayJoin,RENDERER_METRICS,[',']));" +
-            "return read(xhrResponseUrlProperty,xhr)===RENDERER_METRICS_RESPONSE_URL&&read(xhrStatusProperty,xhr)===204" +
+            "const accepted=read(xhrResponseUrlProperty,xhr)===RENDERER_METRICS_RESPONSE_URL&&read(xhrStatusProperty,xhr)===204;" +
+            "if(accepted)rendererMetricsSent=true;return accepted" +
             "}catch(_){return false}};nativeAddEvent.call(DOC,'$SnapshotEvent',reportRendererMetrics,true);" +
+            "const reportRendererMetricsWhenHidden=()=>{if(visibilityState()==='hidden')reportRendererMetrics()};" +
+            "nativeAddEvent.call(DOC,'visibilitychange',reportRendererMetricsWhenHidden,true);" +
             "nativeAddEvent.call(SELF,'pagehide',reportRendererMetrics,true);"
 }
