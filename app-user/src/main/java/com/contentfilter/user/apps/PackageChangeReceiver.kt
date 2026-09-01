@@ -41,6 +41,8 @@ class PackageChangeReceiver : BroadcastReceiver() {
 
     @Inject lateinit var installedAppPublisher: InstalledAppPublisher
 
+    @Inject lateinit var deviceOwnerAppPolicyCoordinator: DeviceOwnerAppPolicyCoordinator
+
     override fun onReceive(
         context: Context,
         intent: Intent,
@@ -66,6 +68,7 @@ class PackageChangeReceiver : BroadcastReceiver() {
             return
         }
         installApprovalStore.markPending(packageName)
+        deviceOwnerAppPolicyCoordinator.hideNow(packageName)
         Log.i(LogTag, "New app pending approval package=$packageName source=${intent.action}")
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
