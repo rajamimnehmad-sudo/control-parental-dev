@@ -106,3 +106,5 @@ Because the mandatory comparable ARM A is unavailable, attributable A/B battery 
 ## Rollback target
 
 Final postflight must STOP the Chrome lab, restore the original 600,000 ms screen timeout, disable stay-awake, restore automatic rotation, and verify proxy/CA/VPN cleanup plus reset count `3`. STOP intentionally leaves Chrome suspended fail-closed under the existing release-authority contract.
+
+Postflight completed: the Chrome lab/proxy stopped, the ephemeral CA was removed, global proxy and always-on/lockdown VPN settings are null, timeout is 600,000 ms, automatic rotation is restored, Wi-Fi is connected, and reset count remains `3`. STOP restored the pre-existing Content Filter DNS VPN (narrow DNS routes only); the laboratory full-tunnel is not present. Chrome is suspended fail-closed by the Device Owner as designed.
