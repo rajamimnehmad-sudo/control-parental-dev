@@ -13,7 +13,7 @@ internal data class ChromeMediaShieldRendererMetricsSnapshot(
     operator fun get(index: Int): Long = values.getOrElse(index) { 0L }
 
     companion object {
-        const val FieldCount = 38
+        const val FieldCount = ChromeMediaShieldRendererMetricsScript.FieldCount
     }
 }
 
@@ -96,6 +96,11 @@ internal class ChromeMediaShieldRendererMetrics {
 
         private const val MaximumDocuments = 128
         private const val MaximumBodyBytes = 4096
-        private val MaximumFieldIndexes = setOf(4, 8, 10)
+        private val MaximumFieldIndexes =
+            setOf(4, 8, 10) +
+                (
+                    ChromeMediaShieldRendererMetricsScript.FamilyMaxMicrosStart until
+                        ChromeMediaShieldRendererMetricsSnapshot.FieldCount
+                )
     }
 }

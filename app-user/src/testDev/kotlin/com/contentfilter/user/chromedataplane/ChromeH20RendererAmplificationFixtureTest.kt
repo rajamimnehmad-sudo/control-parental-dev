@@ -3,6 +3,7 @@ package com.contentfilter.user.chromedataplane
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 
 class ChromeH20RendererAmplificationFixtureTest {
     private val fixture = ChromeH20RendererAmplificationFixture()
@@ -19,6 +20,18 @@ class ChromeH20RendererAmplificationFixtureTest {
             assertContains(script, ChromeMediaShieldRendererMetricsScript.SnapshotEvent)
             assertContains(script, "SITE_MUTATIONS=")
         }
+        val rawDocument =
+            fixture.document(
+                ChromeH20RendererAmplificationMode.ChildStress,
+                requireSelfShieldTrace = false,
+            )
+        val rawScript =
+            fixture.script(
+                ChromeH20RendererAmplificationMode.ChildStress,
+                requireSelfShieldTrace = false,
+            )
+        assertContains(rawDocument, "raw=1")
+        assertFalse(rawScript.contains(ChromeMediaShieldBootstrap.SelfShieldOriginalScriptStartedName))
     }
 
     @Test
@@ -28,7 +41,7 @@ class ChromeH20RendererAmplificationFixtureTest {
                 request(
                     ChromeH20RendererAmplificationFixture.ReportPath,
                     "POST",
-                    "MODE=ATTR_STRESS,SITE_MUTATIONS=160".toByteArray(),
+                    "MODE=ATTR_STRESS,SITE_MUTATIONS=160,DURATION_MICROS=1234".toByteArray(),
                 ),
             )
         assertEquals(204, response?.statusCode)

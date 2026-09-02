@@ -126,6 +126,7 @@ internal class ChromeStockMediaAuthorityFixture(
             const record=(id,value)=>{if(expected.indexOf(id)>=0&&!results.has(id))results.set(id,allowed.has(value)?value:'ERROR')};
             const run=(id,probe)=>tasks.push((async()=>{try{record(id,await probe())}catch(_){record(id,'ERROR')}})());
             const frame=()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+            const domReady=document.readyState==='loading'?new Promise(resolve=>call(AddEvent,document,['DOMContentLoaded',resolve,{once:true}])):Promise.resolve();
             const hidden=(element)=>{if(!element)return false;const shield=call(ElementGet,element,['data-glosh-media-blocked'])==='1',style=GetComputedStyle(element);
             return shield&&(style.display==='none'||style.visibility==='hidden'||style.opacity==='0')};
             const visible=(element)=>{if(!element||hidden(element))return false;const style=GetComputedStyle(element),rect=element.getBoundingClientRect();
@@ -137,18 +138,29 @@ internal class ChromeStockMediaAuthorityFixture(
             const networkImage=async(id)=>{const image=document.getElementById(id),loaded=await awaitImage(image);await frame();return loaded&&visible(image)?'SAFE':'ERROR'};
             const localImage=async(element,operation)=>{let rejected=false;try{await operation()}catch(_){rejected=true}await frame();if(hidden(element))return 'HIDDEN';return rejected?'BLOCKED':'ERROR'};
             const localSink=async(element,operation)=>{let rejected=false,value;try{value=await operation()}catch(_){rejected=true}await frame();if(element&&hidden(element))return 'HIDDEN';return rejected||value===null?'BLOCKED':'ERROR'};
-            const svgHidden=async(id)=>{const element=document.getElementById(id);await frame();return hidden(element)&&element.childElementCount===0?'HIDDEN':'ERROR'};
+            const svgHidden=async(id)=>{const element=document.getElementById(id);await domReady;await frame();return hidden(element)&&element.childElementCount===0?'HIDDEN':'ERROR'};
             const bytes=Uint8Array.from(atob('$encoded'),character=>character.charCodeAt(0));
+            const h20Diagnostic=new URL(location.href).searchParams.get('h20_diag')||'';
+            const finishH20Diagnostic=async(stage)=>{if(h20Diagnostic!==stage)return false;await Promise.allSettled(tasks);
+            document.dispatchEvent(new Event('${ChromeMediaShieldRendererMetricsScript.SnapshotEvent}'));return true};
+            if(await finishH20Diagnostic('static'))return;
 
-            for(const pair of [['network-safe-png','safe-png'],['network-block-webp','block-webp'],['network-block-jpeg','block-jpeg'],
+            const passivePairs=[['network-safe-png','safe-png'],['network-block-webp','block-webp'],['network-block-jpeg','block-jpeg'],
             ['network-jpeg-candidate','jpeg-candidate'],['network-webp-candidate','webp-candidate'],['network-avif-candidate','avif-candidate'],
             ['network-picture-srcset','picture-srcset'],['network-mislabeled','mislabeled'],['network-octet-magic','octet-magic'],
             ['network-same-url-first','same-url-first'],['network-same-url-second','same-url-second'],['network-same-body-first','same-body-first'],
-            ['network-same-body-second','same-body-second']])run(pair[0],()=>networkImage(pair[1]));
+            ['network-same-body-second','same-body-second']],singlePassivePrefix='network-one-',singlePassive=h20Diagnostic.indexOf(singlePassivePrefix)===0?h20Diagnostic.slice(singlePassivePrefix.length):'';
+            for(const pair of passivePairs)if(!singlePassive||pair[1]===singlePassive)run(pair[0],()=>networkImage(pair[1]));
+            if(singlePassive){await Promise.allSettled(tasks);document.dispatchEvent(new Event('${ChromeMediaShieldRendererMetricsScript.SnapshotEvent}'));return}
+            if(await finishH20Diagnostic('network-passive'))return;
             run('network-lazy',async()=>{const image=document.getElementById('lazy-network');image.scrollIntoView({block:'center'});const loaded=await awaitImage(image);await frame();return loaded&&visible(image)?'SAFE':'ERROR'});
+            if(await finishH20Diagnostic('network-lazy'))return;
             run('network-css-url',async()=>{const probe=new Image();probe.src='${ChromePhotosRealWebLabConfig.BlockWebpUrl}';const loaded=await awaitImage(probe);await frame();return loaded&&visible(document.getElementById('css-url'))?'SAFE':'ERROR'});
+            if(await finishH20Diagnostic('network-css'))return;
             run('network-dynamic-replace',async()=>{const image=document.getElementById('dynamic-replace');image.src='${ChromePhotosRealWebLabConfig.BlockWebpUrl}';const loaded=await awaitImage(image);await frame();return loaded&&visible(image)?'SAFE':'ERROR'});
+            if(await finishH20Diagnostic('network-dynamic'))return;
             run('network-shadow',async()=>{const root=document.getElementById('network-shadow').attachShadow({mode:'open'}),image=document.createElement('img');image.src='${ChromePhotosRealWebLabConfig.SafePngUrl}';root.append(image);const loaded=await awaitImage(image);await frame();return loaded&&visible(image)?'SAFE':'ERROR'});
+            if(await finishH20Diagnostic('network'))return;
 
             run('local-data-img',()=>localImage(document.getElementById('data-image'),()=>document.getElementById('data-image').decode()));
             run('local-blob-img',()=>localImage(document.getElementById('blob-image'),()=>{const image=document.getElementById('blob-image'),url=URL.createObjectURL(new Blob([bytes],{type:'image/png'}));image.src=url;return image.decode().finally(()=>URL.revokeObjectURL(url))}));
@@ -164,7 +176,7 @@ internal class ChromeStockMediaAuthorityFixture(
             run('local-webgpu',()=>localSink(document.getElementById('canvas-webgpu'),()=>document.getElementById('canvas-webgpu').getContext('webgpu')));
             for(const id of ['svg-image','svg-foreign','svg-feimage','svg-media'])run('local-'+(id==='svg-foreign'?'svg-foreign-object':id==='svg-feimage'?'svg-fe-image':id),()=>svgHidden(id));
             run('local-svg-external',()=>networkImage('external-svg'));
-            run('local-svg-icon-safe',async()=>{const icon=document.getElementById('icon-safe');await frame();const rect=icon.getBoundingClientRect();return call(ElementGet,icon,['data-glosh-icon-safe'])==='1'&&visible(icon)&&rect.width<=96&&rect.height<=96?'SAFE':'ERROR'});
+            run('local-svg-icon-safe',async()=>{const icon=document.getElementById('icon-safe');await domReady;await frame();const rect=icon.getBoundingClientRect();return call(ElementGet,icon,['data-glosh-icon-safe'])==='1'&&visible(icon)&&rect.width<=96&&rect.height<=96?'SAFE':'ERROR'});
             for(const pair of [['local-shadow-open','open'],['local-shadow-closed','closed']])run(pair[0],async()=>{const root=document.getElementById(pair[1]+'-shadow').attachShadow({mode:pair[1]}),canvas=document.createElement('canvas');root.append(canvas);await frame();return hidden(canvas)?'HIDDEN':canvas.getContext('2d')===null?'BLOCKED':'ERROR'});
             run('local-iframe-transformed',async()=>{const iframe=document.getElementById('network-frame'),loaded=await new Promise(resolve=>{if(iframe.contentDocument&&iframe.contentDocument.readyState==='complete')return resolve(true);let done=false,timer=0;const finish=value=>{if(done)return;done=true;ClearTimer(timer);resolve(value)};call(AddEvent,iframe,['load',()=>finish(true),{once:true}]);timer=SetTimer(()=>finish(false),4000);
             if(iframe.contentDocument&&iframe.contentDocument.readyState==='complete')finish(true)});await frame();
@@ -175,6 +187,7 @@ internal class ChromeStockMediaAuthorityFixture(
             catch(_){try{after=await navigator.serviceWorker.getRegistrations()}catch(_){return 'BLOCKED'}}
             return !escaped&&before.length===0&&after.length===0&&navigator.serviceWorker.controller===null?'BLOCKED':'ERROR'});
             run('local-spa-data-replace',async()=>{history.pushState({},'',location.pathname+'#spa');const image=document.getElementById('spa-data-replace');image.src='data:image/png;base64,$encoded';await frame();return hidden(image)?'HIDDEN':'ERROR'});
+            if(await finishH20Diagnostic('local'))return;
             const prototypeProbe=async()=>{const originalString=Describe(String.prototype,'toLowerCase'),originalArray=Describe(Array.prototype,'0');let tampered=false,host=null,iframe=null,escaped=false;
             try{Define(String.prototype,'toLowerCase',{value:()=> 'div',writable:true,configurable:true});Define(Array.prototype,'0',{set:()=>{},configurable:true});tampered=true;host=document.createElement('div');
             host.innerHTML='<iframe data-glosh-network-frame="1" sandbox="allow-scripts allow-same-origin" src="about:blank"></iframe>';document.body.append(host);iframe=host.querySelector('iframe');await frame();
@@ -214,7 +227,7 @@ internal class ChromeStockMediaAuthorityFixture(
             const intact=sheet.disabled===false&&call(ElementGet,shield,['media'])===null;
             return directStyle&&reflectedStyle&&disabled&&media&&ruleAccess&&nestedInsert&&nestedDelete&&sandboxDirect&&sandboxReflected&&ordinaryWorks&&retainedReflective&&retainedNeutral&&protectedMediaRead&&intact?'BLOCKED':'ERROR'};
 
-            run('normal-css',async()=>{await frame();return GetComputedStyle(document.body).fontFamily&&GetComputedStyle(document.body).backgroundColor!=='rgba(0, 0, 0, 0)'?'SAFE':'ERROR'});
+            run('normal-css',async()=>{await frame();return GetComputedStyle(document.body).fontFamily&&GetComputedStyle(document.documentElement).backgroundColor!=='rgba(0, 0, 0, 0)'?'SAFE':'ERROR'});
             run('normal-layout',async()=>{await frame();return GetComputedStyle(document.getElementById('normal-layout')).display==='grid'?'SAFE':'ERROR'});
             run('normal-form',async()=>{await frame();const input=document.querySelector('#normal-form input');return input&&input.value==='normal'&&visible(input)?'SAFE':'ERROR'});
             run('normal-js',async()=>{document.getElementById('normal-js').textContent='SITE_JS_SAFE';await frame();return document.getElementById('normal-js').textContent==='SITE_JS_SAFE'?'SAFE':'ERROR'});
@@ -223,8 +236,11 @@ internal class ChromeStockMediaAuthorityFixture(
             run('normal-shadow',async()=>{const root=document.getElementById('normal-shadow').attachShadow({mode:'open'});root.innerHTML='<p>normal</p>';await frame();const paragraph=root.querySelector('p');return paragraph&&visible(paragraph)?'SAFE':'ERROR'});
             run('out-of-scope-css-synthesis',async()=>{const raster=document.getElementById('css-synthesis');await frame();return visible(raster)&&raster.querySelectorAll('span').length===64?'OUT_OF_SCOPE_VISIBLE':'ERROR'});
 
-            await Promise.allSettled(tasks);try{record('local-hostile-prototype-fresh-frame',await prototypeProbe())}catch(_){record('local-hostile-prototype-fresh-frame','ERROR')}
+            await Promise.allSettled(tasks);if(await finishH20Diagnostic('pre-probes'))return;
+            try{record('local-hostile-prototype-fresh-frame',await prototypeProbe())}catch(_){record('local-hostile-prototype-fresh-frame','ERROR')}
+            if(await finishH20Diagnostic('prototype'))return;
             try{record('local-protected-primordial-bypass',await protectedPrimordialProbe())}catch(_){record('local-protected-primordial-bypass','ERROR')}
+            if(await finishH20Diagnostic('protected'))return;
             for(const id of expected)if(!results.has(id))results.set(id,'ERROR');
             const body=[...results].sort((a,b)=>a[0].localeCompare(b[0])).map(entry=>entry[0]+'='+entry[1]).join(',');
             try{await fetch('$ReportPath',{method:'POST',headers:{'Content-Type':'text/plain'},body})}catch(_){}})();

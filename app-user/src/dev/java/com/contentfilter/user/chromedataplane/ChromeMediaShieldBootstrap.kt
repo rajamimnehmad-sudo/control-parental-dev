@@ -189,7 +189,9 @@ internal object ChromeMediaShieldBootstrap {
         const nodeText=descriptor(Node.prototype,'textContent'),nodeTypeProperty=propertyDescriptor(DOC,'nodeType'),localNameProperty=propertyDescriptor(DOC.documentElement,'localName');
         const parentNodeProperty=propertyDescriptor(DOC.documentElement,'parentNode'),firstChildProperty=propertyDescriptor(DOC.documentElement,'firstChild');
         const isConnectedProperty=propertyDescriptor(DOC.documentElement,'isConnected'),baseUriProperty=propertyDescriptor(DOC,'baseURI');
-        const styleProperty=propertyDescriptor(DOC.documentElement,'style'),elementAttributesProperty=propertyDescriptor(DOC.documentElement,'attributes');
+        const styleProperty=propertyDescriptor(DOC.documentElement,'style'),svgStyleProperty=self.SVGElement?propertyDescriptor(SVGElement.prototype,'style'):null;
+        const styleLengthProperty=propertyDescriptor(CSSStyleDeclaration.prototype,'length');
+        const elementAttributesProperty=propertyDescriptor(DOC.documentElement,'attributes');
         const documentElementProperty=propertyDescriptor(DOC,'documentElement'),documentHeadProperty=propertyDescriptor(DOC,'head');
         const currentScriptProperty=propertyDescriptor(DOC,'currentScript'),scriptSrcProperty=self.HTMLScriptElement?propertyDescriptor(HTMLScriptElement.prototype,'src'):null;
         const visibilityProperty=propertyDescriptor(DOC,'visibilityState'),eventTargetProperty=propertyDescriptor(new NativeEvent('glosh'),'target');
@@ -217,17 +219,18 @@ internal object ChromeMediaShieldBootstrap {
         const attributeStyleMapProperty=self.StylePropertyMap?propertyDescriptor(DOC.documentElement,'attributeStyleMap'):null;
         const requiredPrimordials=[nodeText,nodeValue,nodeTypeProperty,localNameProperty,parentNodeProperty,firstChildProperty,isConnectedProperty,baseUriProperty,styleProperty,
         elementAttributesProperty,documentElementProperty,documentHeadProperty,visibilityProperty,eventTargetProperty,eventTrustedProperty,mutationTypeProperty,mutationTargetProperty,mutationAddedProperty,
-        nodeListLength,namedMapLength,urlProtocolProperty,templateContentProperty,htmlHiddenProperty,htmlTitleProperty,currentScriptProperty,scriptSrcProperty];
+        nodeListLength,namedMapLength,styleLengthProperty,urlProtocolProperty,templateContentProperty,htmlHiddenProperty,htmlTitleProperty,currentScriptProperty,scriptSrcProperty];
         if((TOP_LEVEL||SELF_SHIELD)&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!xhrResponseTextProperty))failInstall('XHR_PRIMORDIAL_MISSING');
         if(TOP_LEVEL&&!SELF_SHIELD&&(!nativeHasFocus||!nativeElementFocus||!nativeLocationReload||!nativeDialogShowModal||!nativeDialogShow||!nativeDialogClose||!htmlHiddenProperty||!dialogOpenProperty))installed=false;
         for(let index=0;index<requiredPrimordials.length;index+=1)if(!requiredPrimordials[index])failInstall('REQUIRED_PRIMORDIAL_'+index);
         if(self.Attr&&(!attrNameProperty||!attrValueProperty||!attrNamespaceProperty||!attrLocalNameProperty||!attrOwnerProperty))installed=false;
         if(NativePageTransitionEvent&&!pagePersistedProperty)installed=false;
         if((NativePageSwapEvent&&(!pageSwapTransitionProperty||!nativeSkipViewTransition))||(NativePageRevealEvent&&(!pageRevealTransitionProperty||!nativeSkipViewTransition)))installed=false;
-        if(self.HTMLIFrameElement&&!iframeSandboxProperty)installed=false;if(self.StylePropertyMap&&!attributeStyleMapProperty)installed=false;
+        if(self.HTMLIFrameElement&&!iframeSandboxProperty)installed=false;if(self.SVGElement&&!svgStyleProperty)installed=false;if(self.StylePropertyMap&&!attributeStyleMapProperty)installed=false;
         const nodeTypeOf=(value)=>read(nodeTypeProperty,value),localNameOf=(value)=>lower(read(localNameProperty,value)||'');
         const parentOf=(value)=>read(parentNodeProperty,value),firstChildOf=(value)=>read(firstChildProperty,value),connected=(value)=>read(isConnectedProperty,value)===true;
-        const styleOf=(value)=>read(styleProperty,value),attributesOf=(value)=>copyList(read(elementAttributesProperty,value),namedMapLength);
+        const styleOf=(value)=>{try{return read(styleProperty,value)}catch(_){return read(svgStyleProperty,value)}};
+        const attributesOf=(value)=>copyList(read(elementAttributesProperty,value),namedMapLength);
         const documentElement=()=>read(documentElementProperty,DOC),documentHead=()=>read(documentHeadProperty,DOC);
         const templateContent=(value)=>read(templateContentProperty,value);
         const resolvedEndpoint=(value)=>stringOf(new NativeURL(value,read(baseUriProperty,DOC)));
@@ -240,7 +243,7 @@ internal object ChromeMediaShieldBootstrap {
         const attrNamespace=(attribute)=>read(attrNamespaceProperty,attribute),attrLocalName=(attribute)=>stringOf(read(attrLocalNameProperty,attribute)||'');
         const attrOwner=(attribute)=>read(attrOwnerProperty,attribute),sandboxOf=(frame)=>read(iframeSandboxProperty,frame);
         const lockedSandboxes=new WeakSet(),protectedNodes=new WeakSet(),protectedIconNodes=new WeakSet(),protectedMediaNodes=new WeakSet(),protectedStyleMaps=new WeakSet(),protectedSheets=new WeakSet(),protectedMedias=new WeakSet(),guardedStyleOwners=new WeakSet(),protectedDescendants=new WeakMap();
-        const styleOwners=new WeakMap(),styleMapOwners=new WeakMap(),attributeOwners=new WeakMap(),guardedRuleMethodOwners=new WeakMap();
+        const styleOwners=new WeakMap(),styleMapOwners=new WeakMap(),attributeOwners=new WeakMap(),guardedRuleMethodOwners=new WeakMap(),lockedIconStyleSignatures=new WeakMap();
         installSection('BOOTSTRAP_SCRIPT');if(!BOOTSTRAP_SCRIPT)failInstall('CURRENT_SCRIPT_MISSING');
         installSection('STATIC_STYLE_BINDING');
         const watchStyle=(element)=>{try{invoke(WeakMapSet,styleOwners,[styleOf(element),element]);if(attributeStyleMapProperty){const map=read(attributeStyleMapProperty,element);
@@ -265,45 +268,54 @@ internal object ChromeMediaShieldBootstrap {
         const safeIcon=(svg)=>{rendererMetric(26);try{const descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);for(let index=0;index<descendants.length;index+=1)
         if(!invoke(SetHas,ICON_TAGS,[localNameOf(descendants[index])]))return false;const nodes=[svg];for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);
         let attributeBytes=0,pathBytes=0,pathCount=0;for(let index=0;index<nodes.length;index+=1){const node=nodes[index],attrs=attributesOf(node);for(let attributeIndex=0;attributeIndex<attrs.length;attributeIndex+=1){
-        const name=lower(attrName(attrs[attributeIndex]));if(!iconAttributeAllowed(node,name,svg))return false;attributeBytes+=name.length+attrValueOf(attrs[attributeIndex]).length}
+        const name=lower(attrName(attrs[attributeIndex]));if(!iconAttributeAllowed(node,name,svg))return false;if(name!=='style'||!invoke(WeakSetHas,protectedIconNodes,[node]))attributeBytes+=name.length+attrValueOf(attrs[attributeIndex]).length}
         if(localNameOf(node)==='path'){pathCount+=1;const d=nativeGet.call(node,'d')||'';if(!validIconPath(d))return false;pathBytes+=d.length}}
         if(descendants.length>18||attributeBytes>4096||pathCount<1||pathCount>16||pathBytes>2048||!iconDimensions(svg))return false;
         return !elementQuery.call(svg,'[href],[xlink\\:href],[filter],[mask],[clip-path],[fill^="url(" i],[stroke^="url(" i]')}
         catch(_){return false}};
         const lockIconGeometry=(svg)=>{rendererMetric(27);try{const dimensions=iconDimensions(svg);if(!dimensions)return false;const nodes=[svg],descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);
-        for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);for(let index=0;index<nodes.length;index+=1)invoke(WeakSetAdd,protectedIconNodes,[nodes[index]]);
-        rendererMetric(28,2);rendererMetric(37,2);nativeRemove.call(svg,'style');nativeRemove.call(svg,'data-glosh-media-blocked');const rootStyle=styleOf(svg);watchStyle(svg);const width=stringOf(dimensions[0])+'px',height=stringOf(dimensions[1])+'px';
+        for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);const rootStyle=styleOf(svg),width=stringOf(dimensions[0])+'px',height=stringOf(dimensions[1])+'px';
         const rootRules=[['all','initial'],['display','inline-block'],['box-sizing','border-box'],['width',width],['height',height],['min-width','0'],['min-height','0'],['max-width',width],['max-height',height],
         ['margin','0'],['padding','0'],['position','static'],['inset','auto'],['zoom','1'],['scale','none'],['rotate','none'],['translate','none'],['transform','none'],['transform-origin','center'],
         ['filter','none'],['mask','none'],['clip-path','none'],['animation','none'],['transition','none'],['background','none'],['box-shadow','none'],['border','0'],['overflow','hidden'],['contain','paint'],
-        ['opacity','1'],['visibility','visible'],['pointer-events','none'],['color','#000'],['direction','ltr'],['unicode-bidi','normal']];rendererMetric(28,rootRules.length);rendererMetric(37,rootRules.length);for(let index=0;index<rootRules.length;index+=1)
-        nativeStyleSet.call(rootStyle,rootRules[index][0],rootRules[index][1],'important');for(let index=0;index<descendants.length;index+=1){const node=descendants[index],tag=localNameOf(node),style=styleOf(node);watchStyle(node);rendererMetric(28);rendererMetric(37);nativeRemove.call(node,'style');
-        if(tag==='path'){const d=nativeGet.call(node,'d')||'',fillRule=lower(nativeGet.call(node,'fill-rule')||'nonzero');const rules=[['all','initial'],['display','inline'],['d','path("'+d+'")'],['fill','currentcolor'],['stroke','none'],
-        ['fill-rule',fillRule==='evenodd'?'evenodd':'nonzero'],['opacity','1'],['transform','none'],['filter','none'],['clip-path','none'],['mask','none'],['animation','none'],['transition','none']];rendererMetric(28,rules.length);rendererMetric(37,rules.length);for(let ruleIndex=0;ruleIndex<rules.length;ruleIndex+=1)
-        nativeStyleSet.call(style,rules[ruleIndex][0],rules[ruleIndex][1],'important')}else{rendererMetric(28,2);rendererMetric(37,2);nativeStyleSet.call(style,'all','initial','important');nativeStyleSet.call(style,'display','none','important')}}
+        ['opacity','1'],['visibility','visible'],['pointer-events','none'],['color','#000'],['direction','ltr'],['unicode-bidi','normal']];
+        const descendantRules=(node)=>{if(localNameOf(node)!=='path')return [['all','initial'],['display','none']];const d=nativeGet.call(node,'d')||'',fillRule=lower(nativeGet.call(node,'fill-rule')||'nonzero');return [['all','initial'],['display','inline'],['d','path("'+d+'")'],['fill','currentcolor'],['stroke','none'],
+        ['fill-rule',fillRule==='evenodd'?'evenodd':'nonzero'],['opacity','1'],['transform','none'],['filter','none'],['clip-path','none'],['mask','none'],['animation','none'],['transition','none']]};
+        const iconStyleSignature=(style,rules)=>{let signature=stringOf(read(styleLengthProperty,style));for(let index=0;index<rules.length;index+=1){const name=rules[index][0];signature+='\n'+name+'\u0000'+nativeStyleGet.call(style,name)+'\u0000'+nativeStylePriority.call(style,name)}return signature};
+        const rulesLocked=(style,rules)=>{const expected=invoke(WeakMapGet,lockedIconStyleSignatures,[style]);return !!expected&&expected===iconStyleSignature(style,rules)};
+        let alreadyLocked=nativeGet.call(svg,'data-glosh-icon-safe')==='1'&&invoke(WeakSetHas,protectedIconNodes,[svg])&&rulesLocked(rootStyle,rootRules);
+        for(let index=0;alreadyLocked&&index<descendants.length;index+=1){const node=descendants[index];alreadyLocked=invoke(WeakSetHas,protectedIconNodes,[node])&&rulesLocked(styleOf(node),descendantRules(node))}
+        if(alreadyLocked)return true;for(let index=0;index<nodes.length;index+=1)invoke(WeakSetAdd,protectedIconNodes,[nodes[index]]);
+        rendererMetric(28,2);rendererMetric(37,2);nativeRemove.call(svg,'style');nativeRemove.call(svg,'data-glosh-media-blocked');watchStyle(svg);
+        rendererMetric(28,rootRules.length);rendererMetric(37,rootRules.length);for(let index=0;index<rootRules.length;index+=1)nativeStyleSet.call(rootStyle,rootRules[index][0],rootRules[index][1],'important');invoke(WeakMapSet,lockedIconStyleSignatures,[rootStyle,iconStyleSignature(rootStyle,rootRules)]);
+        for(let index=0;index<descendants.length;index+=1){const node=descendants[index],style=styleOf(node),rules=descendantRules(node);watchStyle(node);rendererMetric(28);rendererMetric(37);nativeRemove.call(node,'style');
+        rendererMetric(28,rules.length);rendererMetric(37,rules.length);for(let ruleIndex=0;ruleIndex<rules.length;ruleIndex+=1)nativeStyleSet.call(style,rules[ruleIndex][0],rules[ruleIndex][1],'important');invoke(WeakMapSet,lockedIconStyleSignatures,[style,iconStyleSignature(style,rules)])}
         rendererMetric(28);rendererMetric(37);nativeSet.call(svg,'data-glosh-icon-safe','1');return nativeStylePriority.call(rootStyle,'all')==='important'&&nativeStyleGet.call(rootStyle,'width')===width&&nativeStylePriority.call(rootStyle,'width')==='important'}
         catch(_){return false}};
         const removeDeclarativeTopLayer=(element)=>{for(let index=0;index<TOP_LAYER_ATTRIBUTE_NAMES.length;index+=1){const attribute=TOP_LAYER_ATTRIBUTE_NAMES[index];
         if(nativeHas.call(element,attribute))nativeRemove.call(element,attribute)}};
-        const sanitizeElement=(element)=>{rendererSanitized(element);removeDeclarativeTopLayer(element);const tag=localNameOf(element);
+        const sanitizeElementBody=(element)=>{removeDeclarativeTopLayer(element);const tag=localNameOf(element);
         if(tag==='canvas'||tag==='video'){hide(element);return}
         if(tag==='object'||tag==='embed'){hide(element);nativeRemove.call(element,'data');nativeRemove.call(element,'src');nativeRemove.call(element,'type');
         const parent=parentOf(element);if(parent)nodeRemove.call(parent,element);return}
         if(tag==='frame'||tag==='fencedframe'){hide(element);nativeRemove.call(element,'src');const parent=parentOf(element);if(parent)nodeRemove.call(parent,element);return}
-        if(tag==='iframe'){nativeSet.call(element,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(element)]);
+        if(tag==='iframe'){if(nativeGet.call(element,'sandbox')!==FRAME_SANDBOX)nativeSet.call(element,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(element)]);
         if(nativeHas.call(element,'srcdoc'))nativeRemove.call(element,'srcdoc');
-        if(!networkUrl(nativeGet.call(element,'src'))){nativeRemove.call(element,'data-glosh-network-frame');nativeSet.call(element,'src','about:blank');hide(element)}
-        else{nativeSet.call(element,'data-glosh-network-frame','1');unhide(element)}return}
+        if(!networkUrl(nativeGet.call(element,'src'))){nativeRemove.call(element,'data-glosh-network-frame');if(nativeGet.call(element,'src')!=='about:blank')nativeSet.call(element,'src','about:blank');hide(element)}
+        else{if(nativeGet.call(element,'data-glosh-network-frame')!=='1')nativeSet.call(element,'data-glosh-network-frame','1');unhide(element)}return}
         if(tag==='img'||tag==='source'||(tag==='input'&&lower(nativeGet.call(element,'type')||'')==='image')){const values=lower((nativeGet.call(element,'src')||'')+' '+(nativeGet.call(element,'srcset')||''));
         const structurallyBlocked=tag==='source'&&(nativeHas.call(element,'data-glosh-blocked-src')||nativeHas.call(element,'data-glosh-blocked-srcset'));
-        if(structurallyBlocked||includes(values,'data:')||includes(values,'blob:')){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
-        const style=lower(nativeGet.call(element,'style')||'');if(includes(style,'url(data:')||includes(style,'url(blob:'))hide(element);
+        const retainedLocalBlock=values.trim()===''&&nativeGet.call(element,'data-glosh-media-blocked')==='1'&&invoke(WeakSetHas,protectedMediaNodes,[element]);
+        if(structurallyBlocked||retainedLocalBlock||includes(values,'data:')||includes(values,'blob:')){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
+        const style=lower(nativeGet.call(element,'style')||'');if(includes(style,'url(')&&(includes(style,'data:')||includes(style,'blob:')))hide(element);
         if(tag==='svg'){if(safeIcon(element)&&lockIconGeometry(element)){}
         else{nativeRemove.call(element,'data-glosh-icon-safe');let child=firstChildOf(element);while(child){nodeRemove.call(element,child);child=firstChildOf(element)}hide(element)}}};
-        const scan=(root,origin=RM_OTHER)=>{if(!root)return;rendererScanStarted(origin,root);const started=rendererClock(),type=nodeTypeOf(root);let count=0;if(type===1){sanitizeElement(root);count=1}const query=type===1?elementQueryAll:fragmentQueryAll;
+        const sanitizeElement=(element,family=-1)=>{rendererSanitized(element);if(family<0)return sanitizeElementBody(element);rendererDirectSanitized(family);const started=rendererFamilyStarted(family,element);
+        try{return sanitizeElementBody(element)}finally{rendererFamilyDone(family,0,started)}};
+        const scan=(root,origin=RM_OTHER,api=-1,family=-1)=>{if(!root)return;rendererScanStarted(origin,root,api,family);const started=rendererClock(),type=nodeTypeOf(root);let count=0;if(type===1){sanitizeElement(root);count=1}const query=type===1?elementQueryAll:fragmentQueryAll;
         if(query){const nodes=copyList(query.call(root,'canvas,video,object,embed,frame,fencedframe,iframe,img,source,input[type="image" i],svg,[srcdoc],[style],[popover],[popovertarget],[popovertargetaction],[commandfor],[command]'),nodeListLength);count+=nodes.length;
-        for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}rendererScanDone(count,started)};
-        const sanitizeContainer=(node)=>{rendererMetric(19);if(!node||nodeTypeOf(node)!==1)return;sanitizeElement(node);const svg=elementClosest.call(node,'svg');if(svg&&svg!==node)sanitizeElement(svg)};
+        for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}rendererScanDone(count,started,family)};
+        const sanitizeContainer=(node,family=-1)=>{rendererMetric(19);if(!node||nodeTypeOf(node)!==1)return;sanitizeElement(node,family);const svg=elementClosest.call(node,'svg');if(svg&&svg!==node)sanitizeElement(svg,family)};
         const shieldStyle=DOC.getElementById(STYLE_ID),curtainStyle=HAS_CURTAIN?DOC.getElementById(CURTAIN_ID):null,curtainLayer=USE_MODAL_CURTAIN?nativeCreateElement.call(DOC,'dialog'):null;
         if(curtainLayer){nativeSet.call(curtainLayer,'id',CURTAIN_LAYER_ID);nativeSet.call(curtainLayer,'tabindex','-1');nodeInsert.call(documentElement(),curtainLayer,firstChildOf(documentElement()))}
         if(!shieldStyle)failInstall('SHIELD_STYLE_MISSING');else if(HAS_CURTAIN&&!curtainStyle)failInstall('CURTAIN_STYLE_MISSING');
@@ -342,8 +354,8 @@ internal object ChromeMediaShieldBootstrap {
         const protectedInlineStyle=(element)=>protectedNode(element)||invoke(WeakSetHas,protectedIconNodes,[element])||invoke(WeakSetHas,protectedMediaNodes,[element])||nativeGet.call(element,'data-glosh-media-blocked')==='1'||nativeGet.call(element,'data-glosh-icon-safe')==='1';
         const guardInlineStyleOwner=(prototype)=>{if(!prototype)return true;const owner=propertyOwner(prototype,'style');if(!owner)return false;
         if(invoke(WeakSetHas,guardedStyleOwners,[owner]))return true;const entry=descriptor(owner,'style');if(!entry||!entry.get)return false;
-        try{const guardedGet=function(){if(protectedInlineStyle(this))deny();return invoke(entry.get,this,[])};
-        const guardedSet=function(value){if(protectedInlineStyle(this))deny();return invoke(entry.set,this,[value])};
+        try{const guardedGet=function(){if(protectedInlineStyle(this))deny();const value=invoke(entry.get,this,[]);invoke(WeakMapSet,styleOwners,[value,this]);return value};
+        const guardedSet=function(value){if(protectedInlineStyle(this))deny();const result=invoke(entry.set,this,[value]);watchStyle(this);sanitizeContainer(this);return result};
         ObjectDefine(owner,'style',{get:guardedGet,set:guardedSet,enumerable:entry.enumerable,configurable:false});invoke(WeakSetAdd,guardedStyleOwners,[owner]);
         const sealedEntry=descriptor(owner,'style');return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
         const insideProtected=(node)=>{let current=node;for(let depth=0;current&&depth<128;depth+=1){if(protectedNode(current))return true;current=parentOf(current)}return false};
@@ -406,15 +418,16 @@ internal object ChromeMediaShieldBootstrap {
         if(curtainLayer)nativeAddEvent.call(curtainLayer,'cancel',event=>{invoke(EventPrevent,event,[]);invoke(EventStopImmediate,event,[])},true);
         registerProtectedSheet(shieldSheet);registerProtectedSheet(curtainSheet);
         if(!ensureStyle())failInstall('SHIELD_STYLE_ENSURE_FAILED');if(!ensureCurtain())failInstall('CURTAIN_ENSURE_FAILED');
-        installSection('DOM_MUTATION_GUARDS');installed=seal(Node.prototype,'appendChild',function(node){if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED);const result=nodeAppend.call(this,node);sanitizeContainer(this);return result})&&installed;
-        installed=seal(Node.prototype,'insertBefore',function(node,ref){if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED);const result=nodeInsert.call(this,node,ref);sanitizeContainer(this);return result})&&installed;
-        installed=seal(Node.prototype,'replaceChild',function(node,old){if(insideProtected(this)||containsProtected(old))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED);const result=nodeReplace.call(this,node,old);sanitizeContainer(this);return result})&&installed;
+        installSection('DOM_MUTATION_GUARDS');installed=seal(Node.prototype,'appendChild',function(node){rendererApiCall(RMA_APPEND_CHILD,RMF_DOM_GUARD);if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_APPEND_CHILD,RMF_DOM_GUARD);const result=nodeAppend.call(this,node);sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed;
+        installed=seal(Node.prototype,'insertBefore',function(node,ref){rendererApiCall(RMA_INSERT_BEFORE,RMF_DOM_GUARD);if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_INSERT_BEFORE,RMF_DOM_GUARD);const result=nodeInsert.call(this,node,ref);sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed;
+        installed=seal(Node.prototype,'replaceChild',function(node,old){rendererApiCall(RMA_REPLACE_CHILD,RMF_DOM_GUARD);if(insideProtected(this)||containsProtected(old))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_REPLACE_CHILD,RMF_DOM_GUARD);const result=nodeReplace.call(this,node,old);sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed;
         installed=seal(Node.prototype,'removeChild',function(node){if(containsProtected(node))deny();return nodeRemove.call(this,node)})&&installed;
-        const sealInsertion=(owner,name,removesChildren,removesTarget)=>{if(!owner||!owner[name])return true;const original=owner[name];return seal(owner,name,function(...args){
+        const insertionApi=(name)=>name==='append'?RMA_APPEND:(name==='prepend'?RMA_PREPEND:(name==='replaceChildren'?RMA_REPLACE_CHILDREN:(name==='before'?RMA_BEFORE:(name==='after'?RMA_AFTER:RMA_REPLACE_WITH))));
+        const sealInsertion=(owner,name,removesChildren,removesTarget)=>{if(!owner||!owner[name])return true;const original=owner[name],api=insertionApi(name);return seal(owner,name,function(...args){rendererApiCall(api,RMF_DOM_GUARD);
         const mapped=removesChildren?mappedProtected(this):null;if(removesTarget?containsProtected(this):(removesChildren?(!mapped&&containsProtected(this)):insideProtected(this)))deny();
         for(let index=0;index<args.length;index+=1){const value=args[index];
-        if(value&&nodeTypeOf(value)){rejectProtectedMove(value,this);scan(value,RM_GUARDED)}}const parent=parentOf(this);const result=invoke(original,this,args);scan(this,RM_GUARDED);
-        if(mapped)restoreMappedProtected(this);if(parent)sanitizeContainer(parent);return result})};
+        if(value&&nodeTypeOf(value)){rejectProtectedMove(value,this);scan(value,RM_GUARDED,api,RMF_DOM_GUARD)}}const parent=parentOf(this);const result=invoke(original,this,args);
+        if(mapped)restoreMappedProtected(this);if(parent)sanitizeContainer(parent,RMF_DOM_GUARD);return result})};
         for(const owner of [Element.prototype,Document.prototype,DocumentFragment.prototype])for(const name of ['append','prepend'])
         installed=sealInsertion(owner,name,false)&&installed;
         for(const owner of [Element.prototype,Document.prototype,DocumentFragment.prototype])installed=sealInsertion(owner,'replaceChildren',true)&&installed;
@@ -425,21 +438,21 @@ internal object ChromeMediaShieldBootstrap {
         for(const owner of [Element.prototype,self.CharacterData&&CharacterData.prototype,self.DocumentType&&DocumentType.prototype])if(owner&&owner.remove){const remove=owner.remove;
         installed=seal(owner,'remove',function(){if(containsProtected(this))deny();return invoke(remove,this,[])})&&installed}
         if(Element.prototype.insertAdjacentElement){const adjacent=Element.prototype.insertAdjacentElement;
-        installed=seal(Element.prototype,'insertAdjacentElement',function(position,element){if(insideProtected(this))deny();rejectProtectedMove(element,this);scan(element,RM_GUARDED);const result=invoke(adjacent,this,[position,element]);
-        sanitizeContainer(this);return result})&&installed}
+        installed=seal(Element.prototype,'insertAdjacentElement',function(position,element){rendererApiCall(RMA_ADJACENT_ELEMENT,RMF_DOM_GUARD);if(insideProtected(this))deny();rejectProtectedMove(element,this);scan(element,RM_GUARDED,RMA_ADJACENT_ELEMENT,RMF_DOM_GUARD);const result=invoke(adjacent,this,[position,element]);
+        sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed}
         if(Element.prototype.insertAdjacentText){const adjacentText=Element.prototype.insertAdjacentText;
         installed=seal(Element.prototype,'insertAdjacentText',function(position,text){if(insideProtected(this))deny();return invoke(adjacentText,this,[position,text])})&&installed}
         for(const owner of [Node.prototype,Element.prototype,DocumentFragment.prototype])if(owner&&owner.moveBefore){const moveBefore=owner.moveBefore;
-        installed=seal(owner,'moveBefore',function(node,reference){if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED);const result=invoke(moveBefore,this,[node,reference]);
-        sanitizeContainer(this);return result})&&installed}
+        installed=seal(owner,'moveBefore',function(node,reference){rendererApiCall(RMA_MOVE_BEFORE,RMF_DOM_GUARD);if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_MOVE_BEFORE,RMF_DOM_GUARD);const result=invoke(moveBefore,this,[node,reference]);
+        sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed}
         const rangeElement=(ancestor)=>{if(!ancestor)return null;if(nodeTypeOf(ancestor)===1)return ancestor;const parent=parentOf(ancestor);
         return parent&&nodeTypeOf(parent)===1?parent:null};
-        if(self.Range&&Range.prototype.insertNode){const rangeInsert=Range.prototype.insertNode;installed=seal(Range.prototype,'insertNode',function(node){
-        const ancestor=read(rangeAncestorProperty,this);if(insideProtected(ancestor))deny();rejectProtectedMove(node,ancestor);scan(node,RM_GUARDED);const result=invoke(rangeInsert,this,[node]);
-        const container=rangeElement(ancestor);if(container)sanitizeContainer(container);return result})&&installed}
+        if(self.Range&&Range.prototype.insertNode){const rangeInsert=Range.prototype.insertNode;installed=seal(Range.prototype,'insertNode',function(node){rendererApiCall(RMA_RANGE_INSERT,RMF_DOM_GUARD);
+        const ancestor=read(rangeAncestorProperty,this);if(insideProtected(ancestor))deny();rejectProtectedMove(node,ancestor);scan(node,RM_GUARDED,RMA_RANGE_INSERT,RMF_DOM_GUARD);const result=invoke(rangeInsert,this,[node]);
+        const container=rangeElement(ancestor);if(container)sanitizeContainer(container,RMF_DOM_GUARD);return result})&&installed}
         if(self.Range&&Range.prototype.surroundContents){const surround=Range.prototype.surroundContents;installed=seal(Range.prototype,'surroundContents',function(node){
-        const ancestor=read(rangeAncestorProperty,this);if(containsProtected(ancestor))deny();rejectProtectedMove(node,ancestor);scan(node,RM_GUARDED);const result=invoke(surround,this,[node]);scan(node,RM_GUARDED);
-        const container=rangeElement(ancestor);if(container)sanitizeContainer(container);return result})&&installed}
+        rendererApiCall(RMA_RANGE_SURROUND,RMF_DOM_GUARD);const ancestor=read(rangeAncestorProperty,this);if(containsProtected(ancestor))deny();rejectProtectedMove(node,ancestor);scan(node,RM_GUARDED,RMA_RANGE_SURROUND,RMF_DOM_GUARD);const result=invoke(surround,this,[node]);scan(node,RM_GUARDED,RMA_RANGE_SURROUND,RMF_DOM_GUARD);
+        const container=rangeElement(ancestor);if(container)sanitizeContainer(container,RMF_DOM_GUARD);return result})&&installed}
         if(self.Range){for(const name of ['deleteContents','extractContents']){const original=Range.prototype[name];if(original)installed=seal(Range.prototype,name,function(...args){
         if(containsProtected(read(rangeAncestorProperty,this)))deny();return invoke(original,this,args)})&&installed}}
         const selectionTouchesProtected=(selection)=>{if(!selection||!selectionRangeCountProperty||!selectionGetRangeAt)return true;const count=read(selectionRangeCountProperty,selection);
@@ -447,7 +460,7 @@ internal object ChromeMediaShieldBootstrap {
         if(containsProtected(read(rangeAncestorProperty,range)))return true}return false};
         if(self.Selection&&Selection.prototype.deleteFromDocument){const deleteFromDocument=Selection.prototype.deleteFromDocument;
         installed=seal(Selection.prototype,'deleteFromDocument',function(){if(selectionTouchesProtected(this))deny();return invoke(deleteFromDocument,this,[])})&&installed}
-        const adopt=Document.prototype.adoptNode;installed=seal(Document.prototype,'adoptNode',function(node){if(containsProtected(node))deny();const result=invoke(adopt,this,[node]);scan(result,RM_GUARDED);return result})&&installed;
+        const adopt=Document.prototype.adoptNode;installed=seal(Document.prototype,'adoptNode',function(node){rendererApiCall(RMA_ADOPT,RMF_DOM_GUARD);if(containsProtected(node))deny();const result=invoke(adopt,this,[node]);scan(result,RM_GUARDED,RMA_ADOPT,RMF_DOM_GUARD);return result})&&installed;
         installSection('ATTRIBUTE_GUARDS');const protectedCurtainAttribute=(element,key)=>element===documentElement()&&key===CURTAIN_RELEASE_ATTRIBUTE;
         installed=seal(Element.prototype,'setAttribute',function(name,value){const attributeName=stringOf(name),attributeValue=stringOf(value),key=lower(attributeName),tag=localNameOf(this);
         if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
@@ -515,6 +528,13 @@ internal object ChromeMediaShieldBootstrap {
         if(tokens)invoke(WeakSetAdd,lockedSandboxes,[tokens])};ObjectDefine(owner,'sandbox',{get:guardedGet,set:guardedSet,enumerable:entry.enumerable,configurable:false});
         const sealedEntry=descriptor(owner,'sandbox');return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
         if(self.HTMLIFrameElement)installed=guardFrameSandbox()&&installed;
+        const guardMediaAccessor=(prototype,name)=>{const owner=prototype&&propertyOwner(prototype,name),entry=owner&&descriptor(owner,name);
+        if(!owner||!entry||!entry.get||!entry.set)return false;try{const guardedGet=entry.get,guardedSet=function(value){const result=invoke(entry.set,this,[value]);sanitizeElement(this);return result};
+        ObjectDefine(owner,name,{get:guardedGet,set:guardedSet,enumerable:entry.enumerable,configurable:false});const sealedEntry=descriptor(owner,name);
+        return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
+        for(const pair of [[self.HTMLImageElement&&HTMLImageElement.prototype,'src'],[self.HTMLImageElement&&HTMLImageElement.prototype,'srcset'],
+        [self.HTMLSourceElement&&HTMLSourceElement.prototype,'src'],[self.HTMLSourceElement&&HTMLSourceElement.prototype,'srcset'],
+        [self.HTMLInputElement&&HTMLInputElement.prototype,'src']])installed=guardMediaAccessor(pair[0],pair[1])&&installed;
         const forceSelfTarget=(owner,name)=>{if(!owner)return true;const entry=descriptor(owner,name);if(!entry||!entry.get||!entry.set)return false;
         try{ObjectDefine(owner,name,{get:entry.get,set:function(){invoke(entry.set,this,['_self'])},configurable:false});return true}catch(_){return false}};
         for(const pair of [[self.HTMLAnchorElement&&HTMLAnchorElement.prototype,'target'],[self.HTMLAreaElement&&HTMLAreaElement.prototype,'target'],
@@ -525,14 +545,16 @@ internal object ChromeMediaShieldBootstrap {
         const protectedRule=(value)=>{try{return !!value&&protectedSheet(read(cssParentSheetProperty,value))}catch(_){return false}};
         const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedIconNodes,[owner])||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'||
         nativeGet.call(owner,'data-glosh-icon-safe')==='1'))return true;try{const rule=read(cssParentRuleProperty,value);return !!rule&&protectedRule(rule)}catch(_){return false}};
-        installSection('CSSOM_GUARDS');installed=seal(CSSStyleDeclaration.prototype,'setProperty',function(...args){if(protectedDeclaration(this))deny();return nativeStyleSet.apply(this,args)})&&installed;
-        installed=seal(CSSStyleDeclaration.prototype,'removeProperty',function(...args){if(protectedDeclaration(this))deny();return nativeStyleRemove.apply(this,args)})&&installed;
+        installSection('CSSOM_GUARDS');installed=seal(CSSStyleDeclaration.prototype,'setProperty',function(...args){if(protectedDeclaration(this))deny();const result=nativeStyleSet.apply(this,args);
+        const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner);return result})&&installed;
+        installed=seal(CSSStyleDeclaration.prototype,'removeProperty',function(...args){if(protectedDeclaration(this))deny();const result=nativeStyleRemove.apply(this,args);
+        const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner);return result})&&installed;
         for(const name of ['all','display','boxSizing','width','height','minWidth','minHeight','maxWidth','maxHeight','margin','padding','visibility','opacity','zoom','scale','rotate','translate','transform','transformOrigin',
-        'filter','mask','clipPath','animation','transition','position','inset','background','boxShadow','border','overflow','contain','pointerEvents','zIndex','mixBlendMode','color','direction','unicodeBidi','d','fill','stroke','fillRule']){const entry=descriptor(CSSStyleDeclaration.prototype,name);
+        'filter','mask','clipPath','animation','transition','position','inset','background','backgroundImage','listStyleImage','borderImageSource','cursor','content','boxShadow','border','overflow','contain','pointerEvents','zIndex','mixBlendMode','color','direction','unicodeBidi','d','fill','stroke','fillRule']){const entry=descriptor(CSSStyleDeclaration.prototype,name);
         if(entry&&entry.get&&entry.set){try{ObjectDefine(CSSStyleDeclaration.prototype,name,{get:entry.get,set:function(value){
-        if(protectedDeclaration(this))deny();invoke(entry.set,this,[value])},configurable:false})}catch(_){installed=false}}}
+        if(protectedDeclaration(this))deny();invoke(entry.set,this,[value]);const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner)},configurable:false})}catch(_){installed=false}}}
         const cssText=descriptor(CSSStyleDeclaration.prototype,'cssText');if(cssText&&cssText.get&&cssText.set){try{
-        ObjectDefine(CSSStyleDeclaration.prototype,'cssText',{get:cssText.get,set:function(value){if(protectedDeclaration(this))deny();invoke(cssText.set,this,[value])},configurable:false})
+        ObjectDefine(CSSStyleDeclaration.prototype,'cssText',{get:cssText.get,set:function(value){if(protectedDeclaration(this))deny();invoke(cssText.set,this,[value]);const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner)},configurable:false})
         }catch(_){installed=false}}else installed=false;
         if(self.CSSStyleSheet){for(const name of ['insertRule','deleteRule','addRule','removeRule','replace','replaceSync']){const original=CSSStyleSheet.prototype[name];if(original)
         installed=seal(CSSStyleSheet.prototype,name,function(...args){if(protectedSheet(this))deny();return invoke(original,this,args)})&&installed}}
@@ -581,7 +603,7 @@ internal object ChromeMediaShieldBootstrap {
         }catch(_){installed=false}}else installed=false}}
         installSection('TEXT_MARKUP_GUARDS');if(nodeText&&nodeText.get&&nodeText.set){try{ObjectDefine(Node.prototype,'textContent',{get:nodeText.get,set:function(value){
         const mapped=mappedProtected(this);if(!mapped&&containsProtected(this))deny();if(nodeTypeOf(this)===2&&routeAttributeValue(this,value))return;invoke(nodeText.set,this,[value]);
-        if(mapped){restoreMappedProtected(this);scan(this,RM_MARKUP)}},configurable:false})
+        if(mapped){rendererApiCall(RMA_MAPPED_TEXT,RMF_MARKUP);restoreMappedProtected(this);scan(this,RM_MARKUP,RMA_MAPPED_TEXT,RMF_MARKUP)}},configurable:false})
         }catch(_){installed=false}}else installed=false;
         if(nodeValue&&nodeValue.get&&nodeValue.set){try{ObjectDefine(Node.prototype,'nodeValue',{get:nodeValue.get,set:function(value){
         if(containsProtected(this))deny();if(nodeTypeOf(this)===2&&routeAttributeValue(this,value))return;invoke(nodeValue.set,this,[value])},configurable:false})
@@ -599,25 +621,25 @@ internal object ChromeMediaShieldBootstrap {
         }catch(_){installed=false}}}
         const create=nativeCreateElement,createNS=method(Document.prototype.createElementNS),importNode=method(Document.prototype.importNode);
         const safeElementName=(name)=>{const canonical=stringOf(name);return oneOf(lower(canonical),['object','embed','frame','fencedframe'])?'template':canonical};
-        installed=seal(Document.prototype,'createElement',function(name,options){const node=create.call(this,safeElementName(name),options);sanitizeElement(node);return node})&&installed;
-        installed=seal(Document.prototype,'createElementNS',function(ns,name,options){const namespace=ns===null?null:stringOf(ns),node=createNS.call(this,namespace,safeElementName(name),options);sanitizeElement(node);return node})&&installed;
-        installed=seal(Document.prototype,'importNode',function(node,deep){const copy=importNode.call(this,node,deep);scan(copy,RM_MARKUP);return copy})&&installed;
-        const clone=method(Node.prototype.cloneNode);installed=seal(Node.prototype,'cloneNode',function(deep){const copy=clone.call(this,deep);scan(copy,RM_MARKUP);return copy})&&installed;
+        installed=seal(Document.prototype,'createElement',function(name,options){rendererApiCall(RMA_CREATE,RMF_FACTORY);const node=create.call(this,safeElementName(name),options);sanitizeElement(node,RMF_FACTORY);return node})&&installed;
+        installed=seal(Document.prototype,'createElementNS',function(ns,name,options){rendererApiCall(RMA_CREATE_NS,RMF_FACTORY);const namespace=ns===null?null:stringOf(ns),node=createNS.call(this,namespace,safeElementName(name),options);sanitizeElement(node,RMF_FACTORY);return node})&&installed;
+        installed=seal(Document.prototype,'importNode',function(node,deep){rendererApiCall(RMA_IMPORT,RMF_MARKUP);const copy=importNode.call(this,node,deep);scan(copy,RM_MARKUP,RMA_IMPORT,RMF_MARKUP);return copy})&&installed;
+        const clone=method(Node.prototype.cloneNode);installed=seal(Node.prototype,'cloneNode',function(deep){rendererApiCall(RMA_CLONE,RMF_MARKUP);const copy=clone.call(this,deep);scan(copy,RM_MARKUP,RMA_CLONE,RMF_MARKUP);return copy})&&installed;
         const inner=descriptor(Element.prototype,'innerHTML');
-        const safeMarkup=(value)=>{if(!inner||!inner.set||!inner.get)deny();const template=create.call(DOC,'template');invoke(inner.set,template,[stringOf(value)]);
-        scan(templateContent(template),RM_MARKUP);return invoke(inner.get,template,[])};
+        const safeMarkup=(value)=>{rendererApiCall(RMA_SAFE_MARKUP,RMF_MARKUP);if(!inner||!inner.set||!inner.get)deny();const template=create.call(DOC,'template');invoke(inner.set,template,[stringOf(value)]);
+        scan(templateContent(template),RM_MARKUP,RMA_SAFE_MARKUP,RMF_MARKUP);return invoke(inner.get,template,[])};
         const insertHtml=Element.prototype.insertAdjacentHTML;installed=seal(Element.prototype,'insertAdjacentHTML',function(position,text){
-        if(containsProtected(this))deny();const result=invoke(insertHtml,this,[position,safeMarkup(text)]);scan(this,RM_MARKUP);return result})&&installed;
+        rendererApiCall(RMA_INSERT_HTML,RMF_MARKUP);if(containsProtected(this))deny();const result=invoke(insertHtml,this,[position,safeMarkup(text)]);scan(this,RM_MARKUP,RMA_INSERT_HTML,RMF_MARKUP);return result})&&installed;
         if(inner&&inner.set&&inner.get){try{
-        ObjectDefine(Element.prototype,'innerHTML',{get:inner.get,set:function(value){if(containsProtected(this))deny();invoke(inner.set,this,[safeMarkup(value)]);scan(this,RM_MARKUP)},configurable:false});
+        ObjectDefine(Element.prototype,'innerHTML',{get:inner.get,set:function(value){rendererApiCall(RMA_INNER_HTML,RMF_MARKUP);if(containsProtected(this))deny();invoke(inner.set,this,[safeMarkup(value)]);scan(this,RM_MARKUP,RMA_INNER_HTML,RMF_MARKUP)},configurable:false});
         installed=descriptor(Element.prototype,'innerHTML').configurable===false&&installed}catch(_){installed=false}}else installed=false;
         const outer=descriptor(Element.prototype,'outerHTML');if(outer&&outer.set&&outer.get){try{
-        ObjectDefine(Element.prototype,'outerHTML',{get:outer.get,set:function(value){if(containsProtected(this))deny();const parent=parentOf(this);
-        invoke(outer.set,this,[safeMarkup(value)]);scan(parent,RM_MARKUP)},configurable:false});
+        ObjectDefine(Element.prototype,'outerHTML',{get:outer.get,set:function(value){rendererApiCall(RMA_OUTER_HTML,RMF_MARKUP);if(containsProtected(this))deny();const parent=parentOf(this);
+        invoke(outer.set,this,[safeMarkup(value)]);scan(parent,RM_MARKUP,RMA_OUTER_HTML,RMF_MARKUP)},configurable:false});
         installed=descriptor(Element.prototype,'outerHTML').configurable===false&&installed}catch(_){installed=false}}else installed=false;
         for(const owner of [Element.prototype,self.ShadowRoot&&ShadowRoot.prototype])if(owner&&owner.setHTML){const setHTML=owner.setHTML;
-        installed=seal(owner,'setHTML',function(value,...args){const mapped=mappedProtected(this);if(!mapped&&containsProtected(this))deny();const all=[safeMarkup(value)];for(let index=0;index<args.length;index+=1)append(all,args[index]);
-        const result=invoke(setHTML,this,all);if(mapped)restoreMappedProtected(this);scan(this,RM_MARKUP);return result})&&installed}
+        installed=seal(owner,'setHTML',function(value,...args){rendererApiCall(RMA_SET_HTML,RMF_MARKUP);const mapped=mappedProtected(this);if(!mapped&&containsProtected(this))deny();const all=[safeMarkup(value)];for(let index=0;index<args.length;index+=1)append(all,args[index]);
+        const result=invoke(setHTML,this,all);if(mapped)restoreMappedProtected(this);scan(this,RM_MARKUP,RMA_SET_HTML,RMF_MARKUP);return result})&&installed}
         if(Element.prototype.setHTMLUnsafe)installed=seal(Element.prototype,'setHTMLUnsafe',deny)&&installed;
         if(self.ShadowRoot&&ShadowRoot.prototype.setHTMLUnsafe)installed=seal(ShadowRoot.prototype,'setHTMLUnsafe',deny)&&installed;
         if(Document.parseHTMLUnsafe)installed=seal(Document,'parseHTMLUnsafe',deny)&&installed;
@@ -631,16 +653,16 @@ internal object ChromeMediaShieldBootstrap {
         else{const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}restoreMappedProtected(root)});
         mutationObserve.call(shadowObserver,root,{childList:true,subtree:true,attributes:true,attributeFilter:WATCHED_ATTRIBUTES});rendererMetric(34);scan(root,RM_SHADOW);return root})&&installed;
         if(self.ShadowRoot){const shadowInner=descriptor(ShadowRoot.prototype,'innerHTML');if(shadowInner&&shadowInner.get&&shadowInner.set){try{
-        ObjectDefine(ShadowRoot.prototype,'innerHTML',{get:shadowInner.get,set:function(value){if(!mappedProtected(this))deny();invoke(shadowInner.set,this,[safeMarkup(value)]);
-        restoreMappedProtected(this);scan(this,RM_MARKUP)},configurable:false})
+        ObjectDefine(ShadowRoot.prototype,'innerHTML',{get:shadowInner.get,set:function(value){rendererApiCall(RMA_SHADOW_INNER,RMF_MARKUP);if(!mappedProtected(this))deny();invoke(shadowInner.set,this,[safeMarkup(value)]);
+        restoreMappedProtected(this);scan(this,RM_MARKUP,RMA_SHADOW_INNER,RMF_MARKUP)},configurable:false})
         }catch(_){installed=false}}}
         installSection('DOCUMENT_WRITE_GUARDS');installed=seal(Document.prototype,'write',deny)&&installed;installed=seal(Document.prototype,'writeln',deny)&&installed;
         installed=seal(Document.prototype,'open',deny)&&installed;
         if(Document.prototype.execCommand){const execCommand=Document.prototype.execCommand;installed=seal(Document.prototype,'execCommand',function(command,...args){
         const commandValue=stringOf(command),commandName=lower(commandValue);if(oneOf(commandName,['delete','forwarddelete','cut','inserttext','inserthtml'])&&
-        selectionTouchesProtected(documentGetSelection?documentGetSelection.call(DOC):null))deny();if(commandName==='inserthtml')put(args,1,safeMarkup(args.length>1?args[1]:''));const all=[commandValue];
+        selectionTouchesProtected(documentGetSelection?documentGetSelection.call(DOC):null))deny();if(commandName==='inserthtml'){rendererApiCall(RMA_EXEC_INSERT_HTML,RMF_MARKUP);put(args,1,safeMarkup(args.length>1?args[1]:''))}const all=[commandValue];
         for(let index=0;index<args.length;index+=1)append(all,args[index]);const result=invoke(execCommand,this,all);
-        if(commandName==='inserthtml')scan(documentElement(),RM_MARKUP);return result})&&installed}
+        if(commandName==='inserthtml')scan(documentElement(),RM_MARKUP,RMA_EXEC_INSERT_HTML,RMF_MARKUP);return result})&&installed}
         installSection('NAVIGATION_GUARDS');const openOwner=propertyOwner(self,'open'),originalOpen=openOwner&&openOwner.open;if(originalOpen)installed=seal(openOwner,'open',function(url,target,features){
         const urlValue=stringOf(url);if(!networkUrl(urlValue))return null;invoke(originalOpen,this,[urlValue,target?stringOf(target):'_blank','noopener=yes,noreferrer=yes']);return null})&&installed;else installed=false;
         const guardNavigation=(event)=>{const initial=eventTarget(event),target=initial&&nodeTypeOf(initial)===1?elementClosest.call(initial,'a[href],area[href],form[action]'):null;
@@ -692,6 +714,7 @@ internal object ChromeMediaShieldBootstrap {
         if(type==='childList'){rendererMetric(2);const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1)scan(added[addedIndex],RM_OBSERVER_CHILD)}
         else{rendererMetric(3);const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}});
         mutationObserve.call(observer,documentElement(),{childList:true,subtree:true,attributes:true,attributeFilter:WATCHED_ATTRIBUTES});scan(documentElement(),RM_INITIAL);
+        nativeAddEvent.call(DOC,'DOMContentLoaded',()=>scan(documentElement(),RM_INITIAL),{once:true,capture:true});
         const selfShieldIdentity=SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
         const RENDERER_METRICS_RESPONSE_URL=resolvedEndpoint(RENDERER_METRICS_URL);__GLOSH_RENDERER_METRICS_REPORTING__
         const reportBootstrapFailure=(stage,reason)=>{if(!SELF_SHIELD||bootstrapDiagnosticSent||selfReadyAccepted||!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader)return;

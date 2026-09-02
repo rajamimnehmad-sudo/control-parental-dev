@@ -20,14 +20,20 @@ class ChromeMediaShieldBootstrapContractTest {
                 selfShieldIdentity = identity(),
             )
         assertContains(selfShield, ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath)
-        assertContains(selfShield, "const RENDERER_METRICS=new NativeArray(38)")
+        assertContains(
+            selfShield,
+            "const RENDERER_METRICS=new NativeArray(${ChromeMediaShieldRendererMetricsScript.FieldCount})",
+        )
+        assertContains(selfShield, "rendererApiCall(RMA_CREATE,RMF_FACTORY)")
+        assertContains(selfShield, "scan(templateContent(template),RM_MARKUP,RMA_SAFE_MARKUP,RMF_MARKUP)")
+        assertContains(selfShield, "scan(node,RM_GUARDED,RMA_APPEND_CHILD,RMF_DOM_GUARD)")
         assertContains(selfShield, "rendererMetric(0);rendererMetric(1,records.length)")
         assertContains(selfShield, "sanitizeContainer(target)")
         assertFalse(selfShield.contains("scan(target,RM_OBSERVER_ATTRIBUTE)"))
         assertContains(selfShield, "scan(added[addedIndex],RM_OBSERVER_CHILD)")
         assertContains(selfShield, "scan(added[addedIndex],RM_SHADOW)")
         assertFalse(selfShield.contains("scan(target,RM_SHADOW)"))
-        assertContains(selfShield, "rendererScanStarted(origin,root)")
+        assertContains(selfShield, "rendererScanStarted(origin,root,api,family)")
         assertContains(selfShield, ChromeMediaShieldRendererMetricsScript.SnapshotEvent)
         assertContains(selfShield, "if(rendererMetricsSent||!SELF_SHIELD||!selfReadyAccepted")
         assertFalse(selfShield.contains("setInterval"))
@@ -420,35 +426,60 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "for(const owner of [Element.prototype,Document.prototype,DocumentFragment.prototype])")
         assertContains(script, "for(const name of ['append','prepend'])")
         assertContains(script, "sealInsertion(owner,'replaceChildren',true)")
-        assertContains(script, "function(node){if(insideProtected(this))deny();rejectProtectedMove(node,this)")
+        assertFalse(script.contains("scan(this,RM_GUARDED,api,RMF_DOM_GUARD)"))
+        assertContains(
+            script,
+            "function(node){rendererApiCall(RMA_APPEND_CHILD,RMF_DOM_GUARD);if(insideProtected(this))deny();" +
+                "rejectProtectedMove(node,this)",
+        )
         assertContains(script, "for(const name of ['before','after'])")
         assertContains(script, "sealInsertion(owner,'replaceWith',false,true)")
         assertContains(script, "removesTarget?containsProtected(this)")
         assertContains(script, "seal(Element.prototype,'insertAdjacentElement'")
         assertContains(script, "seal(Element.prototype,'insertAdjacentText'")
         assertContains(script, "seal(Range.prototype,'insertNode'")
-        assertContains(script, "const container=rangeElement(ancestor);if(container)sanitizeContainer(container)")
+        assertContains(
+            script,
+            "const container=rangeElement(ancestor);if(container)sanitizeContainer(container,RMF_DOM_GUARD)",
+        )
         assertTrue(
             script.indexOf("const result=invoke(rangeInsert,this,[node])") <
-                script.indexOf("const container=rangeElement(ancestor);if(container)sanitizeContainer(container)"),
+                script.indexOf(
+                    "const container=rangeElement(ancestor);if(container)sanitizeContainer(container,RMF_DOM_GUARD)",
+                ),
         )
         val surroundStart = script.indexOf("seal(Range.prototype,'surroundContents'")
         val surroundMutation = script.indexOf("const result=invoke(surround,this,[node])", surroundStart)
-        val surroundPostScan = script.indexOf("scan(node,RM_GUARDED);", surroundMutation)
+        val surroundPostScan =
+            script.indexOf("scan(node,RM_GUARDED,RMA_RANGE_SURROUND,RMF_DOM_GUARD);", surroundMutation)
         assertTrue(surroundStart >= 0)
         assertTrue(surroundMutation > surroundStart)
         assertTrue(surroundPostScan > surroundMutation)
         assertTrue(
             surroundPostScan <
-                script.indexOf("const container=rangeElement(ancestor);if(container)sanitizeContainer(container)", surroundStart),
+                script.indexOf(
+                    "const container=rangeElement(ancestor);if(container)sanitizeContainer(container,RMF_DOM_GUARD)",
+                    surroundStart,
+                ),
         )
         assertContains(script, "owner.moveBefore")
         assertContains(script, "ObjectDefine(ShadowRoot.prototype,'innerHTML'")
         assertContains(script, "if(!mappedProtected(this))deny()")
-        assertContains(script, "restoreMappedProtected(this);scan(this,RM_MARKUP)")
+        assertContains(
+            script,
+            "restoreMappedProtected(this);scan(this,RM_MARKUP,RMA_SHADOW_INNER,RMF_MARKUP)",
+        )
         assertContains(script, "invoke(outer.set,this,[safeMarkup(value)])")
         assertContains(script, "put(args,1,safeMarkup")
-        assertContains(script, "nativeSet.call(element,'sandbox',FRAME_SANDBOX)")
+        assertContains(
+            script,
+            "if(nativeGet.call(element,'sandbox')!==FRAME_SANDBOX)" +
+                "nativeSet.call(element,'sandbox',FRAME_SANDBOX)",
+        )
+        assertContains(
+            script,
+            "if(nativeGet.call(element,'src')!=='about:blank')nativeSet.call(element,'src','about:blank')",
+        )
         assertContains(script, "const guardFrameSandbox=()=>")
         assertContains(script, "const guardedSet=function(){invoke(entry.set,this,[FRAME_SANDBOX])")
         assertContains(script, "ObjectDefine(owner,'sandbox',{get:guardedGet,set:guardedSet")
@@ -676,6 +707,9 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "[href],[xlink\\\\:href],[filter],[mask],[clip-path]")
         assertContains(script, "ICON_PATH_CHARS")
         assertContains(script, "protectedIconNodes")
+        assertContains(script, "lockedIconStyleSignatures")
+        assertContains(script, "iconStyleSignature")
+        assertContains(script, "if(alreadyLocked)return true")
         assertContains(script, "['all','initial']")
         assertContains(script, "['d','path(\"'+d+'\")']")
         assertContains(script, "['zoom','1']")

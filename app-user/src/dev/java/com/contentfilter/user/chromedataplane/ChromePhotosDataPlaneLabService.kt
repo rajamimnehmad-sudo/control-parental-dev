@@ -715,6 +715,24 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "shadowScanCalls=${renderer[34]} ensureStyle=${renderer[35]} ensureCurtain=${renderer[36]} " +
                 "internalMutations=${renderer[37]}",
         )
+        val apiCounters =
+            ChromeMediaShieldRendererMetricsScript.apiNames.mapIndexed { index, name ->
+                "$name=${renderer[ChromeMediaShieldRendererMetricsScript.ApiCallStart + index]}/" +
+                    renderer[ChromeMediaShieldRendererMetricsScript.ApiScanStart + index]
+            }.joinToString(" ")
+        Log.i(StatusLogTag, "v=1 seq=$sequence kind=rendererApis callScan=$apiCounters")
+        val familyCounters =
+            ChromeMediaShieldRendererMetricsScript.familyNames.mapIndexed { family, name ->
+                val root = ChromeMediaShieldRendererMetricsScript.FamilyRootStart + family * 4
+                "$name:calls=${renderer[ChromeMediaShieldRendererMetricsScript.FamilyCallStart + family]}," +
+                    "scans=${renderer[ChromeMediaShieldRendererMetricsScript.FamilyScanStart + family]}," +
+                    "direct=${renderer[ChromeMediaShieldRendererMetricsScript.FamilyDirectSanitizeStart + family]}," +
+                    "roots=${renderer[root]}/${renderer[root + 1]}/${renderer[root + 2]}/${renderer[root + 3]}," +
+                    "nodes=${renderer[ChromeMediaShieldRendererMetricsScript.FamilyScanNodesStart + family]}," +
+                    "micros=${renderer[ChromeMediaShieldRendererMetricsScript.FamilyMicrosStart + family]}," +
+                    "maxMicros=${renderer[ChromeMediaShieldRendererMetricsScript.FamilyMaxMicrosStart + family]}"
+            }.joinToString(" ")
+        Log.i(StatusLogTag, "v=1 seq=$sequence kind=rendererFamilies roots=element/fragment/text/other $familyCounters")
         Log.i(
             StatusLogTag,
             "v=1 seq=$sequence kind=health failures=${metrics.failures} proxyQueueRejects=${metrics.queueRejected} " +
