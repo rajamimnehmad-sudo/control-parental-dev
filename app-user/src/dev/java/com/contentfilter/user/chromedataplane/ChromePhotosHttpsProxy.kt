@@ -31,6 +31,7 @@ internal class ChromePhotosHttpsProxy(
     private val coverageLedger: ChromeRealWebProvenanceLedger? = null,
     private val documentAuthority: ChromeMediaShieldDocumentAuthority? = null,
     private val readyEndpoint: ChromeMediaShieldReadyEndpoint? = null,
+    private val originalUiSvgAuthority: ChromeOriginalUiSvgAuthority? = null,
     private val lifecycleLog: (String, Throwable?) -> Unit = ::logProxyLifecycle,
     private val infoLog: (String) -> Unit = { message -> Log.i(LogTag, message) },
     private val warningLog: (String) -> Unit = { message -> Log.w(LogTag, message) },
@@ -130,6 +131,7 @@ internal class ChromePhotosHttpsProxy(
             networkVisualDelivery = visualDeliveryGate.snapshot(),
             mediaShieldDocuments = documentAuthority?.metrics() ?: ChromeMediaShieldDocumentMetrics(),
             mediaShieldReady = readyEndpoint?.metrics() ?: ChromeMediaShieldReadyEndpointMetrics(),
+            originalUiSvg = originalUiSvgAuthority?.metrics() ?: ChromeOriginalUiSvgMetrics(),
         )
     }
 
@@ -160,6 +162,7 @@ internal class ChromePhotosHttpsProxy(
         val cleanupFailure =
             listOf(
                 runCatching { transformer.close() },
+                runCatching { originalUiSvgAuthority?.close() },
                 runCatching { coverageLedger?.close() },
                 runCatching { upstream.close() },
                 runCatching { tls.close() },
@@ -355,7 +358,9 @@ internal class ChromePhotosHttpsProxy(
                 break
             }
             val disposition =
-                if (connectTargetHost == ChromePhotosDataPlaneLabContract.FixtureHost) {
+                if (connectTargetHost == ChromePhotosDataPlaneLabContract.OriginalUiSvgHost) {
+                    serveOriginalUiSvgAsset(request, output)
+                } else if (connectTargetHost == ChromePhotosDataPlaneLabContract.FixtureHost) {
                     serveFixtureRequest(request, protocol, output, requestCorrelationId)
                 } else {
                     serveRealRequest(
@@ -450,6 +455,7 @@ internal class ChromePhotosHttpsProxy(
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldBootstrapDiagnosticPath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath ||
+                request.target == ChromePhotosDataPlaneLabContract.OriginalUiSvgRewritePath ||
                 request.target == ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierPath
             ) {
                 null
@@ -496,6 +502,26 @@ internal class ChromePhotosHttpsProxy(
                     "phase=media_shield_document origin=fixture resource=${response.resourceId} " +
                         "result=${documentResult.logValue()} bytesOut=${result.bytesWritten}",
                 )
+                return request.successDisposition()
+            }
+            originalUiSvgAuthority?.processStylesheet(normalizedRequest, fixtureUpstream)?.let { sanitized ->
+                requests.incrementAndGet()
+                originalBytes.addAndGet(response.originalBytes.size.toLong())
+                responseStarted = true
+                val result = responseWriter.writeBuffered(output, request, sanitized)
+                deliveredBytes.addAndGet(result.bytesWritten)
+                passthroughResponses.incrementAndGet()
+                latencies.add(System.nanoTime() - started)
+                return request.successDisposition()
+            }
+            originalUiSvgAuthority?.processNetworkSvg(normalizedRequest, fixtureUpstream)?.let { sanitized ->
+                requests.incrementAndGet()
+                originalBytes.addAndGet(sanitized.inputBytes.toLong())
+                responseStarted = true
+                val result = responseWriter.writeBuffered(output, request, sanitized)
+                deliveredBytes.addAndGet(result.bytesWritten)
+                recordDecision(sanitized)
+                latencies.add(System.nanoTime() - started)
                 return request.successDisposition()
             }
             val inspection = imageAuthority.inspectBuffered(request, fixtureUpstream, response.originalBytes)
@@ -578,7 +604,9 @@ internal class ChromePhotosHttpsProxy(
             responseStarted = true
             val result = responseWriter.writeBuffered(output, request, readyResponse)
             deliveredBytes.addAndGet(result.bytesWritten)
-            infoLog("phase=media_shield_ready origin=same_origin result=${readyResponse.statusCode} bytesOut=${result.bytesWritten}")
+            infoLog(
+                "phase=media_shield_ready origin=same_origin result=${readyResponse.statusCode} bytesOut=${result.bytesWritten}",
+            )
             return request.successDisposition()
         }
         val coverageToken = coverageLedger?.beginRequest(host, request, correlationId)
@@ -624,6 +652,24 @@ internal class ChromePhotosHttpsProxy(
                             "hostHash=${ChromeProxyLogPrivacy.digest(host)} result=${documentResult.logValue()} " +
                             "bytesOut=${result.bytesWritten}",
                     )
+                    latencies.add(System.nanoTime() - started)
+                    return request.successDisposition()
+                }
+                originalUiSvgAuthority?.processStylesheet(upstreamRequest, response)?.let { sanitized ->
+                    responseStarted = true
+                    val result = responseWriter.writeBuffered(output, request, sanitized)
+                    originalBytes.addAndGet(sanitized.inputBytes.toLong())
+                    deliveredBytes.addAndGet(result.bytesWritten)
+                    passthroughResponses.incrementAndGet()
+                    latencies.add(System.nanoTime() - started)
+                    return request.successDisposition()
+                }
+                originalUiSvgAuthority?.processNetworkSvg(upstreamRequest, response)?.let { sanitized ->
+                    responseStarted = true
+                    val result = responseWriter.writeBuffered(output, request, sanitized)
+                    originalBytes.addAndGet(sanitized.inputBytes.toLong())
+                    deliveredBytes.addAndGet(result.bytesWritten)
+                    recordDecision(sanitized)
                     latencies.add(System.nanoTime() - started)
                     return request.successDisposition()
                 }
@@ -730,7 +776,24 @@ internal class ChromePhotosHttpsProxy(
 
     private fun normalizeUpstreamRequest(request: ChromePhotosProxyRequest): ChromePhotosProxyRequest {
         val documentNormalized = documentAuthority?.normalizeUpstreamRequest(request) ?: request
-        return imageAuthority.normalizeUpstreamRequest(documentNormalized)
+        val svgNormalized = originalUiSvgAuthority?.normalizeUpstreamRequest(documentNormalized) ?: documentNormalized
+        return imageAuthority.normalizeUpstreamRequest(svgNormalized)
+    }
+
+    private fun serveOriginalUiSvgAsset(
+        request: ChromePhotosProxyRequest,
+        output: OutputStream,
+    ): ChromeHttpConnectionDisposition {
+        requests.incrementAndGet()
+        val response = originalUiSvgAuthority?.serveAsset(request)
+        if (response == null) {
+            writePlainError(output, 404, "Not Found")
+            return ChromeHttpConnectionDisposition.Close
+        }
+        val result = responseWriter.writeBuffered(output, request, response)
+        deliveredBytes.addAndGet(result.bytesWritten)
+        passthroughResponses.incrementAndGet()
+        return request.successDisposition()
     }
 
     private fun recordDecision(result: ChromePhotosSanitizedResponse) {

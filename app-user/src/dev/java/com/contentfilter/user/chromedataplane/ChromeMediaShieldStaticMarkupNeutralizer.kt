@@ -9,6 +9,7 @@ import java.util.Locale
 internal object ChromeMediaShieldStaticMarkupNeutralizer {
     fun neutralize(
         source: String,
+        cssSvgRewriter: ChromeCssSvgRewriter? = null,
         metaCspRewriter: ((String) -> String?)? = null,
     ): String {
         val output = StringBuilder(source.length + 64)
@@ -43,6 +44,7 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
             }
             val authorityNeutralizedTag =
                 tag
+                    .rewriteOriginalUiSvgReferences(tagName, cssSvgRewriter)
                     .removeAuthorGloshAttributes()
                     .neutralizeDeclarativeTopLayer()
             output.append(
@@ -84,7 +86,10 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
                 if (closing < 0) {
                     throw ChromeMediaShieldStaticMarkupException("unterminated_raw_text_$tagName")
                 }
-                output.append(source, offset, closing)
+                val rawText = source.substring(offset, closing)
+                output.append(
+                    if (tagName == "style" && cssSvgRewriter != null) cssSvgRewriter.rewrite(rawText).css else rawText,
+                )
                 offset = closing
             }
         }
@@ -298,6 +303,36 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
         return replaceRange(nameRange.first, end, replacement)
     }
 
+    private fun String.rewriteOriginalUiSvgReferences(
+        tagName: String,
+        rewriter: ChromeCssSvgRewriter?,
+    ): String {
+        if (rewriter == null) return this
+        var output = this
+        val originalRanges = attributeNameRanges()
+        val rewrites = mutableListOf<Pair<IntRange, String>>()
+        val iconLink =
+            tagName == "link" &&
+                originalRanges.any { range ->
+                    substring(range).equals("rel", true) &&
+                        attributeValue(range).orEmpty().split(HtmlWhitespace).any { it.equals("icon", true) }
+                }
+        originalRanges.forEach { range ->
+            val name = substring(range).lowercase(Locale.US)
+            val value = attributeValue(range) ?: return@forEach
+            val replacement =
+                when {
+                    name == "style" -> rewriter.rewrite(value).css.takeIf { it != value }
+                    name == "src" && (tagName == "img" || tagName == "input") -> rewriter.rewriteDataUri(value)
+                    name == "href" && iconLink -> rewriter.rewriteDataUri(value)
+                    else -> null
+                }
+            if (replacement != null) rewrites += range to "$name=\"${replacement.escapeHtmlAttribute()}\""
+        }
+        rewrites.asReversed().forEach { (range, replacement) -> output = output.replaceAttribute(range, replacement) }
+        return output
+    }
+
     private fun String.rewriteMetaCsp(rewriter: ((String) -> String?)?): String {
         if (rewriter == null) return this
         val httpEquiv = attributeNameRanges().filter { range -> substring(range).equals("http-equiv", true) }
@@ -335,8 +370,7 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
     }
 
     private fun String.escapeHtmlAttribute(): String =
-        replace("&", "&amp;")
-            .replace("\"", "&quot;")
+        replace("\"", "&quot;")
             .replace("<", "&lt;")
             .replace(">", "&gt;")
 
@@ -449,6 +483,7 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
         )
     private val BlockedVoidMediaElements = setOf("embed", "frame", "fencedframe")
     private val HtmlSpaces = setOf('\t', '\n', '\u000c', '\r', ' ')
+    private val HtmlWhitespace = Regex("[\\t\\n\\u000c\\r ]+")
 }
 
 internal class ChromeMediaShieldStaticMarkupException(

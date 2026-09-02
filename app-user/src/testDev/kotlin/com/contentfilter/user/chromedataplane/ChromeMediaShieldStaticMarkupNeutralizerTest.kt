@@ -1,5 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
+import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -237,5 +239,26 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
                 "<meta http-equiv='Content-Security-Policy' content='a' CONTENT='b'>",
             ) { it }
         }
+    }
+
+    @Test
+    fun `static CSS image and favicon SVGs use original asset authority while raster stays local`() {
+        val svg = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'><path d='M0 0h2v2z'/></svg>".toByteArray()
+        val encoded = Base64.getEncoder().encodeToString(svg)
+        val registry = ChromeOriginalUiSvgRegistry(randomBytes = { size -> ByteArray(size) { 4 } })
+        val rewriter = ChromeCssSvgRewriter(registry)
+        val source =
+            "<style>.a{mask:url(data:image/svg+xml;base64,$encoded)}</style>" +
+                "<div style=\"background:url(data:image/svg+xml;base64,$encoded);content:'a&amp;b'\"></div>" +
+                "<img src=\"data:image/svg+xml;base64,$encoded\">" +
+                "<link rel='shortcut icon' href=\"data:image/svg+xml;base64,$encoded\">" +
+                "<img src='data:image/png;base64,AAAA'>"
+
+        val output = ChromeMediaShieldStaticMarkupNeutralizer.neutralize(source, cssSvgRewriter = rewriter)
+
+        assertEquals(4, ChromePhotosDataPlaneLabContract.OriginalUiSvgOrigin.toRegex().findAll(output).count())
+        assertContains(output, "content:'a&amp;b'")
+        assertContains(output, "data:image/png;base64,AAAA")
+        assertEquals(1, registry.size())
     }
 }

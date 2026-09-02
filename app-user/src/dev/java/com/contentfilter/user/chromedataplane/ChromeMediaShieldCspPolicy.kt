@@ -45,6 +45,7 @@ internal class ChromeMediaShieldCspPolicy(
         admitNonceFor(directives, "script-src-elem", "script-src", scriptNonce)
         admitNonceFor(directives, "style-src-elem", "style-src", styleNonce)
         admitReadyOrigin(directives)
+        admitOriginalUiSvgOrigin(directives)
         return serialize(directives)
     }
 
@@ -53,6 +54,7 @@ internal class ChromeMediaShieldCspPolicy(
         val directives = parse(policy)
         if (directives.isEmpty()) return null
         admitReadyOrigin(directives)
+        admitOriginalUiSvgOrigin(directives)
         return serialize(directives)
     }
 
@@ -76,6 +78,13 @@ internal class ChromeMediaShieldCspPolicy(
         directives[targetKey] = Directive(directives[targetKey]?.name ?: targetKey, sources)
     }
 
+    private fun admitOriginalUiSvgOrigin(directives: LinkedHashMap<String, Directive>) {
+        val inherited = directives["img-src"]?.sources ?: directives["default-src"]?.sources ?: return
+        val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
+        if (OriginalUiSvgOrigin !in sources) sources += OriginalUiSvgOrigin
+        directives["img-src"] = Directive(directives["img-src"]?.name ?: "img-src", sources)
+    }
+
     internal fun splitEffectivePolicies(value: String): List<String> =
         value.split(',').map(String::trim).filter(String::isNotEmpty).ifEmpty { listOf(EmptyFailClosedPolicy) }
 
@@ -97,11 +106,20 @@ internal class ChromeMediaShieldCspPolicy(
             directives[targetKey]?.sources
                 ?: directives["default-src"]?.sources
                 ?: emptyList()
+        if (inherited.authorizesUnrestrictedInline()) return
         val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
         if (nonceSource !in sources) sources += nonceSource
         val existingName = directives[targetKey]?.name ?: targetKey
         directives[targetKey] = Directive(existingName, sources)
     }
+
+    private fun List<String>.authorizesUnrestrictedInline(): Boolean =
+        any { it.equals("'unsafe-inline'", ignoreCase = true) } &&
+            none { source ->
+                val normalized = source.lowercase(Locale.US)
+                normalized.startsWith("'nonce-") || normalized.startsWith("'sha256-") ||
+                    normalized.startsWith("'sha384-") || normalized.startsWith("'sha512-")
+            }
 
     private fun parse(policy: String): LinkedHashMap<String, Directive> {
         val directives = linkedMapOf<String, Directive>()
@@ -124,9 +142,10 @@ internal class ChromeMediaShieldCspPolicy(
         const val ContentSecurityPolicyReportOnly = "Content-Security-Policy-Report-Only"
         const val EmptyFailClosedPolicy = "default-src 'none'"
         const val ReadyOrigin = "https://${ChromePhotosDataPlaneLabContract.FixtureHost}"
+        const val OriginalUiSvgOrigin = ChromePhotosDataPlaneLabContract.OriginalUiSvgOrigin
         const val SelfSource = "'self'"
         const val MediaEnvelope =
-            "img-src https: http:; media-src 'none'; object-src 'none'; worker-src https: http:; " +
+            "img-src https: http: $OriginalUiSvgOrigin; media-src 'none'; object-src 'none'; worker-src https: http:; " +
                 "frame-src https: http:; child-src https: http:; fenced-frame-src 'none'"
         val Whitespace = Regex("\\s+")
         val InvalidatedDocumentEntityHeaders =

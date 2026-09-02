@@ -32,6 +32,7 @@ internal data class ChromePhotosProxyMetrics(
     val networkVisualDelivery: ChromeNetworkVisualDeliverySnapshot = ChromeNetworkVisualDeliverySnapshot(),
     val mediaShieldDocuments: ChromeMediaShieldDocumentMetrics = ChromeMediaShieldDocumentMetrics(),
     val mediaShieldReady: ChromeMediaShieldReadyEndpointMetrics = ChromeMediaShieldReadyEndpointMetrics(),
+    val originalUiSvg: ChromeOriginalUiSvgMetrics = ChromeOriginalUiSvgMetrics(),
 )
 
 internal enum class ChromeHttpConnectionDisposition {

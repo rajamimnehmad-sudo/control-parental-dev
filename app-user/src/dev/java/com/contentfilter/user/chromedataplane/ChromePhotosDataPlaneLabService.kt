@@ -256,6 +256,12 @@ class ChromePhotosDataPlaneLabService : Service() {
                             auditPlaceholderBytes = origin.auditPlaceholderImageBytes,
                             replacementPlaceholderBytes = origin.placeholderImageBytes,
                         )
+                    val originalUiSvgAuthority =
+                        if (stockMediaAuthorityEnabled) {
+                            ChromeOriginalUiSvgAuthority(origin.placeholderImageBytes)
+                        } else {
+                            null
+                        }
                     val documentAuthority =
                         if (stockMediaAuthorityEnabled) {
                             ChromeMediaShieldDocumentAuthority(
@@ -265,6 +271,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                                         sessionId = sessionId,
                                         policyEpoch = mediaPolicyEpoch,
                                         documentSelfShieldEnabled = documentSelfShieldEnabled,
+                                        cssSvgRewriter = originalUiSvgAuthority?.cssRewriter,
                                     ),
                             )
                         } else {
@@ -286,10 +293,14 @@ class ChromePhotosDataPlaneLabService : Service() {
                             documentAuthority = documentAuthority,
                             readyEndpoint =
                                 if (stockMediaAuthorityEnabled) {
-                                    ChromeMediaShieldReadyEndpoint(documentSelfShieldEnabled)
+                                    ChromeMediaShieldReadyEndpoint(
+                                        documentSelfShieldEnabled = documentSelfShieldEnabled,
+                                        svgRewriteEndpoint = originalUiSvgAuthority?.let(::ChromeOriginalUiSvgRewriteEndpoint),
+                                    )
                                 } else {
                                     null
                                 },
+                            originalUiSvgAuthority = originalUiSvgAuthority,
                         )
                     proxy = startedProxy
                     startedProxy.start()
@@ -573,6 +584,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         val networkVisuals = metrics.networkVisualDelivery
         val mediaDocuments = metrics.mediaShieldDocuments
         val readyEndpoint = metrics.mediaShieldReady
+        val originalUiSvg = metrics.originalUiSvg
         val documentRegistry = ChromeMediaShieldDocumentAuthorityRegistry.snapshot()
         val bootstrap = bootstrapController.state()
         val coverage = proxy?.coverageSnapshot()
@@ -633,6 +645,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "mediaDocumentsFailClosed=${mediaDocuments.failClosed} " +
                 "documentTransformOutstanding=${mediaDocuments.outstanding} " +
                 "readyTokensOutstanding=${documentRegistry.issuedDocuments} " +
+                "uiSvgRegistered=${originalUiSvg.registered} uiSvgRegistryBytes=${originalUiSvg.registryBytes} " +
+                "uiSvgCssRewritten=${originalUiSvg.cssRewritten} uiSvgCssRejected=${originalUiSvg.cssRejected} " +
+                "uiSvgNetworkAccepted=${originalUiSvg.networkAccepted} uiSvgNetworkRejected=${originalUiSvg.networkRejected} " +
+                "uiSvgAssetServed=${originalUiSvg.assetServed} uiSvgAssetRejected=${originalUiSvg.assetRejected} " +
                 "h18=${metrics.preRenderShieldReport} " +
                 "h19=${metrics.mediaShieldReport} " +
                 "quicAttempts=${preferences.getLong(ChromePhotosDataPlaneLabContract.KeyQuicAttempts, 0L)} " +
@@ -733,6 +749,14 @@ class ChromePhotosDataPlaneLabService : Service() {
                     "maxMicros=${renderer[ChromeMediaShieldRendererMetricsScript.FamilyMaxMicrosStart + family]}"
             }.joinToString(" ")
         Log.i(StatusLogTag, "v=1 seq=$sequence kind=rendererFamilies roots=element/fragment/text/other $familyCounters")
+        Log.i(
+            StatusLogTag,
+            "v=1 seq=$sequence kind=uiSvg registered=${originalUiSvg.registered} " +
+                "registryBytes=${originalUiSvg.registryBytes} cssRewritten=${originalUiSvg.cssRewritten} " +
+                "cssRejected=${originalUiSvg.cssRejected} networkAccepted=${originalUiSvg.networkAccepted} " +
+                "networkRejected=${originalUiSvg.networkRejected} assetServed=${originalUiSvg.assetServed} " +
+                "assetRejected=${originalUiSvg.assetRejected}",
+        )
         Log.i(
             StatusLogTag,
             "v=1 seq=$sequence kind=health failures=${metrics.failures} proxyQueueRejects=${metrics.queueRejected} " +

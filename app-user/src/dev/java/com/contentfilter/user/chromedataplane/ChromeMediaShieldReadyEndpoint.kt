@@ -57,6 +57,7 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val selfShieldLiveness: ChromeMediaShieldSelfShieldLiveness = ChromeMediaShieldSelfShieldLiveness(),
     private val bootstrapDiagnostics: ChromeMediaShieldBootstrapDiagnostics = ChromeMediaShieldBootstrapDiagnostics(),
     private val rendererMetrics: ChromeMediaShieldRendererMetrics = ChromeMediaShieldRendererMetrics(),
+    private val svgRewriteEndpoint: ChromeOriginalUiSvgRewriteEndpoint? = null,
 ) {
     private val requests = AtomicLong()
     private val preflights = AtomicLong()
@@ -77,8 +78,15 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val bootstrapDiagnosticLastRejectReason = AtomicReference("none")
 
     fun handle(request: ChromePhotosProxyRequest): ChromePhotosSanitizedResponse? {
+        svgRewriteEndpoint?.handle(request)?.let { return it }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldRendererMetricsPath) {
-            return if (documentSelfShieldEnabled) handleRendererMetrics(request) else reject("renderer_metrics_disabled")
+            return if (documentSelfShieldEnabled) {
+                handleRendererMetrics(
+                    request,
+                )
+            } else {
+                reject("renderer_metrics_disabled")
+            }
         }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldBootstrapDiagnosticPath) {
             return if (documentSelfShieldEnabled) {

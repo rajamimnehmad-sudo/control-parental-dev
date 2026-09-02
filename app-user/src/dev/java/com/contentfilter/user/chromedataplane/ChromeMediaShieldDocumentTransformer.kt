@@ -38,6 +38,7 @@ internal class ChromeMediaShieldDocumentTransformer(
     private val policyEpoch: Long,
     private val documentSelfShieldEnabled: Boolean = false,
     private val cspPolicy: ChromeMediaShieldCspPolicy = ChromeMediaShieldCspPolicy(documentSelfShieldEnabled),
+    private val cssSvgRewriter: ChromeCssSvgRewriter? = null,
     private val randomBytes: (Int) -> ByteArray = ::secureRandomBytes,
 ) {
     private val transformed = AtomicLong()
@@ -120,6 +121,7 @@ internal class ChromeMediaShieldDocumentTransformer(
                 ChromeMediaShieldStaticMarkupNeutralizer.neutralize(
                     source = injected,
                     metaCspRewriter = cspPolicy::rewriteMetaPolicy,
+                    cssSvgRewriter = cssSvgRewriter,
                 )
             transformed.incrementAndGet()
             delivered = true

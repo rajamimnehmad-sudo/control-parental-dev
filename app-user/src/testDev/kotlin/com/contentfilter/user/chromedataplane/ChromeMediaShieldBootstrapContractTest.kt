@@ -2,6 +2,8 @@ package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.core.domain.chrome.ChromeMediaShieldDocumentIdentity
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
+import org.junit.Assume.assumeNoException
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -10,6 +12,21 @@ import kotlin.test.assertTrue
 
 class ChromeMediaShieldBootstrapContractTest {
     private val script = ChromeMediaShieldBootstrap.script(ReadyToken, StyleNonce)
+
+    @Test
+    fun `generated bootstrap remains valid JavaScript`() {
+        val process =
+            try {
+                ProcessBuilder("node", "--check", "-").start()
+            } catch (missingNode: Exception) {
+                assumeNoException(missingNode)
+                return
+            }
+        process.outputStream.bufferedWriter().use { it.write(script) }
+        assertTrue(process.waitFor(10, TimeUnit.SECONDS))
+        assertEquals("", process.errorStream.bufferedReader().readText())
+        assertEquals(0, process.exitValue())
+    }
 
     @Test
     fun `renderer observer revalidates attribute targets without rescanning their subtrees`() {
@@ -539,6 +556,27 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
+    fun `tree scans dispatch query selector by exact node receiver type`() {
+        assertContains(script, "documentQueryAll=method(Document.prototype.querySelectorAll)")
+        assertContains(
+            script,
+            "const descendantQuery=(type)=>type===1?elementQueryAll:type===9?documentQueryAll:type===11?fragmentQueryAll:null",
+        )
+        assertContains(script, "const query=descendantQuery(type)")
+        assertFalse(script.contains("const query=type===1?elementQueryAll:fragmentQueryAll"))
+    }
+
+    @Test
+    fun `node text guard reads element identity only for element receivers`() {
+        assertContains(
+            script,
+            "const type=nodeTypeOf(this);if(type===2&&routeAttributeValue(this,value))return;" +
+                "const admitted=type===1&&localNameOf(this)==='style'?rewriteCssCandidate(value):value",
+        )
+        assertFalse(script.contains("const admitted=localNameOf(this)==='style'"))
+    }
+
+    @Test
     fun `sanitizers read native node and element identity after prototype tampering`() {
         assertContains(script, "nodeTypeProperty=propertyDescriptor(DOC,'nodeType')")
         assertContains(script, "localNameProperty=propertyDescriptor(DOC.documentElement,'localName')")
@@ -703,19 +741,17 @@ class ChromeMediaShieldBootstrapContractTest {
     fun `media SVG is hidden unless it satisfies a bounded inert icon grammar`() {
         assertContains(script, "const ICON_TAGS=new Set")
         assertContains(script, "!invoke(SetHas,ICON_TAGS")
-        assertContains(script, "['path','title','desc']")
-        assertContains(script, "[href],[xlink\\\\:href],[filter],[mask],[clip-path]")
+        assertContains(script, "'lineargradient','radialgradient'")
+        assertContains(script, "const internalReference=")
+        assertContains(script, "if(name==='href'||name==='xlink:href')")
         assertContains(script, "ICON_PATH_CHARS")
-        assertContains(script, "protectedIconNodes")
-        assertContains(script, "lockedIconStyleSignatures")
-        assertContains(script, "iconStyleSignature")
-        assertContains(script, "if(alreadyLocked)return true")
-        assertContains(script, "['all','initial']")
-        assertContains(script, "['d','path(\"'+d+'\")']")
-        assertContains(script, "['zoom','1']")
-        assertContains(script, "['scale','none']")
-        assertContains(script, "nativeStylePriority.call(rootStyle,'all')==='important'")
-        assertContains(script, "let child=firstChildOf(element);while(child){nodeRemove.call(element,child)")
+        assertContains(script, "const safeIconStyle=")
+        assertContains(script, "nativeSet.call(svg,'data-glosh-icon-safe','1')")
+        assertContains(script, "unhide(svg);return true")
+        assertFalse(script.contains("rootRules=[['all','initial']"))
+        assertFalse(script.contains("['d','path(\"'+d+'\")']"))
+        assertFalse(script.contains("nativeStylePriority.call(rootStyle,'all')==='important'"))
+        assertFalse(script.contains("let child=firstChildOf(element);while(child){nodeRemove.call(element,child)"))
         assertContains(script, "const WATCHED_ATTRIBUTES=")
         assertContains(script, "'d','points','viewBox','width','height','fill','stroke','transform'")
         assertContains(script, "elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)")

@@ -21,9 +21,7 @@ internal object ChromeMediaShieldBootstrap {
             "source[srcset*='data:' i],source[srcset*='blob:' i],input[type='image' i][src^='data:' i]," +
             "input[type='image' i][src^='blob:' i],iframe:not([data-glosh-network-frame='1'])," +
             "svg:not([data-glosh-icon-safe='1'])," +
-            "[data-glosh-media-blocked='1']{visibility:hidden!important;opacity:0!important}" +
-            "svg[data-glosh-icon-safe='1']{max-width:96px!important;max-height:96px!important;overflow:hidden!important;" +
-            "transform:none!important;filter:none!important;mask:none!important;clip-path:none!important}"
+            "[data-glosh-media-blocked='1']{visibility:hidden!important;opacity:0!important}"
 
     // Keep the nonce-authorized sheet immutable. H20 releases by changing only document-owned
     // state; mutating the sheet after clearing its CSP nonce can leave Chrome applying old rules.
@@ -50,6 +48,7 @@ internal object ChromeMediaShieldBootstrap {
             .replace(SelfShieldTraceUrlPlaceholder, endpoints.selfShieldTrace)
             .replace(BootstrapDiagnosticUrlPlaceholder, endpoints.diagnostic)
             .replace(RendererMetricsUrlPlaceholder, endpoints.rendererMetrics)
+            .replace(SvgRewritePathPlaceholder, ChromePhotosDataPlaneLabContract.OriginalUiSvgRewritePath)
             .replace(RendererMetricsDeclarationsPlaceholder, ChromeMediaShieldRendererMetricsScript.declarations)
             .replace(RendererMetricsReportingPlaceholder, ChromeMediaShieldRendererMetricsScript.reporting)
             .replace(ParserBarrierUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl)
@@ -117,6 +116,7 @@ internal object ChromeMediaShieldBootstrap {
     private const val SelfShieldTraceUrlPlaceholder = "__GLOSH_SELF_SHIELD_TRACE_URL__"
     private const val BootstrapDiagnosticUrlPlaceholder = "__GLOSH_BOOTSTRAP_DIAGNOSTIC_URL__"
     private const val RendererMetricsUrlPlaceholder = "__GLOSH_RENDERER_METRICS_URL__"
+    private const val SvgRewritePathPlaceholder = "__GLOSH_SVG_REWRITE_PATH__"
     private const val RendererMetricsDeclarationsPlaceholder = "__GLOSH_RENDERER_METRICS_DECLARATIONS__"
     private const val RendererMetricsReportingPlaceholder = "__GLOSH_RENDERER_METRICS_REPORTING__"
     private const val ParserBarrierUrlPlaceholder = "__GLOSH_PARSER_BARRIER_URL__"
@@ -129,7 +129,7 @@ internal object ChromeMediaShieldBootstrap {
     private val ScriptTemplate =
         """
         (()=>{'use strict';
-        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',SELF_SHIELD_TRACE_URL='__GLOSH_SELF_SHIELD_TRACE_URL__',BOOTSTRAP_DIAGNOSTIC_URL='__GLOSH_BOOTSTRAP_DIAGNOSTIC_URL__',RENDERER_METRICS_URL='__GLOSH_RENDERER_METRICS_URL__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
+        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',SELF_SHIELD_TRACE_URL='__GLOSH_SELF_SHIELD_TRACE_URL__',BOOTSTRAP_DIAGNOSTIC_URL='__GLOSH_BOOTSTRAP_DIAGNOSTIC_URL__',RENDERER_METRICS_URL='__GLOSH_RENDERER_METRICS_URL__',SVG_REWRITE_URL='__GLOSH_SVG_REWRITE_PATH__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
         const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD,USE_MODAL_CURTAIN=HAS_CURTAIN&&!SELF_SHIELD;
         const STYLE_ID='glosh-h19-media-shield',CURTAIN_ID='glosh-h19-document-curtain',CURTAIN_LAYER_ID='glosh-h19-document-curtain-layer';
         const CSS='__GLOSH_SHIELD_CSS__',CURTAIN_RELEASE_ATTRIBUTE='__GLOSH_CURTAIN_RELEASE_ATTRIBUTE__',FRAME_SANDBOX='allow-scripts allow-forms allow-popups-to-escape-sandbox';let installed=true,installFailure='PRIMORDIALS',bootstrapDiagnosticSent=false,selfReadyAccepted=false;
@@ -145,7 +145,7 @@ internal object ChromeMediaShieldBootstrap {
         const NativeLocation=SELF.location,NativeLocationReloadFunction=NativeLocation&&NativeLocation.reload;
         const NativeXMLHttpRequest=SELF.XMLHttpRequest,NativeHasFocusFunction=Document.prototype.hasFocus,NativeElementFocusFunction=SELF.HTMLElement&&HTMLElement.prototype.focus;
         const NumberIsSafeInteger=Number.isSafeInteger;
-        const StringLower=String.prototype.toLowerCase,StringIncludes=String.prototype.includes,StringTrim=String.prototype.trim,StringLastIndex=String.prototype.lastIndexOf,StringSlice=String.prototype.slice,StringCharCodeAt=String.prototype.charCodeAt;
+        const StringLower=String.prototype.toLowerCase,StringIncludes=String.prototype.includes,StringTrim=String.prototype.trim,StringIndex=String.prototype.indexOf,StringLastIndex=String.prototype.lastIndexOf,StringSlice=String.prototype.slice,StringCharCodeAt=String.prototype.charCodeAt;
         const SetHas=Set.prototype.has,SetAdd=Set.prototype.add,WeakSetHas=WeakSet.prototype.has,WeakSetAdd=WeakSet.prototype.add,WeakSetDelete=WeakSet.prototype.delete;
         const WeakMapGet=WeakMap.prototype.get,WeakMapSet=WeakMap.prototype.set,EventPrevent=Event.prototype.preventDefault,EventStopImmediate=Event.prototype.stopImmediatePropagation;
         const invoke=(fn,owner,args)=>ReflectApply(fn,owner,args),method=(fn)=>({call:(owner,...args)=>invoke(fn,owner,args),apply:(owner,args)=>invoke(fn,owner,args)});
@@ -161,7 +161,7 @@ internal object ChromeMediaShieldBootstrap {
         const descriptor=(owner,name)=>ObjectDescribe(owner,name),propertyOwner=(value,name)=>{let owner=value;while(owner&&!invoke(ObjectHasOwn,owner,[name]))owner=ObjectGetPrototype(owner);return owner};
         const propertyDescriptor=(value,name)=>{const owner=propertyOwner(value,name);return owner?descriptor(owner,name):null};
         const read=(entry,value)=>entry&&entry.get?invoke(entry.get,value,[]):undefined,stringOf=(value)=>NativeString(value),lower=(value)=>invoke(StringLower,stringOf(value),[]);
-        const includes=(value,needle)=>invoke(StringIncludes,stringOf(value),[needle]),trim=(value)=>invoke(StringTrim,stringOf(value),[]),lastIndex=(value,needle)=>invoke(StringLastIndex,stringOf(value),[needle]);
+        const includes=(value,needle)=>invoke(StringIncludes,stringOf(value),[needle]),trim=(value)=>invoke(StringTrim,stringOf(value),[]),indexOf=(value,needle,start)=>invoke(StringIndex,stringOf(value),start===undefined?[needle]:[needle,start]),lastIndex=(value,needle)=>invoke(StringLastIndex,stringOf(value),[needle]);
         const slice=(value,start,end)=>invoke(StringSlice,stringOf(value),end===undefined?[start]:[start,end]),charCode=(value,index)=>invoke(StringCharCodeAt,stringOf(value),[index]);
         const put=(array,index,value)=>{ObjectDefine(array,index,{value,writable:true,enumerable:true,configurable:true});return value};
         const append=(array,value)=>put(array,array.length,value);
@@ -178,7 +178,7 @@ internal object ChromeMediaShieldBootstrap {
         const nativeRemove=method(Element.prototype.removeAttribute),nativeToggle=method(Element.prototype.toggleAttribute);
         const nativeGetNode=method(Element.prototype.getAttributeNode),nativeGetNodeNS=method(Element.prototype.getAttributeNodeNS);
         const elementQuery=method(Element.prototype.querySelector),elementQueryAll=method(Element.prototype.querySelectorAll),elementClosest=method(Element.prototype.closest);
-        const fragmentQueryAll=method(DocumentFragment.prototype.querySelectorAll),nativeAddEvent=method(EventTarget.prototype.addEventListener),nativeDispatchEvent=method(EventTarget.prototype.dispatchEvent);
+        const documentQueryAll=method(Document.prototype.querySelectorAll),fragmentQueryAll=method(DocumentFragment.prototype.querySelectorAll),nativeAddEvent=method(EventTarget.prototype.addEventListener),nativeDispatchEvent=method(EventTarget.prototype.dispatchEvent);
         const nodeAppend=method(Node.prototype.appendChild),nodeInsert=method(Node.prototype.insertBefore),nodeReplace=method(Node.prototype.replaceChild),nodeRemove=method(Node.prototype.removeChild);
         const nativeCreateElement=method(Document.prototype.createElement);
         const nodeContains=method(Node.prototype.contains),nodeValue=descriptor(Node.prototype,'nodeValue');
@@ -186,7 +186,7 @@ internal object ChromeMediaShieldBootstrap {
         const nativeStyleSet=method(CSSStyleDeclaration.prototype.setProperty),nativeStyleRemove=method(CSSStyleDeclaration.prototype.removeProperty);
         const nativeStyleGet=method(CSSStyleDeclaration.prototype.getPropertyValue),nativeStylePriority=method(CSSStyleDeclaration.prototype.getPropertyPriority);
         const mutationObserve=method(MutationObserver.prototype.observe),mutationDisconnect=method(MutationObserver.prototype.disconnect);
-        const nodeText=descriptor(Node.prototype,'textContent'),nodeTypeProperty=propertyDescriptor(DOC,'nodeType'),localNameProperty=propertyDescriptor(DOC.documentElement,'localName');
+        const nodeText=descriptor(Node.prototype,'textContent'),nodeTypeProperty=propertyDescriptor(DOC,'nodeType'),localNameProperty=propertyDescriptor(DOC.documentElement,'localName'),namespaceUriProperty=propertyDescriptor(DOC.documentElement,'namespaceURI');
         const parentNodeProperty=propertyDescriptor(DOC.documentElement,'parentNode'),firstChildProperty=propertyDescriptor(DOC.documentElement,'firstChild');
         const isConnectedProperty=propertyDescriptor(DOC.documentElement,'isConnected'),baseUriProperty=propertyDescriptor(DOC,'baseURI');
         const styleProperty=propertyDescriptor(DOC.documentElement,'style'),svgStyleProperty=self.SVGElement?propertyDescriptor(SVGElement.prototype,'style'):null;
@@ -217,7 +217,7 @@ internal object ChromeMediaShieldBootstrap {
         const dialogOpenProperty=SELF.HTMLDialogElement?propertyDescriptor(HTMLDialogElement.prototype,'open'):null;
         const dialogClosedByProperty=SELF.HTMLDialogElement?propertyDescriptor(HTMLDialogElement.prototype,'closedBy'):null;
         const attributeStyleMapProperty=self.StylePropertyMap?propertyDescriptor(DOC.documentElement,'attributeStyleMap'):null;
-        const requiredPrimordials=[nodeText,nodeValue,nodeTypeProperty,localNameProperty,parentNodeProperty,firstChildProperty,isConnectedProperty,baseUriProperty,styleProperty,
+        const requiredPrimordials=[nodeText,nodeValue,nodeTypeProperty,localNameProperty,namespaceUriProperty,parentNodeProperty,firstChildProperty,isConnectedProperty,baseUriProperty,styleProperty,
         elementAttributesProperty,documentElementProperty,documentHeadProperty,visibilityProperty,eventTargetProperty,eventTrustedProperty,mutationTypeProperty,mutationTargetProperty,mutationAddedProperty,
         nodeListLength,namedMapLength,styleLengthProperty,urlProtocolProperty,templateContentProperty,htmlHiddenProperty,htmlTitleProperty,currentScriptProperty,scriptSrcProperty];
         if((TOP_LEVEL||SELF_SHIELD)&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!xhrResponseTextProperty))failInstall('XHR_PRIMORDIAL_MISSING');
@@ -227,7 +227,7 @@ internal object ChromeMediaShieldBootstrap {
         if(NativePageTransitionEvent&&!pagePersistedProperty)installed=false;
         if((NativePageSwapEvent&&(!pageSwapTransitionProperty||!nativeSkipViewTransition))||(NativePageRevealEvent&&(!pageRevealTransitionProperty||!nativeSkipViewTransition)))installed=false;
         if(self.HTMLIFrameElement&&!iframeSandboxProperty)installed=false;if(self.SVGElement&&!svgStyleProperty)installed=false;if(self.StylePropertyMap&&!attributeStyleMapProperty)installed=false;
-        const nodeTypeOf=(value)=>read(nodeTypeProperty,value),localNameOf=(value)=>lower(read(localNameProperty,value)||'');
+        const nodeTypeOf=(value)=>read(nodeTypeProperty,value),localNameOf=(value)=>lower(read(localNameProperty,value)||''),namespaceOf=(value)=>stringOf(read(namespaceUriProperty,value)||'');
         const parentOf=(value)=>read(parentNodeProperty,value),firstChildOf=(value)=>read(firstChildProperty,value),connected=(value)=>read(isConnectedProperty,value)===true;
         const styleOf=(value)=>{try{return read(styleProperty,value)}catch(_){return read(svgStyleProperty,value)}};
         const attributesOf=(value)=>copyList(read(elementAttributesProperty,value),namedMapLength);
@@ -256,42 +256,24 @@ internal object ChromeMediaShieldBootstrap {
         const networkUrl=(value)=>{if(!value)return false;try{const u=new NativeURL(stringOf(value),read(baseUriProperty,DOC));const protocol=read(urlProtocolProperty,u);
         return protocol==='https:'||protocol==='http:'}catch(_){return false}};
         const TOP_LAYER_ATTRIBUTE_NAMES=['popover','popovertarget','popovertargetaction','commandfor','command'],TOP_LAYER_ATTRIBUTES=new Set(TOP_LAYER_ATTRIBUTE_NAMES);
-        const ICON_TAGS=new Set(['path','title','desc']),ICON_ROOT_ATTRS=new Set(['xmlns','width','height','viewbox','preserveaspectratio','role','aria-hidden','aria-label','focusable','id','class','data-glosh-icon-safe','data-glosh-media-blocked','style']);
-        const ICON_PATH_ATTRS=new Set(['d','fill-rule','id','class','style']),ICON_TEXT_ATTRS=new Set(['id','class']),ICON_PATH_CHARS='MmLlHhVvCcSsQqTtAaZz0123456789+-.eE, \t\n\r\f';
-        const iconAttributeAllowed=(node,name,svg)=>{const tag=localNameOf(node);if(tag==='svg')return invoke(SetHas,ICON_ROOT_ATTRS,[name])&&(name!=='style'||
-        nativeGet.call(svg,'data-glosh-media-blocked')==='1'||invoke(WeakSetHas,protectedIconNodes,[node]));if(tag==='path')return invoke(SetHas,ICON_PATH_ATTRS,[name])&&
-        (name!=='style'||invoke(WeakSetHas,protectedIconNodes,[node]));return invoke(SetHas,ICON_TEXT_ATTRS,[name])};
-        const validIconPath=(value)=>{if(!value||value.length>1024)return false;for(let index=0;index<value.length;index+=1)if(!includes(ICON_PATH_CHARS,value[index]))return false;return true};
-        const iconDimensions=(svg)=>{let width=NativeNumber(nativeGet.call(svg,'width')),height=NativeNumber(nativeGet.call(svg,'height'));
-        if(!(width>0&&height>0)){const viewBox=whitespaceParts(nativeGet.call(svg,'viewBox')||'');if(viewBox.length===4){width=NativeNumber(viewBox[2]);height=NativeNumber(viewBox[3])}}
-        return width>0&&height>0&&width<=96&&height<=96?[width,height]:null};
-        const safeIcon=(svg)=>{rendererMetric(26);try{const descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);for(let index=0;index<descendants.length;index+=1)
-        if(!invoke(SetHas,ICON_TAGS,[localNameOf(descendants[index])]))return false;const nodes=[svg];for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);
-        let attributeBytes=0,pathBytes=0,pathCount=0;for(let index=0;index<nodes.length;index+=1){const node=nodes[index],attrs=attributesOf(node);for(let attributeIndex=0;attributeIndex<attrs.length;attributeIndex+=1){
-        const name=lower(attrName(attrs[attributeIndex]));if(!iconAttributeAllowed(node,name,svg))return false;if(name!=='style'||!invoke(WeakSetHas,protectedIconNodes,[node]))attributeBytes+=name.length+attrValueOf(attrs[attributeIndex]).length}
-        if(localNameOf(node)==='path'){pathCount+=1;const d=nativeGet.call(node,'d')||'';if(!validIconPath(d))return false;pathBytes+=d.length}}
-        if(descendants.length>18||attributeBytes>4096||pathCount<1||pathCount>16||pathBytes>2048||!iconDimensions(svg))return false;
-        return !elementQuery.call(svg,'[href],[xlink\\:href],[filter],[mask],[clip-path],[fill^="url(" i],[stroke^="url(" i]')}
-        catch(_){return false}};
-        const lockIconGeometry=(svg)=>{rendererMetric(27);try{const dimensions=iconDimensions(svg);if(!dimensions)return false;const nodes=[svg],descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);
-        for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);const rootStyle=styleOf(svg),width=stringOf(dimensions[0])+'px',height=stringOf(dimensions[1])+'px';
-        const rootRules=[['all','initial'],['display','inline-block'],['box-sizing','border-box'],['width',width],['height',height],['min-width','0'],['min-height','0'],['max-width',width],['max-height',height],
-        ['margin','0'],['padding','0'],['position','static'],['inset','auto'],['zoom','1'],['scale','none'],['rotate','none'],['translate','none'],['transform','none'],['transform-origin','center'],
-        ['filter','none'],['mask','none'],['clip-path','none'],['animation','none'],['transition','none'],['background','none'],['box-shadow','none'],['border','0'],['overflow','hidden'],['contain','paint'],
-        ['opacity','1'],['visibility','visible'],['pointer-events','none'],['color','#000'],['direction','ltr'],['unicode-bidi','normal']];
-        const descendantRules=(node)=>{if(localNameOf(node)!=='path')return [['all','initial'],['display','none']];const d=nativeGet.call(node,'d')||'',fillRule=lower(nativeGet.call(node,'fill-rule')||'nonzero');return [['all','initial'],['display','inline'],['d','path("'+d+'")'],['fill','currentcolor'],['stroke','none'],
-        ['fill-rule',fillRule==='evenodd'?'evenodd':'nonzero'],['opacity','1'],['transform','none'],['filter','none'],['clip-path','none'],['mask','none'],['animation','none'],['transition','none']]};
-        const iconStyleSignature=(style,rules)=>{let signature=stringOf(read(styleLengthProperty,style));for(let index=0;index<rules.length;index+=1){const name=rules[index][0];signature+='\n'+name+'\u0000'+nativeStyleGet.call(style,name)+'\u0000'+nativeStylePriority.call(style,name)}return signature};
-        const rulesLocked=(style,rules)=>{const expected=invoke(WeakMapGet,lockedIconStyleSignatures,[style]);return !!expected&&expected===iconStyleSignature(style,rules)};
-        let alreadyLocked=nativeGet.call(svg,'data-glosh-icon-safe')==='1'&&invoke(WeakSetHas,protectedIconNodes,[svg])&&rulesLocked(rootStyle,rootRules);
-        for(let index=0;alreadyLocked&&index<descendants.length;index+=1){const node=descendants[index];alreadyLocked=invoke(WeakSetHas,protectedIconNodes,[node])&&rulesLocked(styleOf(node),descendantRules(node))}
-        if(alreadyLocked)return true;for(let index=0;index<nodes.length;index+=1)invoke(WeakSetAdd,protectedIconNodes,[nodes[index]]);
-        rendererMetric(28,2);rendererMetric(37,2);nativeRemove.call(svg,'style');nativeRemove.call(svg,'data-glosh-media-blocked');watchStyle(svg);
-        rendererMetric(28,rootRules.length);rendererMetric(37,rootRules.length);for(let index=0;index<rootRules.length;index+=1)nativeStyleSet.call(rootStyle,rootRules[index][0],rootRules[index][1],'important');invoke(WeakMapSet,lockedIconStyleSignatures,[rootStyle,iconStyleSignature(rootStyle,rootRules)]);
-        for(let index=0;index<descendants.length;index+=1){const node=descendants[index],style=styleOf(node),rules=descendantRules(node);watchStyle(node);rendererMetric(28);rendererMetric(37);nativeRemove.call(node,'style');
-        rendererMetric(28,rules.length);rendererMetric(37,rules.length);for(let ruleIndex=0;ruleIndex<rules.length;ruleIndex+=1)nativeStyleSet.call(style,rules[ruleIndex][0],rules[ruleIndex][1],'important');invoke(WeakMapSet,lockedIconStyleSignatures,[style,iconStyleSignature(style,rules)])}
-        rendererMetric(28);rendererMetric(37);nativeSet.call(svg,'data-glosh-icon-safe','1');return nativeStylePriority.call(rootStyle,'all')==='important'&&nativeStyleGet.call(rootStyle,'width')===width&&nativeStylePriority.call(rootStyle,'width')==='important'}
-        catch(_){return false}};
+        const ICON_TAGS=new Set(['svg','g','defs','symbol','use','path','rect','circle','ellipse','line','polyline','polygon','title','desc','clippath','mask','lineargradient','radialgradient','stop','marker']);
+        const ICON_GLOBAL_ATTRS=new Set(['id','class','style','transform','fill','fill-opacity','fill-rule','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-miterlimit','stroke-dasharray','stroke-dashoffset','stroke-opacity','opacity','clip-path','mask','role','aria-label','aria-hidden','focusable','tabindex','pointer-events','vector-effect','data-glosh-icon-safe','data-glosh-media-blocked']);
+        const ICON_GEOMETRY_ATTRS=new Set(['xmlns','width','height','viewbox','preserveaspectratio','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','points','d','pathlength','href','xlink:href','fx','fy','fr','offset','stop-color','stop-opacity','gradientunits','gradienttransform','spreadmethod','markerwidth','markerheight','refx','refy','orient','markerunits']);
+        const ICON_PATH_CHARS='MmZzLlHhVvCcSsQqTtAaEe0123456789+-. ,\t\n\r\f',ICON_MAX_DIMENSION=16384;
+        const validIconPath=(value)=>{if(value.length>49152)return false;for(let index=0;index<value.length;index+=1)if(!includes(ICON_PATH_CHARS,value[index]))return false;return true};
+        const internalReference=(value)=>{if(!value||value[0]!=='#'||value.length>129)return false;for(let index=1;index<value.length;index+=1){const code=charCode(value,index);if(!((code>=48&&code<=57)||(code>=65&&code<=90)||(code>=97&&code<=122)||includes('_.:-',value[index])))return false}return value.length>1};
+        const safeIconStyle=(value,refs)=>{const text=stringOf(value),folded=lower(text);if(text.length>8192||includes(folded,'javascript:')||includes(folded,'data:')||includes(folded,'blob:')||includes(folded,'http:')||includes(folded,'https:')||includes(folded,'@import')||includes(folded,'expression('))return false;
+        let offset=0;while(true){const relative=indexOf(lower(slice(text,offset)),'url(');if(relative<0)return true;const start=offset+relative+4,end=indexOf(text,')',start);if(end<0)return false;let target=trim(slice(text,start,end));if((target[0]==='\''||target[0]==='"')&&target[target.length-1]===target[0])target=slice(target,1,target.length-1);if(!internalReference(target))return false;append(refs,slice(target,1));offset=end+1}};
+        const iconDimensions=(svg)=>{let width=NativeNumber(nativeGet.call(svg,'width')),height=NativeNumber(nativeGet.call(svg,'height'));const viewBox=whitespaceParts(nativeGet.call(svg,'viewBox')||'');
+        if(viewBox.length===4){const vw=NativeNumber(viewBox[2]),vh=NativeNumber(viewBox[3]);if(!(vw>0&&vh>0&&vw<=ICON_MAX_DIMENSION&&vh<=ICON_MAX_DIMENSION))return null;if(!(width>0&&height>0)){width=vw;height=vh}}
+        return width>0&&height>0&&width<=ICON_MAX_DIMENSION&&height<=ICON_MAX_DIMENSION?[width,height]:null};
+        const safeIcon=(svg)=>{rendererMetric(26);try{const descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);if(descendants.length>511)return false;const nodes=[svg],ids=new Set(),refs=[];for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);
+        let attributeBytes=0,pathBytes=0;for(let index=0;index<nodes.length;index+=1){const node=nodes[index],tag=localNameOf(node);if(namespaceOf(node)!=='http://www.w3.org/2000/svg'||!invoke(SetHas,ICON_TAGS,[tag]))return false;const attrs=attributesOf(node);for(let attributeIndex=0;attributeIndex<attrs.length;attributeIndex+=1){const name=lower(attrName(attrs[attributeIndex])),value=attrValueOf(attrs[attributeIndex]);attributeBytes+=name.length+value.length;if(attributeBytes>65536||slice(name,0,2)==='on'||(!invoke(SetHas,ICON_GLOBAL_ATTRS,[name])&&!invoke(SetHas,ICON_GEOMETRY_ATTRS,[name])))return false;
+        if(name==='id'){if(!internalReference('#'+value)||invoke(SetHas,ids,[value]))return false;invoke(SetAdd,ids,[value])}if(name==='href'||name==='xlink:href'){if(!internalReference(value))return false;append(refs,slice(value,1))}
+        if(name==='style'||name==='fill'||name==='stroke'||name==='clip-path'||name==='mask'){if(!safeIconStyle(value,refs))return false}if(name==='d'){if(!validIconPath(value))return false;pathBytes+=value.length;if(pathBytes>49152)return false}}
+        }
+        if(!iconDimensions(svg))return false;for(let index=0;index<refs.length;index+=1)if(!invoke(SetHas,ids,[refs[index]]))return false;return true}catch(_){return false}};
+        const lockIconGeometry=(svg)=>{rendererMetric(27);try{nativeRemove.call(svg,'data-glosh-media-blocked');if(nativeGet.call(svg,'data-glosh-icon-safe')!=='1')nativeSet.call(svg,'data-glosh-icon-safe','1');unhide(svg);return true}catch(_){return false}};
         const removeDeclarativeTopLayer=(element)=>{for(let index=0;index<TOP_LAYER_ATTRIBUTE_NAMES.length;index+=1){const attribute=TOP_LAYER_ATTRIBUTE_NAMES[index];
         if(nativeHas.call(element,attribute))nativeRemove.call(element,attribute)}};
         const sanitizeElementBody=(element)=>{removeDeclarativeTopLayer(element);const tag=localNameOf(element);
@@ -309,10 +291,11 @@ internal object ChromeMediaShieldBootstrap {
         if(structurallyBlocked||retainedLocalBlock||includes(values,'data:')||includes(values,'blob:')){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
         const style=lower(nativeGet.call(element,'style')||'');if(includes(style,'url(')&&(includes(style,'data:')||includes(style,'blob:')))hide(element);
         if(tag==='svg'){if(safeIcon(element)&&lockIconGeometry(element)){}
-        else{nativeRemove.call(element,'data-glosh-icon-safe');let child=firstChildOf(element);while(child){nodeRemove.call(element,child);child=firstChildOf(element)}hide(element)}}};
+        else{nativeRemove.call(element,'data-glosh-icon-safe');hide(element)}}};
         const sanitizeElement=(element,family=-1)=>{rendererSanitized(element);if(family<0)return sanitizeElementBody(element);rendererDirectSanitized(family);const started=rendererFamilyStarted(family,element);
         try{return sanitizeElementBody(element)}finally{rendererFamilyDone(family,0,started)}};
-        const scan=(root,origin=RM_OTHER,api=-1,family=-1)=>{if(!root)return;rendererScanStarted(origin,root,api,family);const started=rendererClock(),type=nodeTypeOf(root);let count=0;if(type===1){sanitizeElement(root);count=1}const query=type===1?elementQueryAll:fragmentQueryAll;
+        const descendantQuery=(type)=>type===1?elementQueryAll:type===9?documentQueryAll:type===11?fragmentQueryAll:null;
+        const scan=(root,origin=RM_OTHER,api=-1,family=-1)=>{if(!root)return;rendererScanStarted(origin,root,api,family);const started=rendererClock(),type=nodeTypeOf(root);let count=0;if(type===1){sanitizeElement(root);count=1}const query=descendantQuery(type);
         if(query){const nodes=copyList(query.call(root,'canvas,video,object,embed,frame,fencedframe,iframe,img,source,input[type="image" i],svg,[srcdoc],[style],[popover],[popovertarget],[popovertargetaction],[commandfor],[command]'),nodeListLength);count+=nodes.length;
         for(let index=0;index<nodes.length;index+=1)sanitizeElement(nodes[index])}rendererScanDone(count,started,family)};
         const sanitizeContainer=(node,family=-1)=>{rendererMetric(19);if(!node||nodeTypeOf(node)!==1)return;sanitizeElement(node,family);const svg=elementClosest.call(node,'svg');if(svg&&svg!==node)sanitizeElement(svg,family)};
@@ -468,7 +451,9 @@ internal object ChromeMediaShieldBootstrap {
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);nativeSet.call(this,'src','about:blank');hide(this);return}
-        const result=nativeSet.call(this,attributeName,attributeValue);sanitizeContainer(this);return result})&&installed;
+        let admittedValue=attributeValue;if(key==='style')admittedValue=rewriteCssCandidate(admittedValue);else if(key==='src'&&(tag==='img'||(tag==='input'&&lower(nativeGet.call(this,'type')||'')==='image')))admittedValue=rewriteDataSvgValue(admittedValue);
+        else if(key==='href'&&tag==='link'&&includes(' '+lower(nativeGet.call(this,'rel')||' ')+' ',' icon '))admittedValue=rewriteDataSvgValue(admittedValue);
+        const result=nativeSet.call(this,attributeName,admittedValue);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'removeAttribute',function(name){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
         if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
@@ -529,7 +514,7 @@ internal object ChromeMediaShieldBootstrap {
         const sealedEntry=descriptor(owner,'sandbox');return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
         if(self.HTMLIFrameElement)installed=guardFrameSandbox()&&installed;
         const guardMediaAccessor=(prototype,name)=>{const owner=prototype&&propertyOwner(prototype,name),entry=owner&&descriptor(owner,name);
-        if(!owner||!entry||!entry.get||!entry.set)return false;try{const guardedGet=entry.get,guardedSet=function(value){const result=invoke(entry.set,this,[value]);sanitizeElement(this);return result};
+        if(!owner||!entry||!entry.get||!entry.set)return false;try{const guardedGet=entry.get,guardedSet=function(value){const admitted=name==='src'?rewriteDataSvgValue(value):value;const result=invoke(entry.set,this,[admitted]);sanitizeElement(this);return result};
         ObjectDefine(owner,name,{get:guardedGet,set:guardedSet,enumerable:entry.enumerable,configurable:false});const sealedEntry=descriptor(owner,name);
         return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
         for(const pair of [[self.HTMLImageElement&&HTMLImageElement.prototype,'src'],[self.HTMLImageElement&&HTMLImageElement.prototype,'srcset'],
@@ -545,19 +530,32 @@ internal object ChromeMediaShieldBootstrap {
         const protectedRule=(value)=>{try{return !!value&&protectedSheet(read(cssParentSheetProperty,value))}catch(_){return false}};
         const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedIconNodes,[owner])||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'||
         nativeGet.call(owner,'data-glosh-icon-safe')==='1'))return true;try{const rule=read(cssParentRuleProperty,value);return !!rule&&protectedRule(rule)}catch(_){return false}};
-        installSection('CSSOM_GUARDS');installed=seal(CSSStyleDeclaration.prototype,'setProperty',function(...args){if(protectedDeclaration(this))deny();const result=nativeStyleSet.apply(this,args);
-        const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner);return result})&&installed;
+        const SVG_REWRITE_RESPONSE_URL=resolvedEndpoint(SVG_REWRITE_URL),svgRewriteInputs=[],svgRewriteOutputs=[];
+        const rewriteCssCandidate=(value)=>{const source=stringOf(value);if(!SELF_SHIELD||!includes(lower(source),'data:image/svg+xml'))return source;for(let index=0;index<svgRewriteInputs.length;index+=1)if(svgRewriteInputs[index]===source)return svgRewriteOutputs[index];
+        let output=source;try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',SVG_REWRITE_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
+        xhrSend.call(xhr,'v1|SVG_REWRITE|'+READY+'|'+SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|'+(TOP_LEVEL?'T':'S')+'\n'+source);
+        if(read(xhrStatusProperty,xhr)===200&&read(xhrResponseUrlProperty,xhr)===SVG_REWRITE_RESPONSE_URL)output=stringOf(read(xhrResponseTextProperty,xhr)||source)}catch(_){}
+        if(svgRewriteInputs.length<64){append(svgRewriteInputs,source);append(svgRewriteOutputs,output)}return output};
+        const rewriteDataSvgValue=(value)=>{const source=stringOf(value);if(slice(lower(source),0,18)!=='data:image/svg+xml')return source;const rewritten=rewriteCssCandidate('url('+source+')');
+        return slice(rewritten,0,5)==='url("'&&slice(rewritten,-2)==='")'?slice(rewritten,5,-2):source};
+        const rewriteElementSvgReferences=(element)=>{const tag=localNameOf(element),styleValue=nativeGet.call(element,'style');if(styleValue&&includes(lower(styleValue),'data:image/svg+xml'))nativeSet.call(element,'style',rewriteCssCandidate(styleValue));
+        if(tag==='style'){const text=stringOf(read(nodeText,element)||'');if(includes(lower(text),'data:image/svg+xml'))invoke(nodeText.set,element,[rewriteCssCandidate(text)])}
+        if(tag==='img'||(tag==='input'&&lower(nativeGet.call(element,'type')||'')==='image')){const source=nativeGet.call(element,'src');if(source)nativeSet.call(element,'src',rewriteDataSvgValue(source))}
+        if(tag==='link'&&includes(' '+lower(nativeGet.call(element,'rel')||' ')+' ',' icon ')){const href=nativeGet.call(element,'href');if(href)nativeSet.call(element,'href',rewriteDataSvgValue(href))}};
+        const rewriteTreeSvgReferences=(root)=>{const type=nodeTypeOf(root);if(type===1)rewriteElementSvgReferences(root);const query=descendantQuery(type);if(!query)return;const nodes=copyList(query.call(root,'style,[style],img[src],input[type="image" i][src],link[rel~="icon" i][href]'),nodeListLength);for(let index=0;index<nodes.length;index+=1)rewriteElementSvgReferences(nodes[index])};
+        installSection('CSSOM_GUARDS');installed=seal(CSSStyleDeclaration.prototype,'setProperty',function(...args){if(protectedDeclaration(this))deny();
+        if(args.length>1)put(args,1,rewriteCssCandidate(args[1]));const result=nativeStyleSet.apply(this,args);const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner);return result})&&installed;
         installed=seal(CSSStyleDeclaration.prototype,'removeProperty',function(...args){if(protectedDeclaration(this))deny();const result=nativeStyleRemove.apply(this,args);
         const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner);return result})&&installed;
         for(const name of ['all','display','boxSizing','width','height','minWidth','minHeight','maxWidth','maxHeight','margin','padding','visibility','opacity','zoom','scale','rotate','translate','transform','transformOrigin',
         'filter','mask','clipPath','animation','transition','position','inset','background','backgroundImage','listStyleImage','borderImageSource','cursor','content','boxShadow','border','overflow','contain','pointerEvents','zIndex','mixBlendMode','color','direction','unicodeBidi','d','fill','stroke','fillRule']){const entry=descriptor(CSSStyleDeclaration.prototype,name);
         if(entry&&entry.get&&entry.set){try{ObjectDefine(CSSStyleDeclaration.prototype,name,{get:entry.get,set:function(value){
-        if(protectedDeclaration(this))deny();invoke(entry.set,this,[value]);const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner)},configurable:false})}catch(_){installed=false}}}
+        if(protectedDeclaration(this))deny();invoke(entry.set,this,[rewriteCssCandidate(value)]);const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner)},configurable:false})}catch(_){installed=false}}}
         const cssText=descriptor(CSSStyleDeclaration.prototype,'cssText');if(cssText&&cssText.get&&cssText.set){try{
-        ObjectDefine(CSSStyleDeclaration.prototype,'cssText',{get:cssText.get,set:function(value){if(protectedDeclaration(this))deny();invoke(cssText.set,this,[value]);const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner)},configurable:false})
+        ObjectDefine(CSSStyleDeclaration.prototype,'cssText',{get:cssText.get,set:function(value){if(protectedDeclaration(this))deny();invoke(cssText.set,this,[rewriteCssCandidate(value)]);const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner)},configurable:false})
         }catch(_){installed=false}}else installed=false;
         if(self.CSSStyleSheet){for(const name of ['insertRule','deleteRule','addRule','removeRule','replace','replaceSync']){const original=CSSStyleSheet.prototype[name];if(original)
-        installed=seal(CSSStyleSheet.prototype,name,function(...args){if(protectedSheet(this))deny();return invoke(original,this,args)})&&installed}}
+        installed=seal(CSSStyleSheet.prototype,name,function(...args){if(protectedSheet(this))deny();if((name==='insertRule'||name==='addRule'||name==='replace'||name==='replaceSync')&&args.length>0)put(args,0,rewriteCssCandidate(args[0]));return invoke(original,this,args)})&&installed}}
         installed=guardAccessorProperty(StyleSheet.prototype,'disabled',styleSheetDisabledProperty,protectedSheet,false)&&installed;
         installed=guardAccessorProperty(StyleSheet.prototype,'media',styleSheetMediaProperty,protectedSheet,true)&&installed;
         if(self.MediaList){for(const name of ['appendMedium','deleteMedium']){const original=MediaList.prototype[name];if(original)
@@ -602,7 +600,7 @@ internal object ChromeMediaShieldBootstrap {
         ObjectDefine(HTMLStyleElement.prototype,name,{get:entry.get,set:function(value){if(protectedNode(this))deny();invoke(entry.set,this,[value])},configurable:false})
         }catch(_){installed=false}}else installed=false}}
         installSection('TEXT_MARKUP_GUARDS');if(nodeText&&nodeText.get&&nodeText.set){try{ObjectDefine(Node.prototype,'textContent',{get:nodeText.get,set:function(value){
-        const mapped=mappedProtected(this);if(!mapped&&containsProtected(this))deny();if(nodeTypeOf(this)===2&&routeAttributeValue(this,value))return;invoke(nodeText.set,this,[value]);
+        const mapped=mappedProtected(this);if(!mapped&&containsProtected(this))deny();const type=nodeTypeOf(this);if(type===2&&routeAttributeValue(this,value))return;const admitted=type===1&&localNameOf(this)==='style'?rewriteCssCandidate(value):value;invoke(nodeText.set,this,[admitted]);
         if(mapped){rendererApiCall(RMA_MAPPED_TEXT,RMF_MARKUP);restoreMappedProtected(this);scan(this,RM_MARKUP,RMA_MAPPED_TEXT,RMF_MARKUP)}},configurable:false})
         }catch(_){installed=false}}else installed=false;
         if(nodeValue&&nodeValue.get&&nodeValue.set){try{ObjectDefine(Node.prototype,'nodeValue',{get:nodeValue.get,set:function(value){
@@ -627,7 +625,7 @@ internal object ChromeMediaShieldBootstrap {
         const clone=method(Node.prototype.cloneNode);installed=seal(Node.prototype,'cloneNode',function(deep){rendererApiCall(RMA_CLONE,RMF_MARKUP);const copy=clone.call(this,deep);scan(copy,RM_MARKUP,RMA_CLONE,RMF_MARKUP);return copy})&&installed;
         const inner=descriptor(Element.prototype,'innerHTML');
         const safeMarkup=(value)=>{rendererApiCall(RMA_SAFE_MARKUP,RMF_MARKUP);if(!inner||!inner.set||!inner.get)deny();const template=create.call(DOC,'template');invoke(inner.set,template,[stringOf(value)]);
-        scan(templateContent(template),RM_MARKUP,RMA_SAFE_MARKUP,RMF_MARKUP);return invoke(inner.get,template,[])};
+        rewriteTreeSvgReferences(templateContent(template));scan(templateContent(template),RM_MARKUP,RMA_SAFE_MARKUP,RMF_MARKUP);return invoke(inner.get,template,[])};
         const insertHtml=Element.prototype.insertAdjacentHTML;installed=seal(Element.prototype,'insertAdjacentHTML',function(position,text){
         rendererApiCall(RMA_INSERT_HTML,RMF_MARKUP);if(containsProtected(this))deny();const result=invoke(insertHtml,this,[position,safeMarkup(text)]);scan(this,RM_MARKUP,RMA_INSERT_HTML,RMF_MARKUP);return result})&&installed;
         if(inner&&inner.set&&inner.get){try{

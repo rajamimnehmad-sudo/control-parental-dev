@@ -17,7 +17,7 @@ internal class ChromePublicDestinationAuthority(
 ) {
     fun admitConnect(requestLine: String): ChromePhotosConnectTarget? {
         val target = ChromePhotosConnectTarget.parseSyntax(requestLine) ?: return null
-        if (target.host == ChromePhotosDataPlaneLabContract.FixtureHost) return target
+        if (target.host == ChromePhotosDataPlaneLabContract.FixtureHost || target.host == ChromePhotosDataPlaneLabContract.OriginalUiSvgHost) return target
         return target.takeIf { resolvePublic(it.host).isNotEmpty() }
     }
 
@@ -34,7 +34,9 @@ internal class ChromePublicDestinationAuthority(
     fun isSyntacticallyPublicHost(rawHost: String): Boolean =
         runCatching { normalizeDnsHost(rawHost) }
             .getOrNull()
-            ?.let { it != ChromePhotosDataPlaneLabContract.FixtureHost } == true
+            ?.let {
+                it != ChromePhotosDataPlaneLabContract.FixtureHost && it != ChromePhotosDataPlaneLabContract.OriginalUiSvgHost
+            } == true
 }
 
 internal class ChromeAuthorityDns(

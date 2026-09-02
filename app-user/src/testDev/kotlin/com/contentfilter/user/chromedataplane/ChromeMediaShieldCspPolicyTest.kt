@@ -28,7 +28,7 @@ class ChromeMediaShieldCspPolicyTest {
 
         assertEquals(1, policies.size)
         assertEquals(
-            "img-src https: http:; media-src 'none'; object-src 'none'; worker-src https: http:; " +
+            "img-src https: http: https://glosh-ui-svg.test; media-src 'none'; object-src 'none'; worker-src https: http:; " +
                 "frame-src https: http:; child-src https: http:; fenced-frame-src 'none'",
             policies.single(),
         )
@@ -76,7 +76,10 @@ class ChromeMediaShieldCspPolicyTest {
                 StyleNonce,
             )
 
-        assertEquals("img-src https://images.example; object-src 'none'", rewritten)
+        assertEquals(
+            "img-src https://images.example https://glosh-ui-svg.test; object-src 'none'",
+            rewritten,
+        )
     }
 
     @Test
@@ -93,6 +96,34 @@ class ChromeMediaShieldCspPolicyTest {
         assertTrue(rewritten.contains("connect-src https://glosh-photos.test"))
         assertTrue(rewritten.contains("object-src 'none'"))
         assertTrue(rewritten.contains("frame-ancestors 'none'"))
+    }
+
+    @Test
+    fun `site unrestricted inline semantics remain unchanged by bootstrap admission`() {
+        val rewritten =
+            policy.admitBootstrap(
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline' https://css.example",
+                ScriptNonce,
+                StyleNonce,
+            )
+
+        assertTrue(rewritten.contains("script-src 'self' 'unsafe-inline'"))
+        assertTrue(rewritten.contains("style-src 'unsafe-inline' https://css.example"))
+        assertFalse(rewritten.contains("'nonce-$ScriptNonce'"))
+        assertFalse(rewritten.contains("'nonce-$StyleNonce'"))
+    }
+
+    @Test
+    fun `site inline hash semantics still receive exact bootstrap nonce`() {
+        val rewritten =
+            policy.admitBootstrap(
+                "script-src 'unsafe-inline' 'sha256-siteHash'; style-src 'unsafe-inline' 'nonce-siteNonce'",
+                ScriptNonce,
+                StyleNonce,
+            )
+
+        assertTrue(rewritten.contains("script-src 'unsafe-inline' 'sha256-siteHash' 'nonce-$ScriptNonce'"))
+        assertTrue(rewritten.contains("style-src 'unsafe-inline' 'nonce-siteNonce' 'nonce-$StyleNonce'"))
     }
 
     @Test
@@ -126,7 +157,8 @@ class ChromeMediaShieldCspPolicyTest {
         val rewritten = policy.rewriteMetaPolicy("default-src 'self'; connect-src 'none'; object-src 'none'")
 
         assertEquals(
-            "default-src 'self'; connect-src https://glosh-photos.test; object-src 'none'",
+            "default-src 'self'; connect-src https://glosh-photos.test; object-src 'none'; " +
+                "img-src 'self' https://glosh-ui-svg.test",
             rewritten,
         )
         assertEquals(null, policy.rewriteMetaPolicy("default-src &apos;self&apos;"))

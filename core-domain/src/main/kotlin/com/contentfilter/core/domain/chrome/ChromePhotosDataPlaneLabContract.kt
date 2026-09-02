@@ -41,6 +41,8 @@ object ChromePhotosDataPlaneLabContract {
 
     const val FixtureHost = "glosh-photos.test"
     const val FixtureUrl = "https://glosh-photos.test/"
+    const val OriginalUiSvgHost = "glosh-ui-svg.test"
+    const val OriginalUiSvgOrigin = "https://glosh-ui-svg.test"
     const val MediaShieldReadyPath = "/.well-known/glosh-h19-ready"
     const val MediaShieldReadyUrl = "https://glosh-photos.test/.well-known/glosh-h19-ready"
     const val MediaShieldSelfReadyPath = "/.well-known/glosh-h20-self-ready"
@@ -54,6 +56,7 @@ object ChromePhotosDataPlaneLabContract {
     const val MediaShieldRendererMetricsPath = "/.well-known/glosh-h20-renderer-metrics"
     const val MediaShieldRendererMetricsUrl =
         "https://glosh-photos.test/.well-known/glosh-h20-renderer-metrics"
+    const val OriginalUiSvgRewritePath = "/.well-known/glosh-h20-ui-svg-rewrite"
     const val MediaShieldParserBarrierPath = "/.well-known/glosh-h19-parser-barrier.js"
     const val MediaShieldParserBarrierUrl =
         "https://glosh-photos.test/.well-known/glosh-h19-parser-barrier.js"
