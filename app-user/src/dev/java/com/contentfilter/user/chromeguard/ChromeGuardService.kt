@@ -16,6 +16,7 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.contentfilter.user.R
+import com.contentfilter.user.chromedataplane.ChromeBatteryBaselinePreconditions
 
 class ChromeGuardService : Service() {
     private val handler = Handler(Looper.getMainLooper())
@@ -24,6 +25,8 @@ class ChromeGuardService : Service() {
     private var mainBinder: IBinder? = null
     private var mainDeathRecipient: IBinder.DeathRecipient? = null
     private val expiryRunnable = Runnable { onLeaseDeadline() }
+    private val baselineExpiryRunnable = Runnable { onBaselineDeadline() }
+    private var baselineLease: ChromeBatteryBaselineLease? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -46,6 +49,7 @@ class ChromeGuardService : Service() {
         startId: Int,
     ): Int {
         when (intent?.action) {
+            ActionStart -> revokeBaseline("normal_start")
             ActionLockedBoot -> invalidate("boot_guard")
             ActionBootCompleted -> invalidate("boot_guard")
             ActionPackageReplaced -> invalidate("package_replaced_guard")
@@ -57,7 +61,17 @@ class ChromeGuardService : Service() {
                 handler.post { Process.killProcess(Process.myPid()) }
                 return START_NOT_STICKY
             }
-            ActionStatus -> logStatus("requested")
+            ActionStatus -> {
+                expireBaselineIfNeeded()
+                logStatus("requested")
+            }
+            ActionBatteryBaselineStart -> startBatteryBaseline(intent)
+            ActionBatteryBaselineStop -> {
+                revokeBaseline("baseline_stop")
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopSelf()
+                return START_NOT_STICKY
+            }
             ActionStop -> {
                 invalidate(intent.getStringExtra(ChromeGuardContract.KeyReason) ?: "guard_stop")
                 stopForeground(STOP_FOREGROUND_REMOVE)
@@ -73,6 +87,8 @@ class ChromeGuardService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(expiryRunnable)
+        handler.removeCallbacks(baselineExpiryRunnable)
+        baselineLease = null
         unlinkMainDeathRecipient()
         coordinator.revoke("guard_destroyed")
         super.onDestroy()
@@ -82,7 +98,10 @@ class ChromeGuardService : Service() {
         override fun handleMessage(message: Message) {
             val callerAuthorized = ChromeGuardCallerVerifier.isSameApplicationUid(this@ChromeGuardService, message.sendingUid)
             when (message.what) {
-                ChromeGuardContract.MessageBeginSession -> beginSession(message, callerAuthorized)
+                ChromeGuardContract.MessageBeginSession -> {
+                    revokeBaseline("normal_start")
+                    beginSession(message, callerAuthorized)
+                }
                 ChromeGuardContract.MessageHeartbeat -> heartbeat(message, callerAuthorized)
                 ChromeGuardContract.MessageRevoke -> {
                     val reason = message.data.getString(ChromeGuardContract.KeyReason).orEmpty().ifBlank { "main_revoked" }
@@ -164,6 +183,72 @@ class ChromeGuardService : Service() {
         }
     }
 
+    private fun startBatteryBaseline(intent: Intent) {
+        revokeBaseline("baseline_pending")
+        val durationMillis =
+            chromeBatteryBaselineDurationMillis(
+                intent.getIntExtra(ExtraBatteryBaselineMinutes, 0),
+            )
+        val preconditions = ChromeBatteryBaselinePreconditions.capture(this)
+        val reasons = preconditions.rejectionReasons()
+        if (durationMillis == null || reasons.isNotEmpty()) {
+            coordinator.revoke("baseline_precondition")
+            Log.e(
+                LogTag,
+                "event=baseline_rejected durationValid=${durationMillis != null} " +
+                    "reasons=${reasons.joinToString(",").ifBlank { "duration" }}",
+            )
+            logStatus("baseline_rejected")
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        val lease =
+            ChromeBatteryBaselineLease(
+                bootMarker = ChromeGuardBootMarker.current(this),
+                issuedAtElapsed = now,
+                expiresAtElapsed = now + durationMillis,
+            )
+        if (!ChromeSuspensionAuthority(this).ensureReleased()) {
+            coordinator.revoke("baseline_release_failed")
+            logStatus("baseline_rejected")
+            return
+        }
+        baselineLease = lease
+        handler.removeCallbacks(baselineExpiryRunnable)
+        handler.postDelayed(baselineExpiryRunnable, durationMillis)
+        Log.i(
+            LogTag,
+            "event=baseline_started devOnly=true chrome=${ChromeGuardContract.ChromePackage} " +
+                "boot=${lease.bootMarker} issued=${lease.issuedAtElapsed} expires=${lease.expiresAtElapsed}",
+        )
+        logStatus("baseline_started")
+    }
+
+    private fun onBaselineDeadline() {
+        if (!expireBaselineIfNeeded()) {
+            val lease = baselineLease ?: return
+            val now = SystemClock.elapsedRealtime()
+            handler.postDelayed(baselineExpiryRunnable, (lease.expiresAtElapsed - now).coerceAtLeast(0L))
+        }
+    }
+
+    private fun expireBaselineIfNeeded(): Boolean {
+        val lease = baselineLease ?: return false
+        val current = lease.isCurrent(ChromeGuardBootMarker.current(this), SystemClock.elapsedRealtime())
+        if (current) return false
+        revokeBaseline("baseline_expired")
+        Log.w(LogTag, "event=baseline_expired")
+        return true
+    }
+
+    private fun revokeBaseline(reason: String) {
+        if (baselineLease == null) return
+        handler.removeCallbacks(baselineExpiryRunnable)
+        baselineLease = null
+        coordinator.revoke(reason)
+        Log.i(LogTag, "event=baseline_revoked reason=$reason")
+    }
+
     private fun scheduleLeaseDeadline(
         expiresAtElapsed: Long,
         nowElapsed: Long = SystemClock.elapsedRealtime(),
@@ -177,6 +262,8 @@ class ChromeGuardService : Service() {
 
     private fun invalidate(reason: String) {
         handler.removeCallbacks(expiryRunnable)
+        handler.removeCallbacks(baselineExpiryRunnable)
+        baselineLease = null
         coordinator.revoke(reason)
         unlinkMainDeathRecipient()
         logStatus("invalidated")
@@ -225,6 +312,7 @@ class ChromeGuardService : Service() {
 
     private fun logStatus(event: String) {
         val snapshot = coordinator.snapshot()
+        val baseline = baselineLease
         Log.i(
             LogTag,
             "event=$event state=${snapshot.state.name.lowercase()} generation=${snapshot.protectionGeneration} " +
@@ -232,7 +320,9 @@ class ChromeGuardService : Service() {
                 "reason=${snapshot.lastReason} accepted=${snapshot.acceptedHeartbeats} " +
                 "staleRejects=${snapshot.staleRejects} wrongCallerRejects=${snapshot.wrongCallerRejects} " +
                 "guardRestarts=${snapshot.guardRestarts} pid=${Process.myPid()} " +
-                "chromeSuspended=${ChromeSuspensionAuthority(this).isSuspended()}",
+                "chromeSuspended=${ChromeSuspensionAuthority(this).isSuspended()} " +
+                "baselineActive=${baseline != null} baselineBoot=${baseline?.bootMarker ?: -1L} " +
+                "baselineIssued=${baseline?.issuedAtElapsed ?: 0L} baselineExpires=${baseline?.expiresAtElapsed ?: 0L}",
         )
     }
 
@@ -261,6 +351,9 @@ class ChromeGuardService : Service() {
         const val ActionBootCompleted = "com.contentfilter.user.chromeguard.BOOT_COMPLETED"
         const val ActionPackageReplaced = "com.contentfilter.user.chromeguard.PACKAGE_REPLACED"
         const val ActionDevKillSelf = "com.contentfilter.user.chromeguard.DEV_KILL_SELF"
+        const val ActionBatteryBaselineStart = "com.contentfilter.user.chromeguard.BATTERY_BASELINE_START"
+        const val ActionBatteryBaselineStop = "com.contentfilter.user.chromeguard.BATTERY_BASELINE_STOP"
+        const val ExtraBatteryBaselineMinutes = "battery_baseline_minutes"
         const val KeyMainPid = "main_pid"
         const val LogTag = "ChromeProcessGuard"
 

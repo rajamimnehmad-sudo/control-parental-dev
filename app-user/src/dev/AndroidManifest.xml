@@ -50,6 +50,9 @@
                 <action android:name="com.contentfilter.user.chromedataplane.command.MAIN_JAVA_CRASH" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.GUARD_PROCESS_KILL" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.GUARD_STATUS" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.BATTERY_BASELINE_START" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.BATTERY_BASELINE_STOP" />
+                <action android:name="com.contentfilter.user.chromedataplane.command.BATTERY_BASELINE_STATUS" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.PREPARE_UPDATE" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.TRUSTED_BOOTSTRAP_RESET_ARM" />
                 <action android:name="com.contentfilter.user.chromedataplane.command.ACTIVE_DOCUMENT_HOLD_ARM" />

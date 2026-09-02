@@ -15,6 +15,11 @@ internal data class ChromePhotosLabPolicyResult(
     val proxyPolicy: String,
 )
 
+internal data class ChromePhotosLabBatteryBaselineResidualState(
+    val labProxyAbsent: Boolean,
+    val ephemeralCaAbsent: Boolean,
+)
+
 /** Pure, type-sensitive contract used around the Android Bundle/Parcel transaction. */
 internal object ChromeRestrictionsSnapshotContract {
     fun merge(
@@ -213,6 +218,26 @@ internal class ChromePhotosLabPolicyController(
         return proxySettings.getString(ProxySettingsPolicy) == ChromePhotosChromePolicy.proxySettingsJson() &&
             (!stockMediaAuthorityEnabled || ChromeStockMediaManagedPolicy.matches(proxySettings)) &&
             devicePolicyManager.hasCaCertInstalled(admin, caCertificateDer)
+    }
+
+    fun batteryBaselineResidualState(): ChromePhotosLabBatteryBaselineResidualState {
+        val restrictions =
+            devicePolicyManager.getApplicationRestrictions(
+                admin,
+                ChromePhotosDataPlaneLabContract.ChromePackage,
+            )
+        val ownsLabState =
+            preferences.getBoolean(KeyOwnedPolicyApplied, false) ||
+                preferences.contains(KeyRestrictionsSnapshot) ||
+                preferences.contains(KeyRestrictionsSnapshotDigest)
+        return ChromePhotosLabBatteryBaselineResidualState(
+            labProxyAbsent =
+                !ownsLabState &&
+                    restrictions.getString(ProxySettingsPolicy) != ChromePhotosChromePolicy.proxySettingsJson(),
+            ephemeralCaAbsent =
+                !preferences.contains(ChromePhotosDataPlaneLabContract.KeyInstalledCaDer) &&
+                    !preferences.contains(ChromePhotosDataPlaneLabContract.KeyCaFingerprint),
+        )
     }
 
     fun rollbackOwnedPolicyAndCa() {

@@ -20,6 +20,10 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (!context.packageName.endsWith(".dev")) return
+        if (intent.action in BatteryBaselineActions) {
+            handleBatteryBaseline(context, intent)
+            return
+        }
         if (intent.action == ActionActiveDocumentReplay) {
             val result = ChromeMediaShieldActiveDocumentLabControl.replayConsumedPresent()
             setResultData(result)
@@ -192,6 +196,41 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         ContextCompat.startForegroundService(context, serviceIntent)
     }
 
+    private fun handleBatteryBaseline(
+        context: Context,
+        intent: Intent,
+    ) {
+        val serviceIntent = Intent(context, ChromeGuardService::class.java)
+        when (intent.action) {
+            ActionBatteryBaselineStart -> {
+                val preconditions = ChromeBatteryBaselinePreconditions.capture(context)
+                val durationMinutes = intent.getIntExtra(ExtraBatteryBaselineMinutes, 0)
+                val durationValid =
+                    com.contentfilter.user.chromeguard.chromeBatteryBaselineDurationMillis(durationMinutes) != null
+                val reasons = preconditions.rejectionReasons()
+                if (!durationValid || reasons.isNotEmpty()) {
+                    val result = reasons.joinToString(",").ifBlank { "duration" }
+                    setResultData("baseline_rejected:$result")
+                    Log.e(BatteryBaselineLogTag, "event=baseline_request_rejected reasons=$result")
+                    return
+                }
+                serviceIntent
+                    .setAction(ChromeGuardService.ActionBatteryBaselineStart)
+                    .putExtra(ChromeGuardService.ExtraBatteryBaselineMinutes, durationMinutes)
+                setResultData("baseline_requested:${durationMinutes}m")
+            }
+            ActionBatteryBaselineStop -> {
+                serviceIntent.setAction(ChromeGuardService.ActionBatteryBaselineStop)
+                setResultData("baseline_stop_requested")
+            }
+            else -> {
+                serviceIntent.setAction(ChromeGuardService.ActionStatus)
+                setResultData("baseline_status_requested")
+            }
+        }
+        ContextCompat.startForegroundService(context, serviceIntent)
+    }
+
     companion object {
         const val ActionStart = "com.contentfilter.user.chromedataplane.command.START"
         const val ActionStop = "com.contentfilter.user.chromedataplane.command.STOP"
@@ -205,6 +244,12 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ActionMainJavaCrash = "com.contentfilter.user.chromedataplane.command.MAIN_JAVA_CRASH"
         const val ActionGuardProcessKill = "com.contentfilter.user.chromedataplane.command.GUARD_PROCESS_KILL"
         const val ActionGuardStatus = "com.contentfilter.user.chromedataplane.command.GUARD_STATUS"
+        const val ActionBatteryBaselineStart =
+            "com.contentfilter.user.chromedataplane.command.BATTERY_BASELINE_START"
+        const val ActionBatteryBaselineStop =
+            "com.contentfilter.user.chromedataplane.command.BATTERY_BASELINE_STOP"
+        const val ActionBatteryBaselineStatus =
+            "com.contentfilter.user.chromedataplane.command.BATTERY_BASELINE_STATUS"
         const val ActionPrepareUpdate = "com.contentfilter.user.chromedataplane.command.PREPARE_UPDATE"
         const val ActionTrustedBootstrapResetArm =
             "com.contentfilter.user.chromedataplane.command.TRUSTED_BOOTSTRAP_RESET_ARM"
@@ -233,8 +278,12 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         const val ExtraDocumentSelfShieldEnabled = ChromePhotosDataPlaneLabContract.KeyDocumentSelfShieldEnabled
         const val ExtraDecisionCacheEntries = "chrome_photo_decision_cache_entries"
         const val ExtraDecisionConcurrency = "chrome_photo_decision_concurrency"
+        const val ExtraBatteryBaselineMinutes = "battery_baseline_minutes"
         private const val DefaultTransportStressCycles = 100
         private const val ActiveDocumentLogTag = "ChromeMediaShieldActiveDocument"
+        private const val BatteryBaselineLogTag = "ChromeBatteryBaseline"
+        private val BatteryBaselineActions =
+            setOf(ActionBatteryBaselineStart, ActionBatteryBaselineStop, ActionBatteryBaselineStatus)
         private val ActiveDocumentHoldActions =
             setOf(
                 ActionActiveDocumentHoldArm,

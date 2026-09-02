@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 internal data class ChromeOriginalUiSvgAsset(
     val digest: String,
@@ -21,6 +22,10 @@ internal class ChromeOriginalUiSvgRegistry(
     private val active = AtomicBoolean(true)
     private val entries = linkedMapOf<String, ByteArray>()
     private var totalBytes = 0
+
+    init {
+        ActiveRegistries.incrementAndGet()
+    }
 
     @Synchronized
     fun register(bytes: ByteArray): String? {
@@ -59,13 +64,17 @@ internal class ChromeOriginalUiSvgRegistry(
 
     @Synchronized
     override fun close() {
-        active.set(false)
+        if (!active.compareAndSet(true, false)) return
         entries.values.forEach { it.fill(0) }
         entries.clear()
         totalBytes = 0
+        ActiveRegistries.decrementAndGet()
     }
 
-    private companion object {
+    companion object {
+        fun activeRegistryCount(): Int = ActiveRegistries.get()
+
+        private val ActiveRegistries = AtomicInteger()
         const val TokenBytes = 18
         const val SvgMimeType = "image/svg+xml"
         const val PathPrefix = "/.well-known/glosh-ui-svg/v1"
