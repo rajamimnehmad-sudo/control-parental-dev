@@ -414,9 +414,10 @@ class ChromeImageContentAuthorityTest {
             }
         assertTrue(entered.await(1, TimeUnit.SECONDS))
 
-        val second = worker.submit<String> {
-            bounded.withBodyAdmission(onRejected = { "rejected" }) { "accepted" }
-        }
+        val second =
+            worker.submit<String> {
+                bounded.withBodyAdmission(onRejected = { "rejected" }) { "accepted" }
+            }
         assertFalse(second.isDone)
         release.countDown()
 
