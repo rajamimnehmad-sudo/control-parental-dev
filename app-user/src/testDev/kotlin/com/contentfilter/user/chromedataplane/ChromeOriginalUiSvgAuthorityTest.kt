@@ -42,7 +42,7 @@ class ChromeOriginalUiSvgAuthorityTest {
     @Test
     fun validatorAcceptsOriginalAccessibleUiMetadataAndReferences() {
         val svg =
-            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-labelledby="title-id" xml:space="preserve" data-skapa="ssr-icon@11.9.2"><title id="title-id">Menu</title><path fill-rule="evenodd" clip-rule="evenodd" d="M2 4h20v2H2z"/></svg>"""
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" display="inline-block" overflow="visible" aria-labelledby="title-id" xml:space="preserve" data-skapa="ssr-icon@11.9.2"><title id="title-id">Menu</title><path fill-rule="evenodd" clip-rule="evenodd" d="M2 4h20v2H2z"/></svg>"""
                 .toByteArray()
 
         val result = ChromeOriginalUiSvgValidator().validate(svg, "image/svg+xml")

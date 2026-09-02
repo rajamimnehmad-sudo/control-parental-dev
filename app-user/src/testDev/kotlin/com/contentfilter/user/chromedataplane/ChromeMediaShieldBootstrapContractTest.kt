@@ -573,7 +573,7 @@ class ChromeMediaShieldBootstrapContractTest {
             "const type=nodeTypeOf(this);if(type===2&&routeAttributeValue(this,value))return;" +
                 "const admitted=type===1&&localNameOf(this)==='style'?rewriteCssCandidate(value):value",
         )
-        assertFalse(script.contains("const admitted=localNameOf(this)==='style'"))
+        assertFalse(script.contains("const type=nodeTypeOf(this);const admitted=localNameOf(this)==='style'"))
     }
 
     @Test
@@ -591,6 +591,7 @@ class ChromeMediaShieldBootstrapContractTest {
     @Test
     fun `bounded framework metadata does not hide original inline SVG icons`() {
         assertContains(script, "'data-component','data-view-component','data-skapa'")
+        assertContains(script, "'transform','display','overflow','fill'")
         assertContains(script, "'clip-rule'")
         assertContains(script, "'aria-labelledby'")
         assertContains(script, "'xml:space'")
@@ -604,6 +605,18 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "iconDependentsByOwner=new WeakMap()")
         assertContains(script, "const failIcon=(svg)=>")
         assertContains(script, "invoke(SetForEach,dependents")
+    }
+
+    @Test
+    fun `dynamic style text insertion paths route SVG data through native rewriter`() {
+        assertContains(script, "const styleTextOwner=(value)=>")
+        assertContains(script, "const rewriteStyleTextNode=(owner,node)=>")
+        assertContains(script, "rewriteStyleTextNode(this,node);scan(node,RM_GUARDED,RMA_APPEND_CHILD")
+        assertContains(script, "else if(styleTextOwner(textOwner))put(args,index,rewriteCssCandidate(value))")
+        assertContains(script, "owner=place==='beforebegin'||place==='afterend'?parentOf(this):this")
+        assertContains(script, "const admitted=styleTextOwner(parentOf(this))?rewriteCssCandidate(value):value")
+        assertContains(script, "if(styleTextOwner(parentOf(this))){const source=stringOf(read(nodeValue,this)||'')")
+        assertContains(script, "const admitted=localNameOf(this)==='style'?rewriteCssCandidate(value):value")
     }
 
     @Test

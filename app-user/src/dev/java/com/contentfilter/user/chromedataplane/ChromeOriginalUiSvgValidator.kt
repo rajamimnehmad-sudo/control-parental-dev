@@ -221,7 +221,7 @@ internal class ChromeOriginalUiSvgValidator(
             )
         val GlobalAttributes =
             setOf(
-                "id", "class", "style", "transform", "fill", "fill-opacity", "fill-rule", "clip-rule", "stroke",
+                "id", "class", "style", "transform", "display", "overflow", "fill", "fill-opacity", "fill-rule", "clip-rule", "stroke",
                 "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-dasharray",
                 "stroke-dashoffset", "stroke-opacity", "opacity", "clip-path", "mask", "role", "aria-label",
                 "aria-labelledby", "aria-hidden", "focusable", "tabindex", "pointer-events", "vector-effect",
