@@ -146,7 +146,7 @@ internal object ChromeMediaShieldBootstrap {
         const NativeXMLHttpRequest=SELF.XMLHttpRequest,NativeHasFocusFunction=Document.prototype.hasFocus,NativeElementFocusFunction=SELF.HTMLElement&&HTMLElement.prototype.focus;
         const NumberIsSafeInteger=Number.isSafeInteger;
         const StringLower=String.prototype.toLowerCase,StringIncludes=String.prototype.includes,StringTrim=String.prototype.trim,StringIndex=String.prototype.indexOf,StringLastIndex=String.prototype.lastIndexOf,StringSlice=String.prototype.slice,StringCharCodeAt=String.prototype.charCodeAt;
-        const SetHas=Set.prototype.has,SetAdd=Set.prototype.add,WeakSetHas=WeakSet.prototype.has,WeakSetAdd=WeakSet.prototype.add,WeakSetDelete=WeakSet.prototype.delete;
+        const SetHas=Set.prototype.has,SetAdd=Set.prototype.add,SetForEach=Set.prototype.forEach,WeakSetHas=WeakSet.prototype.has,WeakSetAdd=WeakSet.prototype.add,WeakSetDelete=WeakSet.prototype.delete;
         const WeakMapGet=WeakMap.prototype.get,WeakMapSet=WeakMap.prototype.set,EventPrevent=Event.prototype.preventDefault,EventStopImmediate=Event.prototype.stopImmediatePropagation;
         const invoke=(fn,owner,args)=>ReflectApply(fn,owner,args),method=(fn)=>({call:(owner,...args)=>invoke(fn,owner,args),apply:(owner,args)=>invoke(fn,owner,args)});
         const nativeLocationReload=NativeLocationReloadFunction?method(NativeLocationReloadFunction):null;
@@ -174,11 +174,13 @@ internal object ChromeMediaShieldBootstrap {
         const deny=()=>{throw new NativeDOMException('Blocked by Glosh','SecurityError')};
         const seal=(owner,name,value)=>{try{ObjectDefine(owner,name,{value,writable:false,configurable:false});
         const d=descriptor(owner,name);return !!d&&d.value===value&&!d.configurable}catch(_){return false}};
+        const sealCompatibleMethod=(owner,name,value)=>{try{const ignored=function(candidate){if(typeof candidate!=='function')deny()};ObjectDefine(owner,name,{get:()=>value,set:ignored,configurable:false});
+        const d=descriptor(owner,name);return !!d&&d.get&&!d.configurable}catch(_){return false}};
         const nativeSet=method(Element.prototype.setAttribute),nativeGet=method(Element.prototype.getAttribute),nativeHas=method(Element.prototype.hasAttribute);
         const nativeRemove=method(Element.prototype.removeAttribute),nativeToggle=method(Element.prototype.toggleAttribute);
         const nativeGetNode=method(Element.prototype.getAttributeNode),nativeGetNodeNS=method(Element.prototype.getAttributeNodeNS);
         const elementQuery=method(Element.prototype.querySelector),elementQueryAll=method(Element.prototype.querySelectorAll),elementClosest=method(Element.prototype.closest);
-        const documentQueryAll=method(Document.prototype.querySelectorAll),fragmentQueryAll=method(DocumentFragment.prototype.querySelectorAll),nativeAddEvent=method(EventTarget.prototype.addEventListener),nativeDispatchEvent=method(EventTarget.prototype.dispatchEvent);
+        const documentGetById=method(Document.prototype.getElementById),documentQueryAll=method(Document.prototype.querySelectorAll),fragmentQueryAll=method(DocumentFragment.prototype.querySelectorAll),nativeAddEvent=method(EventTarget.prototype.addEventListener),nativeDispatchEvent=method(EventTarget.prototype.dispatchEvent);
         const nodeAppend=method(Node.prototype.appendChild),nodeInsert=method(Node.prototype.insertBefore),nodeReplace=method(Node.prototype.replaceChild),nodeRemove=method(Node.prototype.removeChild);
         const nativeCreateElement=method(Document.prototype.createElement);
         const nodeContains=method(Node.prototype.contains),nodeValue=descriptor(Node.prototype,'nodeValue');
@@ -242,7 +244,7 @@ internal object ChromeMediaShieldBootstrap {
         const attrName=(attribute)=>stringOf(read(attrNameProperty,attribute)||''),attrValueOf=(attribute)=>stringOf(read(attrValueProperty,attribute)||'');
         const attrNamespace=(attribute)=>read(attrNamespaceProperty,attribute),attrLocalName=(attribute)=>stringOf(read(attrLocalNameProperty,attribute)||'');
         const attrOwner=(attribute)=>read(attrOwnerProperty,attribute),sandboxOf=(frame)=>read(iframeSandboxProperty,frame);
-        const lockedSandboxes=new WeakSet(),protectedNodes=new WeakSet(),protectedIconNodes=new WeakSet(),protectedMediaNodes=new WeakSet(),protectedStyleMaps=new WeakSet(),protectedSheets=new WeakSet(),protectedMedias=new WeakSet(),guardedStyleOwners=new WeakSet(),protectedDescendants=new WeakMap();
+        const lockedSandboxes=new WeakSet(),protectedNodes=new WeakSet(),protectedIconNodes=new WeakSet(),protectedMediaNodes=new WeakSet(),protectedStyleMaps=new WeakSet(),protectedSheets=new WeakSet(),protectedMedias=new WeakSet(),guardedStyleOwners=new WeakSet(),protectedDescendants=new WeakMap(),iconDependentsByOwner=new WeakMap();
         const styleOwners=new WeakMap(),styleMapOwners=new WeakMap(),attributeOwners=new WeakMap(),guardedRuleMethodOwners=new WeakMap(),lockedIconStyleSignatures=new WeakMap();
         installSection('BOOTSTRAP_SCRIPT');if(!BOOTSTRAP_SCRIPT)failInstall('CURRENT_SCRIPT_MISSING');
         installSection('STATIC_STYLE_BINDING');
@@ -257,8 +259,8 @@ internal object ChromeMediaShieldBootstrap {
         return protocol==='https:'||protocol==='http:'}catch(_){return false}};
         const TOP_LAYER_ATTRIBUTE_NAMES=['popover','popovertarget','popovertargetaction','commandfor','command'],TOP_LAYER_ATTRIBUTES=new Set(TOP_LAYER_ATTRIBUTE_NAMES);
         const ICON_TAGS=new Set(['svg','g','defs','symbol','use','path','rect','circle','ellipse','line','polyline','polygon','title','desc','clippath','mask','lineargradient','radialgradient','stop','marker']);
-        const ICON_GLOBAL_ATTRS=new Set(['id','class','style','transform','fill','fill-opacity','fill-rule','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-miterlimit','stroke-dasharray','stroke-dashoffset','stroke-opacity','opacity','clip-path','mask','role','aria-label','aria-hidden','focusable','tabindex','pointer-events','vector-effect','data-glosh-icon-safe','data-glosh-media-blocked']);
-        const ICON_GEOMETRY_ATTRS=new Set(['xmlns','width','height','viewbox','preserveaspectratio','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','points','d','pathlength','href','xlink:href','fx','fy','fr','offset','stop-color','stop-opacity','gradientunits','gradienttransform','spreadmethod','markerwidth','markerheight','refx','refy','orient','markerunits']);
+        const ICON_GLOBAL_ATTRS=new Set(['id','class','style','transform','fill','fill-opacity','fill-rule','clip-rule','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-miterlimit','stroke-dasharray','stroke-dashoffset','stroke-opacity','opacity','clip-path','mask','role','aria-label','aria-labelledby','aria-hidden','focusable','tabindex','pointer-events','vector-effect','version','xml:space','data-component','data-view-component','data-skapa','data-glosh-icon-safe','data-glosh-media-blocked']);
+        const ICON_GEOMETRY_ATTRS=new Set(['xmlns','xmlns:xlink','width','height','viewbox','preserveaspectratio','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry','points','d','pathlength','href','xlink:href','fx','fy','fr','offset','stop-color','stop-opacity','gradientunits','gradienttransform','spreadmethod','markerwidth','markerheight','refx','refy','orient','markerunits']);
         const ICON_PATH_CHARS='MmZzLlHhVvCcSsQqTtAaEe0123456789+-. ,\t\n\r\f',ICON_MAX_DIMENSION=16384;
         const validIconPath=(value)=>{if(value.length>49152)return false;for(let index=0;index<value.length;index+=1)if(!includes(ICON_PATH_CHARS,value[index]))return false;return true};
         const internalReference=(value)=>{if(!value||value[0]!=='#'||value.length>129)return false;for(let index=1;index<value.length;index+=1){const code=charCode(value,index);if(!((code>=48&&code<=57)||(code>=65&&code<=90)||(code>=97&&code<=122)||includes('_.:-',value[index])))return false}return value.length>1};
@@ -270,10 +272,13 @@ internal object ChromeMediaShieldBootstrap {
         const safeIcon=(svg)=>{rendererMetric(26);try{const descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);if(descendants.length>511)return false;const nodes=[svg],ids=new Set(),refs=[];for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);
         let attributeBytes=0,pathBytes=0;for(let index=0;index<nodes.length;index+=1){const node=nodes[index],tag=localNameOf(node);if(namespaceOf(node)!=='http://www.w3.org/2000/svg'||!invoke(SetHas,ICON_TAGS,[tag]))return false;const attrs=attributesOf(node);for(let attributeIndex=0;attributeIndex<attrs.length;attributeIndex+=1){const name=lower(attrName(attrs[attributeIndex])),value=attrValueOf(attrs[attributeIndex]);attributeBytes+=name.length+value.length;if(attributeBytes>65536||slice(name,0,2)==='on'||(!invoke(SetHas,ICON_GLOBAL_ATTRS,[name])&&!invoke(SetHas,ICON_GEOMETRY_ATTRS,[name])))return false;
         if(name==='id'){if(!internalReference('#'+value)||invoke(SetHas,ids,[value]))return false;invoke(SetAdd,ids,[value])}if(name==='href'||name==='xlink:href'){if(!internalReference(value))return false;append(refs,slice(value,1))}
+        if(name==='aria-labelledby'){const labels=whitespaceParts(value);if(!labels.length)return false;for(let labelIndex=0;labelIndex<labels.length;labelIndex+=1){if(!internalReference('#'+labels[labelIndex]))return false;append(refs,labels[labelIndex])}}
+        if(name==='xmlns:xlink'&&value!=='http://www.w3.org/1999/xlink')return false;if(name==='xml:space'&&value!=='default'&&value!=='preserve')return false;if(name==='data-skapa'&&(!value||value.length>128))return false;
         if(name==='style'||name==='fill'||name==='stroke'||name==='clip-path'||name==='mask'){if(!safeIconStyle(value,refs))return false}if(name==='d'){if(!validIconPath(value))return false;pathBytes+=value.length;if(pathBytes>49152)return false}}
         }
-        if(!iconDimensions(svg))return false;for(let index=0;index<refs.length;index+=1)if(!invoke(SetHas,ids,[refs[index]]))return false;return true}catch(_){return false}};
-        const lockIconGeometry=(svg)=>{rendererMetric(27);try{nativeRemove.call(svg,'data-glosh-media-blocked');if(nativeGet.call(svg,'data-glosh-icon-safe')!=='1')nativeSet.call(svg,'data-glosh-icon-safe','1');unhide(svg);return true}catch(_){return false}};
+        if(!iconDimensions(svg)&&!elementQuery.call(svg,'symbol'))return false;for(let index=0;index<refs.length;index+=1){if(invoke(SetHas,ids,[refs[index]]))continue;const target=documentGetById.call(DOC,refs[index]),owner=target&&elementClosest.call(target,'svg');if(!target||localNameOf(target)!=='symbol'||namespaceOf(target)!=='http://www.w3.org/2000/svg'||!owner||owner===svg||nativeGet.call(owner,'data-glosh-icon-safe')!=='1')return false;let dependents=invoke(WeakMapGet,iconDependentsByOwner,[owner]);if(!dependents){dependents=new Set();invoke(WeakMapSet,iconDependentsByOwner,[owner,dependents])}invoke(SetAdd,dependents,[svg])}return true}catch(_){return false}};
+        const lockIconGeometry=(svg)=>{rendererMetric(27);try{unhide(svg);if(nativeGet.call(svg,'data-glosh-icon-safe')!=='1')nativeSet.call(svg,'data-glosh-icon-safe','1');return true}catch(_){return false}};
+        const failIcon=(svg)=>{nativeRemove.call(svg,'data-glosh-icon-safe');hide(svg);const dependents=invoke(WeakMapGet,iconDependentsByOwner,[svg]);if(dependents)invoke(SetForEach,dependents,[(dependent)=>{nativeRemove.call(dependent,'data-glosh-icon-safe');hide(dependent)}])};
         const removeDeclarativeTopLayer=(element)=>{for(let index=0;index<TOP_LAYER_ATTRIBUTE_NAMES.length;index+=1){const attribute=TOP_LAYER_ATTRIBUTE_NAMES[index];
         if(nativeHas.call(element,attribute))nativeRemove.call(element,attribute)}};
         const sanitizeElementBody=(element)=>{removeDeclarativeTopLayer(element);const tag=localNameOf(element);
@@ -291,7 +296,7 @@ internal object ChromeMediaShieldBootstrap {
         if(structurallyBlocked||retainedLocalBlock||includes(values,'data:')||includes(values,'blob:')){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
         const style=lower(nativeGet.call(element,'style')||'');if(includes(style,'url(')&&(includes(style,'data:')||includes(style,'blob:')))hide(element);
         if(tag==='svg'){if(safeIcon(element)&&lockIconGeometry(element)){}
-        else{nativeRemove.call(element,'data-glosh-icon-safe');hide(element)}}};
+        else failIcon(element)}};
         const sanitizeElement=(element,family=-1)=>{rendererSanitized(element);if(family<0)return sanitizeElementBody(element);rendererDirectSanitized(family);const started=rendererFamilyStarted(family,element);
         try{return sanitizeElementBody(element)}finally{rendererFamilyDone(family,0,started)}};
         const descendantQuery=(type)=>type===1?elementQueryAll:type===9?documentQueryAll:type===11?fragmentQueryAll:null;
@@ -402,9 +407,9 @@ internal object ChromeMediaShieldBootstrap {
         registerProtectedSheet(shieldSheet);registerProtectedSheet(curtainSheet);
         if(!ensureStyle())failInstall('SHIELD_STYLE_ENSURE_FAILED');if(!ensureCurtain())failInstall('CURTAIN_ENSURE_FAILED');
         installSection('DOM_MUTATION_GUARDS');installed=seal(Node.prototype,'appendChild',function(node){rendererApiCall(RMA_APPEND_CHILD,RMF_DOM_GUARD);if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_APPEND_CHILD,RMF_DOM_GUARD);const result=nodeAppend.call(this,node);sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed;
-        installed=seal(Node.prototype,'insertBefore',function(node,ref){rendererApiCall(RMA_INSERT_BEFORE,RMF_DOM_GUARD);if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_INSERT_BEFORE,RMF_DOM_GUARD);const result=nodeInsert.call(this,node,ref);sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed;
+        installed=sealCompatibleMethod(Node.prototype,'insertBefore',function(node,ref){rendererApiCall(RMA_INSERT_BEFORE,RMF_DOM_GUARD);if(ref!==null&&parentOf(ref)!==this)return node;if(insideProtected(this))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_INSERT_BEFORE,RMF_DOM_GUARD);const result=nodeInsert.call(this,node,ref);sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed;
         installed=seal(Node.prototype,'replaceChild',function(node,old){rendererApiCall(RMA_REPLACE_CHILD,RMF_DOM_GUARD);if(insideProtected(this)||containsProtected(old))deny();rejectProtectedMove(node,this);scan(node,RM_GUARDED,RMA_REPLACE_CHILD,RMF_DOM_GUARD);const result=nodeReplace.call(this,node,old);sanitizeContainer(this,RMF_DOM_GUARD);return result})&&installed;
-        installed=seal(Node.prototype,'removeChild',function(node){if(containsProtected(node))deny();return nodeRemove.call(this,node)})&&installed;
+        installed=sealCompatibleMethod(Node.prototype,'removeChild',function(node){if(parentOf(node)!==this)return node;if(containsProtected(node))deny();return nodeRemove.call(this,node)})&&installed;
         const insertionApi=(name)=>name==='append'?RMA_APPEND:(name==='prepend'?RMA_PREPEND:(name==='replaceChildren'?RMA_REPLACE_CHILDREN:(name==='before'?RMA_BEFORE:(name==='after'?RMA_AFTER:RMA_REPLACE_WITH))));
         const sealInsertion=(owner,name,removesChildren,removesTarget)=>{if(!owner||!owner[name])return true;const original=owner[name],api=insertionApi(name);return seal(owner,name,function(...args){rendererApiCall(api,RMF_DOM_GUARD);
         const mapped=removesChildren?mappedProtected(this):null;if(removesTarget?containsProtected(this):(removesChildren?(!mapped&&containsProtected(this)):insideProtected(this)))deny();

@@ -85,6 +85,17 @@ internal class ChromeOriginalUiSvgValidator(
                 if (!value.startsWith('#') || !SafeId.matches(value.drop(1))) return state.fail("href")
                 state.references += value.drop(1)
             }
+            if (qualifiedName == "aria-labelledby") {
+                val labels = value.trim().split(Whitespace).filter(String::isNotBlank)
+                if (labels.isEmpty() || labels.any { !SafeId.matches(it) }) return state.fail("aria_reference")
+                state.references += labels
+            }
+            if (qualifiedName == "xml:space" && value != "default" && value != "preserve") {
+                return state.fail("xml_space")
+            }
+            if (qualifiedName == "data-skapa" && (value.isEmpty() || value.length > MaximumMetadataBytes)) {
+                return state.fail("metadata")
+            }
             if (qualifiedName in UrlReferenceAttributes) {
                 if (!collectInternalUrlReferences(value, state.references)) return state.fail("url")
             }
@@ -192,6 +203,7 @@ internal class ChromeOriginalUiSvgValidator(
         const val XlinkNamespace = "http://www.w3.org/1999/xlink"
         const val MaximumDimension = 16_384.0
         const val MaximumStyleBytes = 8192
+        const val MaximumMetadataBytes = 128
         const val ForbiddenScheme = "javascript:"
         val ForbiddenXml = Regex("(?is)<!DOCTYPE|<!ENTITY|<\\?xml-stylesheet|<\\?(?!xml(?:\\s|\\?>))")
         val CssActive =
@@ -199,6 +211,7 @@ internal class ChromeOriginalUiSvgValidator(
         val SafeId = Regex("[A-Za-z_][A-Za-z0-9_.:-]{0,127}")
         val PathCharacters = Regex("[MmZzLlHhVvCcSsQqTtAaEe0-9+.,\\-\\s]*")
         val NumberSeparators = Regex("[\\s,]+")
+        val Whitespace = Regex("\\s+")
         val Dimension = Regex("([0-9]+(?:\\.[0-9]+)?)(?:px)?", RegexOption.IGNORE_CASE)
         val AllowedElements =
             setOf(
@@ -208,10 +221,11 @@ internal class ChromeOriginalUiSvgValidator(
             )
         val GlobalAttributes =
             setOf(
-                "id", "class", "style", "transform", "fill", "fill-opacity", "fill-rule", "stroke",
+                "id", "class", "style", "transform", "fill", "fill-opacity", "fill-rule", "clip-rule", "stroke",
                 "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-dasharray",
                 "stroke-dashoffset", "stroke-opacity", "opacity", "clip-path", "mask", "role", "aria-label",
-                "aria-hidden", "focusable", "tabindex", "pointer-events", "vector-effect",
+                "aria-labelledby", "aria-hidden", "focusable", "tabindex", "pointer-events", "vector-effect",
+                "version", "xml:space", "data-component", "data-view-component", "data-skapa",
             )
         val UrlReferenceAttributes =
             setOf("fill", "stroke", "clip-path", "mask", "marker-start", "marker-mid", "marker-end")

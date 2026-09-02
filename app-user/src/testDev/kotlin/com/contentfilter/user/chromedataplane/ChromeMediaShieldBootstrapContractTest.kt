@@ -577,6 +577,36 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
+    fun `common stale DOM patches are absorbed without releasing mutation guards`() {
+        assertContains(script, "const sealCompatibleMethod=(owner,name,value)=>")
+        assertContains(
+            script,
+            "sealCompatibleMethod(Node.prototype,'insertBefore',function(node,ref)",
+        )
+        assertContains(script, "if(ref!==null&&parentOf(ref)!==this)return node")
+        assertContains(script, "sealCompatibleMethod(Node.prototype,'removeChild',function(node)")
+        assertContains(script, "if(parentOf(node)!==this)return node")
+    }
+
+    @Test
+    fun `bounded framework metadata does not hide original inline SVG icons`() {
+        assertContains(script, "'data-component','data-view-component','data-skapa'")
+        assertContains(script, "'clip-rule'")
+        assertContains(script, "'aria-labelledby'")
+        assertContains(script, "'xml:space'")
+        assertContains(script, "'data-skapa'")
+        assertContains(script, "unhide(svg);if(nativeGet.call(svg,'data-glosh-icon-safe')!=='1'")
+        assertContains(script, "documentGetById=method(Document.prototype.getElementById)")
+        assertContains(script, "!iconDimensions(svg)&&!elementQuery.call(svg,'symbol')")
+        assertContains(script, "localNameOf(target)!=='symbol'")
+        assertContains(script, "nativeGet.call(owner,'data-glosh-icon-safe')!=='1'")
+        assertContains(script, "name==='xmlns:xlink'&&value!=='http://www.w3.org/1999/xlink'")
+        assertContains(script, "iconDependentsByOwner=new WeakMap()")
+        assertContains(script, "const failIcon=(svg)=>")
+        assertContains(script, "invoke(SetForEach,dependents")
+    }
+
+    @Test
     fun `sanitizers read native node and element identity after prototype tampering`() {
         assertContains(script, "nodeTypeProperty=propertyDescriptor(DOC,'nodeType')")
         assertContains(script, "localNameProperty=propertyDescriptor(DOC.documentElement,'localName')")
@@ -747,7 +777,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "ICON_PATH_CHARS")
         assertContains(script, "const safeIconStyle=")
         assertContains(script, "nativeSet.call(svg,'data-glosh-icon-safe','1')")
-        assertContains(script, "unhide(svg);return true")
+        assertContains(script, "unhide(svg);if(nativeGet.call(svg,'data-glosh-icon-safe')!=='1'")
         assertFalse(script.contains("rootRules=[['all','initial']"))
         assertFalse(script.contains("['d','path(\"'+d+'\")']"))
         assertFalse(script.contains("nativeStylePriority.call(rootStyle,'all')==='important'"))

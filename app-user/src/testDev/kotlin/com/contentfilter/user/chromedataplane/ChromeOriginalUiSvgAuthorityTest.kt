@@ -28,6 +28,30 @@ class ChromeOriginalUiSvgAuthorityTest {
     }
 
     @Test
+    fun validatorAcceptsBoundedInertFrameworkMetadataWithoutChangingBytes() {
+        val svg =
+            """<svg xmlns="http://www.w3.org/2000/svg" version="1.1" data-component="Icon" data-view-component="true" viewBox="0 0 16 16"><path d="M1 1h14v14H1z"/></svg>"""
+                .toByteArray()
+
+        val result = ChromeOriginalUiSvgValidator().validate(svg, "image/svg+xml")
+
+        assertTrue(result is ChromeOriginalUiSvgValidation.Valid)
+        assertArrayEquals(svg, (result as ChromeOriginalUiSvgValidation.Valid).bytes)
+    }
+
+    @Test
+    fun validatorAcceptsOriginalAccessibleUiMetadataAndReferences() {
+        val svg =
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-labelledby="title-id" xml:space="preserve" data-skapa="ssr-icon@11.9.2"><title id="title-id">Menu</title><path fill-rule="evenodd" clip-rule="evenodd" d="M2 4h20v2H2z"/></svg>"""
+                .toByteArray()
+
+        val result = ChromeOriginalUiSvgValidator().validate(svg, "image/svg+xml")
+
+        assertTrue(result is ChromeOriginalUiSvgValidation.Valid)
+        assertArrayEquals(svg, (result as ChromeOriginalUiSvgValidation.Valid).bytes)
+    }
+
+    @Test
     fun validatorRejectsActiveExternalRasterAndPathologicalInputs() {
         val invalid =
             listOf(
