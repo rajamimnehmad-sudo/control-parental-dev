@@ -7,6 +7,10 @@ Reglas locales/especiales para Codex. `AGENTS.md` y `START_HERE.md` definen el w
 - Leer `START_HERE.md` y usar lectura mínima/condicional; no releer todo el corpus documental por rutina.
 - Todo ticket hereda automáticamente las reglas globales. El prompt debe describir sólo el delta específico de la tarea.
 - **Antes de escribir código**, comprobar: Central vigente, GitHub vigente, writers activos, owner, base SHA, worktree/rama y rutas permitidas.
+- **Base funcional histórica:** `BASE SHA` fija código y evidencia, no gobernanza. Resolver en GitHub el HEAD remoto vigente de `main` y leer desde ese ref `AGENTS.md`, `START_HERE.md` y `docs/CODEX_RULES.md`, salvo que Central declare explícitamente otro ref canónico de gobernanza.
+- Si `BASE SHA` y `GOVERNANCE SHA` difieren, registrar ambos en el preflight y obedecer la gobernanza vigente para workflow/coordinación. No modificar, copiar ni cherry-pickear esos documentos dentro de la rama funcional sólo para cumplir esta regla.
+- Fijar el `GOVERNANCE SHA` al comienzo del lote. No cambiarlo a mitad del lote salvo override explícito de ChatGPT/Central por seguridad o coordinación; adoptar actualizaciones normales en el siguiente checkpoint.
+- Si no puede verificarse el ref/SHA de gobernanza actual, detener la escritura y reportarlo.
 - Si ya existen 2 frentes escribiendo código, no iniciar un tercero.
 - Si Central y GitHub/evidencia parecen contradecirse, no inferir owner/base/estado. Detener la escritura, reportar la contradicción exacta y esperar reconciliación por ChatGPT.
 - Hacer control Git liviano: status, rama, worktrees y commits recientes. Profundizar sólo ante inconsistencia real.

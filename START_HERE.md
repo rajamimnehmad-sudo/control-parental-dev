@@ -5,12 +5,21 @@ Este archivo define la entrada mínima al proyecto. No obliga a releer documenta
 ## Fuentes de verdad
 
 - `AGENTS.md`: reglas operativas transversales y workflow ChatGPT ↔ Codex.
-- Glosh Central / Control Center (`docs/AI_TASK_TRACKER.json` en su rama canónica): tareas, prioridades, owners, bloqueos y cierres persistentes.
+- Glosh Central / Control Center (`docs/AI_TASK_TRACKER.json` en la rama canónica `build/glosh-control-center-v2`): tareas, prioridades, owners, bloqueos y cierres persistentes.
 - GitHub: código, commits, ramas, PR y evidencia compartida.
 
 Los documentos históricos no pueden contradecir estas fuentes.
 
 Si Central y GitHub/evidencia parecen discrepar, no elegir una fuente por reflejo: determinar qué dato quedó atrasado, reconciliar Central y recién después continuar con escritura.
+
+## Base funcional y gobernanza vigente
+
+- La base funcional de un ticket puede ser un SHA histórico para preservar código y evidencia validados.
+- Esa base funcional no fija las reglas de trabajo.
+- Antes de escribir, resolver en GitHub el HEAD remoto vigente de `main` y leer desde ese ref `AGENTS.md`, `START_HERE.md` y `docs/CODEX_RULES.md`, salvo que Central declare explícitamente otro ref canónico de gobernanza.
+- Cuando la base funcional y la gobernanza difieran, registrar `GOVERNANCE REF/SHA` en el preflight. Las copias históricas del worktree no prevalecen para workflow/coordinación.
+- No copiar ni cherry-pickear gobernanza actual a una rama funcional sólo para cumplir esta regla.
+- El `GOVERNANCE SHA` queda fijado durante el lote y se actualiza en el siguiente checkpoint, salvo override explícito de ChatGPT/Central por seguridad o coordinación.
 
 ## Preflight obligatorio de código
 
@@ -19,8 +28,9 @@ Antes de modificar código o preparar un ticket Codex que implique escritura:
 1. comprobar Central vigente;
 2. comprobar GitHub vigente;
 3. identificar writers activos;
-4. confirmar owner, base SHA y rutas de la tarea;
-5. no iniciar un tercer frente si ya existen 2 writers de código.
+4. confirmar owner, base SHA, worktree/rama y rutas de la tarea;
+5. resolver y registrar `GOVERNANCE REF/SHA` cuando difiera de la base funcional;
+6. no iniciar un tercer frente si ya existen 2 writers de código.
 
 Para tareas sólo de lectura o documentación, consultar Central cuando el resultado dependa de estado, prioridad, owner, bloqueo, cierre o trabajo paralelo.
 

@@ -24,6 +24,9 @@ Para planificación, captura de ideas o selección de tickets:
 - Glosh Central / Control Center es la fuente de verdad para tareas, prioridades, owners, bloqueos y estados persistentes.
 - GitHub es la fuente compartida de verdad para código, commits, ramas, PR y evidencia.
 - **Preflight obligatorio de código:** antes de modificar código o emitir un ticket Codex que implique escritura, comprobar Central vigente, GitHub vigente, writers activos y owner/base/rutas de la tarea. Si ya existen 2 frentes escribiendo código, no iniciar un tercero.
+- **Base funcional histórica ≠ gobernanza histórica:** el `base SHA/ref` congela código y evidencia funcional, no las reglas operativas. Antes de escribir, resolver en GitHub el HEAD remoto vigente de `main` y leer desde ese ref `AGENTS.md`, `START_HERE.md` y `docs/CODEX_RULES.md`, salvo que Central declare explícitamente otro ref canónico de gobernanza.
+- Cuando la base funcional y la gobernanza difieran, registrar `GOVERNANCE REF/SHA` en el preflight. Las copias de esos archivos dentro del worktree histórico son contexto histórico y no prevalecen para workflow/coordinación. No copiarlas ni cherry-pickearlas a la rama funcional salvo que el ticket sea de gobernanza.
+- El `GOVERNANCE SHA` verificado al iniciar el lote queda fijado durante ese lote. Una actualización posterior se adopta en el siguiente checkpoint, salvo override explícito de ChatGPT/Central por seguridad o coordinación.
 - No asumir que contexto, SHAs, owners, ramas o estados de un prompt anterior siguen vigentes.
 - **Reconciliación de fuentes:** si Central y GitHub/evidencia parecen contradecirse, no asumir que una fuente invalida globalmente a la otra. Determinar qué dato quedó desactualizado, reconciliar el estado persistente en Central y recién después continuar.
 - Si la discrepancia no puede resolverse con evidencia disponible, detener la escritura y reportar la contradicción exacta.
@@ -72,6 +75,7 @@ Regla transversal permanente del proyecto:
 
 - Todo ticket Codex hereda automáticamente `AGENTS.md`, `START_HERE.md`, `docs/CODEX_RULES.md` y las reglas generales del proyecto. No repetir prohibiciones o contexto global, incluida la política de continuación autónoma.
 - Un ticket debe contener sólo lo material: Task ID/objetivo; owner/base/worktree/rutas cuando hagan falta; restricciones específicas; gates particulares y criterio de cierre.
+- Cuando `BASE SHA` y `GOVERNANCE SHA` difieran, el ticket o su preflight debe registrar ambos anchors sin repetir el contenido de los documentos.
 - No repetir historia que Codex puede obtener de Central/GitHub.
 - Si una tarea es de alto riesgo —seguridad, navegador, dispositivo, datos o release— el ticket puede ampliarse lo necesario; la compacidad nunca reemplaza controles reales.
 
