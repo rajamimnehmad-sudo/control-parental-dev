@@ -243,7 +243,7 @@ internal class ChromePhotosRealResponseSanitizer(
         const val PartialImageReason = "partial_image_entity"
         const val ImageNotModifiedReason = "image_not_modified_without_current_authority"
         const val EncodedImageReason = "encoded_image_unsupported"
-        const val BodyAdmissionReason = "image_body_admission_saturated"
+        const val BodyAdmissionReason = "image_body_admission_interrupted"
         const val ImageByteLimitReason = "image_byte_limit"
         val RedirectCodes = setOf(301, 302, 303, 307, 308)
     }

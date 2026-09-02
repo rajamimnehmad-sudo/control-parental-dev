@@ -9,6 +9,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -398,11 +399,11 @@ class ChromeImageContentAuthorityTest {
     }
 
     @Test
-    fun `body admission is bounded and saturation rejects without waiting`() {
+    fun `body admission applies bounded backpressure without rejecting a burst`() {
         val bounded = ChromeImageContentAuthority(maximumConcurrentBodies = 1)
         val entered = CountDownLatch(1)
         val release = CountDownLatch(1)
-        val worker = Executors.newSingleThreadExecutor()
+        val worker = Executors.newFixedThreadPool(2)
         val first =
             worker.submit<String> {
                 bounded.withBodyAdmission(onRejected = { "rejected" }) {
@@ -413,13 +414,16 @@ class ChromeImageContentAuthorityTest {
             }
         assertTrue(entered.await(1, TimeUnit.SECONDS))
 
-        val second = bounded.withBodyAdmission(onRejected = { "rejected" }) { "accepted" }
+        val second = worker.submit<String> {
+            bounded.withBodyAdmission(onRejected = { "rejected" }) { "accepted" }
+        }
+        assertFalse(second.isDone)
         release.countDown()
 
-        assertEquals("rejected", second)
         assertEquals("accepted", first.get(1, TimeUnit.SECONDS))
+        assertEquals("accepted", second.get(1, TimeUnit.SECONDS))
         assertEquals(1, bounded.metrics().bodyAdmissionPeak)
-        assertEquals(1, bounded.metrics().bodyAdmissionRejects)
+        assertEquals(0, bounded.metrics().bodyAdmissionRejects)
         worker.shutdownNow()
     }
 

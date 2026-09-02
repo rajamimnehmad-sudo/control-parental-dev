@@ -232,7 +232,10 @@ internal class ChromeImageContentAuthority(
         onRejected: () -> T,
         block: () -> T,
     ): T {
-        if (!bodyPermits.tryAcquire()) {
+        try {
+            bodyPermits.acquire()
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
             bodyAdmissionRejects.incrementAndGet()
             return onRejected()
         }

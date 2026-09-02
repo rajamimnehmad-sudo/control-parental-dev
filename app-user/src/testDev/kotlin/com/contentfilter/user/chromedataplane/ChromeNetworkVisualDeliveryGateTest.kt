@@ -210,7 +210,7 @@ class ChromeNetworkVisualDeliveryGateTest {
         val reasons =
             listOf(
                 "analyzer_unavailable",
-                "image_body_admission_saturated",
+                "image_body_admission_interrupted",
                 "image_format_changed_after_peek",
                 "decode_failed",
             )
