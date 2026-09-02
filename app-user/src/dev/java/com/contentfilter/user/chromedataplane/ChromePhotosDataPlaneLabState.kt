@@ -50,6 +50,8 @@ internal class ChromePhotosDataPlaneLifecycle {
     fun current(): ChromePhotosDataPlanePhase = phase
 }
 
+internal fun shouldClearPresentationReadyAfterFixtureScopeLoss(realWebReady: Boolean): Boolean = !realWebReady
+
 internal object ChromePhotosChromePolicy {
     fun proxySettingsJson(): String =
         """{"ProxyMode":"fixed_servers","ProxyServer":"${ChromePhotosDataPlaneLabContract.ProxyHost}:${ChromePhotosDataPlaneLabContract.ProxyPort}","ProxyBypassList":"<-loopback>"}"""

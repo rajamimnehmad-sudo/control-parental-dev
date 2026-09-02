@@ -470,12 +470,19 @@ class ChromePhotosDataPlaneLabService : Service() {
                     val fixtureFresh =
                         runtime.fixtureConfirmed &&
                             now - runtime.fixtureHeartbeatElapsed <= FixtureHeartbeatMaximumAgeMillis
+                    val wasRealWebReady =
+                        labPreferences().getBoolean(
+                            ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed,
+                            false,
+                        )
                     if (!fixtureFresh && runtime.fixtureConfirmed) {
                         ChromePhotosDataPlaneRuntimeAttestation.markFixtureConfirmed(sessionId, false)
-                        labPreferences().edit()
-                            .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
-                            .putBoolean(ChromePhotosDataPlaneLabContract.KeyFixtureConfirmed, false)
-                            .apply()
+                        labPreferences().edit().apply {
+                            if (shouldClearPresentationReadyAfterFixtureScopeLoss(wasRealWebReady)) {
+                                putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false)
+                            }
+                            putBoolean(ChromePhotosDataPlaneLabContract.KeyFixtureConfirmed, false)
+                        }.apply()
                         Log.i(LogTag, "phase=fixture_scope_lost action=lease_revoked")
                     }
                     val realWebScopeConfirmed = proxyHealthy && policyConfirmed && runtime.vpnConfirmed
@@ -484,11 +491,6 @@ class ChromePhotosDataPlaneLabService : Service() {
                         confirmed = realWebScopeConfirmed,
                         heartbeatElapsed = now,
                     )
-                    val wasRealWebReady =
-                        labPreferences().getBoolean(
-                            ChromePhotosDataPlaneLabContract.KeyRealWebScopeConfirmed,
-                            false,
-                        )
                     val bootstrapHealth =
                         ChromePhotosTrustedBootstrapHealth(
                             proxyHealthy = proxyHealthy,

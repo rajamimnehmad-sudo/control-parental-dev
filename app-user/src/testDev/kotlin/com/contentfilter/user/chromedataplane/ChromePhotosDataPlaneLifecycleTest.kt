@@ -5,6 +5,8 @@ import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneRuntimeAttestat
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ChromePhotosDataPlaneLifecycleTest {
     @Test
@@ -29,6 +31,12 @@ class ChromePhotosDataPlaneLifecycleTest {
 
         assertEquals(ChromePhotosDataPlanePhase.Stopped, lifecycle.current())
         assertFailsWith<IllegalStateException> { lifecycle.presentationReady() }
+    }
+
+    @Test
+    fun `fixture expiry preserves independently healthy real web presentation`() {
+        assertFalse(shouldClearPresentationReadyAfterFixtureScopeLoss(realWebReady = true))
+        assertTrue(shouldClearPresentationReadyAfterFixtureScopeLoss(realWebReady = false))
     }
 
     @Test
