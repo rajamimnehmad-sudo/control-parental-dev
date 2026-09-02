@@ -213,7 +213,7 @@ class ChromeMediaShieldDocumentTransformerTest {
             )
         val oversized =
             transformer.transform(
-                ByteArray(2 * 1024 * 1024 + 1) { 'a'.code.toByte() },
+                ByteArray(ChromeMediaShieldMaximumDocumentBytes + 1) { 'a'.code.toByte() },
                 emptyList(),
                 transformDisposition(),
             )
@@ -221,6 +221,26 @@ class ChromeMediaShieldDocumentTransformerTest {
         assertIs<ChromeMediaShieldDocumentResult.FailClosed>(unsafe)
         assertIs<ChromeMediaShieldDocumentResult.FailClosed>(oversized)
         assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
+        assertEquals(0L, transformer.metrics().outstanding)
+    }
+
+    @Test
+    fun `ordinary document above legacy two MiB boundary remains bounded and transformed`() {
+        val prefix = "<!doctype html><html><head></head><body><!--"
+        val suffix = "--></body></html>"
+        val source =
+            prefix +
+                "a".repeat(2 * 1024 * 1024 + 1 - prefix.length - suffix.length) +
+                suffix
+
+        val result =
+            transformer.transform(
+                source.toByteArray(),
+                emptyList(),
+                transformDisposition(),
+            )
+
+        assertIs<ChromeMediaShieldDocumentResult.Transformed>(result)
         assertEquals(0L, transformer.metrics().outstanding)
     }
 

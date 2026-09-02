@@ -7,6 +7,8 @@ import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicLong
 
+internal const val ChromeMediaShieldMaximumDocumentBytes = 4 * 1024 * 1024
+
 internal data class ChromeMediaShieldTransformedDocument(
     val bytes: ByteArray,
     val headers: List<ChromeHttpHeader>,
@@ -59,7 +61,7 @@ internal class ChromeMediaShieldDocumentTransformer(
         var issuedIdentity: ChromeMediaShieldDocumentIdentity? = null
         var delivered = false
         return try {
-            if (sourceBytes.size > MaximumDocumentBytes) return failClosed("document_too_large")
+            if (sourceBytes.size > ChromeMediaShieldMaximumDocumentBytes) return failClosed("document_too_large")
             if (sourceBytes.containsNul()) return failClosed("document_contains_nul")
             val source = sourceBytes.toString(Charsets.ISO_8859_1)
             val insertion =
@@ -189,7 +191,6 @@ internal class ChromeMediaShieldDocumentTransformer(
 
     private companion object {
         const val TokenBytes = 16
-        const val MaximumDocumentBytes = 2 * 1024 * 1024
         const val MaximumInsertionPrefixBytes = 32 * 1024
 
         fun secureRandomBytes(size: Int): ByteArray = ByteArray(size).also(SecureRandom()::nextBytes)

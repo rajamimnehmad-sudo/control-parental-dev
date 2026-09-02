@@ -631,7 +631,7 @@ internal class ChromePhotosHttpsProxy(
                     return request.successDisposition()
                 }
                 if (documentAuthority?.requiresBufferedDecision(upstreamRequest, response) == true) {
-                    val bounded = response.body.readBounded(MaximumDocumentBytes)
+                    val bounded = response.body.readBounded(ChromeMediaShieldMaximumDocumentBytes)
                     val documentResult =
                         checkNotNull(
                             documentAuthority.processBuffered(
@@ -851,7 +851,6 @@ internal class ChromePhotosHttpsProxy(
         const val FingerprintLogLength = 16
         const val NanosPerMillis = 1_000_000.0
         const val MaximumLatencySamples = 512
-        const val MaximumDocumentBytes = 2 * 1024 * 1024
         const val LogTag = "ChromePhotosDataPlane"
         const val StandaloneConnectionId = "standalone"
         const val StandaloneRequestId = "standalone-r1"
