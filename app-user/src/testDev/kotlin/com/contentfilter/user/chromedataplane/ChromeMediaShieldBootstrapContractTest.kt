@@ -608,6 +608,40 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
+    fun `admitted inline SVG remains style compatible while every mutation is revalidated`() {
+        assertContains(
+            script,
+            "const protectedInlineStyle=(element)=>protectedNode(element)||" +
+                "invoke(WeakSetHas,protectedMediaNodes,[element])||" +
+                "nativeGet.call(element,'data-glosh-media-blocked')==='1'",
+        )
+        assertContains(
+            script,
+            "const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);" +
+                "if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedMediaNodes,[owner])||" +
+                "nativeGet.call(owner,'data-glosh-media-blocked')==='1'))return true",
+        )
+        assertFalse(script.contains("nativeGet.call(owner,'data-glosh-icon-safe')==='1'"))
+        assertContains(
+            script,
+            "invoke(entry.set,this,[rewriteCssCandidate(value)]);" +
+                "const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner)",
+        )
+    }
+
+    @Test
+    fun `reading protected inline style remains compatible while mutation stays denied`() {
+        assertContains(
+            script,
+            "const guardedGet=function(){const value=invoke(entry.get,this,[]);" +
+                "invoke(WeakMapSet,styleOwners,[value,this]);return value}",
+        )
+        assertFalse(script.contains("guardedGet=function(){if(protectedInlineStyle(this))deny()"))
+        assertContains(script, "if(protectedDeclaration(this))deny()")
+        assertContains(script, "const guardedSet=function(value){if(protectedInlineStyle(this))deny()")
+    }
+
+    @Test
     fun `dynamic style text insertion paths route SVG data through native rewriter`() {
         assertContains(script, "const styleTextOwner=(value)=>")
         assertContains(script, "const rewriteStyleTextNode=(owner,node)=>")

@@ -339,10 +339,10 @@ internal object ChromeMediaShieldBootstrap {
         return read(styleNonceProperty,style)===''&&!nativeHas.call(style,'nonce')}catch(_){return false}};
         let curtainRequired=HAS_CURTAIN;
         const protectedNode=(node)=>!!node&&invoke(WeakSetHas,protectedNodes,[node]);
-        const protectedInlineStyle=(element)=>protectedNode(element)||invoke(WeakSetHas,protectedIconNodes,[element])||invoke(WeakSetHas,protectedMediaNodes,[element])||nativeGet.call(element,'data-glosh-media-blocked')==='1'||nativeGet.call(element,'data-glosh-icon-safe')==='1';
+        const protectedInlineStyle=(element)=>protectedNode(element)||invoke(WeakSetHas,protectedMediaNodes,[element])||nativeGet.call(element,'data-glosh-media-blocked')==='1';
         const guardInlineStyleOwner=(prototype)=>{if(!prototype)return true;const owner=propertyOwner(prototype,'style');if(!owner)return false;
         if(invoke(WeakSetHas,guardedStyleOwners,[owner]))return true;const entry=descriptor(owner,'style');if(!entry||!entry.get)return false;
-        try{const guardedGet=function(){if(protectedInlineStyle(this))deny();const value=invoke(entry.get,this,[]);invoke(WeakMapSet,styleOwners,[value,this]);return value};
+        try{const guardedGet=function(){const value=invoke(entry.get,this,[]);invoke(WeakMapSet,styleOwners,[value,this]);return value};
         const guardedSet=function(value){if(protectedInlineStyle(this))deny();const result=invoke(entry.set,this,[value]);watchStyle(this);sanitizeContainer(this);return result};
         ObjectDefine(owner,'style',{get:guardedGet,set:guardedSet,enumerable:entry.enumerable,configurable:false});invoke(WeakSetAdd,guardedStyleOwners,[owner]);
         const sealedEntry=descriptor(owner,'style');return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
@@ -535,8 +535,8 @@ internal object ChromeMediaShieldBootstrap {
         installed=forceSelfTarget(pair[0],pair[1])&&installed;
         const protectedSheet=(value)=>!!value&&invoke(WeakSetHas,protectedSheets,[value]);
         const protectedRule=(value)=>{try{return !!value&&protectedSheet(read(cssParentSheetProperty,value))}catch(_){return false}};
-        const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedIconNodes,[owner])||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'||
-        nativeGet.call(owner,'data-glosh-icon-safe')==='1'))return true;try{const rule=read(cssParentRuleProperty,value);return !!rule&&protectedRule(rule)}catch(_){return false}};
+        const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'))return true;
+        try{const rule=read(cssParentRuleProperty,value);return !!rule&&protectedRule(rule)}catch(_){return false}};
         const SVG_REWRITE_RESPONSE_URL=resolvedEndpoint(SVG_REWRITE_URL),svgRewriteInputs=[],svgRewriteOutputs=[];
         const rewriteCssCandidate=(value)=>{const source=stringOf(value);if(!SELF_SHIELD||!includes(lower(source),'data:image/svg+xml'))return source;for(let index=0;index<svgRewriteInputs.length;index+=1)if(svgRewriteInputs[index]===source)return svgRewriteOutputs[index];
         let output=source;try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',SVG_REWRITE_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
@@ -571,7 +571,7 @@ internal object ChromeMediaShieldBootstrap {
         ObjectDefine(MediaList.prototype,'mediaText',{get:mediaTextProperty.get,set:function(value){if(invoke(WeakSetHas,protectedMedias,[this]))deny();invoke(mediaTextProperty.set,this,[value])},configurable:false})
         }catch(_){installed=false}}}
         const protectedStyleMap=(value)=>{if(invoke(WeakSetHas,protectedStyleMaps,[value]))return true;const owner=invoke(WeakMapGet,styleMapOwners,[value]);
-        return !!owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedIconNodes,[owner])||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'||nativeGet.call(owner,'data-glosh-icon-safe')==='1')};
+        return !!owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1')};
         if(self.StylePropertyMap){for(const name of ['set','append','delete','clear']){const original=StylePropertyMap.prototype[name];if(original)
         installed=seal(StylePropertyMap.prototype,name,function(...args){if(protectedStyleMap(this))deny();return invoke(original,this,args)})&&installed}}
         const protectedReflectiveTarget=(value)=>!!value&&(protectedNode(value)||invoke(WeakSetHas,protectedIconNodes,[value])||invoke(WeakSetHas,protectedMediaNodes,[value])||
