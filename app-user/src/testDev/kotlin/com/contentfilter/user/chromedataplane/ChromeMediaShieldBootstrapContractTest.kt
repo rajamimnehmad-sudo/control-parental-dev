@@ -700,27 +700,35 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
-    fun `media SVG is hidden unless it satisfies a bounded inert icon grammar`() {
+    fun `media SVG is hidden while bounded inert icons preserve their original UI`() {
         assertContains(script, "const ICON_TAGS=new Set")
         assertContains(script, "!invoke(SetHas,ICON_TAGS")
         assertContains(script, "['path','title','desc']")
         assertContains(script, "[href],[xlink\\\\:href],[filter],[mask],[clip-path]")
         assertContains(script, "ICON_PATH_CHARS")
-        assertContains(script, "protectedIconNodes")
-        assertContains(script, "lockedIconStyleSignatures")
-        assertContains(script, "iconStyleSignature")
-        assertContains(script, "if(alreadyLocked)return true")
-        assertContains(script, "['all','initial']")
-        assertContains(script, "['d','path(\"'+d+'\")']")
-        assertContains(script, "['zoom','1']")
-        assertContains(script, "['scale','none']")
-        assertContains(script, "nativeStylePriority.call(rootStyle,'all')==='important'")
+        assertContains(script, "const safeIconStyle=")
+        assertContains(script, "const safeIconPaint=")
+        assertContains(script, "const preserveOriginalIcon=")
+        assertContains(script, "safeIcon(element)&&preserveOriginalIcon(element)")
+        assertContains(script, "nativeSet.call(svg,'data-glosh-icon-safe','1')")
+        assertFalse(script.contains("protectedIconNodes"))
+        assertFalse(script.contains("lockedIconStyleSignatures"))
+        assertFalse(script.contains("iconStyleSignature"))
+        assertFalse(script.contains("['d','path(\"'+d+'\")']"))
+        assertFalse(script.contains("nativeRemove.call(svg,'style')"))
+        assertFalse(script.contains("pointer-events','none"))
+        assertContains(script, "const rect=nativeBoundingRect.call(svg)")
+        assertContains(script, "renderedWidth<=96&&renderedHeight<=96")
+        assertContains(script, "'style','class','href'")
         assertContains(script, "let child=firstChildOf(element);while(child){nodeRemove.call(element,child)")
         assertContains(script, "const WATCHED_ATTRIBUTES=")
         assertContains(script, "'d','points','viewBox','width','height','fill','stroke','transform'")
         assertContains(script, "elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)")
         assertFalse(script.contains("scan(target,RM_OBSERVER_ATTRIBUTE)"))
         assertContains(ChromeMediaShieldBootstrap.css, "svg:not([data-glosh-icon-safe='1'])")
+        assertContains(ChromeMediaShieldBootstrap.css, "max-width:96px!important;max-height:96px!important")
+        assertFalse(ChromeMediaShieldBootstrap.css.contains("transform:none!important"))
+        assertFalse(ChromeMediaShieldBootstrap.css.contains("pointer-events:none!important"))
     }
 
     @Test

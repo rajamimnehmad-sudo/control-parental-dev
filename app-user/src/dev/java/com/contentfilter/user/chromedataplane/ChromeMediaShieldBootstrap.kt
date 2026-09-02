@@ -22,8 +22,8 @@ internal object ChromeMediaShieldBootstrap {
             "input[type='image' i][src^='blob:' i],iframe:not([data-glosh-network-frame='1'])," +
             "svg:not([data-glosh-icon-safe='1'])," +
             "[data-glosh-media-blocked='1']{visibility:hidden!important;opacity:0!important}" +
-            "svg[data-glosh-icon-safe='1']{max-width:96px!important;max-height:96px!important;overflow:hidden!important;" +
-            "transform:none!important;filter:none!important;mask:none!important;clip-path:none!important}"
+            "svg[data-glosh-icon-safe='1']{max-width:96px!important;max-height:96px!important;" +
+            "filter:none!important;mask:none!important;clip-path:none!important}"
 
     // Keep the nonce-authorized sheet immutable. H20 releases by changing only document-owned
     // state; mutating the sheet after clearing its CSP nonce can leave Chrome applying old rules.
@@ -176,6 +176,7 @@ internal object ChromeMediaShieldBootstrap {
         const d=descriptor(owner,name);return !!d&&d.value===value&&!d.configurable}catch(_){return false}};
         const nativeSet=method(Element.prototype.setAttribute),nativeGet=method(Element.prototype.getAttribute),nativeHas=method(Element.prototype.hasAttribute);
         const nativeRemove=method(Element.prototype.removeAttribute),nativeToggle=method(Element.prototype.toggleAttribute);
+        const nativeBoundingRect=method(Element.prototype.getBoundingClientRect);
         const nativeGetNode=method(Element.prototype.getAttributeNode),nativeGetNodeNS=method(Element.prototype.getAttributeNodeNS);
         const elementQuery=method(Element.prototype.querySelector),elementQueryAll=method(Element.prototype.querySelectorAll),elementClosest=method(Element.prototype.closest);
         const fragmentQueryAll=method(DocumentFragment.prototype.querySelectorAll),nativeAddEvent=method(EventTarget.prototype.addEventListener),nativeDispatchEvent=method(EventTarget.prototype.dispatchEvent);
@@ -213,13 +214,15 @@ internal object ChromeMediaShieldBootstrap {
         const iframeSandboxProperty=self.HTMLIFrameElement?propertyDescriptor(HTMLIFrameElement.prototype,'sandbox'):null;
         const htmlHiddenProperty=SELF.HTMLElement?propertyDescriptor(HTMLElement.prototype,'hidden'):null;
         const htmlTitleProperty=SELF.HTMLElement?propertyDescriptor(HTMLElement.prototype,'title'):null;
+        const rectWidthProperty=SELF.DOMRectReadOnly?propertyDescriptor(DOMRectReadOnly.prototype,'width'):null;
+        const rectHeightProperty=SELF.DOMRectReadOnly?propertyDescriptor(DOMRectReadOnly.prototype,'height'):null;
         __GLOSH_RENDERER_METRICS_DECLARATIONS__
         const dialogOpenProperty=SELF.HTMLDialogElement?propertyDescriptor(HTMLDialogElement.prototype,'open'):null;
         const dialogClosedByProperty=SELF.HTMLDialogElement?propertyDescriptor(HTMLDialogElement.prototype,'closedBy'):null;
         const attributeStyleMapProperty=self.StylePropertyMap?propertyDescriptor(DOC.documentElement,'attributeStyleMap'):null;
         const requiredPrimordials=[nodeText,nodeValue,nodeTypeProperty,localNameProperty,parentNodeProperty,firstChildProperty,isConnectedProperty,baseUriProperty,styleProperty,
         elementAttributesProperty,documentElementProperty,documentHeadProperty,visibilityProperty,eventTargetProperty,eventTrustedProperty,mutationTypeProperty,mutationTargetProperty,mutationAddedProperty,
-        nodeListLength,namedMapLength,styleLengthProperty,urlProtocolProperty,templateContentProperty,htmlHiddenProperty,htmlTitleProperty,currentScriptProperty,scriptSrcProperty];
+        nodeListLength,namedMapLength,styleLengthProperty,urlProtocolProperty,templateContentProperty,htmlHiddenProperty,htmlTitleProperty,rectWidthProperty,rectHeightProperty,currentScriptProperty,scriptSrcProperty];
         if((TOP_LEVEL||SELF_SHIELD)&&(!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader||!xhrStatusProperty||!xhrResponseUrlProperty||!xhrResponseTextProperty))failInstall('XHR_PRIMORDIAL_MISSING');
         if(TOP_LEVEL&&!SELF_SHIELD&&(!nativeHasFocus||!nativeElementFocus||!nativeLocationReload||!nativeDialogShowModal||!nativeDialogShow||!nativeDialogClose||!htmlHiddenProperty||!dialogOpenProperty))installed=false;
         for(let index=0;index<requiredPrimordials.length;index+=1)if(!requiredPrimordials[index])failInstall('REQUIRED_PRIMORDIAL_'+index);
@@ -242,8 +245,8 @@ internal object ChromeMediaShieldBootstrap {
         const attrName=(attribute)=>stringOf(read(attrNameProperty,attribute)||''),attrValueOf=(attribute)=>stringOf(read(attrValueProperty,attribute)||'');
         const attrNamespace=(attribute)=>read(attrNamespaceProperty,attribute),attrLocalName=(attribute)=>stringOf(read(attrLocalNameProperty,attribute)||'');
         const attrOwner=(attribute)=>read(attrOwnerProperty,attribute),sandboxOf=(frame)=>read(iframeSandboxProperty,frame);
-        const lockedSandboxes=new WeakSet(),protectedNodes=new WeakSet(),protectedIconNodes=new WeakSet(),protectedMediaNodes=new WeakSet(),protectedStyleMaps=new WeakSet(),protectedSheets=new WeakSet(),protectedMedias=new WeakSet(),guardedStyleOwners=new WeakSet(),protectedDescendants=new WeakMap();
-        const styleOwners=new WeakMap(),styleMapOwners=new WeakMap(),attributeOwners=new WeakMap(),guardedRuleMethodOwners=new WeakMap(),lockedIconStyleSignatures=new WeakMap();
+        const lockedSandboxes=new WeakSet(),protectedNodes=new WeakSet(),protectedMediaNodes=new WeakSet(),protectedStyleMaps=new WeakSet(),protectedSheets=new WeakSet(),protectedMedias=new WeakSet(),guardedStyleOwners=new WeakSet(),protectedDescendants=new WeakMap();
+        const styleOwners=new WeakMap(),styleMapOwners=new WeakMap(),attributeOwners=new WeakMap(),guardedRuleMethodOwners=new WeakMap();
         installSection('BOOTSTRAP_SCRIPT');if(!BOOTSTRAP_SCRIPT)failInstall('CURRENT_SCRIPT_MISSING');
         installSection('STATIC_STYLE_BINDING');
         const watchStyle=(element)=>{try{invoke(WeakMapSet,styleOwners,[styleOf(element),element]);if(attributeStyleMapProperty){const map=read(attributeStyleMapProperty,element);
@@ -257,10 +260,12 @@ internal object ChromeMediaShieldBootstrap {
         return protocol==='https:'||protocol==='http:'}catch(_){return false}};
         const TOP_LAYER_ATTRIBUTE_NAMES=['popover','popovertarget','popovertargetaction','commandfor','command'],TOP_LAYER_ATTRIBUTES=new Set(TOP_LAYER_ATTRIBUTE_NAMES);
         const ICON_TAGS=new Set(['path','title','desc']),ICON_ROOT_ATTRS=new Set(['xmlns','width','height','viewbox','preserveaspectratio','role','aria-hidden','aria-label','focusable','id','class','data-glosh-icon-safe','data-glosh-media-blocked','style']);
-        const ICON_PATH_ATTRS=new Set(['d','fill-rule','id','class','style']),ICON_TEXT_ATTRS=new Set(['id','class']),ICON_PATH_CHARS='MmLlHhVvCcSsQqTtAaZz0123456789+-.eE, \t\n\r\f';
-        const iconAttributeAllowed=(node,name,svg)=>{const tag=localNameOf(node);if(tag==='svg')return invoke(SetHas,ICON_ROOT_ATTRS,[name])&&(name!=='style'||
-        nativeGet.call(svg,'data-glosh-media-blocked')==='1'||invoke(WeakSetHas,protectedIconNodes,[node]));if(tag==='path')return invoke(SetHas,ICON_PATH_ATTRS,[name])&&
-        (name!=='style'||invoke(WeakSetHas,protectedIconNodes,[node]));return invoke(SetHas,ICON_TEXT_ATTRS,[name])};
+        const ICON_PATH_ATTRS=new Set(['d','fill','fill-rule','fill-opacity','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-miterlimit','stroke-dasharray','stroke-dashoffset','stroke-opacity','opacity','vector-effect','transform','id','class','style']),ICON_TEXT_ATTRS=new Set(['id','class']),ICON_PATH_CHARS='MmLlHhVvCcSsQqTtAaZz0123456789+-.eE, \t\n\r\f';
+        const safeIconStyle=(node)=>{const raw=lower(nativeGet.call(node,'style')||'');if(raw.length>1024||includes(raw,'\\')||includes(raw,'url(')||includes(raw,'image('))return false;
+        const style=styleOf(node);for(const name of ['background','background-image','list-style-image','border-image-source','cursor','content','filter','mask','-webkit-mask','clip-path'])if(nativeStyleGet.call(style,name)!=='')return false;return true};
+        const safeIconPaint=(value)=>{const raw=lower(value||'');return raw.length<=256&&!includes(raw,'\\')&&!includes(raw,'url(')&&!includes(raw,'image(')};
+        const iconAttributeAllowed=(node,name)=>{const tag=localNameOf(node);if(tag==='svg')return invoke(SetHas,ICON_ROOT_ATTRS,[name])&&(name!=='style'||safeIconStyle(node));if(tag==='path')return invoke(SetHas,ICON_PATH_ATTRS,[name])&&
+        (name!=='style'?(!oneOf(name,['fill','stroke'])||safeIconPaint(nativeGet.call(node,name))):safeIconStyle(node));return invoke(SetHas,ICON_TEXT_ATTRS,[name])};
         const validIconPath=(value)=>{if(!value||value.length>1024)return false;for(let index=0;index<value.length;index+=1)if(!includes(ICON_PATH_CHARS,value[index]))return false;return true};
         const iconDimensions=(svg)=>{let width=NativeNumber(nativeGet.call(svg,'width')),height=NativeNumber(nativeGet.call(svg,'height'));
         if(!(width>0&&height>0)){const viewBox=whitespaceParts(nativeGet.call(svg,'viewBox')||'');if(viewBox.length===4){width=NativeNumber(viewBox[2]);height=NativeNumber(viewBox[3])}}
@@ -268,30 +273,14 @@ internal object ChromeMediaShieldBootstrap {
         const safeIcon=(svg)=>{rendererMetric(26);try{const descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);for(let index=0;index<descendants.length;index+=1)
         if(!invoke(SetHas,ICON_TAGS,[localNameOf(descendants[index])]))return false;const nodes=[svg];for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);
         let attributeBytes=0,pathBytes=0,pathCount=0;for(let index=0;index<nodes.length;index+=1){const node=nodes[index],attrs=attributesOf(node);for(let attributeIndex=0;attributeIndex<attrs.length;attributeIndex+=1){
-        const name=lower(attrName(attrs[attributeIndex]));if(!iconAttributeAllowed(node,name,svg))return false;if(name!=='style'||!invoke(WeakSetHas,protectedIconNodes,[node]))attributeBytes+=name.length+attrValueOf(attrs[attributeIndex]).length}
+        const name=lower(attrName(attrs[attributeIndex]));if(!iconAttributeAllowed(node,name))return false;attributeBytes+=name.length+attrValueOf(attrs[attributeIndex]).length}
         if(localNameOf(node)==='path'){pathCount+=1;const d=nativeGet.call(node,'d')||'';if(!validIconPath(d))return false;pathBytes+=d.length}}
         if(descendants.length>18||attributeBytes>4096||pathCount<1||pathCount>16||pathBytes>2048||!iconDimensions(svg))return false;
         return !elementQuery.call(svg,'[href],[xlink\\:href],[filter],[mask],[clip-path],[fill^="url(" i],[stroke^="url(" i]')}
         catch(_){return false}};
-        const lockIconGeometry=(svg)=>{rendererMetric(27);try{const dimensions=iconDimensions(svg);if(!dimensions)return false;const nodes=[svg],descendants=copyList(elementQueryAll.call(svg,'*'),nodeListLength);
-        for(let index=0;index<descendants.length;index+=1)append(nodes,descendants[index]);const rootStyle=styleOf(svg),width=stringOf(dimensions[0])+'px',height=stringOf(dimensions[1])+'px';
-        const rootRules=[['all','initial'],['display','inline-block'],['box-sizing','border-box'],['width',width],['height',height],['min-width','0'],['min-height','0'],['max-width',width],['max-height',height],
-        ['margin','0'],['padding','0'],['position','static'],['inset','auto'],['zoom','1'],['scale','none'],['rotate','none'],['translate','none'],['transform','none'],['transform-origin','center'],
-        ['filter','none'],['mask','none'],['clip-path','none'],['animation','none'],['transition','none'],['background','none'],['box-shadow','none'],['border','0'],['overflow','hidden'],['contain','paint'],
-        ['opacity','1'],['visibility','visible'],['pointer-events','none'],['color','#000'],['direction','ltr'],['unicode-bidi','normal']];
-        const descendantRules=(node)=>{if(localNameOf(node)!=='path')return [['all','initial'],['display','none']];const d=nativeGet.call(node,'d')||'',fillRule=lower(nativeGet.call(node,'fill-rule')||'nonzero');return [['all','initial'],['display','inline'],['d','path("'+d+'")'],['fill','currentcolor'],['stroke','none'],
-        ['fill-rule',fillRule==='evenodd'?'evenodd':'nonzero'],['opacity','1'],['transform','none'],['filter','none'],['clip-path','none'],['mask','none'],['animation','none'],['transition','none']]};
-        const iconStyleSignature=(style,rules)=>{let signature=stringOf(read(styleLengthProperty,style));for(let index=0;index<rules.length;index+=1){const name=rules[index][0];signature+='\n'+name+'\u0000'+nativeStyleGet.call(style,name)+'\u0000'+nativeStylePriority.call(style,name)}return signature};
-        const rulesLocked=(style,rules)=>{const expected=invoke(WeakMapGet,lockedIconStyleSignatures,[style]);return !!expected&&expected===iconStyleSignature(style,rules)};
-        let alreadyLocked=nativeGet.call(svg,'data-glosh-icon-safe')==='1'&&invoke(WeakSetHas,protectedIconNodes,[svg])&&rulesLocked(rootStyle,rootRules);
-        for(let index=0;alreadyLocked&&index<descendants.length;index+=1){const node=descendants[index];alreadyLocked=invoke(WeakSetHas,protectedIconNodes,[node])&&rulesLocked(styleOf(node),descendantRules(node))}
-        if(alreadyLocked)return true;for(let index=0;index<nodes.length;index+=1)invoke(WeakSetAdd,protectedIconNodes,[nodes[index]]);
-        rendererMetric(28,2);rendererMetric(37,2);nativeRemove.call(svg,'style');nativeRemove.call(svg,'data-glosh-media-blocked');watchStyle(svg);
-        rendererMetric(28,rootRules.length);rendererMetric(37,rootRules.length);for(let index=0;index<rootRules.length;index+=1)nativeStyleSet.call(rootStyle,rootRules[index][0],rootRules[index][1],'important');invoke(WeakMapSet,lockedIconStyleSignatures,[rootStyle,iconStyleSignature(rootStyle,rootRules)]);
-        for(let index=0;index<descendants.length;index+=1){const node=descendants[index],style=styleOf(node),rules=descendantRules(node);watchStyle(node);rendererMetric(28);rendererMetric(37);nativeRemove.call(node,'style');
-        rendererMetric(28,rules.length);rendererMetric(37,rules.length);for(let ruleIndex=0;ruleIndex<rules.length;ruleIndex+=1)nativeStyleSet.call(style,rules[ruleIndex][0],rules[ruleIndex][1],'important');invoke(WeakMapSet,lockedIconStyleSignatures,[style,iconStyleSignature(style,rules)])}
-        rendererMetric(28);rendererMetric(37);nativeSet.call(svg,'data-glosh-icon-safe','1');return nativeStylePriority.call(rootStyle,'all')==='important'&&nativeStyleGet.call(rootStyle,'width')===width&&nativeStylePriority.call(rootStyle,'width')==='important'}
-        catch(_){return false}};
+        const preserveOriginalIcon=(svg)=>{rendererMetric(27);try{if(!iconDimensions(svg))return false;const rect=nativeBoundingRect.call(svg),renderedWidth=read(rectWidthProperty,rect),renderedHeight=read(rectHeightProperty,rect);
+        if(!(renderedWidth>=0&&renderedHeight>=0&&renderedWidth<=96&&renderedHeight<=96))return false;if(invoke(WeakSetHas,protectedMediaNodes,[svg]))unhide(svg);
+        if(nativeGet.call(svg,'data-glosh-icon-safe')!=='1'){rendererMetric(37);nativeSet.call(svg,'data-glosh-icon-safe','1')}return nativeGet.call(svg,'data-glosh-icon-safe')==='1'}catch(_){return false}};
         const removeDeclarativeTopLayer=(element)=>{for(let index=0;index<TOP_LAYER_ATTRIBUTE_NAMES.length;index+=1){const attribute=TOP_LAYER_ATTRIBUTE_NAMES[index];
         if(nativeHas.call(element,attribute))nativeRemove.call(element,attribute)}};
         const sanitizeElementBody=(element)=>{removeDeclarativeTopLayer(element);const tag=localNameOf(element);
@@ -308,7 +297,7 @@ internal object ChromeMediaShieldBootstrap {
         const retainedLocalBlock=values.trim()===''&&nativeGet.call(element,'data-glosh-media-blocked')==='1'&&invoke(WeakSetHas,protectedMediaNodes,[element]);
         if(structurallyBlocked||retainedLocalBlock||includes(values,'data:')||includes(values,'blob:')){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
         const style=lower(nativeGet.call(element,'style')||'');if(includes(style,'url(')&&(includes(style,'data:')||includes(style,'blob:')))hide(element);
-        if(tag==='svg'){if(safeIcon(element)&&lockIconGeometry(element)){}
+        if(tag==='svg'){if(safeIcon(element)&&preserveOriginalIcon(element)){}
         else{nativeRemove.call(element,'data-glosh-icon-safe');let child=firstChildOf(element);while(child){nodeRemove.call(element,child);child=firstChildOf(element)}hide(element)}}};
         const sanitizeElement=(element,family=-1)=>{rendererSanitized(element);if(family<0)return sanitizeElementBody(element);rendererDirectSanitized(family);const started=rendererFamilyStarted(family,element);
         try{return sanitizeElementBody(element)}finally{rendererFamilyDone(family,0,started)}};
@@ -351,7 +340,7 @@ internal object ChromeMediaShieldBootstrap {
         return read(styleNonceProperty,style)===''&&!nativeHas.call(style,'nonce')}catch(_){return false}};
         let curtainRequired=HAS_CURTAIN;
         const protectedNode=(node)=>!!node&&invoke(WeakSetHas,protectedNodes,[node]);
-        const protectedInlineStyle=(element)=>protectedNode(element)||invoke(WeakSetHas,protectedIconNodes,[element])||invoke(WeakSetHas,protectedMediaNodes,[element])||nativeGet.call(element,'data-glosh-media-blocked')==='1'||nativeGet.call(element,'data-glosh-icon-safe')==='1';
+        const protectedInlineStyle=(element)=>protectedNode(element)||invoke(WeakSetHas,protectedMediaNodes,[element])||nativeGet.call(element,'data-glosh-media-blocked')==='1';
         const guardInlineStyleOwner=(prototype)=>{if(!prototype)return true;const owner=propertyOwner(prototype,'style');if(!owner)return false;
         if(invoke(WeakSetHas,guardedStyleOwners,[owner]))return true;const entry=descriptor(owner,'style');if(!entry||!entry.get)return false;
         try{const guardedGet=function(){if(protectedInlineStyle(this))deny();const value=invoke(entry.get,this,[]);invoke(WeakMapSet,styleOwners,[value,this]);return value};
@@ -463,31 +452,31 @@ internal object ChromeMediaShieldBootstrap {
         const adopt=Document.prototype.adoptNode;installed=seal(Document.prototype,'adoptNode',function(node){rendererApiCall(RMA_ADOPT,RMF_DOM_GUARD);if(containsProtected(node))deny();const result=invoke(adopt,this,[node]);scan(result,RM_GUARDED,RMA_ADOPT,RMF_DOM_GUARD);return result})&&installed;
         installSection('ATTRIBUTE_GUARDS');const protectedCurtainAttribute=(element,key)=>element===documentElement()&&key===CURTAIN_RELEASE_ATTRIBUTE;
         installed=seal(Element.prototype,'setAttribute',function(name,value){const attributeName=stringOf(name),attributeValue=stringOf(value),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
+        if(protectedNode(this)||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
         if(oneOf(tag,['button','input'])&&key==='formtarget')return nativeSet.call(this,'formtarget','_self');
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);nativeSet.call(this,'src','about:blank');hide(this);return}
         const result=nativeSet.call(this,attributeName,attributeValue);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'removeAttribute',function(name){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();
+        if(protectedNode(this)||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
         const result=nativeRemove.call(this,attributeName);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'toggleAttribute',function(name,force){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();
+        if(protectedNode(this)||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&(key==='sandbox'||key==='srcdoc')){sanitizeElement(this);return nativeHas.call(this,key)}
         const result=nativeToggle.call(this,attributeName,force);sanitizeContainer(this);return result})&&installed;
         const nativeSetNS=method(Element.prototype.setAttributeNS),nativeRemoveNS=method(Element.prototype.removeAttributeNS);
         installed=seal(Element.prototype,'setAttributeNS',function(namespace,name,value){const namespaceValue=namespace===null?null:stringOf(namespace),attributeName=stringOf(name),attributeValue=stringOf(value);
         const colon=lastIndex(attributeName,':'),key=lower(colon>=0?slice(attributeName,colon+1):attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
+        if(protectedNode(this)||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
         if(oneOf(tag,['button','input'])&&key==='formtarget')return nativeSet.call(this,'formtarget','_self');
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);
         nativeSet.call(this,'src','about:blank');hide(this);return}const result=nativeSetNS.call(this,namespaceValue,attributeName,attributeValue);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'removeAttributeNS',function(namespace,name){const namespaceValue=namespace===null?null:stringOf(namespace),attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
+        if(protectedNode(this)||protectedCurtainAttribute(this,key))deny();if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
         const result=nativeRemoveNS.call(this,namespaceValue,attributeName);sanitizeContainer(this);return result})&&installed;
         const guardedSetAttribute=Element.prototype.setAttribute,guardedSetAttributeNS=Element.prototype.setAttributeNS;
         const guardedRemoveAttribute=Element.prototype.removeAttribute,guardedRemoveAttributeNS=Element.prototype.removeAttributeNS;
@@ -543,8 +532,7 @@ internal object ChromeMediaShieldBootstrap {
         installed=forceSelfTarget(pair[0],pair[1])&&installed;
         const protectedSheet=(value)=>!!value&&invoke(WeakSetHas,protectedSheets,[value]);
         const protectedRule=(value)=>{try{return !!value&&protectedSheet(read(cssParentSheetProperty,value))}catch(_){return false}};
-        const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedIconNodes,[owner])||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'||
-        nativeGet.call(owner,'data-glosh-icon-safe')==='1'))return true;try{const rule=read(cssParentRuleProperty,value);return !!rule&&protectedRule(rule)}catch(_){return false}};
+        const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'))return true;try{const rule=read(cssParentRuleProperty,value);return !!rule&&protectedRule(rule)}catch(_){return false}};
         installSection('CSSOM_GUARDS');installed=seal(CSSStyleDeclaration.prototype,'setProperty',function(...args){if(protectedDeclaration(this))deny();const result=nativeStyleSet.apply(this,args);
         const owner=invoke(WeakMapGet,styleOwners,[this]);if(owner)sanitizeContainer(owner);return result})&&installed;
         installed=seal(CSSStyleDeclaration.prototype,'removeProperty',function(...args){if(protectedDeclaration(this))deny();const result=nativeStyleRemove.apply(this,args);
@@ -566,10 +554,10 @@ internal object ChromeMediaShieldBootstrap {
         ObjectDefine(MediaList.prototype,'mediaText',{get:mediaTextProperty.get,set:function(value){if(invoke(WeakSetHas,protectedMedias,[this]))deny();invoke(mediaTextProperty.set,this,[value])},configurable:false})
         }catch(_){installed=false}}}
         const protectedStyleMap=(value)=>{if(invoke(WeakSetHas,protectedStyleMaps,[value]))return true;const owner=invoke(WeakMapGet,styleMapOwners,[value]);
-        return !!owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedIconNodes,[owner])||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'||nativeGet.call(owner,'data-glosh-icon-safe')==='1')};
+        return !!owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1')};
         if(self.StylePropertyMap){for(const name of ['set','append','delete','clear']){const original=StylePropertyMap.prototype[name];if(original)
         installed=seal(StylePropertyMap.prototype,name,function(...args){if(protectedStyleMap(this))deny();return invoke(original,this,args)})&&installed}}
-        const protectedReflectiveTarget=(value)=>!!value&&(protectedNode(value)||invoke(WeakSetHas,protectedIconNodes,[value])||invoke(WeakSetHas,protectedMediaNodes,[value])||
+        const protectedReflectiveTarget=(value)=>!!value&&(protectedNode(value)||invoke(WeakSetHas,protectedMediaNodes,[value])||
         invoke(WeakSetHas,protectedMedias,[value])||invoke(WeakSetHas,lockedSandboxes,[value])||protectedDeclaration(value)||protectedSheet(value)||protectedRule(value)||protectedStyleMap(value)||!!mappedProtected(value));
         const denyReflectiveTarget=(value)=>{if(protectedReflectiveTarget(value))deny();return value};
         installSection('REFLECTION_GUARDS');installed=seal(NativeObject,'defineProperty',function(target,name,entry){denyReflectiveTarget(target);return invoke(ObjectDefine,NativeObject,[target,name,entry])})&&installed;
@@ -708,7 +696,7 @@ internal object ChromeMediaShieldBootstrap {
         installed=!!workletOwner&&seal(workletOwner,'addModule',deny)&&installed}
         if(NAV.serviceWorker&&NAV.serviceWorker.register){const serviceWorkerOwner=propertyOwner(NAV.serviceWorker,'register');
         installed=!!serviceWorkerOwner&&seal(serviceWorkerOwner,'register',deny)&&installed}
-        installSection('MUTATION_OBSERVER');const WATCHED_ATTRIBUTES=['src','srcset','style','href','xlink:href','srcdoc','sandbox','target','formtarget','popover','popovertarget','popovertargetaction','commandfor','command','data-glosh-media-blocked','data-glosh-icon-safe',
+        installSection('MUTATION_OBSERVER');const WATCHED_ATTRIBUTES=['src','srcset','style','class','href','xlink:href','srcdoc','sandbox','target','formtarget','popover','popovertarget','popovertargetaction','commandfor','command','data-glosh-media-blocked','data-glosh-icon-safe',
         'd','points','viewBox','width','height','fill','stroke','transform','filter','mask','clip-path','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry',CURTAIN_RELEASE_ATTRIBUTE];
         const observer=new NativeMutationObserver(records=>{rendererMetric(0);rendererMetric(1,records.length);rendererMax(4,records.length);ensureStyle();ensureCurtain();for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
         if(type==='childList'){rendererMetric(2);const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1)scan(added[addedIndex],RM_OBSERVER_CHILD)}
