@@ -359,11 +359,6 @@ internal class ChromePhotosProtectedSurface(
     ) : View(context), AutoCloseable {
         private val framePaint = Paint(Paint.FILTER_BITMAP_FLAG)
         private val frameDestination = Rect()
-        private val statusPaint =
-            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.WHITE
-                textSize = 16f * resources.displayMetrics.scaledDensity
-            }
         private var frontFrame: Bitmap? = null
         private var pendingFrame: Bitmap? = null
         private var covered = true
@@ -434,12 +429,6 @@ internal class ChromePhotosProtectedSurface(
             }
             if (covered) {
                 canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), CoverPaint)
-                canvas.drawText(
-                    PendingMessage,
-                    HorizontalPaddingPx,
-                    height - VerticalPaddingPx,
-                    statusPaint,
-                )
             }
             if (diagnosticMarkerEnabled()) drawSurfaceMarkerLattice(canvas)
         }
@@ -508,10 +497,10 @@ internal class ChromePhotosProtectedSurface(
         }
 
         private companion object {
-            const val HorizontalPaddingPx = 32f
-            const val VerticalPaddingPx = 40f
-            const val PendingMessage = "Analizando contenido nuevo…"
-            const val NeutralColor = 0xFF202124.toInt()
+            // Match Chrome's ordinary blank document canvas while the fail-closed surface is
+            // opaque. Security comes from opacity and release authority, not from exposing a
+            // product-specific black progress screen during every navigation.
+            const val NeutralColor = Color.WHITE
             const val MarkerInsetPx = 8f
             val SurfaceMarkerPaint =
                 Paint().apply {
@@ -519,7 +508,7 @@ internal class ChromePhotosProtectedSurface(
                 }
             val CoverPaint =
                 Paint().apply {
-                    color = 0xB31F2328.toInt()
+                    color = Color.WHITE
                 }
         }
     }

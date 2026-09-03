@@ -219,6 +219,8 @@ class ChromeMediaShieldBootstrapContractTest {
             "html:not([${ChromeMediaShieldBootstrap.CurtainReleaseAttribute}='1']) body>*{" +
                 "visibility:hidden!important;opacity:0!important}",
         )
+        assertContains(ChromeMediaShieldBootstrap.curtainCss, "body{background:#ffffff!important}")
+        assertContains(script, "['background','#ffffff'],['color','#000000']")
         assertContains(script, "StringCharCodeAt=String.prototype.charCodeAt")
         assertContains(script, "const code=charCode(value,index)")
         assertFalse(script.contains("value.charCodeAt(index)"))

@@ -1,9 +1,12 @@
 package com.contentfilter.user.chromedataplane
 
 import android.graphics.Bitmap
+import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Shader
 import android.graphics.Typeface
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.atomic.AtomicReference
@@ -448,7 +451,26 @@ internal class ChromePhotosFixtureOrigin(
                     if (index % 2 == 0) canvas.drawRect(index * 40f, 0f, (index + 1) * 40f, 180f, paint)
                 }
             }
-            VisualKind.Placeholder -> canvas.drawColor(Color.rgb(92, 100, 108))
+            VisualKind.Placeholder -> {
+                paint.shader =
+                    LinearGradient(
+                        0f,
+                        0f,
+                        ImageWidth.toFloat(),
+                        ImageHeight.toFloat(),
+                        Color.rgb(223, 228, 234),
+                        Color.rgb(170, 181, 193),
+                        Shader.TileMode.CLAMP,
+                    )
+                canvas.drawRect(0f, 0f, ImageWidth.toFloat(), ImageHeight.toFloat(), paint)
+                paint.shader = null
+                paint.maskFilter = BlurMaskFilter(42f, BlurMaskFilter.Blur.NORMAL)
+                paint.color = Color.argb(145, 119, 132, 147)
+                canvas.drawCircle(72f, 48f, 82f, paint)
+                paint.color = Color.argb(130, 238, 241, 245)
+                canvas.drawCircle(254f, 142f, 105f, paint)
+                paint.maskFilter = null
+            }
             VisualKind.AuditPlaceholder -> {
                 canvas.drawColor(Color.rgb(55, 65, 81))
                 paint.color = Color.rgb(0, 200, 255)
@@ -457,11 +479,13 @@ internal class ChromePhotosFixtureOrigin(
                 }
             }
         }
-        paint.color = Color.WHITE
-        paint.textAlign = Paint.Align.CENTER
-        paint.typeface = Typeface.DEFAULT_BOLD
-        paint.textSize = 30f
-        canvas.drawText(kind.label, ImageWidth / 2f, ImageHeight / 2f + 10f, paint)
+        if (kind != VisualKind.Placeholder) {
+            paint.color = Color.WHITE
+            paint.textAlign = Paint.Align.CENTER
+            paint.typeface = Typeface.DEFAULT_BOLD
+            paint.textSize = 30f
+            canvas.drawText(kind.label, ImageWidth / 2f, ImageHeight / 2f + 10f, paint)
+        }
         return ByteArrayOutputStream().use { output ->
             check(bitmap.compress(Bitmap.CompressFormat.PNG, PngQuality, output))
             bitmap.recycle()
@@ -474,7 +498,7 @@ internal class ChromePhotosFixtureOrigin(
     ) {
         Safe("SAFE-A ORIGINAL"),
         Sentinel("SENTINEL ORIGINAL"),
-        Placeholder("BLOQUEADA POR GLOSH"),
+        Placeholder(""),
         AuditPlaceholder("REPLACE ALL AUDIT"),
     }
 

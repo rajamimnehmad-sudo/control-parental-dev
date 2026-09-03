@@ -286,6 +286,8 @@ class ChromePhotosDataPlaneLabService : Service() {
                             transformer = transformer,
                             imageAuthority =
                                 ChromeImageContentAuthority(
+                                    maximumConcurrentBodies =
+                                        requestedBenchmarkConfig.maximumConcurrentInferences * BodyAdmissionPerInference,
                                     stockMediaAuthority = stockMediaAuthorityEnabled,
                                 ),
                             visualDeliveryGate = visualDeliveryGate,
@@ -915,6 +917,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         private const val FingerprintLogLength = 16
         private const val SessionLogLength = 8
         private const val MaxFailureLength = 80
+        private const val BodyAdmissionPerInference = 2
         private const val KeyVpnWasRunningBeforeLab = "vpn_was_running_before_lab"
         private const val HealthCheckMillis = 100L
         private const val AttestationLifetimeMillis = 400L

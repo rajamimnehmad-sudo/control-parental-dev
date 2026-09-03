@@ -839,10 +839,14 @@ internal class ChromePhotosHttpsProxy(
 
     private companion object {
         const val HttpsPort = 443
-        const val WorkerCount = 8
-        const val WorkerQueueCapacity = 32
-        const val SocketBacklog = 32
-        const val SocketTimeoutMillis = 20_000
+        // Chrome keeps idle HTTP/1.1 CONNECT tunnels alive across origins. Each tunnel owns a
+        // worker while its session waits for the next request, so a small pool serializes fresh
+        // image origins behind unrelated idle tabs until the socket timeout. Keep admission
+        // bounded, but large enough for Chrome's ordinary multi-origin connection fan-out.
+        const val WorkerCount = 64
+        const val WorkerQueueCapacity = 64
+        const val SocketBacklog = 64
+        const val SocketTimeoutMillis = 5_000
         const val MaxLineBytes = 8 * 1024
         const val MaxConnectHeaderCount = 100
         const val MaxConnectHeaderBytes = 64 * 1024

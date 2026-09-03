@@ -27,7 +27,7 @@ internal object ChromeMediaShieldBootstrap {
     // state; mutating the sheet after clearing its CSP nonce can leave Chrome applying old rules.
     val curtainCss: String =
         "html:not([$CurtainReleaseAttribute='1'])," +
-            "html:not([$CurtainReleaseAttribute='1']) body{background:#202124!important}" +
+            "html:not([$CurtainReleaseAttribute='1']) body{background:#ffffff!important}" +
             "html:not([$CurtainReleaseAttribute='1']) body>*{" +
             "visibility:hidden!important;opacity:0!important}"
 
@@ -365,7 +365,7 @@ internal object ChromeMediaShieldBootstrap {
         nodeInsert.call(parent,shieldStyle,firstChildOf(parent))}if(read(nodeText,shieldStyle)!==CSS&&nodeText&&nodeText.set)invoke(nodeText.set,shieldStyle,[CSS]);return ensureProtectedStyle(shieldStyle,shieldSheet,'')};
         const CURTAIN_RULES=[['all','initial'],['position','fixed'],['inset','0'],['display',curtainRequired?'block':'none'],['visibility','visible'],['opacity','1'],
         ['width','100vw'],['height','100vh'],['max-width','none'],['max-height','none'],['box-sizing','border-box'],['margin','0'],['padding','0'],['border','0'],
-        ['background','#202124'],['color','#ffffff'],['z-index','2147483647'],['pointer-events','auto'],['zoom','1'],['scale','1'],['rotate','none'],['translate','none'],
+        ['background','#ffffff'],['color','#000000'],['z-index','2147483647'],['pointer-events','auto'],['zoom','1'],['scale','1'],['rotate','none'],['translate','none'],
         ['transform','none'],['transform-origin','50% 50%'],['transform-box','border-box'],['offset-path','none'],['offset-distance','0'],['offset-position','normal'],
         ['offset-anchor','auto'],['offset-rotate','auto'],['filter','none'],['clip','auto'],['clip-path','none'],['border-radius','0'],['mask','none'],
         ['mix-blend-mode','normal'],['animation','none'],['transition','none'],['contain','strict'],['overflow','hidden']];
