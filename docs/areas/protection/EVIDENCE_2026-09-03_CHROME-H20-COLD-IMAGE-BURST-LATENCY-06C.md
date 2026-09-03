@@ -64,3 +64,21 @@ Repeated ADB screenshots are not valid latency evidence: `ChromePhotosProtectedS
 ## Residual
 
 The remaining optimization candidate is client-side HTTP/2 multiplexing between Chrome and the MITM. It is a material architecture/security decision and was not changed in 06C. Battery A/B remains unavailable while the A23 is charging, so no battery-gate claim is made. Further work requires quantifying that boundary without weakening fail-close, no-store, capability, or media-authority invariants.
+
+## GIF/video follow-up
+
+DEV437 admits only structurally valid, bounded static GIF containers to the
+existing GloshIA R3.1 photo path. The authority validates the logical screen,
+color tables, frame bounds, LZW sub-block framing and trailer before decode;
+animated, malformed, oversized and truncated GIFs remain fail-closed. Original
+GIF bytes are preserved for the normal safe/block replacement contract.
+
+The Chrome visual layer retains the historical dynamic-region video path:
+changed-region signatures, two consecutive safe samples and a bounded 500 ms
+verification schedule (~2 samples/second). This is compositor/accessibility
+visual protection, not a network-video bypass; encoded MP4/HLS/MSE streams and
+unsupported animated GIFs remain fail-closed until their transport gate is
+validated.
+
+Automated authority/engine tests, compile and lint passed for DEV437. APK
+SHA-256: `602d62d8da329e748e96885a22cc2bbad80863553fcb7381f212be7b2d58f306`.
