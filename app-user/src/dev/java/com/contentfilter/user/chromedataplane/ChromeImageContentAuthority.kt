@@ -18,7 +18,7 @@ internal enum class ChromeImageFormat(
     Png("image/png", true),
     Webp("image/webp", true),
     Avif("image/avif", true),
-    Gif("image/gif", false),
+    Gif("image/gif", true),
     Bmp("image/bmp", false),
     Ico("image/x-icon", false),
     Heif("image/heif", false),
@@ -216,6 +216,14 @@ internal class ChromeImageContentAuthority(
         if (candidate.prefixFormat != null && candidate.prefixFormat != format) {
             return ChromeImageContentResolution.Reject(FormatChangedAfterPeekReason)
         }
+        if (format == ChromeImageFormat.Gif) {
+            when (inspectGifContainer(bytes)) {
+                GifContainer.Static -> Unit
+                GifContainer.Animated -> return ChromeImageContentResolution.Reject(AnimatedImageReason)
+                GifContainer.Malformed -> return ChromeImageContentResolution.Reject(GifMalformedReason)
+                GifContainer.TooLarge -> return ChromeImageContentResolution.Reject(GifTooLargeReason)
+            }
+        }
         if (!format.supportedStaticRaster) {
             return ChromeImageContentResolution.Reject("unsupported_${format.name.lowercase(Locale.US)}")
         }
@@ -275,6 +283,64 @@ internal class ChromeImageContentAuthority(
         if (bytes.startsWith(IcoSignature)) return ChromeImageFormat.Ico
         sniffIsoBmff(bytes)?.let { return it }
         return null
+    }
+
+    /** Checks the bounded GIF container without decoding or changing its source bytes. */
+    private fun inspectGifContainer(bytes: ByteArray): GifContainer {
+        if (bytes.size > MaximumGifBytes) return GifContainer.TooLarge
+        if (bytes.size < GifHeaderLength + GifLogicalScreenLength + 1) return GifContainer.Malformed
+        val cursor = GifCursor(bytes, GifHeaderLength)
+        val width = cursor.readLe16() ?: return GifContainer.Malformed
+        val height = cursor.readLe16() ?: return GifContainer.Malformed
+        val packed = cursor.readU8() ?: return GifContainer.Malformed
+        if (width !in 1..MaximumGifDimension || height !in 1..MaximumGifDimension || width.toLong() * height > MaximumGifPixels) {
+            return GifContainer.Malformed
+        }
+        if (cursor.skip(2).not()) return GifContainer.Malformed
+        if (packed and GifGlobalColorTableFlag != 0 && cursor.skip(gifColorTableBytes(packed)).not()) {
+            return GifContainer.Malformed
+        }
+        var frames = 0
+        var trailerSeen = false
+        while (cursor.hasRemaining()) {
+            when (cursor.readU8()) {
+                GifExtensionIntroducer -> {
+                    val label = cursor.readU8() ?: return GifContainer.Malformed
+                    if (label == GifGraphicControlLabel) {
+                        val blockSize = cursor.readU8() ?: return GifContainer.Malformed
+                        if (blockSize != GifGraphicControlBlockSize || cursor.skip(blockSize).not() || cursor.readU8() != 0) return GifContainer.Malformed
+                    } else if (!cursor.skipSubBlocks()) return GifContainer.Malformed
+                }
+                GifImageDescriptor -> {
+                    val left = cursor.readLe16() ?: return GifContainer.Malformed
+                    val top = cursor.readLe16() ?: return GifContainer.Malformed
+                    val frameWidth = cursor.readLe16() ?: return GifContainer.Malformed
+                    val frameHeight = cursor.readLe16() ?: return GifContainer.Malformed
+                    val imagePacked = cursor.readU8() ?: return GifContainer.Malformed
+                    if (frameWidth <= 0 || frameHeight <= 0 || left.toLong() + frameWidth > width || top.toLong() + frameHeight > height) return GifContainer.Malformed
+                    if (imagePacked and GifLocalColorTableFlag != 0 && cursor.skip(gifColorTableBytes(imagePacked)).not()) return GifContainer.Malformed
+                    val lzwMinCodeSize = cursor.readU8() ?: return GifContainer.Malformed
+                    if (lzwMinCodeSize !in 2..8 || !cursor.skipSubBlocks()) return GifContainer.Malformed
+                    frames++
+                    if (frames > 1) return GifContainer.Animated
+                }
+                GifTrailer -> { trailerSeen = true; break }
+                else -> return GifContainer.Malformed
+            }
+        }
+        return if (trailerSeen && frames == 1) GifContainer.Static else GifContainer.Malformed
+    }
+
+    private fun gifColorTableBytes(packed: Int): Int = 3 * (1 shl ((packed and GifColorTableSizeMask) + 1))
+
+    private enum class GifContainer { Static, Animated, Malformed, TooLarge }
+
+    private class GifCursor(private val bytes: ByteArray, private var index: Int) {
+        fun hasRemaining(): Boolean = index < bytes.size
+        fun readU8(): Int? = if (index < bytes.size) bytes[index++].toInt() and 0xff else null
+        fun readLe16(): Int? { val low = readU8() ?: return null; val high = readU8() ?: return null; return low or (high shl 8) }
+        fun skip(count: Int): Boolean { if (count < 0 || count > bytes.size - index) return false; index += count; return true }
+        fun skipSubBlocks(): Boolean { while (true) { val size = readU8() ?: return false; if (size == 0) return true; if (!skip(size)) return false } }
     }
 
     private fun InputStream.peekImagePrefix(maximumBytes: Int): PrefixPeek {
@@ -496,6 +562,8 @@ internal class ChromeImageContentAuthority(
         const val UnknownFormatReason = "image_format_unknown"
         const val FormatChangedAfterPeekReason = "image_format_changed_after_peek"
         const val AnimatedImageReason = "animated_image"
+        const val GifMalformedReason = "gif_malformed"
+        const val GifTooLargeReason = "gif_too_large"
         const val AvifBrandEvidenceReason = "unsupported_avif_brand_evidence"
         val ImageRequestHeadersRemoved =
             setOf("accept-encoding", "range", "if-range", "if-none-match", "if-modified-since")
@@ -507,6 +575,19 @@ internal class ChromeImageContentAuthority(
         val Gif89aSignature = "GIF89a".toByteArray(StandardCharsets.US_ASCII)
         val BmpSignature = byteArrayOf('B'.code.toByte(), 'M'.code.toByte())
         val IcoSignature = byteArrayOf(0, 0, 1, 0)
+        private const val GifHeaderLength = 6
+        private const val GifLogicalScreenLength = 7
+        private const val GifGlobalColorTableFlag = 0x80
+        private const val GifLocalColorTableFlag = 0x80
+        private const val GifColorTableSizeMask = 0x07
+        private const val GifExtensionIntroducer = 0x21
+        private const val GifGraphicControlLabel = 0xF9
+        private const val GifGraphicControlBlockSize = 4
+        private const val GifImageDescriptor = 0x2C
+        private const val GifTrailer = 0x3B
+        private const val MaximumGifDimension = 4_096
+        private const val MaximumGifPixels = 16_777_216L
+        private const val MaximumGifBytes = 16 * 1024 * 1024
     }
 }
 

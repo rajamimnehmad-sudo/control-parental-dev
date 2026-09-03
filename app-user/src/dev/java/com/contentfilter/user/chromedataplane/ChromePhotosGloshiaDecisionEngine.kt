@@ -169,7 +169,7 @@ internal class ChromePhotosGloshiaDecisionEngine(
                 modelSha256 = GloshiaVisualModelInfo.ModelSha256,
                 policyVersion = GloshiaVisualModelInfo.PolicyVersion,
             )
-        val GateMimeTypes = setOf("image/png", "image/jpeg", "image/webp", "image/avif")
+        val GateMimeTypes = setOf("image/png", "image/jpeg", "image/webp", "image/avif", "image/gif")
         const val MaximumImageBytes = ChromePhotosRealUpstream.DefaultMaximumBodyBytes
         const val UnsupportedMimeReason = "unsupported_mime"
         const val ImageByteLimitReason = "image_byte_limit"

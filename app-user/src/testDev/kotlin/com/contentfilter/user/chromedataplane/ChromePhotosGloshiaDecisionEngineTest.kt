@@ -93,7 +93,7 @@ class ChromePhotosGloshiaDecisionEngineTest {
                     },
             )
 
-        val result = engine.decide("gif".toByteArray(), "image/gif")
+        val result = engine.decide("video".toByteArray(), "video/mp4")
 
         assertEquals(ChromePhotoDecision.Unknown, result.decision)
         assertEquals("unsupported_mime", result.reason)
