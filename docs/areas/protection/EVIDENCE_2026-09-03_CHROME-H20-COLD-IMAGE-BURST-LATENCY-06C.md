@@ -18,6 +18,8 @@ The follow-up DEV432 optimization bounds the OkHttp upstream dispatcher at `128`
 
 The Mimo/Coto icon report exposed a generic SVG compatibility false positive: real UI SVGs contain bounded inert `<style>` rules and framework `data-*` metadata. The original-ui validator and the dynamic `safeIcon` path now admit only those bounded class/id rules and inert metadata, while continuing to reject scripts, external URLs, nested raster/media, active CSS, and Glosh control metadata. Authorized SVG bytes are not reconstructed or restyled; rejected inputs remain fail-closed. The dynamic guard has the same conservative grammar, so this is not a host- or framework-specific workaround.
 
+Mimo then exposed the corresponding sprite case used by its hamburger/search UI: an invisible `0×0` SVG containing ID-bearing vector groups under `<defs>`, referenced by ordinary `<use href="#...">` elements. The generic guard now admits only that bounded sprite shape and only references to a validated `<g>`/`<symbol>` inside the sprite's `<defs>`. The original `<use>`, paths, fills, geometry, and interactions remain untouched.
+
 ## Automated validation
 
 - Focused `ChromePhotoDecisionSessionTest`, `ChromeImageContentAuthorityTest`, and `ChromePhotosHttpsProxyConnectionTest`: PASS.
@@ -27,11 +29,12 @@ The Mimo/Coto icon report exposed a generic SVG compatibility false positive: re
 - `git diff --check`: PASS.
 - DEV432 focused `ChromePhotosRealUpstreamTest`: PASS (dispatcher limits asserted).
 - DEV435 focused SVG authority and bootstrap contract tests: PASS (bounded inert style rules, framework metadata, and dynamic guard parity).
+- DEV436 bootstrap contract tests and compile/lint/assemble validation: PASS (bounded `<defs>` sprite handling).
 
 ## APK and update-in-place
 
-- DEV435, `versionName=1.0.1-dev`.
-- APK SHA-256: `884e1c3e3d2afdd3ef4d8c5c0b946ee53b6e86618b0b8a1c5b5eaaf1e279dc78`.
+- DEV436, `versionName=1.0.1-dev`.
+- APK SHA-256: `d967cd99dae8f29a43ed637dedea65150d01c258dfc097f335e9cf51eeb65ec6`.
 - `adb install -r`: PASS; app data inode remained `1239519`.
 - Chrome data/cache was not cleared; bootstrap `resetCount=3` remained unchanged.
 - Device Owner and Chrome-only protection state were restored after measurement: `active=true`, `ready=true`, `stockMediaAuthority=true`, `documentSelfShield=true`.
@@ -47,6 +50,8 @@ With fresh DEV432 and no screenshots or UI-hierarchy instrumentation, Google Ima
 An idle 30-second device sanity sample while protection remained active showed stable app memory (PSS approximately `168 → 155 MiB`, RSS `232 → 221 MiB`), Chrome at approximately `0.7%` cumulative CPU in the sampled view, no sustained guard-process growth, battery temperature `24.8°C`, and no new proxy failures or queue/reject counters. This is a bounded sanity check, not a battery A/B result.
 
 On DEV435, fresh no-screenshot navigations to Mimo and Coto preserved the protected Chrome session and produced `uiSvgNetworkRejected=0` with `uiSvgNetworkAccepted=7` (Mimo) and `10` cumulative (after Coto). The same snapshots showed `proxyQueueRejects=0`, `queueRejects=0`, `timeouts=0`, `protectFailure=0`, `quicAttempts=0`, and `directTcpAttempts=0`; Mimo proxy p95 was `901.793 ms`, Coto-inclusive p95 `902.268 ms`. These are timing/status observations only; no ADB screenshot or UI-hierarchy capture was used.
+
+On DEV436, a fresh Mimo navigation after the sprite fix produced `uiSvgNetworkAccepted=8`, `uiSvgNetworkRejected=0`, proxy p50/p95/p99 `202.726/742.110/944.242 ms`, and inference p95 `255.427 ms`. The snapshot retained `raw BLOCK/UNKNOWN=0/0`, `proxyQueueRejects=0`, `queueRejects=0`, `timeouts=0`, `protectFailure=0`, `quicAttempts=0`, and `directTcpAttempts=0`. Visual confirmation is now requested from the user on the live Mimo tab; repeated screenshots remain excluded because they invoke the protected proof surface.
 
 ## OFF control and instrumentation caveats
 
