@@ -25,6 +25,14 @@ import kotlin.test.assertTrue
 
 class ChromePhotosRealUpstreamTest {
     @Test
+    fun `default upstream dispatcher preserves bounded multi-origin fanout`() {
+        val dispatcher = ChromePhotosRealUpstream.defaultClient().dispatcher
+
+        assertEquals(ChromePhotosRealUpstream.DefaultMaximumRequests, dispatcher.maxRequests)
+        assertEquals(ChromePhotosRealUpstream.DefaultMaximumRequestsPerHost, dispatcher.maxRequestsPerHost)
+    }
+
+    @Test
     fun `upstream default trust rejects untrusted TLS instead of disabling verification`() {
         val tls = ChromePhotosEphemeralTls.create()
         val serverMaterial = tls.serverMaterialFor("localhost")

@@ -843,6 +843,7 @@ internal class ChromePhotosHttpsProxy(
         // worker while its session waits for the next request, so a small pool serializes fresh
         // image origins behind unrelated idle tabs until the socket timeout. Keep admission
         // bounded, but large enough for Chrome's ordinary multi-origin connection fan-out.
+
         const val WorkerCount = 64
         const val WorkerQueueCapacity = 64
         const val SocketBacklog = 64

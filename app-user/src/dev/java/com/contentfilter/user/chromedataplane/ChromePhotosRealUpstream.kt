@@ -1,6 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.feature.vpn.service.VpnController
+import okhttp3.Dispatcher
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -157,6 +158,8 @@ internal class ChromePhotosRealUpstream(
     internal companion object {
         const val HttpsPort = 443
         const val DefaultMaximumBodyBytes = 12 * 1024 * 1024
+        const val DefaultMaximumRequests = 128
+        const val DefaultMaximumRequestsPerHost = 32
         private const val TimeoutSeconds = 20L
 
         fun defaultClient(
@@ -164,6 +167,16 @@ internal class ChromePhotosRealUpstream(
             socketFactory: SocketFactory = SocketFactory.getDefault(),
         ): OkHttpClient =
             OkHttpClient.Builder()
+                // Chrome fans out image and document requests across many origins. OkHttp's
+                // conservative five-request-per-host default needlessly serializes those
+                // requests behind the H20 inspection boundary; keep global admission bounded
+                // while allowing normal HTTP/2 host multiplexing upstream.
+                .dispatcher(
+                    Dispatcher().apply {
+                        maxRequests = DefaultMaximumRequests
+                        maxRequestsPerHost = DefaultMaximumRequestsPerHost
+                    },
+                )
                 .proxy(Proxy.NO_PROXY)
                 .dns(ChromeAuthorityDns(destinationAuthority))
                 .socketFactory(socketFactory)
