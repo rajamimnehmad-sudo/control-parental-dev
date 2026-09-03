@@ -16,6 +16,8 @@ The default decision profile remains bounded at `256 entries / 2 concurrent infe
 
 The follow-up DEV432 optimization bounds the OkHttp upstream dispatcher at `128` total requests and `32` per host. This removes the default five-request-per-host serialization that was visible behind the H20 HTTP/1.1 connection boundary while retaining bounded admission and normal HTTP/2 multiplexing upstream. No client-side HTTP/2 MITM, fail-close, cache, or media-authority semantics changed.
 
+The Mimo/Coto icon report exposed a generic SVG compatibility false positive: real UI SVGs contain bounded inert `<style>` rules and framework `data-*` metadata. The original-ui validator and the dynamic `safeIcon` path now admit only those bounded class/id rules and inert metadata, while continuing to reject scripts, external URLs, nested raster/media, active CSS, and Glosh control metadata. Authorized SVG bytes are not reconstructed or restyled; rejected inputs remain fail-closed. The dynamic guard has the same conservative grammar, so this is not a host- or framework-specific workaround.
+
 ## Automated validation
 
 - Focused `ChromePhotoDecisionSessionTest`, `ChromeImageContentAuthorityTest`, and `ChromePhotosHttpsProxyConnectionTest`: PASS.
@@ -24,11 +26,12 @@ The follow-up DEV432 optimization bounds the OkHttp upstream dispatcher at `128`
 - `:app-user:assembleDevDebug`: PASS.
 - `git diff --check`: PASS.
 - DEV432 focused `ChromePhotosRealUpstreamTest`: PASS (dispatcher limits asserted).
+- DEV435 focused SVG authority and bootstrap contract tests: PASS (bounded inert style rules, framework metadata, and dynamic guard parity).
 
 ## APK and update-in-place
 
-- DEV432, `versionName=1.0.1-dev`.
-- APK SHA-256: `d5990e75a1836ae6d940eaf080bc066a73e9f67d51c7eb2d388f790f67101378`.
+- DEV435, `versionName=1.0.1-dev`.
+- APK SHA-256: `884e1c3e3d2afdd3ef4d8c5c0b946ee53b6e86618b0b8a1c5b5eaaf1e279dc78`.
 - `adb install -r`: PASS; app data inode remained `1239519`.
 - Chrome data/cache was not cleared; bootstrap `resetCount=3` remained unchanged.
 - Device Owner and Chrome-only protection state were restored after measurement: `active=true`, `ready=true`, `stockMediaAuthority=true`, `documentSelfShield=true`.
@@ -43,6 +46,8 @@ With fresh DEV432 and no screenshots or UI-hierarchy instrumentation, Google Ima
 
 An idle 30-second device sanity sample while protection remained active showed stable app memory (PSS approximately `168 → 155 MiB`, RSS `232 → 221 MiB`), Chrome at approximately `0.7%` cumulative CPU in the sampled view, no sustained guard-process growth, battery temperature `24.8°C`, and no new proxy failures or queue/reject counters. This is a bounded sanity check, not a battery A/B result.
 
+On DEV435, fresh no-screenshot navigations to Mimo and Coto preserved the protected Chrome session and produced `uiSvgNetworkRejected=0` with `uiSvgNetworkAccepted=7` (Mimo) and `10` cumulative (after Coto). The same snapshots showed `proxyQueueRejects=0`, `queueRejects=0`, `timeouts=0`, `protectFailure=0`, `quicAttempts=0`, and `directTcpAttempts=0`; Mimo proxy p95 was `901.793 ms`, Coto-inclusive p95 `902.268 ms`. These are timing/status observations only; no ADB screenshot or UI-hierarchy capture was used.
+
 ## OFF control and instrumentation caveats
 
 A temporary DEV-only baseline lease was used only in the separate 06B harness APK and was revoked/expired before DEV431 was installed. It was not included in this functional history. In the OFF control, Google Images showed photos around two seconds; Frávega showed normal UI around four seconds and product photos around six seconds. This bounds the remaining gap to proxy/network/render scheduling rather than R3.1 inference.
@@ -51,4 +56,4 @@ Repeated ADB screenshots are not valid latency evidence: `ChromePhotosProtectedS
 
 ## Residual
 
-The remaining optimization candidate is client-side HTTP/2 multiplexing between Chrome and the MITM. It is a material architecture/security decision and was not changed in 06C. Further work requires quantifying that boundary without weakening fail-close, no-store, capability, or media-authority invariants.
+The remaining optimization candidate is client-side HTTP/2 multiplexing between Chrome and the MITM. It is a material architecture/security decision and was not changed in 06C. Battery A/B remains unavailable while the A23 is charging, so no battery-gate claim is made. Further work requires quantifying that boundary without weakening fail-close, no-store, capability, or media-authority invariants.

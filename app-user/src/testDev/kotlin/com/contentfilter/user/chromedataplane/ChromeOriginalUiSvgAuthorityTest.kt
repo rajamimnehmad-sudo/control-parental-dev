@@ -40,6 +40,28 @@ class ChromeOriginalUiSvgAuthorityTest {
     }
 
     @Test
+    fun validatorAcceptsBoundedInertDataMetadataButRejectsGloshControlMetadata() {
+        val accepted =
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" data-name="heart"><path d="M1 1h14v14H1z"/></svg>"""
+                .toByteArray()
+        val rejected =
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" data-glosh-icon-safe="1"><path d="M1 1h14v14H1z"/></svg>"""
+                .toByteArray()
+
+        assertTrue(ChromeOriginalUiSvgValidator().validate(accepted, "image/svg+xml") is ChromeOriginalUiSvgValidation.Valid)
+        assertTrue(ChromeOriginalUiSvgValidator().validate(rejected, "image/svg+xml") is ChromeOriginalUiSvgValidation.Invalid)
+    }
+
+    @Test
+    fun validatorAcceptsBoundedInternalStyleRulesUsedByRealUiIcons() {
+        val svg =
+            """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30"><defs><style>.cls-1{fill:#464646;stroke-width:.28px;}.cls-1,.cls-2{stroke:#464646;stroke-linecap:round;}</style></defs><path class="cls-1" d="M1 1h28v28H1z"/></svg>"""
+                .toByteArray()
+
+        assertTrue(ChromeOriginalUiSvgValidator().validate(svg, "image/svg+xml") is ChromeOriginalUiSvgValidation.Valid)
+    }
+
+    @Test
     fun validatorAcceptsOriginalAccessibleUiMetadataAndReferences() {
         val svg =
             """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" display="inline-block" overflow="visible" aria-labelledby="title-id" xml:space="preserve" data-skapa="ssr-icon@11.9.2"><title id="title-id">Menu</title><path fill-rule="evenodd" clip-rule="evenodd" d="M2 4h20v2H2z"/></svg>"""

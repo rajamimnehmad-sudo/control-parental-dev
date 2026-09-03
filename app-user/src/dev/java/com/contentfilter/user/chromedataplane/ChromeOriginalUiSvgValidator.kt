@@ -77,7 +77,7 @@ internal class ChromeOriginalUiSvgValidator(
                 if (value != XlinkNamespace) return state.fail("namespace")
                 continue
             }
-            if (!attributeAllowed(name, qualifiedName)) return state.fail("attribute")
+            if (!attributeAllowed(name, qualifiedName, value)) return state.fail("attribute")
             if (attributeName == "id") {
                 if (!SafeId.matches(value) || !state.ids.add(value)) return state.fail("id")
             }
@@ -112,7 +112,10 @@ internal class ChromeOriginalUiSvgValidator(
             when (child.nodeType) {
                 Node.ELEMENT_NODE -> if (!visit(child as Element, depth + 1, state)) return false
                 Node.TEXT_NODE, Node.CDATA_SECTION_NODE -> {
-                    if (name != "title" && name != "desc" && child.nodeValue.orEmpty().isNotBlank()) {
+                    if (name == "style" && child.nodeValue.orEmpty().isNotBlank() && !safeStyleElement(child.nodeValue, state)) {
+                        return false
+                    }
+                    if (name != "title" && name != "desc" && name != "style" && child.nodeValue.orEmpty().isNotBlank()) {
                         return state.fail("text")
                     }
                 }
@@ -124,10 +127,32 @@ internal class ChromeOriginalUiSvgValidator(
         return true
     }
 
+    private fun safeStyleElement(
+        value: String,
+        state: State,
+    ): Boolean {
+        if (value.length > MaximumStyleBytes || SvgStyleForbidden.containsMatchIn(value)) return state.fail("style")
+        val normalized = value.trim()
+        return if (normalized.isNotEmpty() && SvgStyleRule.matches(normalized)) true else state.fail("style")
+    }
+
     private fun attributeAllowed(
         element: String,
         name: String,
-    ): Boolean = name in GlobalAttributes || name in ElementAttributes[element].orEmpty()
+        value: String,
+    ): Boolean =
+        name in GlobalAttributes ||
+            name in ElementAttributes[element].orEmpty() ||
+            isSafeDataAttribute(name, value)
+
+    private fun isSafeDataAttribute(
+        name: String,
+        value: String,
+    ): Boolean =
+        name.startsWith("data-") &&
+            !name.startsWith("data-glosh-") &&
+            SafeDataAttribute.matches(name) &&
+            value.length <= MaximumMetadataBytes
 
     private fun dimensionsValid(root: Element): Boolean {
         val viewBox = root.getAttribute("viewBox").ifBlank { root.getAttribute("viewbox") }
@@ -208,16 +233,21 @@ internal class ChromeOriginalUiSvgValidator(
         val ForbiddenXml = Regex("(?is)<!DOCTYPE|<!ENTITY|<\\?xml-stylesheet|<\\?(?!xml(?:\\s|\\?>))")
         val CssActive =
             Regex("(?is)@import|expression\\s*\\(|-moz-binding|behavior\\s*:|https?\\s*:|data\\s*:|blob\\s*:")
+        val SvgStyleForbidden =
+            Regex("(?is)@|url\\s*\\(|expression\\s*\\(|-moz-binding|behavior\\s*:|https?\\s*:|data\\s*:|blob\\s*:|animation|transition")
         val SafeId = Regex("[A-Za-z_][A-Za-z0-9_.:-]{0,127}")
+        val SafeDataAttribute = Regex("data-[a-z0-9_.:-]{1,63}")
         val PathCharacters = Regex("[MmZzLlHhVvCcSsQqTtAaEe0-9+.,\\-\\s]*")
         val NumberSeparators = Regex("[\\s,]+")
         val Whitespace = Regex("\\s+")
         val Dimension = Regex("([0-9]+(?:\\.[0-9]+)?)(?:px)?", RegexOption.IGNORE_CASE)
+        val SvgStyleRule =
+            Regex("(?s)(?:[.#][A-Za-z_][A-Za-z0-9_.-]*(?:\\s*,\\s*[.#][A-Za-z_][A-Za-z0-9_.-]*)*\\s*\\{\\s*(?:[A-Za-z-]+\\s*:\\s*[^{};]+\\s*;?\\s*)+\\}\\s*)+")
         val AllowedElements =
             setOf(
                 "svg", "g", "defs", "symbol", "use", "path", "rect", "circle", "ellipse", "line",
                 "polyline", "polygon", "title", "desc", "clipPath", "mask", "linearGradient",
-                "radialGradient", "stop", "marker",
+                "radialGradient", "stop", "marker", "style",
             )
         val GlobalAttributes =
             setOf(
