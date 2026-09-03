@@ -41,6 +41,8 @@ With DEV429/DEV431 protection ON, fresh public pages remained usable and preserv
 
 With fresh DEV432 and no screenshots or UI-hierarchy instrumentation, Google Images measured proxy p50/p95/p99 `206/435/437 ms` at 13 peak connections; inference p95 was `186 ms`, decision p95 `206 ms`, and the first ten-second sample had `27` requests with `0` queue rejects/timeouts. Frávega measured proxy p50/p95/p99 `252/796/1179 ms` at 34 peak active tunnels and 60 connections; one cancelled upstream request was classified as an `InterruptedIOException` with no response started, while queue rejects/timeouts, raw BLOCK/UNKNOWN, protect failures, and bypass counters stayed zero. The dispatcher reduced the Google p95 relative to the prior ~913–924 ms observation, while Frávega remains fan-out/network-bound.
 
+An idle 30-second device sanity sample while protection remained active showed stable app memory (PSS approximately `168 → 155 MiB`, RSS `232 → 221 MiB`), Chrome at approximately `0.7%` cumulative CPU in the sampled view, no sustained guard-process growth, battery temperature `24.8°C`, and no new proxy failures or queue/reject counters. This is a bounded sanity check, not a battery A/B result.
+
 ## OFF control and instrumentation caveats
 
 A temporary DEV-only baseline lease was used only in the separate 06B harness APK and was revoked/expired before DEV431 was installed. It was not included in this functional history. In the OFF control, Google Images showed photos around two seconds; Frávega showed normal UI around four seconds and product photos around six seconds. This bounds the remaining gap to proxy/network/render scheduling rather than R3.1 inference.
