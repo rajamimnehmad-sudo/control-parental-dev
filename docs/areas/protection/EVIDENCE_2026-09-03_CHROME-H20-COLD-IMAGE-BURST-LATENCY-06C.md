@@ -91,6 +91,12 @@ visual protection, not a network-video bypass. Encoded MP4/HLS/MSE streams
 remain fail-closed until a transport authority can preserve the same security
 monotonicity; no domain-specific or blanket raster bypass was introduced.
 
+The latency attribution build (DEV439) adds only DEV diagnostics to each real
+response: time to upstream headers, bounded sanitize/decision time, downstream
+write time, and the existing end-to-end request-to-delivery time. It does not
+alter scheduling, buffering, media authority, or release behavior. No
+client-side HTTP/2 change was made.
+
 Automated GIF timeline, selector, authority, engine, compile, lint and assemble
 validation passed for DEV438. APK SHA-256:
 `cf582d81b7f13abbb925a6ec9aa3d802762dc81e7934a302fca1c2d000c5ab46`.
@@ -99,3 +105,10 @@ The APK was installed in place on A23 (`versionCode=438`); app-data inode
 Frávega navigation through the installed build showed real HTTP/2 upstream
 connections, original safe image delivery, and the expected bounded counters;
 no screenshot instrumentation was used.
+
+DEV439 instrumentation APK SHA-256:
+`28f6534e024bf265eba5e741b2019a6e5fcd101ae951b10faee5b65004d087ba`.
+The A23 accepted the update in place and preserved inode `1239519`, but the
+Device Owner currently reports Chrome `suspended=true`; an ADB launch is
+rejected by the system admin dialog. Consequently no fresh real-browser
+cold-burst sample was attributed from DEV439 yet.
