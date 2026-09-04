@@ -5,6 +5,7 @@ import android.media.MediaDataSource
 import android.media.MediaMetadataRetriever
 import java.io.ByteArrayOutputStream
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Samples clear MP4 frames through the existing R3.1 decision session before release. */
 internal class ChromeMediaVideoPayloadInspector(
@@ -36,6 +37,7 @@ internal class ChromeMediaVideoPayloadInspector(
 
     private fun inspectFrames(bytes: ByteArray): ChromeMediaPayloadDecision {
         val retriever = MediaMetadataRetriever()
+        val encodedFrames = mutableListOf<ByteArray>()
         return try {
             retriever.setDataSource(ByteArrayMediaDataSource(bytes))
             val durationMillis = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
@@ -57,46 +59,91 @@ internal class ChromeMediaVideoPayloadInspector(
                             SampleEdge,
                         )
                     }.getOrNull() ?: return ChromeMediaPayloadDecision.Unknown("video_frame_decode_failed")
+                val encoded =
+                    try {
+                        encodeFrame(frame)
+                    } finally {
+                        frame.recycle()
+                    }
+                if (encoded == null) return ChromeMediaPayloadDecision.Unknown("video_frame_encode_failed")
+                encodedFrames += encoded
                 decoded++
-                val decision = inspectFrame(frame)
-                frame.recycle()
-                when (decision) {
-                    ChromeMediaPayloadDecision.Safe -> Unit
-                    else -> return decision
-                }
             }
-            if (decoded == 0) ChromeMediaPayloadDecision.Unknown("video_without_decodable_frame") else ChromeMediaPayloadDecision.Safe
+            if (decoded == 0) {
+                ChromeMediaPayloadDecision.Unknown("video_without_decodable_frame")
+            } else {
+                inspectEncodedFrames(encodedFrames)
+            }
         } catch (_: Throwable) {
             ChromeMediaPayloadDecision.Unknown("video_decode_exception")
         } finally {
+            encodedFrames.forEach { it.fill(0) }
             runCatching { retriever.release() }
         }
     }
 
-    private fun inspectFrame(frame: Bitmap): ChromeMediaPayloadDecision {
+    private fun encodeFrame(frame: Bitmap): ByteArray? {
         val output = ByteArrayOutputStream()
         return try {
-            if (!frame.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                return ChromeMediaPayloadDecision.Unknown("video_frame_encode_failed")
-            }
-            val png = output.toByteArray()
-            try {
-                val result = decisionSession.decide(sha256(png), png, "image/png")
-                when (result.decision) {
-                    ChromePhotoDecision.Safe -> ChromeMediaPayloadDecision.Safe
-                    ChromePhotoDecision.Block -> ChromeMediaPayloadDecision.Block
-                    ChromePhotoDecision.Unknown -> ChromeMediaPayloadDecision.Unknown(result.reason)
-                }
-            } finally {
-                png.fill(0)
-            }
+            if (!frame.compress(Bitmap.CompressFormat.PNG, 100, output)) return null
+            output.toByteArray()
         } finally {
             output.reset()
         }
     }
 
+    /** Keep the existing sample set and policy, but overlap bounded R3.1 calls on the device. */
+    private fun inspectEncodedFrames(frames: List<ByteArray>): ChromeMediaPayloadDecision {
+        if (frames.size == 1) return inspectEncodedFrame(frames.single())
+        val nextIndex = AtomicInteger(0)
+        val results = arrayOfNulls<ChromeMediaPayloadDecision>(frames.size)
+        val workers =
+            List(minOf(MaxParallelFrameAnalyses, frames.size)) {
+                Thread(
+                    {
+                        while (true) {
+                            val index = nextIndex.getAndIncrement()
+                            if (index >= frames.size) break
+                            results[index] = inspectEncodedFrame(frames[index])
+                        }
+                    },
+                    "chrome-media-frame-analysis",
+                ).apply { isDaemon = true }
+            }
+        return try {
+            workers.forEach(Thread::start)
+            workers.forEach(Thread::join)
+            if (results.any { it == null }) {
+                ChromeMediaPayloadDecision.Unknown("video_frame_analysis_incomplete")
+            } else {
+                results.firstOrNull { it != ChromeMediaPayloadDecision.Safe }
+                    ?: ChromeMediaPayloadDecision.Safe
+            }
+        } catch (_: InterruptedException) {
+            workers.forEach(Thread::interrupt)
+            workers.forEach { worker -> runCatching { worker.join(FrameWorkerShutdownWaitMillis) } }
+            Thread.currentThread().interrupt()
+            ChromeMediaPayloadDecision.Unknown("video_frame_analysis_interrupted")
+        }
+    }
+
+    private fun inspectEncodedFrame(png: ByteArray): ChromeMediaPayloadDecision {
+        return try {
+            val result = decisionSession.decide(sha256(png), png, "image/png")
+            when (result.decision) {
+                ChromePhotoDecision.Safe -> ChromeMediaPayloadDecision.Safe
+                ChromePhotoDecision.Block -> ChromeMediaPayloadDecision.Block
+                ChromePhotoDecision.Unknown -> ChromeMediaPayloadDecision.Unknown(result.reason)
+            }
+        } catch (_: Throwable) {
+            ChromeMediaPayloadDecision.Unknown("video_frame_analysis_exception")
+        }
+    }
+
     private companion object {
         const val SampleEdge = 512
+        const val MaxParallelFrameAnalyses = 2
+        const val FrameWorkerShutdownWaitMillis = 1_000L
         val IsoBmffVideoMimeTypes = setOf("video/mp4", "video/quicktime", "video/x-m4v")
         val SupportedVideoMimeTypes = IsoBmffVideoMimeTypes + setOf("video/mp2t", "video/mpeg", "application/mp2t")
     }
