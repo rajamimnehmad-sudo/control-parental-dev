@@ -25,6 +25,10 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
                 output.append(source[offset++])
                 continue
             }
+            if (!source.isPotentialMarkupStart(offset)) {
+                output.append(source[offset++])
+                continue
+            }
             val tagEnd =
                 source.tagEndOrNull(offset) ?: run {
                     throw ChromeMediaShieldStaticMarkupException("unterminated_start_tag")
@@ -116,6 +120,13 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
             index += 1
         }
         return null
+    }
+
+    private fun String.isPotentialMarkupStart(start: Int): Boolean {
+        val next = getOrNull(start + 1) ?: return false
+        if (next == '!' || next == '?') return true
+        if (next == '/') return getOrNull(start + 2)?.isLetter() == true
+        return next.isLetter()
     }
 
     private fun String.startTagNameOrNull(): String? {

@@ -34,6 +34,13 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
     }
 
     @Test
+    fun `preserves literal less-than text without treating it as a truncated tag`() {
+        val source = "<p><<< Window Slide</p><p>2 < 3</p>"
+
+        assertEquals(source, ChromeMediaShieldStaticMarkupNeutralizer.neutralize(source))
+    }
+
+    @Test
     fun `replaces an existing iframe sandbox and preserves quoted greater-than signs`() {
         val source =
             "<iframe title=\"a > b\" sandbox=\"allow-scripts allow-same-origin\" " +

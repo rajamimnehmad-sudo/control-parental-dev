@@ -36,6 +36,7 @@ internal object ChromeMediaShieldBootstrap {
         styleNonce: String,
         topLevel: Boolean = true,
         selfShieldIdentity: ChromeMediaShieldDocumentIdentity? = null,
+        mediaAuthorityEnabled: Boolean = false,
     ): String {
         val endpoints = ChromeMediaShieldBootstrapEndpoints.forIdentity(selfShieldIdentity)
         return ScriptTemplate
@@ -54,6 +55,7 @@ internal object ChromeMediaShieldBootstrap {
             .replace(ParserBarrierUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl)
             .replace(TopLevelPlaceholder, topLevel.toString())
             .replace(SelfShieldPlaceholder, (selfShieldIdentity != null).toString())
+            .replace(MediaAuthorityPlaceholder, mediaAuthorityEnabled.toString())
             .replace(SessionPlaceholder, selfShieldIdentity?.protectionSessionId.orEmpty())
             .replace(PolicyEpochPlaceholder, selfShieldIdentity?.policyEpoch?.toString() ?: "0")
             .replace(NavigationSequencePlaceholder, selfShieldIdentity?.navigationSequence?.toString() ?: "0")
@@ -122,6 +124,7 @@ internal object ChromeMediaShieldBootstrap {
     private const val ParserBarrierUrlPlaceholder = "__GLOSH_PARSER_BARRIER_URL__"
     private const val TopLevelPlaceholder = "__GLOSH_TOP_LEVEL__"
     private const val SelfShieldPlaceholder = "__GLOSH_SELF_SHIELD__"
+    private const val MediaAuthorityPlaceholder = "__GLOSH_MEDIA_AUTHORITY__"
     private const val SessionPlaceholder = "__GLOSH_SESSION__"
     private const val PolicyEpochPlaceholder = "__GLOSH_POLICY_EPOCH__"
     private const val NavigationSequencePlaceholder = "__GLOSH_NAVIGATION_SEQUENCE__"
@@ -129,18 +132,18 @@ internal object ChromeMediaShieldBootstrap {
     private val ScriptTemplate =
         """
         (()=>{'use strict';
-        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',SELF_SHIELD_TRACE_URL='__GLOSH_SELF_SHIELD_TRACE_URL__',BOOTSTRAP_DIAGNOSTIC_URL='__GLOSH_BOOTSTRAP_DIAGNOSTIC_URL__',RENDERER_METRICS_URL='__GLOSH_RENDERER_METRICS_URL__',SVG_REWRITE_URL='__GLOSH_SVG_REWRITE_PATH__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
+        const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,MEDIA_AUTHORITY=__GLOSH_MEDIA_AUTHORITY__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',SELF_SHIELD_TRACE_URL='__GLOSH_SELF_SHIELD_TRACE_URL__',BOOTSTRAP_DIAGNOSTIC_URL='__GLOSH_BOOTSTRAP_DIAGNOSTIC_URL__',RENDERER_METRICS_URL='__GLOSH_RENDERER_METRICS_URL__',SVG_REWRITE_URL='__GLOSH_SVG_REWRITE_PATH__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
         const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD,USE_MODAL_CURTAIN=HAS_CURTAIN&&!SELF_SHIELD;
         const STYLE_ID='glosh-h19-media-shield',CURTAIN_ID='glosh-h19-document-curtain',CURTAIN_LAYER_ID='glosh-h19-document-curtain-layer';
         const CSS='__GLOSH_SHIELD_CSS__',CURTAIN_RELEASE_ATTRIBUTE='__GLOSH_CURTAIN_RELEASE_ATTRIBUTE__',FRAME_SANDBOX='allow-scripts allow-forms allow-popups-to-escape-sandbox';let installed=true,installFailure='PRIMORDIALS',bootstrapDiagnosticSent=false,selfReadyAccepted=false;
         const installSection=(code)=>{if(installed)installFailure=code},failInstall=(code)=>{if(installed)installFailure=code;installed=false};
         const SELF=self,DOC=document,NAV=navigator,IS_TOP_LEVEL=SELF===SELF.top,BOOTSTRAP_SCRIPT=DOC.currentScript,NativeObject=Object,NativeReflect=Reflect;
-        const ReflectApply=NativeReflect.apply,ReflectDefine=NativeReflect.defineProperty,ReflectDelete=NativeReflect.deleteProperty,ReflectSet=NativeReflect.set,ReflectSetPrototype=NativeReflect.setPrototypeOf,ReflectPreventExtensions=NativeReflect.preventExtensions;
+        const ReflectApply=NativeReflect.apply,ReflectConstruct=NativeReflect.construct,ReflectDefine=NativeReflect.defineProperty,ReflectDelete=NativeReflect.deleteProperty,ReflectSet=NativeReflect.set,ReflectSetPrototype=NativeReflect.setPrototypeOf,ReflectPreventExtensions=NativeReflect.preventExtensions;
         const ObjectDefine=NativeObject.defineProperty,ObjectDefineProperties=NativeObject.defineProperties,ObjectAssign=NativeObject.assign,ObjectDescribe=NativeObject.getOwnPropertyDescriptor;
         const ObjectSetPrototype=NativeObject.setPrototypeOf,ObjectPreventExtensions=NativeObject.preventExtensions,ObjectSeal=NativeObject.seal,ObjectFreeze=NativeObject.freeze;
         const ObjectPrototype=NativeObject.prototype,ObjectGetPrototype=NativeObject.getPrototypeOf,ObjectHasOwn=ObjectPrototype.hasOwnProperty;
         const ObjectDefineGetter=ObjectPrototype.__defineGetter__,ObjectDefineSetter=ObjectPrototype.__defineSetter__;
-        const NativeString=String,NativeNumber=Number,NativeURL=URL,NativeDOMException=DOMException,NativeArray=Array,NativeEvent=Event,NativePageTransitionEvent=SELF.PageTransitionEvent;
+        const NativeString=String,NativeNumber=Number,NativeURL=URL,NativeArray=Array,NativeArrayBuffer=SELF.ArrayBuffer,NativeUint8Array=SELF.Uint8Array,NativeProxy=SELF.Proxy,NativeBlob=SELF.Blob,NativeMediaSource=SELF.MediaSource,NativeSourceBuffer=SELF.SourceBuffer,NativeResponse=SELF.Response,NativeHeaders=SELF.Headers,NativeReadableStream=SELF.ReadableStream,NativeReadableStreamDefaultReader=SELF.ReadableStreamDefaultReader,NativeDOMException=DOMException,NativeEvent=Event,NativePageTransitionEvent=SELF.PageTransitionEvent;
         const NativePageSwapEvent=SELF.PageSwapEvent,NativePageRevealEvent=SELF.PageRevealEvent,NativeViewTransition=SELF.ViewTransition,NativeMutationObserver=MutationObserver;
         const NativeLocation=SELF.location,NativeLocationReloadFunction=NativeLocation&&NativeLocation.reload;
         const NativeXMLHttpRequest=SELF.XMLHttpRequest,NativeHasFocusFunction=Document.prototype.hasFocus,NativeElementFocusFunction=SELF.HTMLElement&&HTMLElement.prototype.focus;
@@ -244,7 +247,7 @@ internal object ChromeMediaShieldBootstrap {
         const attrName=(attribute)=>stringOf(read(attrNameProperty,attribute)||''),attrValueOf=(attribute)=>stringOf(read(attrValueProperty,attribute)||'');
         const attrNamespace=(attribute)=>read(attrNamespaceProperty,attribute),attrLocalName=(attribute)=>stringOf(read(attrLocalNameProperty,attribute)||'');
         const attrOwner=(attribute)=>read(attrOwnerProperty,attribute),sandboxOf=(frame)=>read(iframeSandboxProperty,frame);
-        const lockedSandboxes=new WeakSet(),protectedNodes=new WeakSet(),protectedIconNodes=new WeakSet(),protectedMediaNodes=new WeakSet(),protectedStyleMaps=new WeakSet(),protectedSheets=new WeakSet(),protectedMedias=new WeakSet(),guardedStyleOwners=new WeakSet(),protectedDescendants=new WeakMap(),iconDependentsByOwner=new WeakMap();
+        const lockedSandboxes=new WeakSet(),protectedNodes=new WeakSet(),protectedIconNodes=new WeakSet(),protectedMediaNodes=new WeakSet(),protectedStyleMaps=new WeakSet(),protectedSheets=new WeakSet(),protectedMedias=new WeakSet(),guardedStyleOwners=new WeakSet(),protectedDescendants=new WeakMap(),protectedShadowStyles=new WeakMap(),iconDependentsByOwner=new WeakMap(),safeMediaResponses=new WeakSet(),safeMediaBuffers=new WeakSet(),safeMediaBlobs=new WeakSet(),safeMediaStreams=new WeakSet(),safeMediaReaders=new WeakSet(),authorizedMediaSources=new WeakSet(),authorizedMediaUrls=new Set(),safeMediaXhrs=new WeakSet();
         const styleOwners=new WeakMap(),styleMapOwners=new WeakMap(),attributeOwners=new WeakMap(),guardedRuleMethodOwners=new WeakMap(),lockedIconStyleSignatures=new WeakMap();
         installSection('BOOTSTRAP_SCRIPT');if(!BOOTSTRAP_SCRIPT)failInstall('CURRENT_SCRIPT_MISSING');
         installSection('STATIC_STYLE_BINDING');
@@ -286,9 +289,9 @@ internal object ChromeMediaShieldBootstrap {
         if(nativeHas.call(element,attribute))nativeRemove.call(element,attribute)}};
         const sanitizeElementBody=(element)=>{removeDeclarativeTopLayer(element);const tag=localNameOf(element);
         if(tag==='canvas'){hide(element);return}
-        if(tag==='video'){let values=lower(nativeGet.call(element,'src')||'');const sources=copyList(elementQueryAll.call(element,'source'),nodeListLength);
-        for(let index=0;index<sources.length;index+=1)values+=' '+lower(nativeGet.call(sources[index],'src')||'');
-        if(includes(values,'data:')||includes(values,'blob:'))hide(element);else unhide(element);return}
+        if(tag==='video'){let values=lower(nativeGet.call(element,'src')||''),unsafeSource=!authorizedMediaSourceValue(values);const sources=copyList(elementQueryAll.call(element,'source'),nodeListLength);
+        for(let index=0;index<sources.length;index+=1){const sourceValue=lower(nativeGet.call(sources[index],'src')||'');values+=' '+sourceValue;if(!authorizedMediaSourceValue(sourceValue))unsafeSource=true}
+        if(unsafeSource)hide(element);else unhide(element);return}
         if(tag==='object'||tag==='embed'){hide(element);nativeRemove.call(element,'data');nativeRemove.call(element,'src');nativeRemove.call(element,'type');
         const parent=parentOf(element);if(parent)nodeRemove.call(parent,element);return}
         if(tag==='frame'||tag==='fencedframe'){hide(element);nativeRemove.call(element,'src');const parent=parentOf(element);if(parent)nodeRemove.call(parent,element);return}
@@ -299,7 +302,7 @@ internal object ChromeMediaShieldBootstrap {
         if(tag==='img'||tag==='source'||(tag==='input'&&lower(nativeGet.call(element,'type')||'')==='image')){const values=lower((nativeGet.call(element,'src')||'')+' '+(nativeGet.call(element,'srcset')||''));
         const structurallyBlocked=tag==='source'&&(nativeHas.call(element,'data-glosh-blocked-src')||nativeHas.call(element,'data-glosh-blocked-srcset'));
         const retainedLocalBlock=values.trim()===''&&nativeGet.call(element,'data-glosh-media-blocked')==='1'&&invoke(WeakSetHas,protectedMediaNodes,[element]);
-        if(structurallyBlocked||retainedLocalBlock||includes(values,'data:')||includes(values,'blob:')){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
+        if(structurallyBlocked||retainedLocalBlock||!authorizedMediaSourceValue(values)){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
         const style=lower(nativeGet.call(element,'style')||'');if(includes(style,'url(')&&(includes(style,'data:')||includes(style,'blob:')))hide(element);
         if(tag==='svg'){if(safeIcon(element)&&lockIconGeometry(element)){}
         else failIcon(element)}};
@@ -316,6 +319,7 @@ internal object ChromeMediaShieldBootstrap {
         else if(USE_MODAL_CURTAIN&&!curtainLayer)failInstall('CURTAIN_LAYER_MISSING');else{watchStyle(shieldStyle);if(curtainStyle)watchStyle(curtainStyle);if(curtainLayer)watchStyle(curtainLayer)}
         installSection('STYLESHEET_CAPABILITIES');
         const styleSheetProperty=shieldStyle?propertyDescriptor(shieldStyle,'sheet'):null,styleNonceProperty=shieldStyle?propertyDescriptor(shieldStyle,'nonce'):null;
+        const shadowHostProperty=self.ShadowRoot?propertyDescriptor(ShadowRoot.prototype,'host'):null;
         const styleElementDisabledProperty=shieldStyle?propertyDescriptor(shieldStyle,'disabled'):null,styleElementMediaProperty=shieldStyle?propertyDescriptor(shieldStyle,'media'):null;
         const styleElementTypeProperty=shieldStyle?propertyDescriptor(shieldStyle,'type'):null;
         const cssParentRuleProperty=propertyDescriptor(CSSStyleDeclaration.prototype,'parentRule');
@@ -337,6 +341,8 @@ internal object ChromeMediaShieldBootstrap {
         if(media)invoke(WeakSetAdd,protectedMedias,[media])}if(!cssRulesProperty||!cssRuleListLength||!ruleStyleMapProperty)return;
         const rules=copyList(read(cssRulesProperty,sheet),cssRuleListLength);for(let index=0;index<rules.length;index+=1){const map=read(ruleStyleMapProperty,rules[index]);
         if(map)invoke(WeakSetAdd,protectedStyleMaps,[map])}};
+        const reconnectShadowStyle=(host)=>{const style=invoke(WeakMapGet,protectedShadowStyles,[host]);if(!style||!connected(host))return true;const sheet=read(styleSheetProperty,style);if(!sheet){failClosedDocument('SHADOW_GUARDS','CONNECTED_SHADOW_STYLESHEET_MISSING');return false}watchStyle(style);registerProtectedSheet(sheet);return true};
+        const reconnectShadowStyles=(root)=>{if(!root||nodeTypeOf(root)!==1)return true;if(!reconnectShadowStyle(root))return false;const hosts=copyList(elementQueryAll.call(root,'*'),nodeListLength);for(let index=0;index<hosts.length;index+=1)if(!reconnectShadowStyle(hosts[index]))return false;return true};
         if(!styleSheetProperty)failInstall('STYLE_SHEET_DESCRIPTOR_MISSING');else if(!shieldSheet)failInstall('SHIELD_SHEET_MISSING');
         else if(HAS_CURTAIN&&!curtainSheet)failInstall('CURTAIN_SHEET_MISSING');else if(!styleNonceProperty||!styleNonceProperty.get||!styleNonceProperty.set||
         !styleElementDisabledProperty||!styleElementMediaProperty||!styleElementTypeProperty||!cssParentRuleProperty||!cssParentSheetProperty||
@@ -656,11 +662,11 @@ internal object ChromeMediaShieldBootstrap {
         if(self.ShadowRoot&&ShadowRoot.prototype.setHTMLUnsafe)installed=seal(ShadowRoot.prototype,'setHTMLUnsafe',deny)&&installed;
         if(Document.parseHTMLUnsafe)installed=seal(Document,'parseHTMLUnsafe',deny)&&installed;
         installSection('SHADOW_GUARDS');const originalAttach=Element.prototype.attachShadow;installed=seal(Element.prototype,'attachShadow',function(init){if(protectedNode(this))deny();const root=invoke(originalAttach,this,[init]);
-        const style=create.call(DOC,'style');invoke(WeakSetAdd,protectedNodes,[style]);invoke(WeakMapSet,protectedDescendants,[root,style]);
+        const style=create.call(DOC,'style'),shadowHost=shadowHostProperty?read(shadowHostProperty,root):null;invoke(WeakSetAdd,protectedNodes,[style]);invoke(WeakMapSet,protectedDescendants,[root,style]);if(shadowHost)invoke(WeakMapSet,protectedShadowStyles,[shadowHost,style]);
         nativeSet.call(style,'nonce',NONCE);invoke(nodeText.set,style,[CSS]);nodeAppend.call(root,style);
-        if(!clearStyleNonce(style)){nodeRemove.call(root,style);failClosedDocument();deny()}
-        watchStyle(style);const shadowSheet=read(styleSheetProperty,style);if(!shadowSheet){nodeRemove.call(root,style);failClosedDocument();deny()}registerProtectedSheet(shadowSheet);
-        rendererMetric(30);rendererMetric(31);const shadowObserver=new NativeMutationObserver(records=>{rendererMetric(32);rendererMetric(33,records.length);for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
+        if(!clearStyleNonce(style)){nodeRemove.call(root,style);failClosedDocument('SHADOW_GUARDS','STYLE_NONCE_RETIRE_FAILED');deny()}
+        watchStyle(style);const shadowSheet=read(styleSheetProperty,style);if(!shadowSheet){if(!shadowHost||connected(shadowHost)){nodeRemove.call(root,style);failClosedDocument('SHADOW_GUARDS','SHADOW_STYLESHEET_MISSING');deny()}}else registerProtectedSheet(shadowSheet);
+        rendererMetric(30);rendererMetric(31);const shadowObserver=new NativeMutationObserver(records=>{if(shadowHost&&connected(shadowHost)&&!reconnectShadowStyle(shadowHost))return;rendererMetric(32);rendererMetric(33,records.length);for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
         if(type==='childList'){const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1){rendererMetric(34);scan(added[addedIndex],RM_SHADOW)}}
         else{const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}restoreMappedProtected(root)});
         mutationObserve.call(shadowObserver,root,{childList:true,subtree:true,attributes:true,attributeFilter:WATCHED_ATTRIBUTES});rendererMetric(34);scan(root,RM_SHADOW);return root})&&installed;
@@ -691,7 +697,48 @@ internal object ChromeMediaShieldBootstrap {
         if(HTMLCanvasElement.prototype.transferControlToOffscreen)installed=seal(HTMLCanvasElement.prototype,'transferControlToOffscreen',deny)&&installed}
         const denyPropertySetter=(owner,name)=>{if(!owner)return true;const entry=descriptor(owner,name);if(!entry)return true;if(!entry.get||!entry.set)return false;
         try{ObjectDefine(owner,name,{get:entry.get,set:deny,configurable:false});const sealedEntry=descriptor(owner,name);return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.set===deny}catch(_){return false}};
-        installed=denyPropertySetter(self.HTMLMediaElement&&HTMLMediaElement.prototype,'srcObject')&&installed;
+        const mediaAuthorityHeader='X-Glosh-Media-Authority',mediaAuthoritySafeValue='safe',arrayBufferByteLengthProperty=SELF.ArrayBuffer?propertyDescriptor(ArrayBuffer.prototype,'byteLength'):null,arrayBufferIsView=SELF.ArrayBuffer&&ArrayBuffer.isView?method(ArrayBuffer.isView):null;
+        const mediaSrcObjectProperty=self.HTMLMediaElement?propertyDescriptor(HTMLMediaElement.prototype,'srcObject'):null,mediaSourceObjectAuthorized=(value)=>{try{return !!(MEDIA_AUTHORITY&&((NativeMediaSource&&value instanceof NativeMediaSource)||invoke(WeakSetHas,safeMediaBlobs,[value])))}catch(_){return false}};
+        const authorizedMediaSourceValue=(value)=>{const text=lower(value||'');if(includes(text,'data:'))return false;if(!includes(text,'blob:'))return true;return invoke(SetHas,authorizedMediaUrls,[stringOf(value||'')])};
+        const mediaElementSourceAuthorized=(element)=>{if(!MEDIA_AUTHORITY||!element)return false;try{if(mediaSrcObjectProperty&&mediaSourceObjectAuthorized(read(mediaSrcObjectProperty,element)))return true}catch(_){}const source=stringOf(nativeGet.call(element,'src')||'');if(networkUrl(source)||authorizedMediaSourceValue(source))return true;const sources=copyList(elementQueryAll.call(element,'source'),nodeListLength);for(let index=0;index<sources.length;index+=1){const value=stringOf(nativeGet.call(sources[index],'src')||'');if(networkUrl(value)||authorizedMediaSourceValue(value))return true}return false};
+        const markArrayBuffer=(value)=>{if(!value||!arrayBufferByteLengthProperty)return false;try{read(arrayBufferByteLengthProperty,value);invoke(WeakSetAdd,safeMediaBuffers,[value]);return true}catch(_){return false}};
+        const markBufferSource=(value)=>{if(markArrayBuffer(value))return true;try{return !!(arrayBufferIsView&&arrayBufferIsView.call(NativeArrayBuffer,value)&&markArrayBuffer(value.buffer))}catch(_){return false}};
+        const mediaBufferLooksLikeIsoBmff=(value)=>{try{if(!NativeUint8Array)return false;let bytes;if(arrayBufferIsView&&arrayBufferIsView.call(NativeArrayBuffer,value))bytes=new NativeUint8Array(value.buffer,value.byteOffset,value.byteLength);else if(arrayBufferByteLengthProperty){read(arrayBufferByteLengthProperty,value);bytes=new NativeUint8Array(value)}else return false;if(!bytes||bytes.byteLength<8||bytes.byteLength>67108864)return false;let offset=0,count=0,hasInit=false,hasMedia=false;while(offset+8<=bytes.byteLength&&count++<4096){const size=bytes[offset]*16777216+bytes[offset+1]*65536+bytes[offset+2]*256+bytes[offset+3],type=NativeString.fromCharCode(bytes[offset+4],bytes[offset+5],bytes[offset+6],bytes[offset+7]);if(size<8||size>bytes.byteLength-offset||type==='pssh'||type==='sinf'||type==='encv'||type==='enca'||type==='schm'||type==='tenc')return false;if(type==='ftyp'||type==='moov')hasInit=true;if(type==='moof'||type==='mdat')hasMedia=true;offset+=size}return offset===bytes.byteLength&&(hasInit||hasMedia)}catch(_){return false}};
+        const authorizedBufferSource=(value)=>{try{if(invoke(WeakSetHas,safeMediaBuffers,[value]))return true;return !!(arrayBufferIsView&&arrayBufferIsView.call(NativeArrayBuffer,value)&&(invoke(WeakSetHas,safeMediaBuffers,[value.buffer])||mediaBufferLooksLikeIsoBmff(value)))}catch(_){return false}};
+        const markDerivedBuffer=(value,source)=>{if(!authorizedBufferSource(source))return false;return markBufferSource(value)};
+        const nativeMediaSource=NativeURL&&NativeURL.createObjectURL?method(NativeURL.createObjectURL):null,mediaUrlOwner=NativeURL&&propertyOwner(NativeURL,'createObjectURL');
+        const safeMediaObject=(value)=>{try{return !!(MEDIA_AUTHORITY&&((NativeMediaSource&&value instanceof NativeMediaSource)||invoke(WeakSetHas,safeMediaBlobs,[value])))}catch(_){return false}};
+        const promiseThen=SELF.Promise&&Promise.prototype.then?method(Promise.prototype.then):null,responseHeadersProperty=NativeResponse?propertyDescriptor(NativeResponse.prototype,'headers'):null,headersGet=NativeHeaders&&NativeHeaders.prototype.get?method(NativeHeaders.prototype.get):null;
+        const responseIsMediaSafe=(response)=>{try{const headers=responseHeadersProperty&&read(responseHeadersProperty,response);return !!(headersGet&&headers&&stringOf(headersGet.call(headers,mediaAuthorityHeader)).toLowerCase()===mediaAuthoritySafeValue)}catch(_){return false}};
+        const markMediaResponse=(response)=>{if(responseIsMediaSafe(response))invoke(WeakSetAdd,safeMediaResponses,[response]);return response};
+        if(MEDIA_AUTHORITY&&NativeResponse&&promiseThen){const responseArrayBufferOwner=propertyOwner(NativeResponse.prototype,'arrayBuffer'),responseArrayBufferEntry=responseArrayBufferOwner&&descriptor(responseArrayBufferOwner,'arrayBuffer');
+        if(responseArrayBufferEntry&&typeof responseArrayBufferEntry.value==='function'){const nativeArrayBufferResponse=method(responseArrayBufferEntry.value),guardedArrayBuffer=function(...args){const response=this,promise=nativeArrayBufferResponse.apply(response,args);return promiseThen.call(promise,(value)=>{if(invoke(WeakSetHas,safeMediaResponses,[response]))markBufferSource(value);return value})};installed=seal(responseArrayBufferOwner,'arrayBuffer',guardedArrayBuffer)&&installed}
+        const responseBlobOwner=propertyOwner(NativeResponse.prototype,'blob'),responseBlobEntry=responseBlobOwner&&descriptor(responseBlobOwner,'blob');
+        if(responseBlobEntry&&typeof responseBlobEntry.value==='function'){const nativeBlobResponse=method(responseBlobEntry.value),guardedBlob=function(...args){const response=this,promise=nativeBlobResponse.apply(response,args);return promiseThen.call(promise,(value)=>{if(invoke(WeakSetHas,safeMediaResponses,[response]))invoke(WeakSetAdd,safeMediaBlobs,[value]);return value})};installed=seal(responseBlobOwner,'blob',guardedBlob)&&installed}
+        const responseBytesOwner=propertyOwner(NativeResponse.prototype,'bytes'),responseBytesEntry=responseBytesOwner&&descriptor(responseBytesOwner,'bytes');
+        if(responseBytesEntry&&typeof responseBytesEntry.value==='function'){const nativeBytesResponse=method(responseBytesEntry.value),guardedBytes=function(...args){const response=this,promise=nativeBytesResponse.apply(response,args);return promiseThen.call(promise,(value)=>{if(invoke(WeakSetHas,safeMediaResponses,[response]))markBufferSource(value);return value})};installed=seal(responseBytesOwner,'bytes',guardedBytes)&&installed}
+        const responseBodyOwner=propertyOwner(NativeResponse.prototype,'body'),responseBodyEntry=responseBodyOwner&&descriptor(responseBodyOwner,'body');
+        if(responseBodyEntry&&responseBodyEntry.get){const nativeBodyGetter=responseBodyEntry.get;try{ObjectDefine(responseBodyOwner,'body',{get:function(){const stream=invoke(nativeBodyGetter,this,[]);if(invoke(WeakSetHas,safeMediaResponses,[this])&&stream)invoke(WeakSetAdd,safeMediaStreams,[stream]);return stream},enumerable:responseBodyEntry.enumerable,configurable:false});installed=installed&&!!descriptor(responseBodyOwner,'body')&&!descriptor(responseBodyOwner,'body').configurable}catch(_){installed=false}}
+        }
+        const fetchOwner=propertyOwner(SELF,'fetch'),fetchEntry=fetchOwner&&descriptor(fetchOwner,'fetch');
+        if(MEDIA_AUTHORITY&&fetchEntry&&typeof fetchEntry.value==='function'&&promiseThen){const nativeFetch=method(fetchEntry.value),guardedFetch=function(...args){const promise=nativeFetch.apply(this||SELF,args);return promiseThen.call(promise,markMediaResponse)};installed=seal(fetchOwner,'fetch',guardedFetch)&&installed}
+        const streamReaderOwner=NativeReadableStream&&NativeReadableStream.prototype?propertyOwner(NativeReadableStream.prototype,'getReader'):null,streamReaderEntry=streamReaderOwner&&descriptor(streamReaderOwner,'getReader');
+        if(MEDIA_AUTHORITY&&streamReaderEntry&&typeof streamReaderEntry.value==='function'){const nativeGetReader=method(streamReaderEntry.value),guardedGetReader=function(...args){const reader=nativeGetReader.apply(this,args);if(invoke(WeakSetHas,safeMediaStreams,[this]))invoke(WeakSetAdd,safeMediaReaders,[reader]);return reader};installed=seal(streamReaderOwner,'getReader',guardedGetReader)&&installed}
+        const readerReadOwner=NativeReadableStreamDefaultReader&&NativeReadableStreamDefaultReader.prototype?propertyOwner(NativeReadableStreamDefaultReader.prototype,'read'):null,readerReadEntry=readerReadOwner&&descriptor(readerReadOwner,'read');
+        if(MEDIA_AUTHORITY&&readerReadEntry&&typeof readerReadEntry.value==='function'&&promiseThen){const nativeReaderRead=method(readerReadEntry.value),guardedReaderRead=function(...args){const reader=this,promise=nativeReaderRead.apply(reader,args);return promiseThen.call(promise,(result)=>{if(invoke(WeakSetHas,safeMediaReaders,[reader])&&result&&!result.done)markBufferSource(result.value);return result})};installed=seal(readerReadOwner,'read',guardedReaderRead)&&installed}
+        const xhrHeaderGetter=NativeXMLHttpRequest&&NativeXMLHttpRequest.prototype.getResponseHeader?method(NativeXMLHttpRequest.prototype.getResponseHeader):null,xhrResponseProperty=NativeXMLHttpRequest?propertyDescriptor(NativeXMLHttpRequest.prototype,'response'):null;
+        const xhrIsMediaSafe=(xhr)=>{try{return !!(invoke(WeakSetHas,safeMediaXhrs,[xhr])&&xhrHeaderGetter&&stringOf(xhrHeaderGetter.call(xhr,mediaAuthorityHeader)).toLowerCase()===mediaAuthoritySafeValue)}catch(_){return false}};
+        if(MEDIA_AUTHORITY&&NativeXMLHttpRequest&&xhrSend){const xhrSendOwner=propertyOwner(NativeXMLHttpRequest.prototype,'send'),xhrSendEntry=xhrSendOwner&&descriptor(xhrSendOwner,'send');if(xhrSendEntry&&typeof xhrSendEntry.value==='function'){const guardedXhrSend=function(...args){invoke(WeakSetAdd,safeMediaXhrs,[this]);return xhrSend.apply(this,args)};installed=seal(xhrSendOwner,'send',guardedXhrSend)&&installed}
+        const xhrResponseOwner=propertyOwner(NativeXMLHttpRequest.prototype,'response');if(xhrResponseOwner&&xhrResponseProperty&&xhrResponseProperty.get){const nativeXhrResponse=xhrResponseProperty.get;try{ObjectDefine(xhrResponseOwner,'response',{get:function(){const value=invoke(nativeXhrResponse,this,[]);if(xhrIsMediaSafe(this)){markBufferSource(value);if(value&&NativeBlob&&value instanceof NativeBlob)invoke(WeakSetAdd,safeMediaBlobs,[value])}return value},enumerable:xhrResponseProperty.enumerable,configurable:false});installed=installed&&!!descriptor(xhrResponseOwner,'response')&&!descriptor(xhrResponseOwner,'response').configurable}catch(_){installed=false}}}
+        if(MEDIA_AUTHORITY&&NativeUint8Array&&NativeProxy){try{const guardedUint8Array=new NativeProxy(NativeUint8Array,{construct(target,args,newTarget){const value=ReflectConstruct(target,args,newTarget);if(args.length>0)markDerivedBuffer(value,args[0]);return value}});installed=seal(SELF,'Uint8Array',guardedUint8Array)&&installed}catch(_){installed=false}}
+        if(MEDIA_AUTHORITY&&NativeUint8Array&&NativeUint8Array.prototype){const typedArrayOwner=propertyOwner(NativeUint8Array.prototype,'set'),typedArraySetEntry=typedArrayOwner&&descriptor(typedArrayOwner,'set');if(typedArrayOwner&&typedArraySetEntry&&typeof typedArraySetEntry.value==='function'){const nativeTypedArraySet=method(typedArraySetEntry.value),guardedTypedArraySet=function(source,...args){const result=nativeTypedArraySet.call(this,source,...args);markDerivedBuffer(this,source);return result};installed=seal(typedArrayOwner,'set',guardedTypedArraySet)&&installed}
+        const typedArraySliceOwner=propertyOwner(NativeUint8Array.prototype,'slice'),typedArraySliceEntry=typedArraySliceOwner&&descriptor(typedArraySliceOwner,'slice');if(typedArraySliceOwner&&typedArraySliceEntry&&typeof typedArraySliceEntry.value==='function'){const nativeTypedArraySlice=method(typedArraySliceEntry.value),guardedTypedArraySlice=function(...args){const value=nativeTypedArraySlice.apply(this,args);markDerivedBuffer(value,this);return value};installed=seal(typedArraySliceOwner,'slice',guardedTypedArraySlice)&&installed}}
+        if(MEDIA_AUTHORITY&&NativeArrayBuffer&&NativeArrayBuffer.prototype){const arrayBufferSliceOwner=propertyOwner(NativeArrayBuffer.prototype,'slice'),arrayBufferSliceEntry=arrayBufferSliceOwner&&descriptor(arrayBufferSliceOwner,'slice');if(arrayBufferSliceOwner&&arrayBufferSliceEntry&&typeof arrayBufferSliceEntry.value==='function'){const nativeArrayBufferSlice=method(arrayBufferSliceEntry.value),guardedArrayBufferSlice=function(...args){const value=nativeArrayBufferSlice.apply(this,args);markDerivedBuffer(value,this);return value};installed=seal(arrayBufferSliceOwner,'slice',guardedArrayBufferSlice)&&installed}}
+        const blobPartsAuthorized=(parts)=>{if(!parts)return false;try{const length=parts.length;if(!NumberIsSafeInteger(length)||length<0||length>4096)return false;for(let index=0;index<length;index+=1){const part=parts[index];if(invoke(WeakSetHas,safeMediaBlobs,[part]))continue;if(!authorizedBufferSource(part))return false}return true}catch(_){return false}};
+        if(MEDIA_AUTHORITY&&NativeBlob){const blobOwner=propertyOwner(SELF,'Blob'),blobEntry=blobOwner&&descriptor(blobOwner,'Blob');if(blobOwner&&blobEntry&&blobEntry.value===NativeBlob){const guardedBlob=function(parts,options){if(!new.target)deny();const value=new NativeBlob(parts,options);if(blobPartsAuthorized(parts))invoke(WeakSetAdd,safeMediaBlobs,[value]);return value};try{ObjectDefine(guardedBlob,'prototype',{value:NativeBlob.prototype,writable:false,configurable:false});installed=seal(blobOwner,'Blob',guardedBlob)&&installed}catch(_){installed=false}}}
+        if(MEDIA_AUTHORITY&&NativeSourceBuffer&&NativeSourceBuffer.prototype&&NativeSourceBuffer.prototype.appendBuffer){const appendOwner=propertyOwner(NativeSourceBuffer.prototype,'appendBuffer'),appendEntry=appendOwner&&descriptor(appendOwner,'appendBuffer');if(appendOwner&&appendEntry&&typeof appendEntry.value==='function'){const nativeAppendBuffer=method(appendEntry.value),guardedAppendBuffer=function(value){if(!authorizedBufferSource(value))deny();return nativeAppendBuffer.call(this,value)};installed=seal(appendOwner,'appendBuffer',guardedAppendBuffer)&&installed}}
+        if(MEDIA_AUTHORITY&&nativeMediaSource&&mediaUrlOwner){const guardedCreateObjectUrl=function(value){if(!safeMediaObject(value))return deny();const url=nativeMediaSource.call(NativeURL,value);invoke(SetAdd,authorizedMediaUrls,[url]);if(NativeMediaSource&&value instanceof NativeMediaSource)invoke(WeakSetAdd,authorizedMediaSources,[value]);return url};installed=seal(mediaUrlOwner,'createObjectURL',guardedCreateObjectUrl)&&installed}else if(!MEDIA_AUTHORITY&&nativeMediaSource&&mediaUrlOwner)installed=seal(mediaUrlOwner,'createObjectURL',deny)&&installed;
+        if(MEDIA_AUTHORITY&&mediaSrcObjectProperty&&mediaSrcObjectProperty.set){const mediaOwner=propertyOwner(HTMLMediaElement.prototype,'srcObject');try{const mediaGetter=mediaSrcObjectProperty.get,mediaSetter=mediaSrcObjectProperty.set;ObjectDefine(mediaOwner,'srcObject',{get:mediaGetter,set:function(value){if(!mediaSourceObjectAuthorized(value))deny();return invoke(mediaSetter,this,[value])},enumerable:mediaSrcObjectProperty.enumerable,configurable:false});const sealedMedia=descriptor(mediaOwner,'srcObject');installed=!!sealedMedia&&!sealedMedia.configurable&&sealedMedia.set!==mediaSrcObjectProperty.set&&installed}catch(_){installed=false}}else installed=denyPropertySetter(self.HTMLMediaElement&&HTMLMediaElement.prototype,'srcObject')&&installed;
         if(SELF.HTMLDialogElement){installed=seal(HTMLDialogElement.prototype,'showModal',deny)&&installed;
         installed=seal(HTMLDialogElement.prototype,'show',function(){if(curtainRequired||protectedNode(this))deny();return nativeDialogShow.call(this)})&&installed;
         installed=seal(HTMLDialogElement.prototype,'close',function(...args){if(protectedNode(this))deny();return nativeDialogClose.apply(this,args)})&&installed;
@@ -706,7 +753,7 @@ internal object ChromeMediaShieldBootstrap {
         installed=denyPropertySetter(owner,'popoverTargetElement')&&installed;installed=denyPropertySetter(owner,'popoverTargetAction')&&installed}
         if(SELF.HTMLButtonElement){installed=denyPropertySetter(HTMLButtonElement.prototype,'commandForElement')&&installed;
         installed=denyPropertySetter(HTMLButtonElement.prototype,'command')&&installed}
-        if(Element.prototype.requestFullscreen)installed=seal(Element.prototype,'requestFullscreen',deny)&&installed;
+        if(Element.prototype.requestFullscreen){const nativeRequestFullscreen=method(Element.prototype.requestFullscreen);installed=seal(Element.prototype,'requestFullscreen',function(...args){if(MEDIA_AUTHORITY&&localNameOf(this)==='video'&&mediaElementSourceAuthorized(this))return nativeRequestFullscreen.apply(this,args);deny()})&&installed}
         if(Document.prototype.startViewTransition)installed=seal(Document.prototype,'startViewTransition',deny)&&installed;
         if(self.HTMLVideoElement&&HTMLVideoElement.prototype.requestPictureInPicture)
         installed=seal(HTMLVideoElement.prototype,'requestPictureInPicture',deny)&&installed;
@@ -714,7 +761,7 @@ internal object ChromeMediaShieldBootstrap {
         installed=!!documentPipOwner&&seal(documentPipOwner,'requestWindow',deny)&&installed}
         if(self.OffscreenCanvas){installed=seal(OffscreenCanvas.prototype,'getContext',()=>null)&&installed;
         if(OffscreenCanvas.prototype.transferToImageBitmap)installed=seal(OffscreenCanvas.prototype,'transferToImageBitmap',deny)&&installed}
-        if(self.URL&&NativeURL.createObjectURL)installed=seal(NativeURL,'createObjectURL',deny)&&installed;
+        if(!MEDIA_AUTHORITY&&self.URL&&NativeURL.createObjectURL)installed=seal(NativeURL,'createObjectURL',deny)&&installed;
         const imageBitmapOwner=propertyOwner(self,'createImageBitmap');if(imageBitmapOwner&&imageBitmapOwner.createImageBitmap)
         installed=seal(imageBitmapOwner,'createImageBitmap',deny)&&installed;
         if(SELF.CSS&&SELF.CSS.paintWorklet&&SELF.CSS.paintWorklet.addModule){const workletOwner=propertyOwner(SELF.CSS.paintWorklet,'addModule');
@@ -724,7 +771,7 @@ internal object ChromeMediaShieldBootstrap {
         installSection('MUTATION_OBSERVER');const WATCHED_ATTRIBUTES=['src','srcset','style','href','xlink:href','srcdoc','sandbox','target','formtarget','popover','popovertarget','popovertargetaction','commandfor','command','data-glosh-media-blocked','data-glosh-icon-safe',
         'd','points','viewBox','width','height','fill','stroke','transform','filter','mask','clip-path','x','y','x1','y1','x2','y2','cx','cy','r','rx','ry',CURTAIN_RELEASE_ATTRIBUTE];
         const observer=new NativeMutationObserver(records=>{rendererMetric(0);rendererMetric(1,records.length);rendererMax(4,records.length);ensureStyle();ensureCurtain();for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
-        if(type==='childList'){rendererMetric(2);const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1)scan(added[addedIndex],RM_OBSERVER_CHILD)}
+        if(type==='childList'){rendererMetric(2);const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1){if(!reconnectShadowStyles(added[addedIndex]))return;scan(added[addedIndex],RM_OBSERVER_CHILD)}}
         else{rendererMetric(3);const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}});
         mutationObserve.call(observer,documentElement(),{childList:true,subtree:true,attributes:true,attributeFilter:WATCHED_ATTRIBUTES});scan(documentElement(),RM_INITIAL);
         nativeAddEvent.call(DOC,'DOMContentLoaded',()=>scan(documentElement(),RM_INITIAL),{once:true,capture:true});
@@ -733,7 +780,7 @@ internal object ChromeMediaShieldBootstrap {
         const reportBootstrapFailure=(stage,reason)=>{if(!SELF_SHIELD||bootstrapDiagnosticSent||selfReadyAccepted||!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader)return;
         bootstrapDiagnosticSent=true;try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',BOOTSTRAP_DIAGNOSTIC_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
         xhrSend.call(xhr,'v1|BOOTSTRAP_FAIL|'+READY+'|'+selfShieldIdentity+'|INSTALL|'+stage+'|'+reason)}catch(_){}};
-        const failClosedDocument=(stage='RUNTIME',reason='UNCLASSIFIED')=>{reportBootstrapFailure(stage,reason);mutationDisconnect.call(observer);let replaced=false;try{nativeDocOpen.call(DOC);nativeDocWrite.call(DOC,
+        const failClosedDocument=(stage='RUNTIME',reason='UNCLASSIFIED')=>{try{if(SELF.console&&typeof SELF.console.error==='function')SELF.console.error('GLOSH_FAIL_CLOSED:'+stage+':'+reason)}catch(_){}reportBootstrapFailure(stage,reason);mutationDisconnect.call(observer);let replaced=false;try{nativeDocOpen.call(DOC);nativeDocWrite.call(DOC,
         '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>html,body{margin:0;background:#202124;color:#fff;font:16px sans-serif}</style></head><body>Glosh protected this document.</body></html>');
         nativeDocClose.call(DOC);replaced=true}catch(_){}try{invoke(nativeStop,SELF,[])}catch(_){}if(!replaced){try{const root=documentElement();let child=firstChildOf(root);
         while(child){nodeRemove.call(root,child);child=firstChildOf(root)}nativeSet.call(root,'data-glosh-h19-fail-closed','true')}catch(_){}}};
@@ -742,7 +789,7 @@ internal object ChromeMediaShieldBootstrap {
         const retireBootstrapSecrets=()=>clearStyleNonce(shieldStyle)&&(!curtainStyle||clearStyleNonce(curtainStyle))&&retireScript(BOOTSTRAP_SCRIPT);
         let subdocumentGuardConsumed=false;const subdocumentGuard=()=>{if(subdocumentGuardConsumed)return false;subdocumentGuardConsumed=true;
         const guardScript=read(currentScriptProperty,DOC),callbackDeleted=ReflectDelete(SELF,'__gloshH19SubdocumentGuard__')&&!descriptor(SELF,'__gloshH19SubdocumentGuard__');
-        if(!callbackDeleted||!guardScript||read(scriptSrcProperty,guardScript)!==''||!retireScript(guardScript)){failClosedDocument();return false}return true};
+        if(!callbackDeleted||!guardScript||read(scriptSrcProperty,guardScript)!==''||!retireScript(guardScript)){failClosedDocument('SUBDOCUMENT_GUARD','CALLBACK_OR_SCRIPT_INVALID');return false}return true};
         if(!installed){failClosedDocument('INSTALL',installFailure);return}if(!retireBootstrapSecrets()){failClosedDocument('BOOTSTRAP_SECRET_RETIREMENT','RETIRE_FAILED');return}if(SELF_SHIELD){
         const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
         if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'){failClosedDocument('PARSER_FAIL_CLOSED','INSTALLER_UNAVAILABLE');return}
@@ -754,42 +801,42 @@ internal object ChromeMediaShieldBootstrap {
         let selfShieldStage=0,parserContinuationConsumed=false,originalScriptConsumed=false;
         const originalScriptStarted=()=>{if(originalScriptConsumed||selfShieldStage!==6)return false;originalScriptConsumed=true;
         const callbackDeleted=ReflectDelete(SELF,'__gloshH20OriginalScriptStarted__')&&!descriptor(SELF,'__gloshH20OriginalScriptStarted__');
-        if(!callbackDeleted){failClosedDocument();return false}selfShieldStage=7;if(!requestSelfShieldTrace('ORIGINAL_SCRIPT_STARTED')){failClosedDocument();return false}return true};
+        if(!callbackDeleted){failClosedDocument('ORIGINAL_SCRIPT_STARTED','CALLBACK_DELETE_FAILED');return false}selfShieldStage=7;if(!requestSelfShieldTrace('ORIGINAL_SCRIPT_STARTED')){failClosedDocument('ORIGINAL_SCRIPT_STARTED','TRACE_REJECTED');return false}return true};
         const parserContinuation=()=>{if(parserContinuationConsumed||selfShieldStage!==4)return false;parserContinuationConsumed=true;
         const script=read(currentScriptProperty,DOC),callbackDeleted=ReflectDelete(SELF,'__gloshH20ParserContinuation__')&&!descriptor(SELF,'__gloshH20ParserContinuation__');
-        if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''){failClosedDocument();return false}selfShieldStage=5;
-        if(!requestSelfShieldTrace('PARSER_CONTINUED')){failClosedDocument();return false}selfShieldStage=6;
+        if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''){failClosedDocument('PARSER_CONTINUATION','CALLBACK_OR_SCRIPT_INVALID');return false}selfShieldStage=5;
+        if(!requestSelfShieldTrace('PARSER_CONTINUED')){failClosedDocument('PARSER_CONTINUATION','TRACE_REJECTED');return false}selfShieldStage=6;
         try{if(descriptor(SELF,'__gloshH20OriginalScriptStarted__'))throw 0;ObjectDefine(SELF,'__gloshH20OriginalScriptStarted__',
-        {value:originalScriptStarted,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument();return false}
-        if(!retireScript(script)){failClosedDocument();return false}return true};
+        {value:originalScriptStarted,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument('PARSER_CONTINUATION','MARKER_DEFINE_FAILED');return false}
+        if(!retireScript(script)){failClosedDocument('PARSER_CONTINUATION','SCRIPT_RETIRE_FAILED');return false}return true};
         let selfShieldOperation='SELF_READY_CONSTRUCT';try{const xhr=new NativeXMLHttpRequest();selfShieldOperation='SELF_READY_OPEN';xhrOpen.call(xhr,'POST',SELF_READY_URL,false);
         selfShieldOperation='SELF_READY_HEADER';xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');selfShieldOperation='SELF_READY_SEND';xhrSend.call(xhr,selfReadyBody);
         selfShieldOperation='SELF_READY_VERIFY';if(read(xhrResponseUrlProperty,xhr)!==SELF_READY_RESPONSE_URL||read(xhrStatusProperty,xhr)!==204){failClosedDocument('SELF_READY','REJECTED');return}
         selfReadyAccepted=true;selfShieldStage=1;selfShieldOperation='FAIL_CLOSED_INSTALLER_RETIRE';
-        if(invoke(parserFailClosedRetire.value,parserFailClosed,[])!==true||!ReflectDelete(SELF,'__gloshH19ParserBarrierFailClosed__')||descriptor(SELF,'__gloshH19ParserBarrierFailClosed__')){failClosedDocument();return}selfShieldStage=2;
-        selfShieldOperation='CURTAIN_RELEASE';curtainRequired=false;if(!ensureCurtain()){failClosedDocument();return}selfShieldStage=3;
-        if(curtainLayer||nativeGet.call(documentElement(),CURTAIN_RELEASE_ATTRIBUTE)!=='1'){failClosedDocument();return}selfShieldStage=4;
-        selfShieldOperation='RELEASE_TRACE';if(!requestSelfShieldTrace('RELEASE_COMPLETED')||descriptor(SELF,'__gloshH20ParserContinuation__')){failClosedDocument();return}
+        if(invoke(parserFailClosedRetire.value,parserFailClosed,[])!==true||!ReflectDelete(SELF,'__gloshH19ParserBarrierFailClosed__')||descriptor(SELF,'__gloshH19ParserBarrierFailClosed__')){failClosedDocument('PARSER_FAIL_CLOSED','RETIRE_FAILED');return}selfShieldStage=2;
+        selfShieldOperation='CURTAIN_RELEASE';curtainRequired=false;if(!ensureCurtain()){failClosedDocument('CURTAIN','RELEASE_ENSURE_FAILED');return}selfShieldStage=3;
+        if(curtainLayer||nativeGet.call(documentElement(),CURTAIN_RELEASE_ATTRIBUTE)!=='1'){failClosedDocument('CURTAIN','RELEASE_STATE_INVALID');return}selfShieldStage=4;
+        selfShieldOperation='RELEASE_TRACE';if(!requestSelfShieldTrace('RELEASE_COMPLETED')||descriptor(SELF,'__gloshH20ParserContinuation__')){failClosedDocument('RELEASE_TRACE','REJECTED_OR_CALLBACK_PRESENT');return}
         selfShieldOperation='PARSER_CONTINUATION_DEFINE';
         ObjectDefine(SELF,'__gloshH20ParserContinuation__',{value:parserContinuation,writable:false,enumerable:false,configurable:true})}
         catch(_){failClosedDocument('SELF_SHIELD_SEQUENCE',selfShieldOperation)}return}if(!TOP_LEVEL){
         const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
-        try{if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||descriptor(SELF,'__gloshH19SubdocumentGuard__')){failClosedDocument();return}
-        ObjectDefine(SELF,'__gloshH19SubdocumentGuard__',{value:subdocumentGuard,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument()}return}
+        try{if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||descriptor(SELF,'__gloshH19SubdocumentGuard__')){failClosedDocument('SUBDOCUMENT_GUARD','INSTALLER_OR_CALLBACK_INVALID');return}
+        ObjectDefine(SELF,'__gloshH19SubdocumentGuard__',{value:subdocumentGuard,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument('SUBDOCUMENT_GUARD','INSTALL_FAILED')}return}
         let lifecycle=0,currentLifecycle=0,activePhase='idle',challenge='',authorityArmed=false;
-        const showCurtain=()=>{curtainRequired=true;if(ensureCurtain())return true;failClosedDocument();return false};
+        const showCurtain=()=>{curtainRequired=true;if(ensureCurtain())return true;failClosedDocument('LIFECYCLE','CURTAIN_SHOW_FAILED');return false};
         const hideCurtain=()=>{curtainRequired=false;return ensureCurtain()};
         const acquireActiveDocument=()=>{if(!showCurtain()||!curtainLayer)return false;if(activeDocument())return true;try{
         nativeElementFocus.call(curtainLayer,{preventScroll:true})}catch(_){return false}return activeDocument()};
         const stopCrossDocumentTransition=(event,entry)=>{if(!entry)return true;try{const transition=read(entry,event);if(transition)nativeSkipViewTransition.call(transition);return true}
-        catch(_){showCurtain();failClosedDocument();return false}};
+        catch(_){showCurtain();failClosedDocument('LIFECYCLE','TRANSITION_STOP_FAILED');return false}};
         const validChallenge=(value)=>{if(value.length<22||value.length>128)return false;for(let index=0;index<value.length;index+=1){const code=charCode(value,index);
         if(!((code>=48&&code<=57)||(code>=65&&code<=90)||(code>=97&&code<=122)||code===45||code===95))return false}return true};
         const requestReady=(body)=>{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',READY_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
         xhrSend.call(xhr,body);if(read(xhrResponseUrlProperty,xhr)!==READY_URL)return null;return [read(xhrStatusProperty,xhr),stringOf(read(xhrResponseTextProperty,xhr)||'')]};
         const reloadParkedDocument=(event)=>{if(!authorityArmed||activePhase!=='parked'||!trustedEvent(event)||!activeDocument())return;activePhase='reloading';showCurtain();
-        try{nativeLocationReload.call(NativeLocation)}catch(_){activePhase='parked';failClosedDocument()}};
-        const parkDocument=()=>{activePhase='parked';challenge='';showCurtain();failClosedDocument();
+        try{nativeLocationReload.call(NativeLocation)}catch(_){activePhase='parked';failClosedDocument('LIFECYCLE','RELOAD_FAILED')}};
+        const parkDocument=()=>{activePhase='parked';challenge='';showCurtain();failClosedDocument('LIFECYCLE','PARKED_DOCUMENT');
         nativeAddEvent.call(SELF,'focus',reloadParkedDocument,true);nativeAddEvent.call(DOC,'visibilitychange',reloadParkedDocument,true)};
         const remoteRevoke=(oldLifecycle,oldChallenge)=>{if(!oldChallenge)return;try{requestReady('v2|REVOKE|'+READY+'|'+oldLifecycle+'|'+oldChallenge)}catch(_){}};
         const revokeReady=()=>{if(!authorityArmed)return;showCurtain();const oldLifecycle=currentLifecycle,oldChallenge=challenge;activePhase='revoked';challenge='';remoteRevoke(oldLifecycle,oldChallenge)};
@@ -815,14 +862,14 @@ internal object ChromeMediaShieldBootstrap {
         let firstAuthorityComplete=false,parserBarrierConsumed=false,parserGuardConsumed=false;
         const parserBarrierCommit=(ready)=>{if(parserBarrierConsumed)return;parserBarrierConsumed=true;const script=read(currentScriptProperty,DOC);
         const exactScript=!!script&&read(scriptSrcProperty,script)===BARRIER_URL;const callbackDeleted=ReflectDelete(SELF,'__gloshH19ParserBarrierCommit__')&&!descriptor(SELF,'__gloshH19ParserBarrierCommit__');
-        if(!callbackDeleted||!exactScript||ready!==true||!retireScript(script)){failClosedDocument();return}if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}
-        authorityArmed=true;beginReadyLifecycle();firstAuthorityComplete=activePhase==='released';if(!firstAuthorityComplete)failClosedDocument()};
+        if(!callbackDeleted||!exactScript||ready!==true||!retireScript(script)){failClosedDocument('PARSER_BARRIER','COMMIT_INVALID');return}if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}
+        authorityArmed=true;beginReadyLifecycle();firstAuthorityComplete=activePhase==='released';if(!firstAuthorityComplete)failClosedDocument('PARSER_BARRIER','AUTHORITY_NOT_RELEASED')};
         const parserBarrierGuard=()=>{if(parserGuardConsumed)return false;parserGuardConsumed=true;const script=read(currentScriptProperty,DOC);
         const callbackDeleted=ReflectDelete(SELF,'__gloshH19ParserBarrierGuard__')&&!descriptor(SELF,'__gloshH19ParserBarrierGuard__');
-        if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''||!retireScript(script)||!firstAuthorityComplete){failClosedDocument();return false}return true};
+        if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''||!retireScript(script)||!firstAuthorityComplete){failClosedDocument('PARSER_BARRIER','GUARD_INVALID');return false}return true};
         const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
-        try{if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||descriptor(SELF,'__gloshH19ParserBarrierCommit__')||descriptor(SELF,'__gloshH19ParserBarrierGuard__')){failClosedDocument();return}
+        try{if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||descriptor(SELF,'__gloshH19ParserBarrierCommit__')||descriptor(SELF,'__gloshH19ParserBarrierGuard__')){failClosedDocument('PARSER_BARRIER','INSTALLER_OR_CALLBACK_INVALID');return}
         ObjectDefine(SELF,'__gloshH19ParserBarrierCommit__',{value:parserBarrierCommit,writable:false,enumerable:false,configurable:true});
-        ObjectDefine(SELF,'__gloshH19ParserBarrierGuard__',{value:parserBarrierGuard,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument();return}})();
+        ObjectDefine(SELF,'__gloshH19ParserBarrierGuard__',{value:parserBarrierGuard,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument('PARSER_BARRIER','INSTALL_FAILED');return}})();
         """.trimIndent().replace("\n", "")
 }

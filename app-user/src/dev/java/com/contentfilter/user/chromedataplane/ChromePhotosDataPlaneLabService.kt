@@ -271,6 +271,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                                         sessionId = sessionId,
                                         policyEpoch = mediaPolicyEpoch,
                                         documentSelfShieldEnabled = documentSelfShieldEnabled,
+                                        mediaAuthorityEnabled = stockMediaAuthorityEnabled,
                                         cssSvgRewriter = originalUiSvgAuthority?.cssRewriter,
                                     ),
                             )

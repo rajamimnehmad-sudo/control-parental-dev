@@ -34,6 +34,12 @@ class ChromeMediaContentAuthorityTest {
 
         assertIs<ChromeMediaContentInspection.Candidate>(authority.inspect(requestFor("/asset"), response("video/mp4")))
         assertIs<ChromeMediaContentInspection.Candidate>(authority.inspect(requestFor("/segment.ts"), response("video/mp2t")))
+        val inferredSegment =
+            assertIs<ChromeMediaContentInspection.Candidate>(
+                authority.inspect(requestFor("/segment.ts"), response("application/octet-stream")),
+            )
+        assertEquals(ChromeMediaKind.HlsSegment, inferredSegment.kind)
+        assertEquals("video/mp2t", inferredSegment.declaredMimeType)
         val hls = assertIs<ChromeMediaContentInspection.Candidate>(authority.inspect(requestFor("/asset"), response("application/vnd.apple.mpegurl")))
         assertEquals(ChromeMediaKind.HlsManifest, hls.kind)
         assertIs<ChromeMediaContentInspection.Passthrough>(authority.inspect(requestFor("/asset"), response("application/json")))

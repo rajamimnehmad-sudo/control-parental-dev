@@ -61,7 +61,7 @@ internal class ChromeMediaResponseSanitizer(
             return ChromePhotosSanitizedResponse(
                 statusCode = 200,
                 statusText = "OK",
-                headers = entityHeaders,
+                headers = safeMediaHeaders(entityHeaders),
                 bytes = bytes,
                 decision = ChromePhotosResourceDecision.Safe,
                 cacheHit = false,
@@ -90,7 +90,7 @@ internal class ChromeMediaResponseSanitizer(
             return ChromePhotosSanitizedResponse(
                 statusCode = 200,
                 statusText = "OK",
-                headers = entityHeaders,
+                headers = safeMediaHeaders(entityHeaders),
                 bytes = bytes,
                 decision = ChromePhotosResourceDecision.Safe,
                 cacheHit = false,
@@ -103,7 +103,7 @@ internal class ChromeMediaResponseSanitizer(
             statusCode = 206,
             statusText = "Partial Content",
             headers =
-                entityHeaders +
+                safeMediaHeaders(entityHeaders) +
                     ChromeHttpHeader("Content-Range", "bytes ${resolved.start}-${resolved.endInclusive}/${bytes.size}") +
                     ChromeHttpHeader("Accept-Ranges", "bytes"),
             bytes = rangedBytes,
@@ -124,6 +124,23 @@ internal class ChromeMediaResponseSanitizer(
             (header.name.equals("ETag", true) || header.name.equals("Last-Modified", true)) &&
                 header.value.trim() == value
         }
+    }
+
+    private fun safeMediaHeaders(entityHeaders: List<ChromeHttpHeader>): List<ChromeHttpHeader> {
+        val exposed =
+            entityHeaders.firstOrNull { it.name.equals("Access-Control-Expose-Headers", true) }
+                ?.value
+                ?.split(',')
+                ?.map(String::trim)
+                ?.filter(String::isNotEmpty)
+                ?.toMutableList()
+                ?: mutableListOf()
+        if (MediaAuthorityHeader !in exposed.map { it.lowercase(Locale.US) }) {
+            exposed += MediaAuthorityHeader
+        }
+        return entityHeaders.filterNot { it.name.equals("Access-Control-Expose-Headers", true) } +
+            ChromeHttpHeader("Access-Control-Expose-Headers", exposed.joinToString(", ")) +
+            ChromeHttpHeader(MediaAuthorityHeader, MediaAuthoritySafeValue)
     }
 
     private fun transformedMediaHeaders(
@@ -207,7 +224,10 @@ internal class ChromeMediaResponseSanitizer(
                 "cache-control",
                 "expires",
                 "vary",
+                MediaAuthorityHeader.lowercase(Locale.US),
             )
+        const val MediaAuthorityHeader = "X-Glosh-Media-Authority"
+        const val MediaAuthoritySafeValue = "safe"
     }
 }
 

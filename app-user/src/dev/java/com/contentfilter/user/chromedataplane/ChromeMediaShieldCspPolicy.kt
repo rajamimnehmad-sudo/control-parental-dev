@@ -5,7 +5,15 @@ import java.util.Locale
 
 internal class ChromeMediaShieldCspPolicy(
     private val sameOriginReady: Boolean = false,
+    private val mediaAuthorityEnabled: Boolean = false,
 ) {
+    private val mediaEnvelope: String
+        get() =
+            "img-src https: http: $OriginalUiSvgOrigin; media-src https: http:" +
+                (if (mediaAuthorityEnabled) " blob:" else "") +
+                "; object-src 'none'; worker-src https: http:; " +
+                "frame-src https: http:; child-src https: http:; fenced-frame-src 'none'"
+
     fun apply(
         sourceHeaders: List<ChromeHttpHeader>,
         scriptNonce: String,
@@ -30,7 +38,7 @@ internal class ChromeMediaShieldCspPolicy(
                 else -> output += header
             }
         }
-        output += ChromeHttpHeader(ContentSecurityPolicy, MediaEnvelope)
+        output += ChromeHttpHeader(ContentSecurityPolicy, mediaEnvelope)
         output += ChromeHttpHeader("Content-Type", "text/html; charset=$charset")
         output += ChromeHttpHeader("Cache-Control", "no-store")
         return output
@@ -144,9 +152,6 @@ internal class ChromeMediaShieldCspPolicy(
         const val ReadyOrigin = "https://${ChromePhotosDataPlaneLabContract.FixtureHost}"
         const val OriginalUiSvgOrigin = ChromePhotosDataPlaneLabContract.OriginalUiSvgOrigin
         const val SelfSource = "'self'"
-        const val MediaEnvelope =
-            "img-src https: http: $OriginalUiSvgOrigin; media-src https: http:; object-src 'none'; worker-src https: http:; " +
-                "frame-src https: http:; child-src https: http:; fenced-frame-src 'none'"
         val Whitespace = Regex("\\s+")
         val InvalidatedDocumentEntityHeaders =
             setOf(

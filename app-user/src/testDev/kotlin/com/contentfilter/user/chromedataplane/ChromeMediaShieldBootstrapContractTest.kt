@@ -161,7 +161,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "catch(_){rejectCurrent()}")
         assertContains(
             script,
-            "const parkDocument=()=>{activePhase='parked';challenge='';showCurtain();failClosedDocument()",
+            "const parkDocument=()=>{activePhase='parked';challenge='';showCurtain();failClosedDocument('LIFECYCLE','PARKED_DOCUMENT')",
         )
         assertContains(script, "const parserBarrierCommit=(ready)=>")
         assertContains(script, "read(scriptSrcProperty,script)===BARRIER_URL")
@@ -428,7 +428,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "ObjectDefine(owner,'style',{get:guardedGet")
         assertContains(script, "seal(EventTarget.prototype,'dispatchEvent'")
         assertContains(script, "if(protectedNode(this))deny();return nativeDispatchEvent.call(this,event)")
-        assertContains(script, "seal(Element.prototype,'requestFullscreen',deny)")
+        assertContains(script, "if(MEDIA_AUTHORITY&&localNameOf(this)==='video'&&mediaElementSourceAuthorized(this))")
         assertContains(script, "seal(Document.prototype,'startViewTransition',deny)")
         assertContains(script, "NativePageSwapEvent=SELF.PageSwapEvent")
         assertContains(script, "NativePageRevealEvent=SELF.PageRevealEvent")
@@ -697,7 +697,11 @@ class ChromeMediaShieldBootstrapContractTest {
             "if(!installed){failClosedDocument('INSTALL',installFailure);return}" +
                 "if(!retireBootstrapSecrets()){failClosedDocument('BOOTSTRAP_SECRET_RETIREMENT','RETIRE_FAILED');return}",
         )
-        assertContains(script, "if(!clearStyleNonce(style)){nodeRemove.call(root,style);failClosedDocument();deny()}")
+        assertContains(script, "if(!clearStyleNonce(style)){nodeRemove.call(root,style);failClosedDocument('SHADOW_GUARDS','STYLE_NONCE_RETIRE_FAILED');deny()}")
+        assertContains(script, "const shadowHostProperty=self.ShadowRoot?propertyDescriptor(ShadowRoot.prototype,'host'):null")
+        assertContains(script, "protectedShadowStyles=new WeakMap()")
+        assertContains(script, "CONNECTED_SHADOW_STYLESHEET_MISSING")
+        assertContains(script, "if(!shadowHost||connected(shadowHost))")
         assertEquals(1, Regex(Regex.escape(ReadyToken)).findAll(script).count())
         assertEquals(1, Regex(Regex.escape(StyleNonce)).findAll(script).count())
         assertFalse(script.contains("data-glosh-ready-token"))
@@ -747,7 +751,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(subdocument, "read(scriptSrcProperty,guardScript)!==''")
         assertContains(subdocument, "!retireScript(guardScript)")
         assertTrue(
-            subdocument.indexOf("if(!retireBootstrapSecrets()){failClosedDocument();return}") <
+            subdocument.indexOf("if(!retireBootstrapSecrets()){failClosedDocument('BOOTSTRAP_SECRET_RETIREMENT','RETIRE_FAILED');return}") <
                 subdocument.indexOf("ObjectDefine(SELF,'${ChromeMediaShieldBootstrap.SubdocumentGuardName}'"),
         )
         assertContains(guard, "const f=S.${ChromeMediaShieldBootstrap.SubdocumentGuardName}")
@@ -813,7 +817,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "oneOf(lower(canonical),['object','embed','frame','fencedframe'])")
         assertContains(
             script,
-            "const showCurtain=()=>{curtainRequired=true;if(ensureCurtain())return true;failClosedDocument();return false}",
+            "const showCurtain=()=>{curtainRequired=true;if(ensureCurtain())return true;failClosedDocument('LIFECYCLE','CURTAIN_SHOW_FAILED');return false}",
         )
         assertFalse(script.contains("data-glosh-curtain-released"))
     }
@@ -845,9 +849,11 @@ class ChromeMediaShieldBootstrapContractTest {
         assertFalse(ChromeMediaShieldBootstrap.css.startsWith("canvas,video"))
         assertContains(script, "if(tag==='canvas'){hide(element);return}")
         assertContains(script, "if(tag==='video'){let values=lower")
-        assertContains(script, "if(includes(values,'data:')||includes(values,'blob:'))hide(element);else unhide(element);return}")
+        assertContains(script, "if(unsafeSource)hide(element);else unhide(element);return}")
         assertContains(script, "self.HTMLMediaElement&&HTMLMediaElement.prototype,'src'")
         assertContains(script, "denyPropertySetter(self.HTMLMediaElement&&HTMLMediaElement.prototype,'srcObject')")
+        assertContains(script, "X-Glosh-Media-Authority")
+        assertContains(script, "appendBuffer")
     }
 
     @Test

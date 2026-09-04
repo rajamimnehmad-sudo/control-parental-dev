@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicLong
 internal enum class ChromeMediaKind {
     ProgressiveVideo,
     HlsManifest,
+    HlsSegment,
 }
 
 internal data class ChromeMediaAuthorityMetrics(
@@ -80,7 +81,8 @@ internal class ChromeMediaContentAuthority(
     ): ChromeMediaContentInspection {
         val requestIntent = request.isMediaIntent()
         val declared = response.headers.singleDeclaredContentTypeOrNull()
-        val kind = mediaKind(declared, request.target)
+        val effectiveDeclared = declared.effectiveMediaMimeType(request.target)
+        val kind = mediaKind(effectiveDeclared, request.target)
         if (!requestIntent && kind == null) {
             return ChromeMediaContentInspection.Passthrough(response)
         }
@@ -88,7 +90,7 @@ internal class ChromeMediaContentAuthority(
         return ChromeMediaContentInspection.Candidate(
             response = response,
             kind = kind ?: ChromeMediaKind.ProgressiveVideo,
-            declaredMimeType = declared,
+            declaredMimeType = effectiveDeclared,
             requestIntent = requestIntent,
         )
     }
@@ -148,6 +150,7 @@ internal class ChromeMediaContentAuthority(
         }
         return when (candidate.kind) {
             ChromeMediaKind.HlsManifest -> ChromeHlsManifestPolicy.inspect(bytes)
+            ChromeMediaKind.HlsSegment -> payloadInspector.inspect(bytes, mime)
             ChromeMediaKind.ProgressiveVideo -> payloadInspector.inspect(bytes, mime)
         }
     }
@@ -178,9 +181,10 @@ internal class ChromeMediaContentAuthority(
             target: String,
         ): ChromeMediaKind? =
             when {
-                declaredMimeType?.startsWith("video/") == true -> ChromeMediaKind.ProgressiveVideo
                 declaredMimeType in HlsMimeTypes -> ChromeMediaKind.HlsManifest
                 targetLooksLikeHls(target) -> ChromeMediaKind.HlsManifest
+                targetLooksLikeHlsSegment(target) -> ChromeMediaKind.HlsSegment
+                declaredMimeType?.startsWith("video/") == true -> ChromeMediaKind.ProgressiveVideo
                 targetLooksLikeProgressiveVideo(target) -> ChromeMediaKind.ProgressiveVideo
                 else -> null
             }
@@ -192,6 +196,11 @@ internal class ChromeMediaContentAuthority(
             rawPath(target).lowercase(Locale.US).endsWith(".m3u8") ||
                 rawPath(target).lowercase(Locale.US).endsWith(".m3u")
 
+        fun targetLooksLikeHlsSegment(target: String): Boolean =
+            rawPath(target).lowercase(Locale.US).let { path ->
+                path.endsWith(".ts") || path.endsWith(".m4s")
+            }
+
         fun targetLooksLikeProgressiveVideo(target: String): Boolean =
             rawPath(target).lowercase(Locale.US).let { path -> MediaPathSuffixes.any(path::endsWith) && !targetLooksLikeHls(target) }
 
@@ -200,6 +209,28 @@ internal class ChromeMediaContentAuthority(
                 ?: target.substringBefore('?').substringBefore('#')
     }
 }
+
+private fun String?.effectiveMediaMimeType(target: String): String? {
+    if (this != null && this !in AmbiguousMediaMimeTypes) return this
+    val path =
+        runCatching { URI(target).rawPath.orEmpty() }
+            .getOrDefault(target.substringBefore('?').substringBefore('#'))
+            .lowercase(Locale.US)
+    return when {
+        path.endsWith(".ts") -> "video/mp2t"
+        path.endsWith(".m4s") -> "video/mp4"
+        else -> this
+    }
+}
+
+private val AmbiguousMediaMimeTypes =
+    setOf(
+        "application/octet-stream",
+        "binary/octet-stream",
+        "application/unknown",
+        "application/x-unknown",
+        "unknown/unknown",
+    )
 
 internal fun interface ChromeMediaPayloadInspector {
     fun inspect(
