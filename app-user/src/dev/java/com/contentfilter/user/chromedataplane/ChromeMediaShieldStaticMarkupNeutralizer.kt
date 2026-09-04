@@ -53,7 +53,13 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
                     "template" -> authorityNeutralizedTag.blockDeclarativeShadowRoot()
                     "object" -> blockedTemplate(tagName, paired = !tag.isSelfClosingStartTag())
                     in BlockedVoidMediaElements -> blockedTemplate(tagName, paired = false)
-                    "canvas", "video", "svg" -> authorityNeutralizedTag.protectInitialMedia()
+                    "canvas", "svg" -> authorityNeutralizedTag.protectInitialMedia()
+                    "video" ->
+                        if (authorityNeutralizedTag.hasLocalMediaSource()) {
+                            authorityNeutralizedTag.protectInitialMedia()
+                        } else {
+                            authorityNeutralizedTag
+                        }
                     "img" ->
                         if (authorityNeutralizedTag.hasLocalMediaSource()) {
                             authorityNeutralizedTag.protectInitialMedia()

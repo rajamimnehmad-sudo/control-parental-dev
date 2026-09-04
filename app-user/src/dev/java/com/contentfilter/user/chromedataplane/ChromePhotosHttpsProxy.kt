@@ -26,6 +26,7 @@ internal class ChromePhotosHttpsProxy(
     private val upstream: ChromePhotosUpstream = ChromePhotosRealUpstream(destinationAuthority = destinationAuthority),
     private val transformer: ChromePhotosResourceTransformer = chromePhotosDeterministicTransformer(origin),
     private val imageAuthority: ChromeImageContentAuthority = ChromeImageContentAuthority(),
+    private val mediaAuthority: ChromeMediaContentAuthority? = null,
     private val visualDeliveryGate: ChromeNetworkVisualDeliveryGate =
         ChromeNetworkVisualDeliveryGate(replacementPlaceholderBytes = origin.placeholderImageBytes),
     private val coverageLedger: ChromeRealWebProvenanceLedger? = null,
@@ -44,6 +45,13 @@ internal class ChromePhotosHttpsProxy(
             imageAuthority = imageAuthority,
             visualDeliveryGate = visualDeliveryGate,
         )
+    private val mediaResponseSanitizer =
+        mediaAuthority?.let { authority ->
+            ChromeMediaResponseSanitizer(
+                authority = authority,
+                placeholderBytes = origin.placeholderImageBytes,
+            )
+        }
     private val requestReader = ChromeHttp1RequestReader()
     private val responseWriter = ChromeHttp1ResponseWriter()
     private val running = AtomicBoolean(false)
@@ -128,6 +136,7 @@ internal class ChromePhotosHttpsProxy(
             mediaShieldReport = origin.mediaShieldReport(),
             decisionSession = transformer.decisionMetrics(),
             imageAuthority = imageAuthority.metrics(),
+            mediaAuthority = mediaAuthority?.metrics() ?: ChromeMediaAuthorityMetrics(),
             networkVisualDelivery = visualDeliveryGate.snapshot(),
             mediaShieldDocuments = documentAuthority?.metrics() ?: ChromeMediaShieldDocumentMetrics(),
             mediaShieldReady = readyEndpoint?.metrics() ?: ChromeMediaShieldReadyEndpointMetrics(),
@@ -695,6 +704,44 @@ internal class ChromePhotosHttpsProxy(
                     latencies.add(System.nanoTime() - started)
                     return request.successDisposition()
                 }
+                val mediaInspection = mediaAuthority?.inspect(upstreamRequest, response)
+                if (mediaInspection is ChromeMediaContentInspection.Candidate) {
+                    val sanitizeStarted = System.nanoTime()
+                    val sanitized =
+                        checkNotNull(mediaResponseSanitizer).sanitize(
+                            requestMethod = request.method,
+                            request = request,
+                            candidate = mediaInspection,
+                        )
+                    val sanitizeNanos = System.nanoTime() - sanitizeStarted
+                    responseStarted = true
+                    val writeStarted = System.nanoTime()
+                    val result = responseWriter.writeBuffered(output, request, sanitized)
+                    val writeNanos = System.nanoTime() - writeStarted
+                    originalBytes.addAndGet(sanitized.inputBytes.toLong())
+                    deliveredBytes.addAndGet(result.bytesWritten)
+                    recordDecision(sanitized)
+                    if (coverageToken != null) {
+                        coverageLedger.recordInspected(
+                            token = coverageToken,
+                            statusCode = response.statusCode,
+                            declaredContentType = response.headers.firstValue("Content-Type"),
+                            response = sanitized,
+                        )
+                    }
+                    infoLog(
+                        "phase=media_authority origin=real kind=${mediaInspection.kind.name.lowercase(Locale.US)} " +
+                            "hostClass=${ChromeProxyLogPrivacy.hostClass(host)} " +
+                            "hostHash=${ChromeProxyLogPrivacy.digest(host)} method=${request.method} " +
+                            "clientProtocol=$clientProtocol upstreamProtocol=${response.protocol} " +
+                            "status=${sanitized.statusCode} contentType=${sanitized.contentType.safeLogContentType()} " +
+                            "bytesIn=${sanitized.inputBytes} bytesOut=${result.bytesWritten} " +
+                            "decision=${sanitized.decision.name.lowercase(Locale.US)} " +
+                            "upstreamHeadersMs=${upstreamHeadersNanos.toPhaseMillis()} " +
+                            "sanitizeMs=${sanitizeNanos.toPhaseMillis()} downstreamWriteMs=${writeNanos.toPhaseMillis()} " +
+                            "requestToDeliveryMs=${started.elapsedMillis(System.nanoTime())}",
+                    )
+                } else {
                 val inspection = imageAuthority.inspect(request, response)
                 if (inspection is ChromeImageContentInspection.Candidate) {
                     val sanitizeStarted = System.nanoTime()
@@ -751,6 +798,7 @@ internal class ChromePhotosHttpsProxy(
                             "bytesOut=${result.bytesWritten} transfer=${if (result.chunked) "chunked" else "fixed"} " +
                             "upstreamHeadersMs=${upstreamHeadersNanos.toPhaseMillis()} downstreamWriteMs=${writeNanos.toPhaseMillis()}",
                     )
+                }
                 }
             }
             latencies.add(System.nanoTime() - started)
@@ -822,7 +870,8 @@ internal class ChromePhotosHttpsProxy(
     private fun normalizeUpstreamRequest(request: ChromePhotosProxyRequest): ChromePhotosProxyRequest {
         val documentNormalized = documentAuthority?.normalizeUpstreamRequest(request) ?: request
         val svgNormalized = originalUiSvgAuthority?.normalizeUpstreamRequest(documentNormalized) ?: documentNormalized
-        return imageAuthority.normalizeUpstreamRequest(svgNormalized)
+        val mediaNormalized = mediaAuthority?.normalizeUpstreamRequest(svgNormalized) ?: svgNormalized
+        return imageAuthority.normalizeUpstreamRequest(mediaNormalized)
     }
 
     private fun serveOriginalUiSvgAsset(

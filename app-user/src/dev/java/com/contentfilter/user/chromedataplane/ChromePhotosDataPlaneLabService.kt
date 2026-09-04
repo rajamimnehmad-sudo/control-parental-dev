@@ -290,6 +290,16 @@ class ChromePhotosDataPlaneLabService : Service() {
                                         requestedBenchmarkConfig.maximumConcurrentInferences * BodyAdmissionPerInference,
                                     stockMediaAuthority = stockMediaAuthorityEnabled,
                                 ),
+                            mediaAuthority =
+                                if (stockMediaAuthorityEnabled) {
+                                    ChromeMediaContentAuthority(
+                                        payloadInspector = ChromeMediaVideoPayloadInspector(decisionSession),
+                                        maximumConcurrentBodies =
+                                            requestedBenchmarkConfig.maximumConcurrentInferences.coerceAtMost(2),
+                                    )
+                                } else {
+                                    null
+                                },
                             visualDeliveryGate = visualDeliveryGate,
                             coverageLedger = coverageLedger,
                             documentAuthority = documentAuthority,
@@ -585,6 +595,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         val metrics = proxy?.metrics() ?: ChromePhotosProxyMetrics()
         val decisions = metrics.decisionSession
         val images = metrics.imageAuthority
+        val media = metrics.mediaAuthority
         val networkVisuals = metrics.networkVisualDelivery
         val mediaDocuments = metrics.mediaShieldDocuments
         val readyEndpoint = metrics.mediaShieldReady
@@ -634,6 +645,9 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "imageCandidates=${images.candidates} imagePrefixPeeks=${images.prefixPeeks} " +
                 "imageMagicCandidates=${images.magicCandidates} imageBodyAdmissionPeak=${images.bodyAdmissionPeak} " +
                 "imageBodyAdmissionRejects=${images.bodyAdmissionRejects} " +
+                "mediaCandidates=${media.candidates} mediaBodyAdmissionPeak=${media.bodyAdmissionPeak} " +
+                "mediaBodyAdmissionRejects=${media.bodyAdmissionRejects} mediaSafe=${media.safe} " +
+                "mediaBlocked=${media.blocked} mediaUnknown=${media.unknown} " +
                 "networkVisualCandidates=${networkVisuals.candidates} " +
                 "networkVisualReplaced=${networkVisuals.replaced} " +
                 "networkVisualRawDelivered=${networkVisuals.rawDelivered} " +

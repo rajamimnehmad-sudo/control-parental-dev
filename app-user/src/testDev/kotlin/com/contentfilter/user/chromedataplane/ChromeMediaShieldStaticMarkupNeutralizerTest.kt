@@ -139,6 +139,21 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
     }
 
     @Test
+    fun `network video remains original while local video is protected`() {
+        val source =
+            "<video controls src='https://example.test/movie.mp4'></video>" +
+                "<video src='data:video/mp4;base64,AAAA'></video>" +
+                "<video><source src='blob:https://example.test/id'></video>"
+
+        val output = ChromeMediaShieldStaticMarkupNeutralizer.neutralize(source)
+
+        assertContains(output, "<video controls src='https://example.test/movie.mp4'>")
+        assertEquals(2, "data-glosh-media-blocked=\"1\"".toRegex().findAll(output).count())
+        assertContains(output, "src='data:video/mp4;base64,AAAA'")
+        assertContains(output, "data-glosh-blocked-src=\"1\"")
+    }
+
+    @Test
     fun `local picture source cannot be selected before bootstrap sanitization`() {
         val source =
             "<picture><source srcset='data:image/png;base64,AAAA 1x, https://example.test/a.png 2x'>" +

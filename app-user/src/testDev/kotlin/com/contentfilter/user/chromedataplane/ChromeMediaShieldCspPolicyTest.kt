@@ -28,10 +28,12 @@ class ChromeMediaShieldCspPolicyTest {
 
         assertEquals(1, policies.size)
         assertEquals(
-            "img-src https: http: https://glosh-ui-svg.test; media-src 'none'; object-src 'none'; worker-src https: http:; " +
+            "img-src https: http: https://glosh-ui-svg.test; media-src https: http:; object-src 'none'; worker-src https: http:; " +
                 "frame-src https: http:; child-src https: http:; fenced-frame-src 'none'",
             policies.single(),
         )
+        assertTrue(policies.single().contains("media-src https: http:"))
+        assertFalse(policies.single().contains("media-src 'none'"))
         assertEquals("no-store", output.value("Cache-Control"))
         assertEquals("nosniff", output.value("X-Content-Type-Options"))
         assertEquals("text/html; charset=utf-8", output.value("Content-Type"))

@@ -29,6 +29,7 @@ internal data class ChromePhotosProxyMetrics(
     val mediaShieldReport: String = "not_run",
     val decisionSession: ChromePhotoDecisionSessionMetrics = ChromePhotoDecisionSessionMetrics(),
     val imageAuthority: ChromeImageAuthorityMetrics = ChromeImageAuthorityMetrics(),
+    val mediaAuthority: ChromeMediaAuthorityMetrics = ChromeMediaAuthorityMetrics(),
     val networkVisualDelivery: ChromeNetworkVisualDeliverySnapshot = ChromeNetworkVisualDeliverySnapshot(),
     val mediaShieldDocuments: ChromeMediaShieldDocumentMetrics = ChromeMediaShieldDocumentMetrics(),
     val mediaShieldReady: ChromeMediaShieldReadyEndpointMetrics = ChromeMediaShieldReadyEndpointMetrics(),

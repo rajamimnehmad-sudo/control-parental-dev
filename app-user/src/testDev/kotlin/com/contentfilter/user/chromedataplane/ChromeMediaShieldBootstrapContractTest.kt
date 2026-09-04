@@ -841,6 +841,16 @@ class ChromeMediaShieldBootstrapContractTest {
     }
 
     @Test
+    fun `network video is not globally hidden while local media remains fail closed`() {
+        assertFalse(ChromeMediaShieldBootstrap.css.startsWith("canvas,video"))
+        assertContains(script, "if(tag==='canvas'){hide(element);return}")
+        assertContains(script, "if(tag==='video'){let values=lower")
+        assertContains(script, "if(includes(values,'data:')||includes(values,'blob:'))hide(element);else unhide(element);return}")
+        assertContains(script, "self.HTMLMediaElement&&HTMLMediaElement.prototype,'src'")
+        assertContains(script, "denyPropertySetter(self.HTMLMediaElement&&HTMLMediaElement.prototype,'srcObject')")
+    }
+
+    @Test
     fun `normal CSS and generic workers remain available within the documented product boundary`() {
         assertFalse(ChromeMediaShieldBootstrap.css.contains("div"))
         assertFalse(ChromeMediaShieldBootstrap.css.contains("span"))

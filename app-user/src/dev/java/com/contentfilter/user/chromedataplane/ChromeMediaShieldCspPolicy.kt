@@ -145,7 +145,7 @@ internal class ChromeMediaShieldCspPolicy(
         const val OriginalUiSvgOrigin = ChromePhotosDataPlaneLabContract.OriginalUiSvgOrigin
         const val SelfSource = "'self'"
         const val MediaEnvelope =
-            "img-src https: http: $OriginalUiSvgOrigin; media-src 'none'; object-src 'none'; worker-src https: http:; " +
+            "img-src https: http: $OriginalUiSvgOrigin; media-src https: http:; object-src 'none'; worker-src https: http:; " +
                 "frame-src https: http:; child-src https: http:; fenced-frame-src 'none'"
         val Whitespace = Regex("\\s+")
         val InvalidatedDocumentEntityHeaders =

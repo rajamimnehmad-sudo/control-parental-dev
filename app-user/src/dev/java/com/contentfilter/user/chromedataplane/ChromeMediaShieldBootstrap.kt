@@ -16,7 +16,7 @@ internal object ChromeMediaShieldBootstrap {
     const val SelfShieldOriginalScriptStartedName = "__gloshH20OriginalScriptStarted__"
 
     val css: String =
-        "canvas,video,object,embed,frame,fencedframe,[srcdoc],img[src^='data:' i],img[src^='blob:' i]," +
+        "canvas,object,embed,frame,fencedframe,[srcdoc],img[src^='data:' i],img[src^='blob:' i]," +
             "img[srcset*='data:' i],img[srcset*='blob:' i],source[src^='data:' i],source[src^='blob:' i]," +
             "source[srcset*='data:' i],source[srcset*='blob:' i],input[type='image' i][src^='data:' i]," +
             "input[type='image' i][src^='blob:' i],iframe:not([data-glosh-network-frame='1'])," +
@@ -285,7 +285,10 @@ internal object ChromeMediaShieldBootstrap {
         const removeDeclarativeTopLayer=(element)=>{for(let index=0;index<TOP_LAYER_ATTRIBUTE_NAMES.length;index+=1){const attribute=TOP_LAYER_ATTRIBUTE_NAMES[index];
         if(nativeHas.call(element,attribute))nativeRemove.call(element,attribute)}};
         const sanitizeElementBody=(element)=>{removeDeclarativeTopLayer(element);const tag=localNameOf(element);
-        if(tag==='canvas'||tag==='video'){hide(element);return}
+        if(tag==='canvas'){hide(element);return}
+        if(tag==='video'){let values=lower(nativeGet.call(element,'src')||'');const sources=copyList(elementQueryAll.call(element,'source'),nodeListLength);
+        for(let index=0;index<sources.length;index+=1)values+=' '+lower(nativeGet.call(sources[index],'src')||'');
+        if(includes(values,'data:')||includes(values,'blob:'))hide(element);else unhide(element);return}
         if(tag==='object'||tag==='embed'){hide(element);nativeRemove.call(element,'data');nativeRemove.call(element,'src');nativeRemove.call(element,'type');
         const parent=parentOf(element);if(parent)nodeRemove.call(parent,element);return}
         if(tag==='frame'||tag==='fencedframe'){hide(element);nativeRemove.call(element,'src');const parent=parentOf(element);if(parent)nodeRemove.call(parent,element);return}
@@ -528,6 +531,7 @@ internal object ChromeMediaShieldBootstrap {
         ObjectDefine(owner,name,{get:guardedGet,set:guardedSet,enumerable:entry.enumerable,configurable:false});const sealedEntry=descriptor(owner,name);
         return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
         for(const pair of [[self.HTMLImageElement&&HTMLImageElement.prototype,'src'],[self.HTMLImageElement&&HTMLImageElement.prototype,'srcset'],
+        [self.HTMLMediaElement&&HTMLMediaElement.prototype,'src'],
         [self.HTMLSourceElement&&HTMLSourceElement.prototype,'src'],[self.HTMLSourceElement&&HTMLSourceElement.prototype,'srcset'],
         [self.HTMLInputElement&&HTMLInputElement.prototype,'src']])installed=guardMediaAccessor(pair[0],pair[1])&&installed;
         const forceSelfTarget=(owner,name)=>{if(!owner)return true;const entry=descriptor(owner,name);if(!entry||!entry.get||!entry.set)return false;
@@ -687,6 +691,7 @@ internal object ChromeMediaShieldBootstrap {
         if(HTMLCanvasElement.prototype.transferControlToOffscreen)installed=seal(HTMLCanvasElement.prototype,'transferControlToOffscreen',deny)&&installed}
         const denyPropertySetter=(owner,name)=>{if(!owner)return true;const entry=descriptor(owner,name);if(!entry)return true;if(!entry.get||!entry.set)return false;
         try{ObjectDefine(owner,name,{get:entry.get,set:deny,configurable:false});const sealedEntry=descriptor(owner,name);return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.set===deny}catch(_){return false}};
+        installed=denyPropertySetter(self.HTMLMediaElement&&HTMLMediaElement.prototype,'srcObject')&&installed;
         if(SELF.HTMLDialogElement){installed=seal(HTMLDialogElement.prototype,'showModal',deny)&&installed;
         installed=seal(HTMLDialogElement.prototype,'show',function(){if(curtainRequired||protectedNode(this))deny();return nativeDialogShow.call(this)})&&installed;
         installed=seal(HTMLDialogElement.prototype,'close',function(...args){if(protectedNode(this))deny();return nativeDialogClose.apply(this,args)})&&installed;

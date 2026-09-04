@@ -307,6 +307,40 @@ class ChromePhotosHttpsProxyConnectionTest {
     }
 
     @Test
+    fun `real media path authorizes the full body before serving a client range`() {
+        val upstream =
+            ScriptedUpstream(
+                Reply(
+                    response(
+                        body = "0123456789".byteInputStream(),
+                        bodyLength = 10,
+                        contentType = "video/mp4",
+                    ),
+                ),
+            )
+        val mediaAuthority = ChromeMediaContentAuthority(ChromeMediaPayloadInspector { _, _ -> ChromeMediaPayloadDecision.Safe })
+
+        val result =
+            runSession(
+                upstream = upstream,
+                input =
+                    "GET /movie.mp4 HTTP/1.1\r\n" +
+                        "Host: example.com\r\n" +
+                        "Sec-Fetch-Dest: video\r\n" +
+                        "Range: bytes=2-5\r\n\r\n",
+                mediaAuthority = mediaAuthority,
+            )
+
+        assertTrue(result.output.startsWith("HTTP/1.1 206 Partial Content"))
+        assertTrue(result.output.contains("Content-Range: bytes 2-5/10"))
+        assertTrue(result.output.endsWith("\r\n\r\n2345"))
+        assertEquals(1, upstream.executeCalls.get())
+        assertTrue(upstream.requests.single().headerValues("Range").isEmpty())
+        assertEquals(listOf("identity"), upstream.requests.single().headerValues("Accept-Encoding"))
+        assertEquals(1, mediaAuthority.metrics().safe)
+    }
+
+    @Test
     fun `allowed redirect body is discarded with entity metadata invalidated`() {
         val response =
             ChromePhotosUpstreamResponse(
@@ -414,6 +448,7 @@ class ChromePhotosHttpsProxyConnectionTest {
         upstream: ScriptedUpstream,
         input: String,
         imageAuthority: ChromeImageContentAuthority = ChromeImageContentAuthority(),
+        mediaAuthority: ChromeMediaContentAuthority? = null,
     ): SessionResult {
         val fixture = FakeFixtureSource()
         val proxy =
@@ -425,6 +460,7 @@ class ChromePhotosHttpsProxyConnectionTest {
                 upstream = upstream,
                 transformer = chromePhotosDeterministicTransformer(fixture),
                 imageAuthority = imageAuthority,
+                mediaAuthority = mediaAuthority,
                 lifecycleLog = { _, _ -> },
                 infoLog = {},
                 warningLog = {},
