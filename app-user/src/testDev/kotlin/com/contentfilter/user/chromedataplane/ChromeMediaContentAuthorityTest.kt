@@ -48,7 +48,7 @@ class ChromeMediaContentAuthorityTest {
     @Test
     fun `clear HLS manifest is safe and encrypted or unsafe references fail closed`() {
         val safe =
-            "#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:4.0,\nsegment-1.ts\n#EXTINF:4.0,\nhttps://cdn.example/segment-2.ts\n"
+            "#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:4.0,\nsegment-1.ts\n#EXTINF:4.0,\nhttps://cdn.example/segment-2.ts\n#EXTINF:4.0,\n//media.example/segment-3.ts\n"
         val encrypted = "#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI=\"key\"\nsegment.ts\n"
         val unsafe = "#EXTM3U\n#EXTINF:4,\ndata:text/plain,raw\n"
 

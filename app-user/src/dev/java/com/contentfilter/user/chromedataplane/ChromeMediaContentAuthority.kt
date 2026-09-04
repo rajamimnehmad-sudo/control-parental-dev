@@ -331,9 +331,16 @@ internal object ChromeHlsManifestPolicy {
     private fun isAllowedReference(value: String): Boolean {
         if (value.isBlank() || value.any(Char::isISOControl)) return false
         if (value.startsWith("data:", true) || value.startsWith("blob:", true) || value.startsWith("javascript:", true)) return false
-        val uri = runCatching { URI(value) }.getOrNull() ?: return false
+        val uri =
+            runCatching {
+                if (value.startsWith("//")) URI("https:$value") else URI(value)
+            }.getOrNull() ?: return false
         if (!uri.isAbsolute) return !value.startsWith("//")
-        return uri.scheme.equals("https", true) && uri.userInfo == null && uri.port in setOf(-1, 443) && uri.host != null
+        return uri.scheme.equals("https", true) &&
+            uri.userInfo == null &&
+            uri.port in setOf(-1, 443) &&
+            uri.host != null &&
+            (!value.startsWith("//") || ChromePublicDestinationAuthority().isSyntacticallyPublicHost(uri.host))
     }
 
     private class HlsManifestRejected(message: String) : Exception(message)
