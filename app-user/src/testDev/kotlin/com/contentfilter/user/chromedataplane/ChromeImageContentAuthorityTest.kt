@@ -102,13 +102,15 @@ class ChromeImageContentAuthorityTest {
     }
 
     @Test
-    fun `valid static GIF reaches the visual engine while animated and malformed GIFs fail closed`() {
+    fun `valid static and animated GIFs reach the visual engine while malformed GIFs fail closed`() {
         val staticGif = staticGif()
         val candidate =
             assertIs<ChromeImageContentInspection.Candidate>(
                 authority.inspect(request(ChromeHttpHeader("Sec-Fetch-Dest", "image")), response(staticGif, "image/gif")),
             )
         assertEquals(ChromeImageFormat.Gif, assertIs<ChromeImageContentResolution.Inspect>(authority.resolve(candidate, staticGif)).format)
+        val animated = animatedGif()
+        assertEquals(ChromeImageFormat.Gif, assertIs<ChromeImageContentResolution.Inspect>(authority.resolve(candidate, animated)).format)
         assertIs<ChromeImageContentResolution.Reject>(authority.resolve(candidate, "GIF89a-bad".toByteArray()))
     }
 
@@ -473,6 +475,15 @@ class ChromeImageContentAuthorityTest {
         *"GIF89a".toByteArray(), 1, 0, 1, 0, 0x80.toByte(), 0, 0,
         0, 0, 0, 0xff.toByte(), 0xff.toByte(), 0xff.toByte(),
         0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x44, 0, 0x3b,
+    )
+
+    private fun animatedGif() = byteArrayOf(
+        *"GIF89a".toByteArray(), 1, 0, 1, 0, 0x80.toByte(), 0, 0,
+        0, 0, 0, 0xff.toByte(), 0xff.toByte(), 0xff.toByte(),
+        0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x44, 0,
+        0x21, 0xf9.toByte(), 4, 0, 5, 0, 0, 0,
+        0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x4c, 0,
+        0x3b,
     )
 
     private fun png(body: String) =

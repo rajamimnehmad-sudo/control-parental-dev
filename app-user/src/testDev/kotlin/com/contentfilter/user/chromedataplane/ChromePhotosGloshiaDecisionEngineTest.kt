@@ -101,6 +101,41 @@ class ChromePhotosGloshiaDecisionEngineTest {
     }
 
     @Test
+    fun `animated GIF analyzes bounded frames and allows only after all sampled frames pass`() {
+        val decodedFrames = AtomicInteger()
+        val decoder = fakeGifDecoder(decodedFrames)
+        val engine =
+            ChromePhotosGloshiaDecisionEngine(
+                analyzer = analyzer(listOf(0.1f, 0.1f)),
+                preprocessor = GloshiaImagePreprocessor { error("animated GIF must use frame decoder") },
+                gifFrameDecoder = decoder,
+            )
+
+        val result = engine.decide(animatedGif(), "image/gif")
+
+        assertEquals(ChromePhotoDecision.Safe, result.decision)
+        assertEquals("model_allow", result.reason)
+        assertEquals(2, decodedFrames.get())
+    }
+
+    @Test
+    fun `animated GIF blocks as soon as a sampled frame is unsafe`() {
+        val decodedFrames = AtomicInteger()
+        val engine =
+            ChromePhotosGloshiaDecisionEngine(
+                analyzer = analyzer(listOf(0.8f)),
+                preprocessor = GloshiaImagePreprocessor { error("animated GIF must use frame decoder") },
+                gifFrameDecoder = fakeGifDecoder(decodedFrames),
+            )
+
+        val result = engine.decide(animatedGif(), "image/gif")
+
+        assertEquals(ChromePhotoDecision.Block, result.decision)
+        assertEquals("model_filter", result.reason)
+        assertEquals(1, decodedFrames.get())
+    }
+
+    @Test
     fun `oversized decoded dimensions fail closed before inference`() {
         val analyzerCalls = AtomicInteger()
         val result =
@@ -166,6 +201,32 @@ class ChromePhotosGloshiaDecisionEngineTest {
             height = GloshiaImageContract.TargetSize,
             rgb888 = ByteArray(GloshiaImageContract.PreparedByteCount) { fill.toByte() },
         )
+
+    private fun fakeGifDecoder(decodedFrames: AtomicInteger) =
+        object : ChromeGifFrameDecoder {
+            override fun decode(
+                bytes: ByteArray,
+                timeline: ChromeGifTimeline,
+                inspectFrame: (ChromeGifFrame, GloshiaPreparedImage) -> Boolean,
+            ): ChromeGifFrameDecodeResult {
+                timeline.frames.forEachIndexed { index, frame ->
+                    decodedFrames.incrementAndGet()
+                    if (!inspectFrame(frame, preparedImage(index + 1))) {
+                        return ChromeGifFrameDecodeResult.Stopped
+                    }
+                }
+                return ChromeGifFrameDecodeResult.Completed
+            }
+        }
+
+    private fun animatedGif() = byteArrayOf(
+        *"GIF89a".toByteArray(), 1, 0, 1, 0, 0x80.toByte(), 0, 0,
+        0, 0, 0, 0xff.toByte(), 0xff.toByte(), 0xff.toByte(),
+        0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x44, 0,
+        0x21, 0xf9.toByte(), 4, 0, 5, 0, 0, 0,
+        0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x4c, 0,
+        0x3b,
+    )
 
     private fun GloshiaImagePreprocessResult.Ready.images() = listOf(image) + regionalImages
 

@@ -34,6 +34,7 @@ internal class ChromePhotosGloshiaDecisionEngine(
     analyzer: GloshiaVisualAnalyzer,
     private val preprocessor: GloshiaImagePreprocessor = AndroidGloshiaImagePreprocessor,
     private val nanoTime: () -> Long = System::nanoTime,
+    private val gifFrameDecoder: ChromeGifFrameDecoder = AndroidChromeGifFrameDecoder,
 ) : ChromePhotoDecisionEngine {
     override val identity = GloshiaIdentity
     private val lifecycleAnalyzer = LifecycleGloshiaVisualAnalyzer(analyzer)
@@ -50,6 +51,18 @@ internal class ChromePhotosGloshiaDecisionEngine(
         if (normalizedMime !in GateMimeTypes) return unknown(UnsupportedMimeReason, totalStarted = totalStarted)
         if (imageBytes.isEmpty() || imageBytes.size > MaximumImageBytes) {
             return unknown(ImageByteLimitReason, totalStarted = totalStarted)
+        }
+
+        if (normalizedMime == GifMimeType) {
+            when (val timeline = ChromeGifTimelineParser.parse(imageBytes)) {
+                is ChromeGifTimelineResult.Animated ->
+                    return decideAnimatedGif(imageBytes, timeline.timeline, totalStarted)
+                is ChromeGifTimelineResult.Rejected ->
+                    return unknown(timeline.reason, totalStarted = totalStarted)
+                ChromeGifTimelineResult.NotGif ->
+                    return unknown(InvalidGifReason, totalStarted = totalStarted)
+                ChromeGifTimelineResult.StaticGif -> Unit
+            }
         }
 
         val preprocessStarted = nanoTime()
@@ -143,6 +156,130 @@ internal class ChromePhotosGloshiaDecisionEngine(
 
     override fun isHealthy(): Boolean = healthy.get() && !closed.get()
 
+    private fun decideAnimatedGif(
+        imageBytes: ByteArray,
+        timeline: ChromeGifTimeline,
+        totalStarted: Long,
+    ): ChromePhotoDecisionResult {
+        val decodeStarted = nanoTime()
+        val selector = ChromeGifTemporalSelector()
+        val candidateId = sha256(imageBytes).take(CandidateIdLength)
+        var inspectedFrames = 0
+        var analyzedFrames = 0
+        var inferenceNanos = 0L
+        var terminal: ChromePhotoDecisionResult? = null
+        val decodeResult =
+            runCatching {
+                gifFrameDecoder.decode(imageBytes, timeline) { frame, prepared ->
+                    if (closed.get() || Thread.currentThread().isInterrupted) {
+                        terminal = unknown(AnalysisExpiredReason, ChromePhotoDecisionSource.Unavailable, totalStarted)
+                        return@decode false
+                    }
+                    inspectedFrames += 1
+                    when (selector.select(inspectedFrames - 1, frame.sampleTimeMillis, prepared)) {
+                        ChromeGifTemporalDecision.Skip -> return@decode true
+                        ChromeGifTemporalDecision.Reject -> {
+                            terminal = unknown(GifDecodeMismatchReason, totalStarted = totalStarted)
+                            return@decode false
+                        }
+                        ChromeGifTemporalDecision.Analyze -> Unit
+                    }
+                    if (analyzedFrames >= MaximumGifHeavyAnalyses) {
+                        terminal = unknown(GifAnalysisLimitReason, totalStarted = totalStarted)
+                        return@decode false
+                    }
+                    analyzedFrames += 1
+                    val started = nanoTime()
+                    val decision =
+                        runCatching {
+                            GloshiaPreparedRasterPolicy.decide(
+                                candidateId = candidateId,
+                                preparedImages = listOf(prepared),
+                                analyzer = lifecycleAnalyzer,
+                                canContinue = { !closed.get() && !Thread.currentThread().isInterrupted },
+                                analyze = { currentAnalyzer, image ->
+                                    val inferenceStarted = nanoTime()
+                                    currentAnalyzer.analyze(image).also {
+                                        inferenceNanos += nanoTime() - inferenceStarted
+                                    }
+                                },
+                            )
+                        }.getOrElse {
+                            terminal = unknown(EngineExceptionReason, ChromePhotoDecisionSource.Error, totalStarted)
+                            return@decode false
+                        }
+                    val mapped = decision.toChromeDecision(totalStarted, decodeStarted, inferenceNanos)
+                    if (mapped.decision == ChromePhotoDecision.Unknown) {
+                        terminal = mapped
+                        return@decode false
+                    }
+                    if (mapped.decision == ChromePhotoDecision.Block) {
+                        terminal = mapped
+                        return@decode false
+                    }
+                    true
+                }
+            }.getOrElse {
+                ChromeGifFrameDecodeResult.Rejected(GifDecodeFailedReason)
+            }
+        terminal?.let { return it }
+        if (decodeResult != ChromeGifFrameDecodeResult.Completed || inspectedFrames != timeline.frames.size) {
+            return unknown(
+                reason = (decodeResult as? ChromeGifFrameDecodeResult.Rejected)?.reason ?: GifDecodeFailedReason,
+                totalStarted = totalStarted,
+                preprocessNanos = nanoTime() - decodeStarted,
+                inferenceNanos = inferenceNanos,
+            )
+        }
+        return ChromePhotoDecisionResult(
+            decision = ChromePhotoDecision.Safe,
+            reason = GloshiaVisualPolicyContract.ModelAllowReason,
+            source = ChromePhotoDecisionSource.Engine,
+            basis = GloshiaVisualDecisionBasisName,
+            preparedImageCount = analyzedFrames,
+            timings =
+                ChromePhotoDecisionTimings(
+                    decodeAndPreprocessMs = (nanoTime() - decodeStarted).toMillis(),
+                    inferenceMs = inferenceNanos.toMillis(),
+                    totalLocalMs = (nanoTime() - totalStarted).toMillis(),
+                ),
+        )
+    }
+
+    private fun com.glosh.visual.GloshiaVisualDecision.toChromeDecision(
+        totalStarted: Long,
+        decodeStarted: Long,
+        inferenceNanos: Long,
+    ): ChromePhotoDecisionResult {
+        val mapped =
+            when {
+                action == GloshiaVisualAction.Allow && reason == GloshiaVisualPolicyContract.ModelAllowReason -> ChromePhotoDecision.Safe
+                action == GloshiaVisualAction.Block && reason == GloshiaVisualPolicyContract.ModelFilterReason -> ChromePhotoDecision.Block
+                else -> ChromePhotoDecision.Unknown
+            }
+        val systemicUnavailable = reason in SystemicUnavailableReasons
+        if (systemicUnavailable) healthy.set(false)
+        return ChromePhotoDecisionResult(
+            decision = mapped,
+            reason = reason,
+            source =
+                when {
+                    systemicUnavailable -> ChromePhotoDecisionSource.Unavailable
+                    mapped == ChromePhotoDecision.Unknown -> ChromePhotoDecisionSource.Error
+                    else -> ChromePhotoDecisionSource.Engine
+                },
+            filterProbability = filterProbability,
+            basis = basis.name,
+            preparedImageCount = preparedImageCount,
+            timings =
+                ChromePhotoDecisionTimings(
+                    decodeAndPreprocessMs = (nanoTime() - decodeStarted).toMillis(),
+                    inferenceMs = inferenceNanos.toMillis(),
+                    totalLocalMs = (nanoTime() - totalStarted).toMillis(),
+                ),
+        )
+    }
+
     private fun unknown(
         reason: String,
         source: ChromePhotoDecisionSource = ChromePhotoDecisionSource.Engine,
@@ -177,6 +314,14 @@ internal class ChromePhotosGloshiaDecisionEngine(
         const val InvalidDecodedImageReason = "invalid_decoded_image"
         const val EngineExceptionReason = "engine_exception"
         const val AnalyzerClosedReason = "analyzer_closed"
+        const val GifMimeType = "image/gif"
+        const val InvalidGifReason = "gif_invalid"
+        const val GifDecodeMismatchReason = "gif_decode_mismatch"
+        const val GifDecodeFailedReason = "gif_decode_failed"
+        const val GifAnalysisLimitReason = "gif_analysis_limit"
+        const val MaximumGifHeavyAnalyses = 10
+        const val AnalysisExpiredReason = GloshiaVisualPolicyContract.AnalysisExpiredReason
+        const val GloshiaVisualDecisionBasisName = "None"
         private const val CandidateIdLength = 32
         private val SystemicUnavailableReasons =
             setOf(

@@ -219,7 +219,13 @@ internal class ChromeImageContentAuthority(
         if (format == ChromeImageFormat.Gif) {
             when (inspectGifContainer(bytes)) {
                 GifContainer.Static -> Unit
-                GifContainer.Animated -> return ChromeImageContentResolution.Reject(AnimatedImageReason)
+                GifContainer.Animated ->
+                    when (val timeline = ChromeGifTimelineParser.parse(bytes)) {
+                        is ChromeGifTimelineResult.Animated -> Unit
+                        is ChromeGifTimelineResult.Rejected ->
+                            return ChromeImageContentResolution.Reject(timeline.reason)
+                        else -> return ChromeImageContentResolution.Reject(AnimatedImageReason)
+                    }
                 GifContainer.Malformed -> return ChromeImageContentResolution.Reject(GifMalformedReason)
                 GifContainer.TooLarge -> return ChromeImageContentResolution.Reject(GifTooLargeReason)
             }
@@ -308,8 +314,16 @@ internal class ChromeImageContentAuthority(
                     val label = cursor.readU8() ?: return GifContainer.Malformed
                     if (label == GifGraphicControlLabel) {
                         val blockSize = cursor.readU8() ?: return GifContainer.Malformed
-                        if (blockSize != GifGraphicControlBlockSize || cursor.skip(blockSize).not() || cursor.readU8() != 0) return GifContainer.Malformed
-                    } else if (!cursor.skipSubBlocks()) return GifContainer.Malformed
+                        if (
+                            blockSize != GifGraphicControlBlockSize ||
+                            cursor.skip(blockSize).not() ||
+                            cursor.readU8() != 0
+                        ) {
+                            return GifContainer.Malformed
+                        }
+                    } else if (!cursor.skipSubBlocks()) {
+                        return GifContainer.Malformed
+                    }
                 }
                 GifImageDescriptor -> {
                     val left = cursor.readLe16() ?: return GifContainer.Malformed
@@ -324,7 +338,10 @@ internal class ChromeImageContentAuthority(
                     frames++
                     if (frames > 1) return GifContainer.Animated
                 }
-                GifTrailer -> { trailerSeen = true; break }
+                GifTrailer -> {
+                    trailerSeen = true
+                    break
+                }
                 else -> return GifContainer.Malformed
             }
         }
@@ -337,10 +354,30 @@ internal class ChromeImageContentAuthority(
 
     private class GifCursor(private val bytes: ByteArray, private var index: Int) {
         fun hasRemaining(): Boolean = index < bytes.size
-        fun readU8(): Int? = if (index < bytes.size) bytes[index++].toInt() and 0xff else null
-        fun readLe16(): Int? { val low = readU8() ?: return null; val high = readU8() ?: return null; return low or (high shl 8) }
-        fun skip(count: Int): Boolean { if (count < 0 || count > bytes.size - index) return false; index += count; return true }
-        fun skipSubBlocks(): Boolean { while (true) { val size = readU8() ?: return false; if (size == 0) return true; if (!skip(size)) return false } }
+
+        fun readU8(): Int? {
+            return if (index < bytes.size) bytes[index++].toInt() and 0xff else null
+        }
+
+        fun readLe16(): Int? {
+            val low = readU8() ?: return null
+            val high = readU8() ?: return null
+            return low or (high shl 8)
+        }
+
+        fun skip(count: Int): Boolean {
+            if (count < 0 || count > bytes.size - index) return false
+            index += count
+            return true
+        }
+
+        fun skipSubBlocks(): Boolean {
+            while (true) {
+                val size = readU8() ?: return false
+                if (size == 0) return true
+                if (!skip(size)) return false
+            }
+        }
     }
 
     private fun InputStream.peekImagePrefix(maximumBytes: Int): PrefixPeek {

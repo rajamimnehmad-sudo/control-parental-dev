@@ -67,18 +67,35 @@ The remaining optimization candidate is client-side HTTP/2 multiplexing between 
 
 ## GIF/video follow-up
 
-DEV437 admits only structurally valid, bounded static GIF containers to the
-existing GloshIA R3.1 photo path. The authority validates the logical screen,
-color tables, frame bounds, LZW sub-block framing and trailer before decode;
-animated, malformed, oversized and truncated GIFs remain fail-closed. Original
-GIF bytes are preserved for the normal safe/block replacement contract.
+DEV438 adds a bounded animated-GIF path to the existing GloshIA R3.1 photo
+authority. The validator walks the complete container before authorization:
+logical screen and color tables, reserved bits, frame bounds, LZW sub-block
+framing, normalized frame timing, a maximum of 120 frames/60 seconds, and a
+final trailer with no trailing bytes. Malformed, oversized, truncated, or
+structurally ambiguous GIFs remain fail-closed. Android decodes one frame at a
+time into a 224px RGB tensor, clears it after inspection, and preserves the
+original GIF bytes for SAFE delivery; a BLOCK decision still uses the existing
+neutral placeholder contract. No raster `data:`/`blob:` allowance was added.
 
-The Chrome visual layer retains the historical dynamic-region video path:
-changed-region signatures, two consecutive safe samples and a bounded 500 ms
+The temporal selector follows the proven DAG strategy but is local to Chrome:
+cheap 16x16 signatures, immediate analysis on material change, and a 500ms
+model cadence with a ten-analysis cap. All frames are structurally visited, so
+skipped stable frames cannot hide a malformed or unbounded container. The
+candidate digest is computed once per GIF rather than once per frame to avoid
+avoidable CPU work during animation.
+
+The Chrome visual layer still retains its separate dynamic-region video path:
+changed-region signatures, two consecutive safe samples and a bounded 500ms
 verification schedule (~2 samples/second). This is compositor/accessibility
-visual protection, not a network-video bypass; encoded MP4/HLS/MSE streams and
-unsupported animated GIFs remain fail-closed until their transport gate is
-validated.
+visual protection, not a network-video bypass. Encoded MP4/HLS/MSE streams
+remain fail-closed until a transport authority can preserve the same security
+monotonicity; no domain-specific or blanket raster bypass was introduced.
 
-Automated authority/engine tests, compile and lint passed for DEV437. APK
-SHA-256: `602d62d8da329e748e96885a22cc2bbad80863553fcb7381f212be7b2d58f306`.
+Automated GIF timeline, selector, authority, engine, compile, lint and assemble
+validation passed for DEV438. APK SHA-256:
+`cf582d81b7f13abbb925a6ec9aa3d802762dc81e7934a302fca1c2d000c5ab46`.
+The APK was installed in place on A23 (`versionCode=438`); app-data inode
+`1239519`, Chrome data/cache, and `resetCount=3` were preserved. A fresh
+Frávega navigation through the installed build showed real HTTP/2 upstream
+connections, original safe image delivery, and the expected bounded counters;
+no screenshot instrumentation was used.
