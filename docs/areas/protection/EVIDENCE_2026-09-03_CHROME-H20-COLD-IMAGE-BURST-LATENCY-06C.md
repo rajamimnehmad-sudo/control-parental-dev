@@ -108,6 +108,12 @@ no screenshot instrumentation was used.
 
 DEV439 instrumentation APK SHA-256:
 `28f6534e024bf265eba5e741b2019a6e5fcd101ae951b10faee5b65004d087ba`.
+Because the first DEV439 artifact was built before the ignored DEV environment
+files were restored, the same HEAD was rebuilt with `--rerun-tasks` and the
+Supabase DEV configuration present. The resulting update-in-place candidate is
+SHA-256 `3ddd55f9267275ca880e0f300fc2a698a52567769f57bf8f007f5326974ef9dd`
+(versionCode 439); generated BuildConfig values were confirmed non-empty
+without recording their contents.
 The A23 accepted the update in place and preserved inode `1239519`. A brief
 ADB-triggered Google navigation did reach the proxy before the Device Owner
 closed Chrome for the inactive-device `RequireActivation` state. The fresh
