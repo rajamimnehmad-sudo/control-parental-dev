@@ -1,6 +1,7 @@
 package com.contentfilter.user.chromedataplane
 
 import java.net.URI
+import java.util.LinkedHashMap
 import java.util.Locale
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicInteger
@@ -61,6 +62,19 @@ internal class ChromeMediaContentAuthority(
     private val safe = AtomicLong()
     private val blocked = AtomicLong()
     private val unknown = AtomicLong()
+    private val payloadDecisionCacheLock = Any()
+    /** Session-scoped exact-payload decisions avoid re-decoding identical MP4 range responses. */
+    private val payloadDecisionCache =
+        object :
+            LinkedHashMap<MediaPayloadDecisionCacheKey, ChromeMediaPayloadDecision>(
+                MediaPayloadCacheEntries,
+                LoadFactor,
+                true,
+            ) {
+            override fun removeEldestEntry(
+                eldest: MutableMap.MutableEntry<MediaPayloadDecisionCacheKey, ChromeMediaPayloadDecision>?,
+            ): Boolean = size > MediaPayloadCacheEntries
+        }
 
     init {
         require(maximumConcurrentBodies > 0)
@@ -148,11 +162,24 @@ internal class ChromeMediaContentAuthority(
         if (candidate.response.statusCode !in setOf(200, 203)) {
             return ChromeMediaPayloadDecision.Unknown("media_status_${candidate.response.statusCode}")
         }
-        return when (candidate.kind) {
+        val cacheKey =
+            MediaPayloadDecisionCacheKey(
+                kind = candidate.kind,
+                mime = mime,
+                contentHash = sha256(bytes),
+            )
+        synchronized(payloadDecisionCacheLock) {
+            payloadDecisionCache[cacheKey]
+        }?.let { return it }
+        val decision = when (candidate.kind) {
             ChromeMediaKind.HlsManifest -> ChromeHlsManifestPolicy.inspect(bytes)
             ChromeMediaKind.HlsSegment -> payloadInspector.inspect(bytes, mime)
             ChromeMediaKind.ProgressiveVideo -> payloadInspector.inspect(bytes, mime)
         }
+        synchronized(payloadDecisionCacheLock) {
+            payloadDecisionCache[cacheKey] = decision
+        }
+        return decision
     }
 
     private fun ChromePhotosProxyRequest.isMediaIntent(): Boolean {
@@ -162,6 +189,8 @@ internal class ChromeMediaContentAuthority(
 
     private companion object {
         const val DefaultMaximumConcurrentBodies = 2
+        const val MediaPayloadCacheEntries = 64
+        const val LoadFactor = 0.75f
         const val UnknownMimeReason = "media_mime_missing_or_ambiguous"
         const val EncodedMediaReason = "encoded_media_unsupported"
         const val PartialMediaReason = "partial_media_without_full_authority"
@@ -208,6 +237,12 @@ internal class ChromeMediaContentAuthority(
             runCatching { URI(target).rawPath }.getOrNull()?.ifEmpty { "/" }
                 ?: target.substringBefore('?').substringBefore('#')
     }
+
+    private data class MediaPayloadDecisionCacheKey(
+        val kind: ChromeMediaKind,
+        val mime: String,
+        val contentHash: String,
+    )
 }
 
 private fun String?.effectiveMediaMimeType(target: String): String? {

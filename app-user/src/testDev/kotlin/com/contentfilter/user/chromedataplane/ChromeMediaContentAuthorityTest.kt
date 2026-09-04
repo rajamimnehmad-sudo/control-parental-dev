@@ -81,6 +81,24 @@ class ChromeMediaContentAuthorityTest {
     }
 
     @Test
+    fun `identical complete media reuses the bounded payload decision`() {
+        var inspections = 0
+        val authority =
+            ChromeMediaContentAuthority(
+                ChromeMediaPayloadInspector { _, _ ->
+                    inspections++
+                    ChromeMediaPayloadDecision.Safe
+                },
+            )
+        val bytes = "complete-media".toByteArray()
+        val candidate = candidate(bytes)
+
+        assertEquals(ChromeMediaPayloadDecision.Safe, authority.inspectPayload(candidate, bytes))
+        assertEquals(ChromeMediaPayloadDecision.Safe, authority.inspectPayload(candidate, bytes.copyOf()))
+        assertEquals(1, inspections)
+    }
+
+    @Test
     fun `authorized range produces RFC-compatible 206 without leaking source bytes`() {
         val source = "0123456789".toByteArray()
         val authority = ChromeMediaContentAuthority(ChromeMediaPayloadInspector { _, _ -> ChromeMediaPayloadDecision.Safe })
