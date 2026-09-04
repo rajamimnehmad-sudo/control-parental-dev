@@ -108,7 +108,22 @@ no screenshot instrumentation was used.
 
 DEV439 instrumentation APK SHA-256:
 `28f6534e024bf265eba5e741b2019a6e5fcd101ae951b10faee5b65004d087ba`.
-The A23 accepted the update in place and preserved inode `1239519`, but the
-Device Owner currently reports Chrome `suspended=true`; an ADB launch is
-rejected by the system admin dialog. Consequently no fresh real-browser
-cold-burst sample was attributed from DEV439 yet.
+The A23 accepted the update in place and preserved inode `1239519`. A brief
+ADB-triggered Google navigation did reach the proxy before the Device Owner
+closed Chrome for the inactive-device `RequireActivation` state. The fresh
+trace therefore is attribution-only, not a cold-burst gate: redirect/header
+samples were `61–219 ms` upstream and `<1 ms` downstream write; the transformed
+document was `156.557 ms` to upstream headers + `128.585 ms` document decision +
+`2.084 ms` write; one image response failed closed as
+`unknown/encoded_image_unsupported` with `86.940 ms` to headers and `2.791 ms`
+write. The trace showed `clientProtocol=http/1.1` and
+`upstreamProtocol=h2`, with no raw decision or bypass regression. Chrome was
+then re-suspended by the guard (`suspended=true`, accessibility decision
+`RequireActivation`), so a complete DEV439 cold-burst comparison remains
+blocked by the device policy precondition rather than by a demonstrated proxy
+or model regression.
+
+The current direction explicitly keeps MP4/HLS/MSE and HTML5 video out of this
+batch; those transports remain fail-closed. The animated-GIF implementation is
+preserved at DEV438/`6cf7dc41`, but its physical safe/block/malformed gate is
+not promoted until a controlled Chrome session can remain active.
