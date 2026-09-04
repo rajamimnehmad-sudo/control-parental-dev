@@ -45,6 +45,29 @@ class ChromePhotosRealResponseSanitizerTest {
     }
 
     @Test
+    fun `valid static GIF follows the same byte-preserving SAFE path`() {
+        val gif = staticGif()
+        val gifSanitizer =
+            ChromePhotosRealResponseSanitizer(
+                ChromePhotosResourceTransformer(
+                    safeBytes = listOf(gif),
+                    blockedBytes = emptyList(),
+                    placeholderBytes = placeholder,
+                ),
+                authority,
+                placeholder,
+                maximumImageBytes = 64,
+            )
+
+        val result = gifSanitizer.sanitize("GET", upstream("image/gif", gif))
+
+        assertEquals(ChromePhotosResourceDecision.Safe, result.decision)
+        assertEquals("image/gif", result.contentType)
+        assertContentEquals(gif, result.bytes)
+        assertEquals("nosniff", result.headers.firstValue("X-Content-Type-Options"))
+    }
+
+    @Test
     fun `replace all audit mode bypasses model verdict without delivering candidate bytes`() {
         val audit = "h18-audit-placeholder".toByteArray()
         val gate =
@@ -307,6 +330,12 @@ class ChromePhotosRealResponseSanitizerTest {
         byteArrayOf(0x89.toByte(), 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a) + value.toByteArray()
 
     private fun jpeg(value: String) = byteArrayOf(0xff.toByte(), 0xd8.toByte(), 0xff.toByte()) + value.toByteArray()
+
+    private fun staticGif() = byteArrayOf(
+        *"GIF89a".toByteArray(), 1, 0, 1, 0, 0x80.toByte(), 0, 0,
+        0, 0, 0, 0xff.toByte(), 0xff.toByte(), 0xff.toByte(),
+        0x2c, 0, 0, 0, 0, 1, 0, 1, 0, 0, 2, 1, 0x44, 0, 0x3b,
+    )
 
     private fun webp(value: String): ByteArray {
         val header = ByteArray(12)
