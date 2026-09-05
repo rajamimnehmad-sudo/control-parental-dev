@@ -7,6 +7,7 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
+import java.net.SocketException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -444,6 +445,40 @@ class ChromePhotosHttpsProxyConnectionTest {
         assertEquals(1, failures)
     }
 
+    @Test
+    fun `client socket reset after response is lifecycle cancellation not proxy failure`() {
+        val fixture = FakeFixtureSource()
+        val proxy =
+            ChromePhotosHttpsProxy(
+                tls = ChromePhotosEphemeralTls.create(),
+                origin = fixture,
+                onFixtureHeartbeat = {},
+                onFatalFailure = {},
+                upstream = ScriptedUpstream(),
+                transformer = chromePhotosDeterministicTransformer(fixture),
+                lifecycleLog = { _, _ -> },
+                infoLog = {},
+                warningLog = {},
+            )
+
+        proxy.use {
+            it.handleHttp11Session(
+                input =
+                    ByteArrayInputStream(
+                        "GET /first HTTP/1.1\r\nHost: ${ChromePhotosDataPlaneLabContract.FixtureHost}\r\n\r\n"
+                            .toByteArray(Charsets.US_ASCII),
+                    ),
+                output = ClientDisconnectOutputStream(),
+                connectTargetHost = ChromePhotosDataPlaneLabContract.FixtureHost,
+                protocol = "http/1.1",
+                shouldContinue = { true },
+            )
+
+            assertEquals(0, it.metrics().failures)
+            assertEquals(1, it.metrics().clientDisconnects)
+        }
+    }
+
     private fun runSession(
         upstream: ScriptedUpstream,
         input: String,
@@ -623,6 +658,10 @@ class ChromePhotosHttpsProxyConnectionTest {
             if (written == maximumBytes) throw IOException("fixture output failure")
             written++
         }
+    }
+
+    private class ClientDisconnectOutputStream : OutputStream() {
+        override fun write(value: Int) = throw SocketException("connection reset")
     }
 
     private class FailingAfterPrefixInputStream(
