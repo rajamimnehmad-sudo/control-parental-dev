@@ -14,6 +14,7 @@ internal data class ChromePhotosProxyMetrics(
     val cacheHits: Long = 0,
     val cacheMisses: Long = 0,
     val failures: Long = 0,
+    val clientDisconnects: Long = 0,
     val originalBytes: Long = 0,
     val deliveredBytes: Long = 0,
     val streamedResponses: Long = 0,

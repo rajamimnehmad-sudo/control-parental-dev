@@ -75,6 +75,7 @@ internal class ChromePhotosHttpsProxy(
     private val cacheHits = AtomicLong()
     private val cacheMisses = AtomicLong()
     private val failures = AtomicLong()
+    private val clientDisconnects = AtomicLong()
     private val originalBytes = AtomicLong()
     private val deliveredBytes = AtomicLong()
     private val streamedResponses = AtomicLong()
@@ -121,6 +122,7 @@ internal class ChromePhotosHttpsProxy(
             cacheHits = cacheHits.get(),
             cacheMisses = cacheMisses.get(),
             failures = failures.get(),
+            clientDisconnects = clientDisconnects.get(),
             originalBytes = originalBytes.get(),
             deliveredBytes = deliveredBytes.get(),
             streamedResponses = streamedResponses.get(),
@@ -261,6 +263,11 @@ internal class ChromePhotosHttpsProxy(
                 handleTlsTunnel(socket, admittedTarget, correlationId)
             }
         } catch (error: Throwable) {
+            if (error.isExpectedClientDisconnect()) {
+                clientDisconnects.incrementAndGet()
+                if (running.get()) infoLog("phase=client_disconnect correlationId=$correlationId")
+                return
+            }
             failures.incrementAndGet()
             val target = connectTarget
             val tlsFailure = ChromeProxyTlsDiagnostics.classify(error)
@@ -583,6 +590,11 @@ internal class ChromePhotosHttpsProxy(
             }
             request.successDisposition()
         } catch (error: Throwable) {
+            if (responseStarted && error.isExpectedClientDisconnect()) {
+                clientDisconnects.incrementAndGet()
+                infoLog("phase=client_disconnect correlationId=$correlationId")
+                return ChromeHttpConnectionDisposition.Close
+            }
             failures.incrementAndGet()
             if (coverageToken != null) coverageLedger?.recordFailure(coverageToken, error.javaClass.simpleName)
             warningLog(
@@ -804,6 +816,11 @@ internal class ChromePhotosHttpsProxy(
             latencies.add(System.nanoTime() - started)
             request.successDisposition()
         } catch (error: Throwable) {
+            if (responseStarted && error.isExpectedClientDisconnect()) {
+                clientDisconnects.incrementAndGet()
+                infoLog("phase=client_disconnect correlationId=$correlationId")
+                return ChromeHttpConnectionDisposition.Close
+            }
             failures.incrementAndGet()
             if (coverageToken != null) coverageLedger.recordFailure(coverageToken, error.javaClass.simpleName)
             val errorResponseWritten =
@@ -933,6 +950,18 @@ internal class ChromePhotosHttpsProxy(
 
     private fun Long.toPhaseMillis(): String = "%.3f".format(Locale.US, this / NanosPerMillis)
 
+    private fun Throwable.isExpectedClientDisconnect(): Boolean {
+        val seen = HashSet<Throwable>()
+        var current: Throwable? = this
+        repeat(MaximumCauseDepth) {
+            val error = current ?: return false
+            if (!seen.add(error)) return false
+            if (error is SocketException || error.javaClass.simpleName in ClientDisconnectExceptionNames) return true
+            current = error.cause
+        }
+        return false
+    }
+
     private companion object {
         const val HttpsPort = 443
         // Chrome keeps idle HTTP/1.1 CONNECT tunnels alive across origins. Each tunnel owns a
@@ -952,6 +981,7 @@ internal class ChromePhotosHttpsProxy(
         const val FingerprintLogLength = 16
         const val NanosPerMillis = 1_000_000.0
         const val MaximumLatencySamples = 512
+        const val MaximumCauseDepth = 8
         const val LogTag = "ChromePhotosDataPlane"
         const val StandaloneConnectionId = "standalone"
         const val StandaloneRequestId = "standalone-r1"
@@ -962,6 +992,7 @@ internal class ChromePhotosHttpsProxy(
         const val TlsResponseStreamStage = "response_stream"
         val FixturePresenceResourceIds = setOf(FixtureHeartbeatId)
         val RedirectCodes = setOf(301, 302, 303, 307, 308)
+        val ClientDisconnectExceptionNames = setOf("ConnectionResetException", "BrokenPipeException")
     }
 
     private data class ProxyResources(

@@ -613,7 +613,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "connections=${metrics.connections} requests=${metrics.requests} safe=${metrics.safeDecisions} " +
                 "blocked=${metrics.blockedDecisions} unknown=${metrics.unknownDecisions} " +
                 "passthrough=${metrics.passthroughResponses} cacheHits=${metrics.cacheHits} " +
-                "cacheMisses=${metrics.cacheMisses} failures=${metrics.failures} " +
+                "cacheMisses=${metrics.cacheMisses} failures=${metrics.failures} clientDisconnects=${metrics.clientDisconnects} " +
                 "bytesIn=${metrics.originalBytes} bytesOut=${metrics.deliveredBytes} " +
                 "streamed=${metrics.streamedResponses} proxyQueueRejects=${metrics.queueRejected} " +
                 "proxyActivePeak=${metrics.activeConnectionsPeak} " +
@@ -778,7 +778,7 @@ class ChromePhotosDataPlaneLabService : Service() {
         )
         Log.i(
             StatusLogTag,
-            "v=1 seq=$sequence kind=health failures=${metrics.failures} proxyQueueRejects=${metrics.queueRejected} " +
+            "v=1 seq=$sequence kind=health failures=${metrics.failures} clientDisconnects=${metrics.clientDisconnects} proxyQueueRejects=${metrics.queueRejected} " +
                 "protectFailure=${metrics.upstream.protectFailure} quicAttempts=${preferences.getLong(
                     ChromePhotosDataPlaneLabContract.KeyQuicAttempts,
                     0L,
