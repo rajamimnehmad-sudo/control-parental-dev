@@ -102,6 +102,28 @@ class ChromeImageContentAuthorityTest {
     }
 
     @Test
+    fun `image prefix probe replays a mislabeled SVG without changing the source bytes`() {
+        val svg = " <svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 1 1\"><path d=\"M0 0h1v1z\"/></svg>".toByteArray()
+        val probe =
+            authority.probeImagePrefix(
+                request(ChromeHttpHeader("Sec-Fetch-Dest", "image")),
+                response(svg, "image/png"),
+            )
+
+        assertEquals(ChromeImageFormat.Svg, probe.format)
+        assertContentEquals(svg, probe.response.body.readBytes())
+
+        val png = png("photo")
+        val rasterProbe =
+            authority.probeImagePrefix(
+                request(ChromeHttpHeader("Sec-Fetch-Dest", "image")),
+                response(png, "image/png"),
+            )
+        assertEquals(ChromeImageFormat.Png, rasterProbe.format)
+        assertContentEquals(png, rasterProbe.response.body.readBytes())
+    }
+
+    @Test
     fun `valid static and animated GIFs reach the visual engine while malformed GIFs fail closed`() {
         val staticGif = staticGif()
         val candidate =

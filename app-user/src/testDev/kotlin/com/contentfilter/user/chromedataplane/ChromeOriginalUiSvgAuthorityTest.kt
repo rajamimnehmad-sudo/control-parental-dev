@@ -166,11 +166,49 @@ class ChromeOriginalUiSvgAuthorityTest {
         assertEquals(ChromePhotosResourceDecision.Passthrough, accepted.decision)
         assertArrayEquals(safeSvg, accepted.bytes)
 
+        val acceptedWithCharset =
+            checkNotNull(authority.processNetworkSvg(request, upstream("image/svg+xml; charset=utf-8", safeSvg)))
+        assertEquals(ChromePhotosResourceDecision.Passthrough, acceptedWithCharset.decision)
+        assertArrayEquals(safeSvg, acceptedWithCharset.bytes)
+
         val active = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><script/></svg>".toByteArray()
         val rejected = checkNotNull(authority.processNetworkSvg(request, upstream("image/svg+xml", active)))
         assertEquals(ChromePhotosResourceDecision.Unknown, rejected.decision)
         assertArrayEquals(placeholder, rejected.bytes)
         assertEquals("image/png", rejected.headers.single { it.name.equals("Content-Type", true) }.value)
+    }
+
+    @Test
+    fun networkSvgAcceptsOnlyAValidatedImageMimeMismatchWithAProvenSvgPrefix() {
+        val placeholder = "placeholder".toByteArray()
+        val authority = ChromeOriginalUiSvgAuthority(placeholder)
+        val request = request(destination = "image")
+
+        assertNull(authority.processNetworkSvg(request, upstream("image/png", safeSvg)))
+
+        val accepted =
+            checkNotNull(
+                authority.processNetworkSvg(
+                    request,
+                    upstream("image/png", safeSvg),
+                    ChromeImageFormat.Svg,
+                ),
+            )
+        assertEquals(ChromePhotosResourceDecision.Passthrough, accepted.decision)
+        assertArrayEquals(safeSvg, accepted.bytes)
+        assertEquals("image/svg+xml", accepted.headers.single { it.name.equals("Content-Type", true) }.value)
+
+        val active = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><script/></svg>".toByteArray()
+        val rejected =
+            checkNotNull(
+                authority.processNetworkSvg(
+                    request,
+                    upstream("image/png", active),
+                    ChromeImageFormat.Svg,
+                ),
+            )
+        assertEquals(ChromePhotosResourceDecision.Unknown, rejected.decision)
+        assertArrayEquals(placeholder, rejected.bytes)
     }
 
     @Test

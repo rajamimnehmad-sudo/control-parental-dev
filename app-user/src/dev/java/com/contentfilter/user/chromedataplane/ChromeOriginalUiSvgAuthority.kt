@@ -85,9 +85,20 @@ internal class ChromeOriginalUiSvgAuthority(
     fun processNetworkSvg(
         request: ChromePhotosProxyRequest,
         response: ChromePhotosUpstreamResponse,
+        sniffedFormat: ChromeImageFormat? = null,
     ): ChromePhotosSanitizedResponse? {
         val contentTypes = response.headers.filter { it.name.equals("Content-Type", true) }.map { it.value }
-        if (contentTypes.size != 1 || contentTypes.single().trim().lowercase(Locale.US) != SvgMimeType) return null
+        val declaredSvg =
+            contentTypes.size == 1 &&
+                contentTypes.single().substringBefore(';').trim().lowercase(Locale.US) == SvgMimeType
+        val mislabeledImageSvg =
+            contentTypes.size == 1 &&
+                !contentTypes.single().contains(',') &&
+                contentTypes.single().substringBefore(';').trim().lowercase(Locale.US).startsWith("image/") &&
+                !declaredSvg &&
+                request.isSvgImageIntent() &&
+                sniffedFormat == ChromeImageFormat.Svg
+        if (!declaredSvg && !mislabeledImageSvg) return null
         if (request.method == ChromePhotosProxyRequest.Head) {
             return if (response.statusCode == 200) {
                 ChromePhotosSanitizedResponse(

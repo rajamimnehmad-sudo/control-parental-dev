@@ -33,6 +33,11 @@ internal data class ChromeImageAuthorityMetrics(
     val bodyAdmissionRejects: Long = 0,
 )
 
+internal data class ChromeImagePrefixProbe(
+    val response: ChromePhotosUpstreamResponse,
+    val format: ChromeImageFormat?,
+)
+
 internal sealed interface ChromeImageContentInspection {
     val response: ChromePhotosUpstreamResponse
 
@@ -162,6 +167,37 @@ internal class ChromeImageContentAuthority(
                 prefixFormat = format,
             )
         }
+    }
+
+    /**
+     * Peeks only far enough to recognize a mislabeled original SVG and replays the bytes for the
+     * next authority. The caller must continue to use the returned response because the source
+     * stream has already advanced by the bounded prefix.
+     */
+    fun probeImagePrefix(
+        request: ChromePhotosProxyRequest,
+        response: ChromePhotosUpstreamResponse,
+    ): ChromeImagePrefixProbe {
+        val declaredMimeTypes = response.headers.declaredContentTypes()
+        if (
+            !request.isImageIntent(stockMediaAuthority) ||
+            request.method == ChromePhotosProxyRequest.Head ||
+            response.statusCode != 200 ||
+            !response.headers.hasIdentityContentEncoding() ||
+            declaredMimeTypes.size != 1 ||
+            !declaredMimeTypes.single().startsWith("image/") ||
+            declaredMimeTypes.single().contains(',') ||
+            declaredMimeTypes.single() == "image/svg+xml"
+        ) {
+            return ChromeImagePrefixProbe(response, null)
+        }
+        val peek = response.body.peekImagePrefix(maximumSniffBytes)
+        prefixPeeks.incrementAndGet()
+        if (peek.format != null) magicCandidates.incrementAndGet()
+        return ChromeImagePrefixProbe(
+            response = response.copy(body = SequenceInputStream(ByteArrayInputStream(peek.bytes), response.body)),
+            format = peek.format,
+        )
     }
 
     fun inspectBuffered(

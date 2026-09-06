@@ -530,7 +530,13 @@ internal class ChromePhotosHttpsProxy(
                 latencies.add(System.nanoTime() - started)
                 return request.successDisposition()
             }
-            originalUiSvgAuthority?.processNetworkSvg(normalizedRequest, fixtureUpstream)?.let { sanitized ->
+            val imagePrefixProbe = imageAuthority.probeImagePrefix(normalizedRequest, fixtureUpstream)
+            val responseWithReplayedPrefix = imagePrefixProbe.response
+            originalUiSvgAuthority?.processNetworkSvg(
+                normalizedRequest,
+                responseWithReplayedPrefix,
+                imagePrefixProbe.format,
+            )?.let { sanitized ->
                 requests.incrementAndGet()
                 originalBytes.addAndGet(sanitized.inputBytes.toLong())
                 responseStarted = true
@@ -540,7 +546,7 @@ internal class ChromePhotosHttpsProxy(
                 latencies.add(System.nanoTime() - started)
                 return request.successDisposition()
             }
-            val inspection = imageAuthority.inspectBuffered(request, fixtureUpstream, response.originalBytes)
+            val inspection = imageAuthority.inspectBuffered(request, responseWithReplayedPrefix, response.originalBytes)
             val sanitized =
                 when (inspection) {
                     is ChromeImageContentInspection.Candidate ->
@@ -707,7 +713,13 @@ internal class ChromePhotosHttpsProxy(
                     latencies.add(System.nanoTime() - started)
                     return request.successDisposition()
                 }
-                originalUiSvgAuthority?.processNetworkSvg(upstreamRequest, response)?.let { sanitized ->
+                val imagePrefixProbe = imageAuthority.probeImagePrefix(upstreamRequest, response)
+                val responseWithReplayedPrefix = imagePrefixProbe.response
+                originalUiSvgAuthority?.processNetworkSvg(
+                    upstreamRequest,
+                    responseWithReplayedPrefix,
+                    imagePrefixProbe.format,
+                )?.let { sanitized ->
                     responseStarted = true
                     val result = responseWriter.writeBuffered(output, request, sanitized)
                     originalBytes.addAndGet(sanitized.inputBytes.toLong())
@@ -716,7 +728,7 @@ internal class ChromePhotosHttpsProxy(
                     latencies.add(System.nanoTime() - started)
                     return request.successDisposition()
                 }
-                val mediaInspection = mediaAuthority?.inspect(upstreamRequest, response)
+                val mediaInspection = mediaAuthority?.inspect(upstreamRequest, responseWithReplayedPrefix)
                 if (mediaInspection is ChromeMediaContentInspection.Candidate) {
                     val sanitizeStarted = System.nanoTime()
                     val sanitized =
@@ -754,7 +766,7 @@ internal class ChromePhotosHttpsProxy(
                             "requestToDeliveryMs=${started.elapsedMillis(System.nanoTime())}",
                     )
                 } else {
-                val inspection = imageAuthority.inspect(request, response)
+                val inspection = imageAuthority.inspect(request, responseWithReplayedPrefix)
                 if (inspection is ChromeImageContentInspection.Candidate) {
                     val sanitizeStarted = System.nanoTime()
                     val sanitized = responseSanitizer.sanitizeCandidate(request.method, inspection)
