@@ -68,22 +68,18 @@ internal class ChromeVisualProbeController(
 
     fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (!enabled) return
-        if (attestationReader.read().documentSelfShieldEnabled) {
+        val attestation = attestationReader.read()
+        if (attestation.documentSelfShieldEnabled) {
             scope.launch(Dispatchers.Main.immediate) { deactivateOnMain("document_self_shield_owned") }
             return
         }
         // Events may revoke structural continuity, but they never create active-document authority.
         mediaReadyCoordinator?.onAccessibilityEvent(event)
-        if (
-            mediaReadyCoordinator?.hasCurrentClaim() == true &&
-            attestationReader.read().mediaAuthorityEnabled &&
-            ChromeMediaShieldAuthorityEventPolicy.isSteadyChromeEvent(event)
-        ) {
-            // H19 is content-authoritative, not geometry-authoritative. The exact READY event was
-            // consumed above; ordinary DOM/focus/scroll churn must not synchronously rescan the
-            // Chrome tree or invalidate a current per-body authority.
-            return
-        }
+        // H19 owns the native protected surface whenever stock-media authority is active. The
+        // legacy feasibility probe must not cover Chrome before H19 receives HELLO: that would
+        // publish our accessibility surface as the only active window and deadlock the parser
+        // barrier that is needed to deliver HELLO in the first place.
+        if (attestation.mediaAuthorityEnabled) return
         val signal =
             ProbeSignal(
                 eventType = event.eventType,

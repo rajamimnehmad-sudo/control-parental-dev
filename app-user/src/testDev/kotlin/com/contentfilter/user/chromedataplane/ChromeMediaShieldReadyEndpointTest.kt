@@ -155,15 +155,15 @@ class ChromeMediaShieldReadyEndpointTest {
 
             assertEquals(200, response.statusCode)
             assertEquals(
-                "self.__gloshH19ParserBarrierCommit__&&self.__gloshH19ParserBarrierCommit__(true);",
+                "try{setTimeout(function(){try{document.title='GLOSH_PARSER_EXECUTED'}catch(_){}},0)}catch(_){}self.__gloshH19ParserBarrierCommit__&&self.__gloshH19ParserBarrierCommit__(true);",
                 response.bytes.toString(Charsets.US_ASCII),
             )
             assertTrue(response.bytes.toString(Charsets.US_ASCII).contains(Token).not())
             assertEquals("no-store", response.headers.firstValue("Cache-Control"))
             assertEquals("nosniff", response.headers.firstValue("X-Content-Type-Options"))
             assertEquals("cross-origin", response.headers.firstValue("Cross-Origin-Resource-Policy"))
-            assertEquals("application/javascript; charset=us-ascii", response.headers.firstValue("Content-Type"))
-            assertEquals(null, response.headers.firstValue("Access-Control-Allow-Origin"))
+            assertEquals("text/javascript; charset=us-ascii", response.headers.firstValue("Content-Type"))
+            assertEquals("*", response.headers.firstValue("Access-Control-Allow-Origin"))
             assertEquals(0, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().readyClaims)
             assertEquals(1L, endpoint.metrics().parserBarrierRequests)
             assertEquals(1L, endpoint.metrics().parserBarrierReady)

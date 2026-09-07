@@ -694,12 +694,17 @@ internal class ChromePhotosHttpsProxy(
                     val writeNanos = System.nanoTime() - writeStarted
                     originalBytes.addAndGet(if (bounded.exceeded) 0L else bounded.bytes.size.toLong())
                     deliveredBytes.addAndGet(result.bytesWritten)
+                    val csp =
+                        sanitized.headers
+                            .filter { it.name.equals("Content-Security-Policy", ignoreCase = true) }
+                            .joinToString(" || ") { it.value }
                     infoLog(
                         "phase=media_shield_document origin=real " +
                             "hostClass=${ChromeProxyLogPrivacy.hostClass(host)} " +
                             "hostHash=${ChromeProxyLogPrivacy.digest(host)} result=${documentResult.logValue()} " +
                             "bytesOut=${result.bytesWritten} upstreamHeadersMs=${upstreamHeadersNanos.toPhaseMillis()} " +
-                            "documentDecisionMs=${decisionNanos.toPhaseMillis()} downstreamWriteMs=${writeNanos.toPhaseMillis()}",
+                            "documentDecisionMs=${decisionNanos.toPhaseMillis()} downstreamWriteMs=${writeNanos.toPhaseMillis()} " +
+                            "csp=$csp",
                     )
                     latencies.add(System.nanoTime() - started)
                     return request.successDisposition()

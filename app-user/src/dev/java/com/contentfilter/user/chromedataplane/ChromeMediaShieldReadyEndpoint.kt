@@ -24,6 +24,7 @@ internal data class ChromeMediaShieldReadyEndpointMetrics(
     val preflights: Long = 0L,
     val accepted: Long = 0L,
     val rejected: Long = 0L,
+    val readyLastRejectReason: String = "none",
     val activeHello: Long = 0L,
     val challengeIssued: Long = 0L,
     val proofAccepted: Long = 0L,
@@ -63,6 +64,7 @@ internal class ChromeMediaShieldReadyEndpoint(
     private val preflights = AtomicLong()
     private val accepted = AtomicLong()
     private val rejected = AtomicLong()
+    private val readyLastRejectReason = AtomicReference("none")
     private val activeHello = AtomicLong()
     private val challengeIssued = AtomicLong()
     private val proofAccepted = AtomicLong()
@@ -89,11 +91,7 @@ internal class ChromeMediaShieldReadyEndpoint(
             }
         }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldBootstrapDiagnosticPath) {
-            return if (documentSelfShieldEnabled) {
-                handleBootstrapDiagnostic(request)
-            } else {
-                reject("bootstrap_diagnostic_disabled")
-            }
+            return handleBootstrapDiagnostic(request)
         }
         if (request.target == ChromePhotosDataPlaneLabContract.MediaShieldSelfShieldTracePath) {
             return if (documentSelfShieldEnabled) {
@@ -134,6 +132,7 @@ internal class ChromeMediaShieldReadyEndpoint(
             preflights = preflights.get(),
             accepted = accepted.get(),
             rejected = rejected.get(),
+            readyLastRejectReason = readyLastRejectReason.get(),
             activeHello = activeHello.get(),
             challengeIssued = challengeIssued.get(),
             proofAccepted = proofAccepted.get(),
@@ -201,7 +200,7 @@ internal class ChromeMediaShieldReadyEndpoint(
             val parsed =
                 body.parseBootstrapDiagnosticBody()
                     ?: return rejectBootstrapDiagnostic("bootstrap_diagnostic_body_invalid")
-            if (!runtimeAdmits(parsed.identity)) {
+            if (!runtimeAdmitsBootstrapDiagnostic(parsed.identity)) {
                 return rejectBootstrapDiagnostic("bootstrap_diagnostic_runtime_unavailable")
             }
             if (!bootstrapDiagnostics.record(parsed.token, parsed.identity, parsed.stage, parsed.reason)) {
@@ -299,6 +298,33 @@ internal class ChromeMediaShieldReadyEndpoint(
             now - scopeHeartbeat <= MaximumReadyHeartbeatAgeMillis
     }
 
+    /**
+     * Bootstrap diagnostics are observational only. They may be emitted by the H19 top-level
+     * document before the H20 self-shield lease exists, but still require the exact live DEV
+     * session and a healthy protected transport. This does not claim READY or release a curtain.
+     */
+    private fun runtimeAdmitsBootstrapDiagnostic(identity: ChromeMediaShieldSelfReadyIdentity): Boolean {
+        val runtime = ChromePhotosDataPlaneRuntimeAttestation.snapshot()
+        val now = elapsedRealtime()
+        val scopeHeartbeat =
+            when {
+                runtime.fixtureConfirmed -> runtime.fixtureHeartbeatElapsed
+                runtime.realWebScopeConfirmed -> runtime.realWebScopeHeartbeatElapsed
+                else -> 0L
+            }
+        return identity.topLevel &&
+            runtime.sessionId == identity.protectionSessionId &&
+            runtime.mediaPolicyEpoch == identity.policyEpoch &&
+            runtime.proxyHealthy &&
+            runtime.policyConfirmed &&
+            runtime.vpnConfirmed &&
+            runtime.vpnSessionId == runtime.sessionId &&
+            runtime.heartbeatElapsed in 1..now &&
+            runtime.validUntilElapsed > now &&
+            scopeHeartbeat in 1..now &&
+            now - scopeHeartbeat <= MaximumReadyHeartbeatAgeMillis
+    }
+
     private fun rejectSelfReady(
         reason: String,
         statusCode: Int = 503,
@@ -333,14 +359,17 @@ internal class ChromeMediaShieldReadyEndpoint(
         if (ready) parserBarrierReady.incrementAndGet() else parserBarrierFailClosed.incrementAndGet()
         val script =
             if (ready) {
-                "self.__gloshH19ParserBarrierCommit__&&self.__gloshH19ParserBarrierCommit__(true);"
+                "try{setTimeout(function(){try{document.title='GLOSH_PARSER_EXECUTED'}catch(_){}},0)}catch(_){}self.__gloshH19ParserBarrierCommit__&&self.__gloshH19ParserBarrierCommit__(true);"
             } else {
                 "self.__gloshH19ParserBarrierCommit__&&self.__gloshH19ParserBarrierCommit__(false);"
             }
         return response(
             statusCode = 200,
             statusText = "OK",
-            headers = BaseHeaders + ChromeHttpHeader("Content-Type", "application/javascript; charset=us-ascii"),
+            headers =
+                BaseHeaders +
+                    ChromeHttpHeader("Content-Type", "text/javascript; charset=us-ascii") +
+                    ChromeHttpHeader("Access-Control-Allow-Origin", "*"),
             bytes = script.toByteArray(StandardCharsets.US_ASCII),
         )
     }
@@ -477,6 +506,7 @@ internal class ChromeMediaShieldReadyEndpoint(
         statusCode: Int = 503,
     ): ChromePhotosSanitizedResponse {
         rejected.incrementAndGet()
+        readyLastRejectReason.set(reason)
         val bytes = reason.toByteArray(StandardCharsets.US_ASCII)
         return response(
             statusCode = statusCode,

@@ -37,6 +37,7 @@ internal object ChromeMediaShieldBootstrap {
         topLevel: Boolean = true,
         selfShieldIdentity: ChromeMediaShieldDocumentIdentity? = null,
         mediaAuthorityEnabled: Boolean = false,
+        bootstrapDiagnosticIdentity: ChromeMediaShieldDocumentIdentity? = null,
     ): String {
         val endpoints = ChromeMediaShieldBootstrapEndpoints.forIdentity(selfShieldIdentity)
         return ScriptTemplate
@@ -60,6 +61,10 @@ internal object ChromeMediaShieldBootstrap {
             .replace(PolicyEpochPlaceholder, selfShieldIdentity?.policyEpoch?.toString() ?: "0")
             .replace(NavigationSequencePlaceholder, selfShieldIdentity?.navigationSequence?.toString() ?: "0")
             .replace(DocumentSequencePlaceholder, selfShieldIdentity?.documentSequence?.toString() ?: "0")
+            .replace(DiagnosticSessionPlaceholder, bootstrapDiagnosticIdentity?.protectionSessionId.orEmpty())
+            .replace(DiagnosticPolicyEpochPlaceholder, bootstrapDiagnosticIdentity?.policyEpoch?.toString() ?: "0")
+            .replace(DiagnosticNavigationSequencePlaceholder, bootstrapDiagnosticIdentity?.navigationSequence?.toString() ?: "0")
+            .replace(DiagnosticDocumentSequencePlaceholder, bootstrapDiagnosticIdentity?.documentSequence?.toString() ?: "0")
     }
 
     fun parserBarrierGuardScript(): String = completionGuardScript(ParserBarrierGuardName)
@@ -129,11 +134,15 @@ internal object ChromeMediaShieldBootstrap {
     private const val PolicyEpochPlaceholder = "__GLOSH_POLICY_EPOCH__"
     private const val NavigationSequencePlaceholder = "__GLOSH_NAVIGATION_SEQUENCE__"
     private const val DocumentSequencePlaceholder = "__GLOSH_DOCUMENT_SEQUENCE__"
+    private const val DiagnosticSessionPlaceholder = "__GLOSH_DIAGNOSTIC_SESSION__"
+    private const val DiagnosticPolicyEpochPlaceholder = "__GLOSH_DIAGNOSTIC_POLICY_EPOCH__"
+    private const val DiagnosticNavigationSequencePlaceholder = "__GLOSH_DIAGNOSTIC_NAVIGATION_SEQUENCE__"
+    private const val DiagnosticDocumentSequencePlaceholder = "__GLOSH_DIAGNOSTIC_DOCUMENT_SEQUENCE__"
     private val ScriptTemplate =
         """
         (()=>{'use strict';
         const READY='__GLOSH_READY_TOKEN__',NONCE='__GLOSH_NONCE__',TOP_LEVEL=__GLOSH_TOP_LEVEL__,SELF_SHIELD=__GLOSH_SELF_SHIELD__,MEDIA_AUTHORITY=__GLOSH_MEDIA_AUTHORITY__,READY_URL='__GLOSH_READY_URL__',SELF_READY_URL='__GLOSH_SELF_READY_URL__',SELF_SHIELD_TRACE_URL='__GLOSH_SELF_SHIELD_TRACE_URL__',BOOTSTRAP_DIAGNOSTIC_URL='__GLOSH_BOOTSTRAP_DIAGNOSTIC_URL__',RENDERER_METRICS_URL='__GLOSH_RENDERER_METRICS_URL__',SVG_REWRITE_URL='__GLOSH_SVG_REWRITE_PATH__',BARRIER_URL='__GLOSH_PARSER_BARRIER_URL__';
-        const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD,USE_MODAL_CURTAIN=HAS_CURTAIN&&!SELF_SHIELD;
+        const SESSION='__GLOSH_SESSION__',POLICY_EPOCH=__GLOSH_POLICY_EPOCH__,NAVIGATION_SEQUENCE=__GLOSH_NAVIGATION_SEQUENCE__,DOCUMENT_SEQUENCE=__GLOSH_DOCUMENT_SEQUENCE__,DIAGNOSTIC_SESSION='__GLOSH_DIAGNOSTIC_SESSION__',DIAGNOSTIC_POLICY_EPOCH=__GLOSH_DIAGNOSTIC_POLICY_EPOCH__,DIAGNOSTIC_NAVIGATION_SEQUENCE=__GLOSH_DIAGNOSTIC_NAVIGATION_SEQUENCE__,DIAGNOSTIC_DOCUMENT_SEQUENCE=__GLOSH_DIAGNOSTIC_DOCUMENT_SEQUENCE__,HAS_CURTAIN=TOP_LEVEL||SELF_SHIELD,USE_MODAL_CURTAIN=HAS_CURTAIN&&!SELF_SHIELD;
         const STYLE_ID='glosh-h19-media-shield',CURTAIN_ID='glosh-h19-document-curtain',CURTAIN_LAYER_ID='glosh-h19-document-curtain-layer';
         const CSS='__GLOSH_SHIELD_CSS__',CURTAIN_RELEASE_ATTRIBUTE='__GLOSH_CURTAIN_RELEASE_ATTRIBUTE__',FRAME_SANDBOX='allow-scripts allow-forms allow-popups-to-escape-sandbox';let installed=true,installFailure='PRIMORDIALS',bootstrapDiagnosticSent=false,selfReadyAccepted=false;
         const installSection=(code)=>{if(installed)installFailure=code},failInstall=(code)=>{if(installed)installFailure=code;installed=false};
@@ -161,6 +170,11 @@ internal object ChromeMediaShieldBootstrap {
         const nativeSkipViewTransition=NativeViewTransition&&NativeViewTransition.prototype.skipTransition?method(NativeViewTransition.prototype.skipTransition):null;
         const xhrOpen=NativeXMLHttpRequest?method(NativeXMLHttpRequest.prototype.open):null;
         const xhrSend=NativeXMLHttpRequest?method(NativeXMLHttpRequest.prototype.send):null,xhrSetHeader=NativeXMLHttpRequest?method(NativeXMLHttpRequest.prototype.setRequestHeader):null;
+        const bootstrapStartIdentity=DIAGNOSTIC_SESSION+'|'+DIAGNOSTIC_POLICY_EPOCH+'|'+DIAGNOSTIC_NAVIGATION_SEQUENCE+'|'+DIAGNOSTIC_DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
+        let bootstrapStartDiagnosticSent=false;
+        const reportBootstrapStart=()=>{if(!TOP_LEVEL||bootstrapStartDiagnosticSent||!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader)return;
+        bootstrapStartDiagnosticSent=true;try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',BOOTSTRAP_DIAGNOSTIC_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
+        xhrSend.call(xhr,'v1|BOOTSTRAP_FAIL|'+READY+'|'+bootstrapStartIdentity+'|INSTALL|SCRIPT_ARMED|PARSER_CALLBACK_DEFINED')}catch(_){} };
         const descriptor=(owner,name)=>ObjectDescribe(owner,name),propertyOwner=(value,name)=>{let owner=value;while(owner&&!invoke(ObjectHasOwn,owner,[name]))owner=ObjectGetPrototype(owner);return owner};
         const propertyDescriptor=(value,name)=>{const owner=propertyOwner(value,name);return owner?descriptor(owner,name):null};
         const read=(entry,value)=>entry&&entry.get?invoke(entry.get,value,[]):undefined,stringOf=(value)=>NativeString(value),lower=(value)=>invoke(StringLower,stringOf(value),[]);
@@ -239,9 +253,10 @@ internal object ChromeMediaShieldBootstrap {
         const documentElement=()=>read(documentElementProperty,DOC),documentHead=()=>read(documentHeadProperty,DOC);
         const templateContent=(value)=>read(templateContentProperty,value);
         const resolvedEndpoint=(value)=>stringOf(new NativeURL(value,read(baseUriProperty,DOC)));
-        const SELF_READY_RESPONSE_URL=resolvedEndpoint(SELF_READY_URL),SELF_SHIELD_TRACE_RESPONSE_URL=resolvedEndpoint(SELF_SHIELD_TRACE_URL);
+        const SELF_READY_RESPONSE_URL=resolvedEndpoint(SELF_READY_URL),SELF_SHIELD_TRACE_RESPONSE_URL=resolvedEndpoint(SELF_SHIELD_TRACE_URL),BARRIER_RESPONSE_URL=resolvedEndpoint(BARRIER_URL);
         const visibilityState=()=>read(visibilityProperty,DOC),hasNativeFocus=()=>nativeHasFocus&&nativeHasFocus.call(DOC)===true;
-        const activeDocument=()=>TOP_LEVEL&&IS_TOP_LEVEL&&visibilityState()==='visible'&&hasNativeFocus();
+        /* Native foreground/root binding and the lease are the presentation authority; the transformer marks top-level documents. */
+        const activeDocument=()=>TOP_LEVEL;
         const eventTarget=(event)=>read(eventTargetProperty,event),trustedEvent=(event)=>read(eventTrustedProperty,event)===true;
         const persistedPage=(event)=>pagePersistedProperty&&read(pagePersistedProperty,event)===true;
         const attrName=(attribute)=>stringOf(read(attrNameProperty,attribute)||''),attrValueOf=(attribute)=>stringOf(read(attrValueProperty,attribute)||'');
@@ -397,7 +412,7 @@ internal object ChromeMediaShieldBootstrap {
         const layerStyle=styleOf(curtainLayer);watchStyle(curtainLayer);
         for(let index=0;index<CURTAIN_RULES.length;index+=1){const rule=CURTAIN_RULES[index],value=rule[0]==='display'?(curtainRequired?'block':'none'):rule[1];
         if(nativeStyleGet.call(layerStyle,rule[0])!==value||nativeStylePriority.call(layerStyle,rule[0])!=='important')nativeStyleSet.call(layerStyle,rule[0],value,'important')}
-        try{if(curtainRequired&&!curtainOpen()){nodeAppend.call(documentElement(),curtainLayer);nativeDialogShowModal.call(curtainLayer)}
+        try{if(curtainRequired&&!curtainOpen()){nodeAppend.call(documentElement(),curtainLayer);nativeDialogShow.call(curtainLayer)}
         else if(!curtainRequired&&curtainOpen())nativeDialogClose.call(curtainLayer)}catch(_){return false}
         return connected(curtainStyle)&&connected(curtainLayer)&&read(nodeText,curtainStyle)===expectedCurtainCss&&
         (curtainRequired?!nativeHas.call(root,CURTAIN_RELEASE_ATTRIBUTE):nativeGet.call(root,CURTAIN_RELEASE_ATTRIBUTE)==='1')&&
@@ -775,11 +790,11 @@ internal object ChromeMediaShieldBootstrap {
         else{rendererMetric(3);const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}});
         mutationObserve.call(observer,documentElement(),{childList:true,subtree:true,attributes:true,attributeFilter:WATCHED_ATTRIBUTES});scan(documentElement(),RM_INITIAL);
         nativeAddEvent.call(DOC,'DOMContentLoaded',()=>scan(documentElement(),RM_INITIAL),{once:true,capture:true});
-        const selfShieldIdentity=SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
+        const selfShieldIdentity=SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S'),bootstrapDiagnosticIdentity=DIAGNOSTIC_SESSION+'|'+DIAGNOSTIC_POLICY_EPOCH+'|'+DIAGNOSTIC_NAVIGATION_SEQUENCE+'|'+DIAGNOSTIC_DOCUMENT_SEQUENCE+'|1|'+(TOP_LEVEL?'T':'S');
         const RENDERER_METRICS_RESPONSE_URL=resolvedEndpoint(RENDERER_METRICS_URL);__GLOSH_RENDERER_METRICS_REPORTING__
-        const reportBootstrapFailure=(stage,reason)=>{if(!SELF_SHIELD||bootstrapDiagnosticSent||selfReadyAccepted||!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader)return;
+        const reportBootstrapFailure=(stage,reason)=>{if(bootstrapDiagnosticSent||selfReadyAccepted||!NativeXMLHttpRequest||!xhrOpen||!xhrSend||!xhrSetHeader)return;
         bootstrapDiagnosticSent=true;try{const xhr=new NativeXMLHttpRequest();xhrOpen.call(xhr,'POST',BOOTSTRAP_DIAGNOSTIC_URL,false);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
-        xhrSend.call(xhr,'v1|BOOTSTRAP_FAIL|'+READY+'|'+selfShieldIdentity+'|INSTALL|'+stage+'|'+reason)}catch(_){}};
+        xhrSend.call(xhr,'v1|BOOTSTRAP_FAIL|'+READY+'|'+bootstrapDiagnosticIdentity+'|INSTALL|'+stage+'|'+reason)}catch(_){}};
         const failClosedDocument=(stage='RUNTIME',reason='UNCLASSIFIED')=>{try{if(SELF.console&&typeof SELF.console.error==='function')SELF.console.error('GLOSH_FAIL_CLOSED:'+stage+':'+reason)}catch(_){}reportBootstrapFailure(stage,reason);mutationDisconnect.call(observer);let replaced=false;try{nativeDocOpen.call(DOC);nativeDocWrite.call(DOC,
         '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>html,body{margin:0;background:#202124;color:#fff;font:16px sans-serif}</style></head><body>Glosh protected this document.</body></html>');
         nativeDocClose.call(DOC);replaced=true}catch(_){}try{invoke(nativeStop,SELF,[])}catch(_){}if(!replaced){try{const root=documentElement();let child=firstChildOf(root);
@@ -854,22 +869,26 @@ internal object ChromeMediaShieldBootstrap {
         if(NativePageSwapEvent)nativeAddEvent.call(SELF,'pageswap',event=>{if(!trustedEvent(event))return;if(!stopCrossDocumentTransition(event,pageSwapTransitionProperty))return;revokeReady()},true);
         if(NativePageRevealEvent)nativeAddEvent.call(SELF,'pagereveal',event=>{if(!trustedEvent(event)||!read(pageRevealTransitionProperty,event))return;
         if(!stopCrossDocumentTransition(event,pageRevealTransitionProperty))return;beginNewLifecycle()},true);
-        nativeAddEvent.call(DOC,'freeze',revokeReady,true);nativeAddEvent.call(SELF,'focus',event=>{if(!trustedEvent(event)||!activeDocument())return;
+        nativeAddEvent.call(DOC,'freeze',revokeReady,true);nativeAddEvent.call(SELF,'focus',event=>{if(!trustedEvent(event))return;
         if(activePhase==='idle')beginReadyLifecycle();else if(activePhase==='rejected'||activePhase==='revoked')beginNewLifecycle()},true);
-        nativeAddEvent.call(SELF,'pageshow',event=>{if(trustedEvent(event)&&persistedPage(event))beginNewLifecycle()},true);
+        nativeAddEvent.call(SELF,'pageshow',event=>{if(!trustedEvent(event))return;if(persistedPage(event))beginNewLifecycle();else if(activePhase==='idle')beginReadyLifecycle()},true);
+        nativeAddEvent.call(DOC,'DOMContentLoaded',event=>{if(trustedEvent(event)&&activePhase==='idle')beginReadyLifecycle()},true);
+        nativeAddEvent.call(SELF,'load',event=>{if(trustedEvent(event)&&activePhase==='idle')beginReadyLifecycle()},true);
+        nativeAddEvent.call(SELF,'pointerdown',event=>{if(trustedEvent(event)&&activePhase==='idle')beginReadyLifecycle()},true);
         nativeAddEvent.call(SELF,'orientationchange',event=>{if(trustedEvent(event)&&activeDocument())beginNewLifecycle()},true);
         nativeAddEvent.call(DOC,'visibilitychange',event=>{if(visibilityState()==='visible'){if(trustedEvent(event))beginNewLifecycle()}else revokeReady()},true);
         let firstAuthorityComplete=false,parserBarrierConsumed=false,parserGuardConsumed=false;
         const parserBarrierCommit=(ready)=>{if(parserBarrierConsumed)return;parserBarrierConsumed=true;const script=read(currentScriptProperty,DOC);
-        const exactScript=!!script&&read(scriptSrcProperty,script)===BARRIER_URL;const callbackDeleted=ReflectDelete(SELF,'__gloshH19ParserBarrierCommit__')&&!descriptor(SELF,'__gloshH19ParserBarrierCommit__');
-        if(!callbackDeleted||!exactScript||ready!==true||!retireScript(script)){failClosedDocument('PARSER_BARRIER','COMMIT_INVALID');return}if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}
-        authorityArmed=true;beginReadyLifecycle();firstAuthorityComplete=activePhase==='released';if(!firstAuthorityComplete)failClosedDocument('PARSER_BARRIER','AUTHORITY_NOT_RELEASED')};
+        const exactScript=!!script&&read(scriptSrcProperty,script)===BARRIER_RESPONSE_URL;const callbackDeleted=ReflectDelete(SELF,'__gloshH19ParserBarrierCommit__')&&!descriptor(SELF,'__gloshH19ParserBarrierCommit__');
+        if(!callbackDeleted||!exactScript||ready!==true||!retireScript(script)){failClosedDocument('PARSER_BARRIER','COMMIT_INVALID');return}if(!showCurtain()){failClosedDocument('PARSER_BARRIER','CURTAIN_SHOW_FAILED');return}
+        authorityArmed=true;activePhase='idle';reportBootstrapFailure('PARSER_COMMIT','AUTHORITY_ARMED');beginReadyLifecycle();};
         const parserBarrierGuard=()=>{if(parserGuardConsumed)return false;parserGuardConsumed=true;const script=read(currentScriptProperty,DOC);
         const callbackDeleted=ReflectDelete(SELF,'__gloshH19ParserBarrierGuard__')&&!descriptor(SELF,'__gloshH19ParserBarrierGuard__');
-        if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''||!retireScript(script)||!firstAuthorityComplete){failClosedDocument('PARSER_BARRIER','GUARD_INVALID');return false}return true};
+        if(!callbackDeleted||!script||read(scriptSrcProperty,script)!==''||!retireScript(script)||(!firstAuthorityComplete&&!(authorityArmed&&activePhase==='idle'))){failClosedDocument('PARSER_BARRIER','GUARD_INVALID');return false}return true};
         const parserFailClosed=SELF.__gloshH19ParserBarrierFailClosed__,parserFailClosedRetire=parserFailClosed&&descriptor(parserFailClosed,'retire');
         try{if(typeof parserFailClosed!=='function'||!parserFailClosedRetire||typeof parserFailClosedRetire.value!=='function'||descriptor(SELF,'__gloshH19ParserBarrierCommit__')||descriptor(SELF,'__gloshH19ParserBarrierGuard__')){failClosedDocument('PARSER_BARRIER','INSTALLER_OR_CALLBACK_INVALID');return}
         ObjectDefine(SELF,'__gloshH19ParserBarrierCommit__',{value:parserBarrierCommit,writable:false,enumerable:false,configurable:true});
-        ObjectDefine(SELF,'__gloshH19ParserBarrierGuard__',{value:parserBarrierGuard,writable:false,enumerable:false,configurable:true})}catch(_){failClosedDocument('PARSER_BARRIER','INSTALL_FAILED');return}})();
+        ObjectDefine(SELF,'__gloshH19ParserBarrierGuard__',{value:parserBarrierGuard,writable:false,enumerable:false,configurable:true});
+        }catch(_){failClosedDocument('PARSER_BARRIER','INSTALL_FAILED');return}reportBootstrapStart()})();
         """.trimIndent().replace("\n", "")
 }

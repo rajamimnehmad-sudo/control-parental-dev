@@ -172,19 +172,30 @@ internal class ChromeMediaShieldActiveDocumentContextReader(
     private fun readResult(expectedWindowId: Int?): ChromeMediaShieldActiveDocumentContextReadResult {
         val window =
             windowInspector.findUniqueForegroundCandidate(expectedWindowId)
+        if (window == null) {
+            val activeRoot = windowInspector.rootInActiveWindowForChrome(expectedWindowId)
                 ?: return unavailable("foreground_window_unavailable")
+            return readRootBinding(activeRoot.windowId, activeRoot)
+        }
         val root = window.root ?: return unavailable("foreground_root_unavailable")
+        return readRootBinding(window.id, root)
+    }
+
+    private fun readRootBinding(
+        windowId: Int,
+        root: AccessibilityNodeInfo,
+    ): ChromeMediaShieldActiveDocumentContextReadResult {
         try {
             if (root.packageName?.toString() != ChromePackageName) {
                 return unavailable("foreground_root_package_mismatch")
             }
-            if (root.windowId != window.id) return unavailable("foreground_root_window_mismatch")
+            if (root.windowId != windowId) return unavailable("foreground_root_window_mismatch")
             val nativeIdentity =
-                nativeRootIdentity(window.id, root)
+                nativeRootIdentity(windowId, root)
                     ?: return unavailable("foreground_root_identity_unavailable")
             val viewport = viewport(root) ?: return unavailable("foreground_viewport_invalid")
             return ChromeMediaShieldActiveDocumentContextReadResult.Found(
-                binding(window.id, viewport, nativeIdentity),
+                binding(windowId, viewport, nativeIdentity),
             )
         } finally {
             ChromeMediaShieldAccessibilityNodeTraversal.recycle(root)

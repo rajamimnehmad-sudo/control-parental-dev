@@ -51,6 +51,7 @@ internal class ChromeMediaShieldCspPolicy(
     ): String {
         val directives = parse(policy)
         admitNonceFor(directives, "script-src-elem", "script-src", scriptNonce)
+        if (!sameOriginReady) admitParserBarrierOrigin(directives)
         admitNonceFor(directives, "style-src-elem", "style-src", styleNonce)
         admitReadyOrigin(directives)
         admitOriginalUiSvgOrigin(directives)
@@ -61,6 +62,7 @@ internal class ChromeMediaShieldCspPolicy(
         if (policy.isBlank() || '&' in policy || '<' in policy || '>' in policy) return null
         val directives = parse(policy)
         if (directives.isEmpty()) return null
+        if (!sameOriginReady) admitParserBarrierOrigin(directives)
         admitReadyOrigin(directives)
         admitOriginalUiSvgOrigin(directives)
         return serialize(directives)
@@ -83,6 +85,23 @@ internal class ChromeMediaShieldCspPolicy(
         val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
         val readySource = if (sameOriginReady) SelfSource else ReadyOrigin
         if (readySource !in sources) sources += readySource
+        directives[targetKey] = Directive(directives[targetKey]?.name ?: targetKey, sources)
+    }
+
+    private fun admitParserBarrierOrigin(directives: LinkedHashMap<String, Directive>) {
+        val targetKey =
+            when {
+                directives.containsKey("script-src-elem") -> "script-src-elem"
+                directives.containsKey("script-src") -> "script-src"
+                directives.containsKey("default-src") -> "script-src"
+                else -> return
+            }
+        val inherited =
+            directives[targetKey]?.sources
+                ?: directives["default-src"]?.sources
+                ?: emptyList()
+        val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
+        if (ReadyOrigin !in sources) sources += ReadyOrigin
         directives[targetKey] = Directive(directives[targetKey]?.name ?: targetKey, sources)
     }
 

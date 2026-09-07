@@ -10,15 +10,27 @@ internal class ChromeMediaShieldParserBarrierAdmission(
     private val onCancelled: () -> Unit,
 ) : AutoCloseable {
     private val pending = linkedSetOf<ChromeMediaShieldParserBarrierCompletion>()
+    private var lastChromeBinding: ChromeMediaShieldActiveDocumentNativeBinding? = null
 
     fun accept(completion: ChromeMediaShieldParserBarrierCompletion) {
         if (!completion.isPending()) return
         removeTerminalRequests()
         when (val observed = readContext()) {
             is ChromeMediaShieldActiveDocumentContextReadResult.Found -> {
+                lastChromeBinding = observed.binding
                 publishReady(observed.binding, completion)
             }
             is ChromeMediaShieldActiveDocumentContextReadResult.Unavailable -> {
+                // A protected SurfaceControl may temporarily become the only accessibility
+                // window while Chrome remains the same native foreground window. This barrier is
+                // non-authoritative, so reuse the last exact Chrome binding only to release the
+                // parser; the subsequent H19 HELLO performs a fresh context check before any
+                // presentation authority can be granted.
+                val cached = lastChromeBinding
+                if (cached != null) {
+                    publishReady(cached, completion)
+                    return
+                }
                 if (pending.size >= MaximumPendingRequests) {
                     val oldest = pending.first()
                     pending.remove(oldest)
@@ -33,12 +45,14 @@ internal class ChromeMediaShieldParserBarrierAdmission(
 
     fun onChromeStructuralEvent() {
         removeTerminalRequests()
+        val observed = readContext() as? ChromeMediaShieldActiveDocumentContextReadResult.Found
+        if (observed != null) lastChromeBinding = observed.binding
         if (pending.isEmpty()) return
-        val observed = readContext() as? ChromeMediaShieldActiveDocumentContextReadResult.Found ?: return
+        val binding = observed?.binding ?: lastChromeBinding ?: return
         val current = pending.toList()
         pending.clear()
         current.forEach { completion ->
-            if (completion.ready()) onReady(observed.binding)
+            if (completion.ready()) onReady(binding)
         }
     }
 

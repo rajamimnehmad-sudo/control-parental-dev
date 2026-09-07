@@ -95,6 +95,8 @@ class ChromeMediaShieldBootstrapContractTest {
 
     @Test
     fun `boot is parser-first and active document handshake keeps one barrier at every phase`() {
+        assertContains(script, "BARRIER_RESPONSE_URL=resolvedEndpoint(BARRIER_URL)")
+        assertContains(script, "read(scriptSrcProperty,script)===BARRIER_RESPONSE_URL")
         assertFalse(script.contains("setTimeout"))
         assertFalse(script.contains("setInterval"))
         assertFalse(script.contains("requestAnimationFrame"))
@@ -110,7 +112,7 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "IS_TOP_LEVEL=SELF===SELF.top")
         assertContains(
             script,
-            "const activeDocument=()=>TOP_LEVEL&&IS_TOP_LEVEL&&visibilityState()==='visible'&&hasNativeFocus()",
+            "const activeDocument=()=>TOP_LEVEL",
         )
         assertContains(
             script,
@@ -164,23 +166,18 @@ class ChromeMediaShieldBootstrapContractTest {
             "const parkDocument=()=>{activePhase='parked';challenge='';showCurtain();failClosedDocument('LIFECYCLE','PARKED_DOCUMENT')",
         )
         assertContains(script, "const parserBarrierCommit=(ready)=>")
-        assertContains(script, "read(scriptSrcProperty,script)===BARRIER_URL")
-        assertContains(script, "beginReadyLifecycle();firstAuthorityComplete=activePhase==='released'")
+        assertContains(script, "read(scriptSrcProperty,script)===BARRIER_RESPONSE_URL")
+        assertContains(script, "if(!showCurtain()){failClosedDocument('PARSER_BARRIER','CURTAIN_SHOW_FAILED');return}authorityArmed=true;activePhase='idle';reportBootstrapFailure('PARSER_COMMIT','AUTHORITY_ARMED');beginReadyLifecycle()")
         assertContains(script, "const parserBarrierGuard=()=>")
-        assertContains(script, "!retireScript(script)||!firstAuthorityComplete")
+        assertContains(
+            script,
+            "!retireScript(script)||(!firstAuthorityComplete&&!(authorityArmed&&activePhase==='idle'))",
+        )
         assertContains(script, "nativeLocationReload.call(NativeLocation)")
         assertContains(script, "nativeSet.call(curtainLayer,'tabindex','-1')")
         assertTrue(
             script.indexOf("showCurtain()||!curtainLayer") <
                 script.indexOf("nativeElementFocus.call(curtainLayer,{preventScroll:true})"),
-        )
-        assertTrue(
-            script.indexOf("nativeElementFocus.call(curtainLayer,{preventScroll:true})") <
-                script.indexOf("if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}"),
-        )
-        assertTrue(
-            script.indexOf("nativeElementFocus.call(curtainLayer,{preventScroll:true})") <
-                script.indexOf("authorityArmed=true;beginReadyLifecycle()"),
         )
         assertEquals(
             1,
@@ -194,7 +191,12 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "nativeAddEvent.call(SELF,'pagehide',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(DOC,'freeze',revokeReady,true)")
         assertContains(script, "nativeAddEvent.call(SELF,'focus'")
+        assertContains(script, "nativeAddEvent.call(SELF,'focus',event=>{if(!trustedEvent(event))return;")
         assertContains(script, "activePhase==='rejected'||activePhase==='revoked'")
+        assertContains(script, "nativeAddEvent.call(SELF,'pageshow',event=>{if(!trustedEvent(event))return;if(persistedPage(event))beginNewLifecycle();else if(activePhase==='idle')beginReadyLifecycle()},true)")
+        assertContains(script, "nativeAddEvent.call(DOC,'DOMContentLoaded',event=>{if(trustedEvent(event)&&activePhase==='idle')beginReadyLifecycle()},true)")
+        assertContains(script, "nativeAddEvent.call(SELF,'load',event=>{if(trustedEvent(event)&&activePhase==='idle')beginReadyLifecycle()},true)")
+        assertContains(script, "nativeAddEvent.call(SELF,'pointerdown',event=>{if(trustedEvent(event)&&activePhase==='idle')beginReadyLifecycle()},true)")
         assertContains(script, "nativeAddEvent.call(SELF,'orientationchange'")
         assertContains(script, "nativeAddEvent.call(DOC,'visibilitychange'")
         assertContains(
@@ -208,7 +210,7 @@ class ChromeMediaShieldBootstrapContractTest {
         )
         assertTrue(
             script.indexOf("invoke(dialogClosedByProperty.set,curtainLayer,['none'])") <
-                script.indexOf("nativeDialogShowModal.call(curtainLayer)"),
+                script.indexOf("nativeDialogShow.call(curtainLayer)"),
         )
         assertContains(script, "if(!installed){failClosedDocument('INSTALL',installFailure);return}")
         assertContains(script, "nativeDocOpen.call(DOC)")
@@ -250,7 +252,7 @@ class ChromeMediaShieldBootstrapContractTest {
         )
         assertContains(
             script,
-            "nodeAppend.call(documentElement(),curtainLayer);nativeDialogShowModal.call(curtainLayer)",
+            "nodeAppend.call(documentElement(),curtainLayer);nativeDialogShow.call(curtainLayer)",
         )
         assertContains(script, "else if(!curtainRequired&&curtainOpen())nativeDialogClose.call(curtainLayer)")
         assertContains(script, "curtainOpen()===curtainRequired")
@@ -712,12 +714,14 @@ class ChromeMediaShieldBootstrapContractTest {
         assertContains(script, "ReflectDelete(SELF,'${ChromeMediaShieldBootstrap.ParserBarrierGuardName}')")
         assertContains(script, "authorityArmed=false")
         assertContains(script, "if(!authorityArmed||activePhase!=='idle'||!activeDocument())return")
-        val callbackFocusGate =
-            "if(!acquireActiveDocument()){authorityArmed=true;parkDocument();return}authorityArmed=true;beginReadyLifecycle()"
-        assertContains(script, callbackFocusGate)
-        assertEquals(
-            1,
-            Regex(Regex.escape(callbackFocusGate)).findAll(script).count(),
+        val parserBarrierArm =
+            "if(!showCurtain()){failClosedDocument('PARSER_BARRIER','CURTAIN_SHOW_FAILED');return}" +
+                "authorityArmed=true;activePhase='idle';reportBootstrapFailure('PARSER_COMMIT','AUTHORITY_ARMED');beginReadyLifecycle()"
+        assertContains(script, parserBarrierArm)
+        assertEquals(1, Regex(Regex.escape(parserBarrierArm)).findAll(script).count())
+        assertContains(
+            script,
+            "(!firstAuthorityComplete&&!(authorityArmed&&activePhase==='idle'))",
         )
         val guard = ChromeMediaShieldBootstrap.parserBarrierGuardScript()
         val fallback = ChromeMediaShieldBootstrap.parserBarrierFailClosedInstallerScript()

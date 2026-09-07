@@ -49,6 +49,23 @@ class ChromeMediaShieldParserBarrierAdmissionTest {
     }
 
     @Test
+    fun `protected surface may reuse the last Chrome binding only for parser release`() {
+        var context: ChromeMediaShieldActiveDocumentContextReadResult =
+            ChromeMediaShieldActiveDocumentContextReadResult.Found(Binding)
+        val observed = mutableListOf<ChromeMediaShieldActiveDocumentNativeBinding>()
+        val completion = RecordingCompletion()
+        val admission = admission(readContext = { context }, observed = observed)
+
+        admission.onChromeStructuralEvent()
+        context = ChromeMediaShieldActiveDocumentContextReadResult.Unavailable("foreground_window_unavailable")
+        admission.accept(completion)
+
+        assertEquals(1, completion.ready)
+        assertEquals(listOf(Binding), observed)
+        assertFalse(admission.hasPending())
+    }
+
+    @Test
     fun `concurrent pending requests share the same structural publication`() {
         var context: ChromeMediaShieldActiveDocumentContextReadResult =
             ChromeMediaShieldActiveDocumentContextReadResult.Unavailable("foreground_window_unavailable")

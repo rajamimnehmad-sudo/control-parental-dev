@@ -22,6 +22,20 @@ class ChromeMediaShieldCspPolicyTest {
     }
 
     @Test
+    fun `external parser barrier receives only the fixed fixture script origin`() {
+        val rewritten =
+            policy.admitBootstrap(
+                "default-src 'self'; object-src 'none'",
+                ScriptNonce,
+                StyleNonce,
+            )
+
+        assertTrue(rewritten.contains("script-src 'self' 'nonce-$ScriptNonce' https://glosh-photos.test"))
+        assertTrue(rewritten.contains("style-src 'self' 'nonce-$StyleNonce'"))
+        assertFalse(rewritten.contains("script-src https://scripts.example"))
+    }
+
+    @Test
     fun `absent site policy receives a separate bounded media envelope`() {
         val output = policy.apply(emptyList(), ScriptNonce, StyleNonce)
         val policies = output.values("Content-Security-Policy")
@@ -94,6 +108,7 @@ class ChromeMediaShieldCspPolicyTest {
             )
 
         assertTrue(rewritten.contains("script-src 'nonce-$ScriptNonce'"))
+        assertTrue(rewritten.contains("script-src 'nonce-$ScriptNonce' https://glosh-photos.test"))
         assertTrue(rewritten.contains("style-src 'nonce-$StyleNonce'"))
         assertTrue(rewritten.contains("connect-src https://glosh-photos.test"))
         assertTrue(rewritten.contains("object-src 'none'"))
@@ -160,6 +175,7 @@ class ChromeMediaShieldCspPolicyTest {
 
         assertEquals(
             "default-src 'self'; connect-src https://glosh-photos.test; object-src 'none'; " +
+                "script-src 'self' https://glosh-photos.test; " +
                 "img-src 'self' https://glosh-ui-svg.test",
             rewritten,
         )

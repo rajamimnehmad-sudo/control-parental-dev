@@ -91,6 +91,7 @@ internal class ChromeMediaShieldDocumentTransformer(
                     topLevel = topLevel,
                     selfShieldIdentity = identity.takeIf { documentSelfShieldEnabled },
                     mediaAuthorityEnabled = mediaAuthorityEnabled,
+                    bootstrapDiagnosticIdentity = identity.takeIf { topLevel },
                 )
             val failClosedInstaller = ChromeMediaShieldBootstrap.parserBarrierFailClosedInstallerScript()
             val parserTail =
@@ -100,7 +101,7 @@ internal class ChromeMediaShieldDocumentTransformer(
                 } else if (topLevel) {
                     val guardScript = ChromeMediaShieldBootstrap.parserBarrierGuardScript()
                     "<script nonce=\"$scriptNonce\" src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\" " +
-                        "referrerpolicy=\"no-referrer\"></script><script nonce=\"$scriptNonce\">" +
+                        "referrerpolicy=\"no-referrer\" crossorigin=\"anonymous\"></script><script nonce=\"$scriptNonce\">" +
                         "$guardScript</script>"
                 } else {
                     "<script nonce=\"$scriptNonce\">${ChromeMediaShieldBootstrap.subdocumentGuardScript()}</script>"

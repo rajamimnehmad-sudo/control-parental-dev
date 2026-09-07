@@ -3,6 +3,7 @@ package com.contentfilter.feature.accessibility.chromevisual
 import android.accessibilityservice.AccessibilityService
 import android.graphics.Rect
 import android.os.Build
+import android.util.Log
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
@@ -43,14 +44,62 @@ internal class ChromeVisualWindowInspector(
     }
 
     /** Root-free current-window check used after browser evidence already authenticated Chrome. */
-    fun findUniqueForegroundCandidate(expectedWindowId: Int? = null): AccessibilityWindowInfo? =
-        service.windows
-            .filter { window ->
-                window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
-                    (window.isActive || window.isFocused) &&
-                    (expectedWindowId == null || window.id == expectedWindowId)
-            }.distinctBy { it.id }
-            .singleOrNull()
+    fun findUniqueForegroundCandidate(expectedWindowId: Int? = null): AccessibilityWindowInfo? {
+        val applicationWindows =
+            service.windows
+                .filter { window ->
+                    window.type == AccessibilityWindowInfo.TYPE_APPLICATION &&
+                        (expectedWindowId == null || window.id == expectedWindowId)
+                }.distinctBy { it.id }
+        val foregroundWindows = applicationWindows.filter { it.isActive || it.isFocused }
+        if (foregroundWindows.isNotEmpty()) return foregroundWindows.singleOrNull()
+
+        // SurfaceControl protection is attached to Chrome's application window but Android may
+        // publish the protected surface as the active system window while Chrome remains the only
+        // application window. Keep the boundary fail-closed: this fallback is valid only when the
+        // complete application set contains exactly one Chrome window and no competing foreground
+        // application was observed above.
+        val fallback = applicationWindows.singleOrNull()?.takeIf(::isChromeWindow)
+        if (fallback == null) logForegroundProbe(applicationWindows)
+        return fallback
+    }
+
+    /**
+     * SurfaceControl-protected Chrome may expose no AccessibilityWindowInfo while the active
+     * window root is still available through the service-level API. The caller owns the returned
+     * node and must recycle it after deriving its binding.
+     */
+    fun rootInActiveWindowForChrome(expectedWindowId: Int? = null): AccessibilityNodeInfo? {
+        val root = service.rootInActiveWindow ?: return null
+        val matchesChrome = root.packageName?.toString() == ChromePackageName
+        val matchesWindow = expectedWindowId == null || root.windowId == expectedWindowId
+        if (matchesChrome && matchesWindow) {
+            Log.i("GloshH19Ready", "phase=window_probe root_in_active_window windowId=${root.windowId}")
+            return root
+        }
+        ChromeMediaShieldAccessibilityNodeTraversal.recycle(root)
+        return null
+    }
+
+    private fun logForegroundProbe(applicationWindows: List<AccessibilityWindowInfo>) {
+        Log.i(
+            "GloshH19Ready",
+            "phase=window_probe apps=" +
+                applicationWindows.joinToString(separator = ",") { window ->
+                    "${window.id}:${window.type}:${window.isActive}:${window.isFocused}:${rootPackage(window)}"
+                },
+        )
+    }
+
+    private fun rootPackage(window: AccessibilityWindowInfo): String {
+        val root = runCatching { window.root }.getOrNull() ?: return "none"
+        return try {
+            root.packageName?.toString() ?: "null"
+        } finally {
+            @Suppress("DEPRECATION")
+            runCatching(root::recycle)
+        }
+    }
 
     fun inputMethodTop(): Int? =
         service.windows

@@ -71,11 +71,7 @@ class ChromeMediaShieldDocumentTransformerTest {
         assertTrue(policies.first().contains("'nonce-$exactScriptNonce'"))
         assertContains(
             html,
-            "src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\" referrerpolicy=\"no-referrer\"",
-        )
-        assertFalse(
-            html.contains("${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}?") ||
-                html.contains("${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}#"),
+            "src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\" referrerpolicy=\"no-referrer\" crossorigin=\"anonymous\"",
         )
         assertEquals(2, policies.size)
         assertTrue(policies.first().contains("default-src 'self'"))
@@ -86,7 +82,13 @@ class ChromeMediaShieldDocumentTransformerTest {
         assertFalse(result.headers.any { it.name.equals("Content-Length", true) })
         assertFalse(result.headers.any { it.name.equals("ETag", true) })
         assertEquals("no-store", result.headers.firstValue("Cache-Control"))
-        val expectedScript = ChromeMediaShieldBootstrap.script(token(3), token(2), topLevel = true)
+        val expectedScript =
+            ChromeMediaShieldBootstrap.script(
+                token(3),
+                token(2),
+                topLevel = true,
+                bootstrapDiagnosticIdentity = result.identity,
+            )
         val expectedBarrier =
             "<script nonce=\"${token(1)}\" src=\"${ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl}\" " +
                 "referrerpolicy=\"no-referrer\"></script><script nonce=\"${token(1)}\">" +
