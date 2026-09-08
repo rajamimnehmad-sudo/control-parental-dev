@@ -904,7 +904,9 @@ internal class ChromePhotosHttpsProxy(
 
     private companion object {
         const val HttpsPort = 443
-        const val WorkerCount = 8
+        // Real multi-origin traces with 8 connection workers showed p95 admission wait >19s.
+        // Keep all queues/body/inference limits unchanged; bound connection workers at 32.
+        const val WorkerCount = 32
         const val WorkerQueueCapacity = 32
         const val SocketBacklog = 32
         const val SocketTimeoutMillis = 20_000
