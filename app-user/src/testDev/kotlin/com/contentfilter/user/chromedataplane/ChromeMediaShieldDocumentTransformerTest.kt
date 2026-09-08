@@ -27,6 +27,16 @@ class ChromeMediaShieldDocumentTransformerTest {
     fun tearDown() = ChromeMediaShieldDocumentAuthorityRegistry.clear()
 
     @Test
+    fun `local photo physical fixture passes the actual document transformer`() {
+        val fixture =
+            ChromeLocalPhotoFixture(byteArrayOf(1, 2, 3))
+                .responseFor(ChromePhotosProxyRequest("GET", "/local-photos"))!!
+        assertIs<ChromeMediaShieldDocumentResult.Transformed>(
+            transformer.transform(fixture.originalBytes, fixture.headers, transformDisposition()),
+        )
+    }
+
+    @Test
     fun `doctype and site CSP survive while parser-first shield receives exact nonce`() {
         val result =
             assertIs<ChromeMediaShieldDocumentResult.Transformed>(

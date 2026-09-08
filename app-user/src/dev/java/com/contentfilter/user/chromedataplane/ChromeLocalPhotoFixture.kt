@@ -8,9 +8,9 @@ internal class ChromeLocalPhotoFixture(private val safe: ByteArray) {
         val data = "data:image/png;base64," + Base64.getEncoder().encodeToString(safe)
         val html =
             """
-            <!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+            <!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">
             <title>LOCAL_PHOTO_RUNNING</title><style>body{font:16px sans-serif}img,input{width:96px;height:72px;object-fit:contain}#report{white-space:pre-wrap}</style>
-            <h1>Static local photos</h1><pre id="report">RUNNING</pre>
+            </head><body><h1>Static local photos</h1><pre id="report">RUNNING</pre>
             <img id="static" src="$data"><img id="dynamic"><img id="set" srcset="$data 1x, $data 2x">
             <picture><source id="picture-source" srcset="$data"><img id="picture"></picture>
             <input id="input" type="image" src="$data"><img id="stale"><img id="removed"><div id="markup"></div><div id="shadow"></div>
@@ -30,7 +30,7 @@ internal class ChromeLocalPhotoFixture(private val safe: ByteArray) {
               document.getElementById('report').textContent=rows.join('\n');document.title=ok?'LOCAL_PHOTO_PASS':'LOCAL_PHOTO_FAIL';
             }
             setTimeout(check,8000);
-            </script>
+            </script></body></html>
             """.trimIndent()
         return ChromePhotosFixtureResponse("local-photos", "text/html; charset=utf-8", html.toByteArray())
     }
