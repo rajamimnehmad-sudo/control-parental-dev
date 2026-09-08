@@ -20,6 +20,10 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (!context.packageName.endsWith(".dev")) return
+        if (intent.action == ActionGuardHeartbeatDelay) {
+            setResultData("accepted=${chromePhotosGuardHeartbeatRecovery.requestDelay()}")
+            return
+        }
         if (intent.action == ActionActiveDocumentReplay) {
             val result = ChromeMediaShieldActiveDocumentLabControl.replayConsumedPresent()
             setResultData(result)
@@ -83,6 +87,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
                 return
             }
             ActionPrepareUpdate -> {
+                chromePhotosGuardHeartbeatRecovery.stop()
                 ChromePhotosTrustedBootstrapBootGuard.blockChrome(context)
                 ContextCompat.startForegroundService(
                     context,
@@ -93,6 +98,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
             }
         }
         if (intent.action == Intent.ACTION_LOCKED_BOOT_COMPLETED) {
+            chromePhotosGuardHeartbeatRecovery.stop()
             ChromePhotosProtectedSurfaceDiagnostics.setMarkerEnabledForExplicitDevGate(false)
             ChromePhotosTrustedBootstrapBootGuard.blockChrome(context)
             return
@@ -193,6 +199,7 @@ class ChromePhotosDataPlaneLabReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        const val ActionGuardHeartbeatDelay = "com.contentfilter.user.chromedataplane.command.GUARD_HEARTBEAT_DELAY"
         const val ActionStart = "com.contentfilter.user.chromedataplane.command.START"
         const val ActionStop = "com.contentfilter.user.chromedataplane.command.STOP"
         const val ActionStatus = "com.contentfilter.user.chromedataplane.command.STATUS"

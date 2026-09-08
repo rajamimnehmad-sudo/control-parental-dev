@@ -19,6 +19,7 @@ import com.contentfilter.user.chromeguard.ChromeGuardClient
 import com.contentfilter.user.chromeguard.ChromeGuardClientSession
 import com.contentfilter.user.chromeguard.ChromeGuardContract
 import com.contentfilter.user.chromeguard.ChromeGuardHealth
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -167,6 +168,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                             bootstrapGeneration = ChromePhotosDataPlaneLabContract.TrustedBootstrapGeneration,
                         )
                     lastGuardHeartbeatElapsed = 0L
+                    chromePhotosGuardHeartbeatRecovery.start()
                     bootstrapController.preserveAcrossSessionReset(preferences.edit().clear())
                         .putString(ChromePhotosDataPlaneLabContract.KeySessionId, sessionId)
                         .putBoolean(ChromePhotosDataPlaneLabContract.KeyActive, false)
@@ -362,6 +364,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     }
 
     private fun stopLab() {
+        chromePhotosGuardHeartbeatRecovery.stop()
         operation?.cancel()
         operation =
             serviceScope?.launch {
@@ -415,6 +418,7 @@ class ChromePhotosDataPlaneLabService : Service() {
     }
 
     private fun markFailClosed(reason: String) {
+        chromePhotosGuardHeartbeatRecovery.stop()
         gloshiaReady = false
         guardClient.revoke(reason)
         runCatching { bootstrapController.requireDevOwnerAndBlockChrome(reason) }
@@ -444,6 +448,11 @@ class ChromePhotosDataPlaneLabService : Service() {
         healthJob =
             serviceScope?.launch {
                 while (currentSessionId == sessionId && lifecycle.current() in ActivePhases) {
+                    val injectedDelay = chromePhotosGuardHeartbeatRecovery.consumeDelay()
+                    if (injectedDelay > 0L) {
+                        Log.i(LogTag, "phase=guard_heartbeat_delay durationMs=$injectedDelay")
+                        delay(injectedDelay)
+                    }
                     val proxyHealthy = proxy?.isHealthy() == true
                     val fullTunnelActive =
                         VpnController.isDevFullTunnelGateActive(this@ChromePhotosDataPlaneLabService)
@@ -515,7 +524,10 @@ class ChromePhotosDataPlaneLabService : Service() {
                                 realWebScopeConfirmed = realWebScopeConfirmed,
                             ) &&
                             !bootstrapController.isChromeSuspended()
-                    if (chromeReleased && !wasRealWebReady) {
+                    if (
+                        chromeReleased &&
+                        (!wasRealWebReady || !labPreferences().getBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false))
+                    ) {
                         lifecycle.presentationReady()
                         labPreferences().edit()
                             .putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, true)
@@ -548,12 +560,40 @@ class ChromePhotosDataPlaneLabService : Service() {
             }
     }
 
-    private fun publishGuardHeartbeatIfDue(
+    private suspend fun publishGuardHeartbeatIfDue(
         now: Long,
         health: ChromePhotosTrustedBootstrapHealth,
         realWebScopeConfirmed: Boolean,
     ): Boolean {
+        if (!chromePhotosGuardHeartbeatRecovery.isEnabled()) return false
         val session = guardSession ?: return false
+        if (chromePhotosGuardHeartbeatRecovery.needsNewSession(
+                now,
+                lastGuardHeartbeatElapsed,
+                bootstrapController.isChromeSuspended(),
+            )
+        ) {
+            // Never send another lease from an expired generation. Opening a session keeps Chrome
+            // suspended; the next health-loop iteration must freshly verify all health before release.
+            labPreferences().edit().putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false).apply()
+            try {
+                guardSession =
+                    guardClient.openSession(
+                        sessionId = session.sessionId,
+                        mainProcessNonce = UUID.randomUUID().toString(),
+                        bootstrapGeneration = session.bootstrapGeneration,
+                    )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                markFailClosed("guard_session_renewal_failed")
+                Log.w(LogTag, "phase=guard_session_renewal_failed error=${error.javaClass.simpleName}")
+                return false
+            }
+            lastGuardHeartbeatElapsed = 0L
+            Log.i(LogTag, "phase=guard_session_renewed previousGeneration=${session.protectionGeneration}")
+            return false
+        }
         if (now - lastGuardHeartbeatElapsed >= ChromeGuardContract.HeartbeatIntervalMillis) {
             val published =
                 guardClient.publishHeartbeat(

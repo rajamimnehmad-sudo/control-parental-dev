@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromeguard
 
+import com.contentfilter.user.chromedataplane.ChromePhotosGuardHeartbeatRecovery
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,6 +29,24 @@ class ChromeGuardCoordinatorTest {
         assertTrue(fixture.coordinator.expireIfNeeded(Now + ChromeGuardContract.LeaseTtlMillis))
         assertEquals("main_process_lost", fixture.coordinator.snapshot().lastReason)
         assertEquals(ChromeGuardState.Suspended, fixture.coordinator.snapshot().state)
+    }
+
+    @Test
+    fun `late heartbeat recovery opens a new generation without releasing before a current lease`() {
+        val fixture = fixture()
+        val recovery = ChromePhotosGuardHeartbeatRecovery().apply { start() }
+        val first = fixture.begin()
+        assertEquals(ChromeGuardLeaseVerification.Accepted, fixture.heartbeat(first))
+        val resumedAt = Now + ChromeGuardContract.LeaseTtlMillis + 1L
+        assertTrue(fixture.coordinator.expireIfNeeded(resumedAt))
+        assertTrue(recovery.needsNewSession(resumedAt, Now, true))
+        val second = fixture.begin()
+        assertNotEquals(first, second)
+        assertEquals(ChromeGuardState.Suspended, fixture.coordinator.snapshot().state)
+        assertEquals(1, fixture.suspension.releaseCalls)
+        assertEquals(ChromeGuardLeaseVerification.Accepted, fixture.heartbeat(second, now = resumedAt))
+        assertEquals(ChromeGuardState.Released, fixture.coordinator.snapshot().state)
+        assertEquals(2, fixture.suspension.releaseCalls)
     }
 
     @Test
@@ -166,6 +185,7 @@ class ChromeGuardCoordinatorTest {
         fun heartbeat(
             generation: Long,
             sequence: Long = 1L,
+            now: Long = Now,
         ): ChromeGuardLeaseVerification =
             coordinator.heartbeat(
                 lease =
@@ -175,14 +195,14 @@ class ChromeGuardCoordinatorTest {
                         mainProcessNonce = "nonce",
                         bootMarker = BootMarker,
                         heartbeatSequence = sequence,
-                        issuedAtElapsedRealtime = Now,
-                        expiresAtElapsedRealtime = Now + ChromeGuardContract.LeaseTtlMillis,
+                        issuedAtElapsedRealtime = now,
+                        expiresAtElapsedRealtime = now + ChromeGuardContract.LeaseTtlMillis,
                         transportGeneration = generation,
                         proxyGeneration = generation,
                         bootstrapGeneration = 1,
                         health = ChromeGuardHealth(true, true, true, true, true, true, true),
                     ),
-                nowElapsed = Now,
+                nowElapsed = now,
                 callerAuthorized = true,
             )
     }
