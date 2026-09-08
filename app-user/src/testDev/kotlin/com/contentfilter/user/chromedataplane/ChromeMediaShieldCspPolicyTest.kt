@@ -169,11 +169,12 @@ class ChromeMediaShieldCspPolicyTest {
     }
 
     @Test
-    fun `meta CSP rewrite preserves policy and admits only fixed ready origin`() {
+    fun `meta CSP rewrite preserves policy and admits fixed ready origin and shield CSS`() {
         val rewritten = policy.rewriteMetaPolicy("default-src 'self'; connect-src 'none'; object-src 'none'")
 
         assertEquals(
             "default-src 'self'; connect-src https://glosh-photos.test; object-src 'none'; " +
+                "style-src 'self' 'sha256-WdroEfOyTz3OMNJvefpC8aEoI/trAJdiC/4jM93LOao='; " +
                 "img-src 'self' https://glosh-ui-svg.test",
             rewritten,
         )
