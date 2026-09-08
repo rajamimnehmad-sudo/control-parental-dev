@@ -43,6 +43,10 @@ internal class ChromeOriginalUiSvgFixture {
         <img id="data-image" width="32" height="32" src="data:image/svg+xml;base64,$safeSvgBase64">
         <img id="network-image" width="32" height="32" src="$NetworkSvgPath"><img id="unsafe-network" width="32" height="32" src="$UnsafeNetworkSvgPath"><img id="raster-negative" src="data:image/png;base64,AAAA">
         <svg id="unsafe-inline" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><foreignObject><div xmlns="http://www.w3.org/1999/xhtml">bad</div></foreignObject></svg>
+        <svg id="sprite-owner" xmlns="http://www.w3.org/2000/svg" width="0" height="0"><defs><g id="sprite-shape"><path fill="#146c43" d="M2 3h20v18H2z"/></g></defs></svg>
+        <svg id="sprite-use" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><use href="#sprite-shape"/></svg>
+        <svg id="unsafe-sprite" xmlns="http://www.w3.org/2000/svg" width="0" height="0"><defs><g id="unsafe-sprite-shape"><foreignObject width="24" height="24"><div xmlns="http://www.w3.org/1999/xhtml">unsafe</div></foreignObject></g></defs></svg>
+        <svg id="unsafe-sprite-use" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><use href="#unsafe-sprite-shape"/></svg>
         </div><pre id="result">RUNNING</pre><script>
         (()=>{const checks=[];const check=(name,value)=>checks.push(name+':'+(value?'PASS':'FAIL'));let clicks=0;
         document.getElementById('inline-button').addEventListener('click',()=>clicks++);document.getElementById('inline-button').click();
@@ -52,6 +56,7 @@ internal class ChromeOriginalUiSvgFixture {
         const internal='${com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract.OriginalUiSvgOrigin}';const attr=(id,name)=>document.getElementById(id).getAttribute(name)||'';const computed=id=>getComputedStyle(document.getElementById(id));
         setTimeout(()=>{const inline=document.getElementById('inline'),path=inline.querySelector('path');
         check('INLINE_ORIGINAL',path.getAttribute('d')==='M2 3h20v18H2z'&&path.getAttribute('fill')==='#123456'&&path.getAttribute('stroke')==='#654321'&&inline.getAttribute('data-glosh-icon-safe')==='1');check('INLINE_CLICK',clicks===1);
+        check('SPRITE_ORIGINAL',attr('sprite-owner','data-glosh-icon-safe')==='1'&&attr('sprite-use','data-glosh-icon-safe')==='1'&&document.querySelector('#sprite-use use').getAttribute('href')==='#sprite-shape');check('UNSAFE_SPRITE_FAIL_CLOSED',attr('unsafe-sprite','data-glosh-media-blocked')==='1'&&attr('unsafe-sprite-use','data-glosh-media-blocked')==='1');
         check('STATIC_CSS',computed('static').maskImage.includes(internal));check('EXTERNAL_CSS',computed('external').maskImage.includes(internal));check('STYLE_ATTRIBUTE',attr('attribute','style').includes(internal));
         check('DATA_IMAGE',attr('data-image','src').startsWith(internal)&&document.getElementById('data-image').naturalWidth>0);check('FAVICON',document.querySelector('link[rel~=icon]').href.startsWith(internal));
         const shield=document.getElementById('glosh-h19-media-shield'),shieldText=shield.textContent;let headRemovalOk=true;try{shield.parentNode.removeChild(shield);shield.remove()}catch(_){headRemovalOk=false}let rewriteDenied=false;try{shield.textContent=''}catch(_){rewriteDenied=true}check('PROTECTED_HEAD_RETENTION',headRemovalOk&&shield.isConnected&&shield.textContent===shieldText&&rewriteDenied);
