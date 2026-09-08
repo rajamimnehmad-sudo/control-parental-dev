@@ -4,8 +4,8 @@ package com.contentfilter.user.chromedataplane
 internal object ChromeLocalPhotoScript {
     val declarations =
         """
-        const localPhotoTimer=SELF.setTimeout,localPhotoAbort=NativeXMLHttpRequest.prototype.abort,localPhotoExec=RegExp.prototype.exec;
-        const localPhotoStates=new WeakMap(),localPhotoQueue=[];let localPhotoActive=null,localPhotoBytes=0,localPhotoScheduled=false,localPhotoDocumentActive=true;
+        const localPhotoTimer=SELF.setTimeout,localPhotoAbort=NativeXMLHttpRequest.prototype.abort,localPhotoExec=RegExp.prototype.exec,localPhotoRect=Element.prototype.getBoundingClientRect;
+        const localPhotoStates=new WeakMap(),localPhotoQueue=[];let localPhotoActive=null,localPhotoBytes=0,localPhotoScheduled=false,localPhotoDocumentActive=true,localPhotoOvertakes=0;
         const LOCAL_PHOTO_URL=stringOf(new NativeURL('/__glosh/local-photo/submit',NativeLocation.href)),LOCAL_PHOTO_ASSET='https://glosh-photos.test/__glosh/local-photo/asset/';
         const localPhotoPrefix='v1|LOCAL_PHOTO|'+READY+'|'+SESSION+'|'+POLICY_EPOCH+'|'+NAVIGATION_SEQUENCE+'|'+DOCUMENT_SEQUENCE+'|'+(TOP_LEVEL?'T':'S')+'\n';
         const localPhotoSlots=(element)=>{let slots=invoke(WeakMapGet,localPhotoStates,[element]);if(!slots){slots={src:null,srcset:null};invoke(WeakMapSet,localPhotoStates,[element,slots])}return slots};
@@ -14,8 +14,14 @@ internal object ChromeLocalPhotoScript {
         const localPhotoSchedule=()=>{if(localPhotoScheduled||!localPhotoDocumentActive||!selfReadyAccepted)return;localPhotoScheduled=true;invoke(localPhotoTimer,SELF,[()=>{localPhotoScheduled=false;localPhotoPump()},0])};
         const localPhotoFinish=(job)=>{if(job.finished)return;job.finished=true;if(localPhotoDocumentActive&&localPhotoSlots(job.element)[job.key]===job){localPhotoSlots(job.element)[job.key]=null;nativeRemove.call(job.element,'data-glosh-local-'+job.key)}localPhotoBytes-=job.value.length;job.value='';job.items.length=0;job.output='';job.xhr=null;job.element=null;if(localPhotoActive===job)localPhotoActive=null;localPhotoSchedule()};
         const localPhotoCurrent=(job)=>localPhotoDocumentActive&&!job.finished&&!job.cancelled&&localPhotoSlots(job.element)[job.key]===job&&!(nativeGet.call(job.element,job.key)||'');
+        // A visible pending photo may overtake FIFO work, but every fifth overtake serves the oldest job.
+        // Geometry affects scheduling only; the same byte authority still decides every result.
+        const localPhotoVisible=(job)=>{try{let element=job.element;const parent=parentOf(element);if(localNameOf(element)==='source'&&parent)element=elementQuery.call(parent,'img')||element;
+        const rect=invoke(localPhotoRect,element,[]);return rect.width>0&&rect.height>0&&rect.bottom>0&&rect.right>0&&rect.top<SELF.innerHeight&&rect.left<SELF.innerWidth}catch(_){return false}};
+        const localPhotoSelect=()=>{let selected=0;if(localPhotoOvertakes<4){for(let i=0;i<localPhotoQueue.length;i+=1){const candidate=localPhotoQueue[i];if(localPhotoCurrent(candidate)&&localPhotoVisible(candidate)){selected=i;break}}}
+        if(selected>0)localPhotoOvertakes+=1;else localPhotoOvertakes=0;return selected};
         const localPhotoPump=()=>{if(localPhotoActive||!localPhotoDocumentActive||!selfReadyAccepted)return;let job=null;
-        while(localPhotoQueue.length){job=localPhotoQueue[0];for(let i=1;i<localPhotoQueue.length;i+=1)localPhotoQueue[i-1]=localPhotoQueue[i];localPhotoQueue.length-=1;if(localPhotoCurrent(job))break;localPhotoFinish(job);job=null}
+        while(localPhotoQueue.length){const selected=localPhotoSelect();job=localPhotoQueue[selected];for(let i=selected+1;i<localPhotoQueue.length;i+=1)localPhotoQueue[i-1]=localPhotoQueue[i];localPhotoQueue.length-=1;if(localPhotoCurrent(job))break;localPhotoFinish(job);job=null}
         if(!job)return;localPhotoActive=job;localPhotoSend(job)};
         const localPhotoSend=(job)=>{if(!localPhotoCurrent(job)){localPhotoFinish(job);return}const item=job.items[job.index];let xhr=null;
         try{xhr=new NativeXMLHttpRequest();job.xhr=xhr;xhrOpen.call(xhr,'POST',LOCAL_PHOTO_URL,true);xhrSetHeader.call(xhr,'Content-Type','text/plain;charset=UTF-8');
