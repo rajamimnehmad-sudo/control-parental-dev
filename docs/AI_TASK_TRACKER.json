@@ -6,33 +6,195 @@
       "title": "Coordinación",
       "context": "Estado operativo post-convergencia: baseline canónica fijada; Glosh Central coordina estados/prioridades, GitHub demuestra código/evidencia y los worktrees aíslan escritura. Default máximo 2 frentes de código.",
       "tasks": [
-        {"id":"codex-local-inventory","title":"Inventario local completo con Codex","detail":"Inventario histórico terminado sin modificar el proyecto; la auditoría local↔GitHub 02 actualiza este estado.","status":"done","priority":"critical"},
-        {"id":"mac-local-github-audit-02","title":"Auditar Mac local contra GitHub","detail":"PASS READ-ONLY. Canonical work/chrome-visual@6a045f13 quedó sin cambios por la auditoría. Hallazgos: 21 commits no publicados, de los cuales 16 tienen contenido realmente local; 25 commits unreachable ambiguos; único worktree dirty es el canónico; .codex-tmp mezcla ~5.5 GiB de corpus/evidencia con entornos regenerables; archivo local no Git de ~201 MiB; ~14.1 GiB de builds/cachés regenerables. No se limpió ni publicó nada.","status":"done","priority":"important"},
-        {"id":"glosh-convergence-audit-01","title":"Auditar estado real y convergencia de Glosh","detail":"DONE / CHATGPT REVIEWED. Audit remoto review/glosh-convergence-audit-01 @ be8bb9aea058392923f382b0a0e37dd5ca1184e1. Confirmó que no existe un único SHA integrado vigente: main 7269636f convive con mecanismos revisados no integrados y ramas que arrastran historia ajena. R1 sigue BLOCKED; DAG y Glosh Remote siguen PAUSED/RESERVE. Inventario Mac vigente al audit: 88 commits exactos alcanzables no contenidos en origin, 31 con patch único; 56 commits unreachable, 30 con patch único; 14 entradas dirty/untracked.","status":"done","priority":"critical"},
-        {"id":"mac-local-preservation-03","title":"Preservar trabajo local antes de limpiar","detail":"DONE / CHATGPT REVIEWED. Documento review/mac-local-preservation-03 @ 6c2f7613213f7683c83afd423bcd5c22ee5eb228; ref remoto preserve/mac-local-preservation-03-safe-code @ f6e32dab2da6e2faf5f56f7e9bd0bb694565a592; bundle privado final-v3 SHA-256 75d6cddb882ce1bf45fa81e13efd54feeaa8764a4fd0ab99f98c31e0af7c612a. Todo LOCAL UNIQUE/AMBIGUOUS quedó recuperable.","status":"done","priority":"critical"},
-        {"id":"glosh-convergence-baseline-01","title":"Construir baseline técnica convergente de Glosh","detail":"PASS FINAL / CHATGPT REVIEWED / CANONICAL. Base origin/main 7269636f3c916bf92cd93947bf2595db330836dd; functional de6f105d87d94144c5ab6b438f832b6210047c8d; review/glosh-convergence-baseline-01 @ c2900bc5a2f28fa9d291862197f70a2e2c8e2f6c. Contiene Chrome passing hasta 13B-R, GloshIA R3.1 y P0 exact-hosts/atomic-sync/device-token-scope; las rutas bloqueadas/pausadas permanecen excluidas.","status":"done","priority":"critical"},
-        {"id":"mac-safe-cleanup-01","title":"Limpiar artefactos locales regenerables con preservación verificada","detail":"DONE / CHATGPT REVIEWED. review/mac-safe-cleanup-01 @ e9c7e2bcb8f9f91e030238d6681ac5fed8785c14. Se eliminaron 418 rutas regenerables y APFS ganó 17.329.319.936 bytes reales. Preservación, .codex-tmp, dirty original, ramas y worktrees quedaron intactos. No se requiere segunda pasada para cerrar el ordenamiento general.","status":"done","priority":"critical"},
-        {"id":"glosh-general-ordering-closeout-01","title":"Cerrar ordenamiento general de Glosh","detail":"DONE / CHATGPT REVIEWED. Audit, preservación, baseline canónica y cleanup regenerable cerrados. No hay frente de producto activo por defecto; cada nuevo frente debe arrancar leyendo Central + GitHub actuales.","status":"done","priority":"critical"},
-        {"id":"glosh-orchestration-01","title":"Automatizar handoff mínimo ChatGPT ↔ Codex","detail":"PENDIENTE / NO ACTIVO. Objetivo posterior: Central define task/base/owner; ChatGPT emite ticket corto; Codex ejecuta hasta PASS/BLOCKED/FAILED y publica SHA/evidencia mínima; una señal dispara revisión ChatGPT. Evitar un orquestador grande y reducir prompts, handoffs, tokens e intervención manual.","status":"pending","priority":"important"},
-        {"id":"preserve-local-state","title":"Preservar todo el estado local","detail":"DONE / SUPERADO por MAC-LOCAL-PRESERVATION-03, que dejó cobertura recuperable verificada del estado local relevante.","status":"done","priority":"critical"},
-        {"id":"p0-hardening-batch-01","title":"Primer lote P0","detail":"Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.","status":"done","priority":"critical"},
-        {"id":"p0-backend-closeout-02","title":"Cerrar backend P0","detail":"Hardening RPC base aplicado en Production. Scope token cross-device PASS; quedan gate end-to-end de pairing y deuda Auth del pairing Admin. Sin owner activo.","status":"pending","priority":"critical"},
-        {"id":"superadmin-product-batch-01","title":"Lote grande Super Admin","detail":"DONE. PR #96 fue fuente funcional pero cerró sin merge; la integración vigente llegó a main mediante PR #100/#101.","status":"done","priority":"important"},
-        {"id":"chrome-visual-closure-batch-04","title":"Cerrar Chrome Visual en Chrome real","detail":"H20 COMPATIBILITY/REPLACE-ALL PASS PHYSICAL / CHATGPT REVIEWED. SERVICE-WORKER-BOUNDARY-01 queda BLOCKED / CHATGPT REVIEWED como diagnóstico histórico. RESET-INVARIANT-01 PASS FINAL / CHATGPT REVIEWED sobre DEV412. SELECTIVE-R31-01 PASS FINAL / CHATGPT REVIEWED sobre DEV413: Chrome oficial entregó SAFE originales, sustituyó BLOCK/UNKNOWN con raw 0/0, preservó resetCount=3 y navegación real usable en Frávega/Mimo. Siguiente orden: normalidad/performance y batería, no reabrir arquitectura H19/H20 ya cerrada.","status":"pending","priority":"critical"},
-        {"id":"manual-codex-workflow","title":"Workflow manual ChatGPT → Codex","detail":"ChatGPT resuelve análisis/arquitectura/revisión; Codex se reserva principalmente para Mac/local, builds, tests, ADB, dispositivos, scripts y benchmarks.","status":"done","priority":"critical"},
-        {"id":"parallel-coordination-v2","title":"Endurecer coordinación paralela","detail":"Owner único, max 2 escritores, worktrees/rutas aisladas, PASS técnico separado de cierre Central y prohibición de pisar/limpiar trabajo ajeno.","status":"done","priority":"critical"},
-        {"id":"ai-auto-handoff-01","title":"Autorun experimental de Codex","detail":"Retirado del flujo normal.","status":"done","priority":"normal"},
-        {"id":"codex-effort-routing","title":"Elegir esfuerzo Codex por cada ticket","detail":"ChatGPT elige el menor esfuerzo suficiente.","status":"done","priority":"important"},
-        {"id":"workflow-cost-optimization","title":"Optimizar workflow para bajar costos","detail":"DONE / AUDITADO 25-08-2026. Tickets delta, lectura mínima, lotes coherentes, tests proporcionales, evidencia heredable, handoff compacto y review/*-final en el mismo ticket. Docs-only no compila ni versiona Android.","status":"done","priority":"critical"},
-        {"id":"workflow-hygiene-01","title":"Reducir ruido de workflow y repo","detail":"DONE / CHATGPT REVIEWED. AGENTS prohíbe microcommits de gobernanza y ramas copy/check/v2 rutinarias; BACKLOG_PRODUCTO y HANDOFF_ACTUAL viejos quedan como stubs y sus snapshots íntegros se preservan en docs/archive. Control Center deja de compilar APK por cambios solo del tracker, agrega concurrency y retención 14 días. No se borraron ramas/PR.","status":"done","priority":"important"},
-        {"id":"vercel-super-admin-trigger-isolation","title":"Evitar deploys innecesarios de Super Admin","detail":"MITIGATED / GLOBAL FIX BLOCKED. Control Center ya no dispara Vercel en su rama; ramas antiguas pueden seguir creando previews. Gmail mitigó notificaciones. Falta ajuste global de settings Vercel cuando haya acceso de escritura.","status":"blocked","priority":"important"},
-        {"id":"control-center-sync-rule","title":"Sincronizar siempre Glosh Central","detail":"AI_TASK_TRACKER.json es el estado que consume la app. Cambios materiales se reflejan en el mismo ciclo. Tracker-only no debe compilar APK; in_progress solo si hay owner/rutas activas persistentes.","status":"done","priority":"critical"},
-        {"id":"review-branch-handoff-rule","title":"Publicar review final en el mismo lote Codex","detail":"PASS técnico publica y verifica review/*-final en el mismo ticket. Evitar ramas intermedias innecesarias; PR/merge/main/Production/deploy/borrados/gastos siguen separados.","status":"done","priority":"critical"},
-        {"id":"gloshia-data-preservation-rule","title":"Blindar datos de entrenamiento/calibración","detail":"Datasets, muestras, labels, reviews, calibraciones, métricas y evidencia no se borran por resets operativos sin autorización separada.","status":"done","priority":"critical"},
-        {"id":"apps-account-product-batch-07","title":"Próximo lote Apps / cuentas","detail":"Usuario UX V4 pausado/preservado; Admin UX V4 visualmente implementado y pendiente gate técnico; Vite UI Lab Usuario preservado en review/apps-ui-lab-01-final @ 58c9ae2b63c7d010df2cc992044883e0ec269b30. Sin owner activo en Apps; al retomar, preflight + revisión del checkpoint antes de nueva escritura.","status":"pending","priority":"important"},
-        {"id":"clean-data-reset","title":"Reset limpio de datos Glosh","detail":"Datos operativos en cero; Super Admin/Auth raíz preservados. Evidencia IA excluida de resets operativos.","status":"done","priority":"important"},
-        {"id":"control-center-v2","title":"Control Center V2","detail":"DONE / CHATGPT REVIEWED. Resumen superior filtra por estado; Prioridad/Secciones y sync preservados. APK v0.4.0 PASS, SHA-256 d6a8c59d…0883.","status":"done","priority":"normal"},
-        {"id":"pro-audit","title":"Auditoría Pro y mapa técnico","detail":"Auditoría integral completada; hallazgos se cierran por lotes auditables.","status":"done","priority":"important"}
+        {
+          "id": "codex-local-inventory",
+          "title": "Inventario local completo con Codex",
+          "detail": "Inventario histórico terminado sin modificar el proyecto; la auditoría local↔GitHub 02 actualiza este estado.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "mac-local-github-audit-02",
+          "title": "Auditar Mac local contra GitHub",
+          "detail": "PASS READ-ONLY. Canonical work/chrome-visual@6a045f13 quedó sin cambios por la auditoría. Hallazgos: 21 commits no publicados, de los cuales 16 tienen contenido realmente local; 25 commits unreachable ambiguos; único worktree dirty es el canónico; .codex-tmp mezcla ~5.5 GiB de corpus/evidencia con entornos regenerables; archivo local no Git de ~201 MiB; ~14.1 GiB de builds/cachés regenerables. No se limpió ni publicó nada.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "glosh-convergence-audit-01",
+          "title": "Auditar estado real y convergencia de Glosh",
+          "detail": "DONE / CHATGPT REVIEWED. Audit remoto review/glosh-convergence-audit-01 @ be8bb9aea058392923f382b0a0e37dd5ca1184e1. Confirmó que no existe un único SHA integrado vigente: main 7269636f convive con mecanismos revisados no integrados y ramas que arrastran historia ajena. R1 sigue BLOCKED; DAG y Glosh Remote siguen PAUSED/RESERVE. Inventario Mac vigente al audit: 88 commits exactos alcanzables no contenidos en origin, 31 con patch único; 56 commits unreachable, 30 con patch único; 14 entradas dirty/untracked.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "mac-local-preservation-03",
+          "title": "Preservar trabajo local antes de limpiar",
+          "detail": "DONE / CHATGPT REVIEWED. Documento review/mac-local-preservation-03 @ 6c2f7613213f7683c83afd423bcd5c22ee5eb228; ref remoto preserve/mac-local-preservation-03-safe-code @ f6e32dab2da6e2faf5f56f7e9bd0bb694565a592; bundle privado final-v3 SHA-256 75d6cddb882ce1bf45fa81e13efd54feeaa8764a4fd0ab99f98c31e0af7c612a. Todo LOCAL UNIQUE/AMBIGUOUS quedó recuperable.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "glosh-convergence-baseline-01",
+          "title": "Construir baseline técnica convergente de Glosh",
+          "detail": "PASS FINAL / CHATGPT REVIEWED / CANONICAL. Base origin/main 7269636f3c916bf92cd93947bf2595db330836dd; functional de6f105d87d94144c5ab6b438f832b6210047c8d; review/glosh-convergence-baseline-01 @ c2900bc5a2f28fa9d291862197f70a2e2c8e2f6c. Contiene Chrome passing hasta 13B-R, GloshIA R3.1 y P0 exact-hosts/atomic-sync/device-token-scope; las rutas bloqueadas/pausadas permanecen excluidas.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "mac-safe-cleanup-01",
+          "title": "Limpiar artefactos locales regenerables con preservación verificada",
+          "detail": "DONE / CHATGPT REVIEWED. review/mac-safe-cleanup-01 @ e9c7e2bcb8f9f91e030238d6681ac5fed8785c14. Se eliminaron 418 rutas regenerables y APFS ganó 17.329.319.936 bytes reales. Preservación, .codex-tmp, dirty original, ramas y worktrees quedaron intactos. No se requiere segunda pasada para cerrar el ordenamiento general.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "glosh-general-ordering-closeout-01",
+          "title": "Cerrar ordenamiento general de Glosh",
+          "detail": "DONE / CHATGPT REVIEWED. Audit, preservación, baseline canónica y cleanup regenerable cerrados. No hay frente de producto activo por defecto; cada nuevo frente debe arrancar leyendo Central + GitHub actuales.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "glosh-orchestration-01",
+          "title": "Automatizar handoff mínimo ChatGPT ↔ Codex",
+          "detail": "PENDIENTE / NO ACTIVO. Objetivo posterior: Central define task/base/owner; ChatGPT emite ticket corto; Codex ejecuta hasta PASS/BLOCKED/FAILED y publica SHA/evidencia mínima; una señal dispara revisión ChatGPT. Evitar un orquestador grande y reducir prompts, handoffs, tokens e intervención manual.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "preserve-local-state",
+          "title": "Preservar todo el estado local",
+          "detail": "DONE / SUPERADO por MAC-LOCAL-PRESERVATION-03, que dejó cobertura recuperable verificada del estado local relevante.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "p0-hardening-batch-01",
+          "title": "Primer lote P0",
+          "detail": "Hosts Supabase exactos y sync atómico aprobados; pairing requiere cierre dinámico real.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "p0-backend-closeout-02",
+          "title": "Cerrar backend P0",
+          "detail": "Hardening RPC base aplicado en Production. Scope token cross-device PASS; quedan gate end-to-end de pairing y deuda Auth del pairing Admin. Sin owner activo.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "superadmin-product-batch-01",
+          "title": "Lote grande Super Admin",
+          "detail": "DONE. PR #96 fue fuente funcional pero cerró sin merge; la integración vigente llegó a main mediante PR #100/#101.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "chrome-visual-closure-batch-04",
+          "title": "Cerrar Chrome Visual en Chrome real",
+          "detail": "H20 COMPATIBILITY/REPLACE-ALL PASS PHYSICAL / CHATGPT REVIEWED. SERVICE-WORKER-BOUNDARY-01 queda BLOCKED / CHATGPT REVIEWED como diagnóstico histórico. RESET-INVARIANT-01 PASS FINAL / CHATGPT REVIEWED sobre DEV412. SELECTIVE-R31-01 PASS FINAL / CHATGPT REVIEWED sobre DEV413: Chrome oficial entregó SAFE originales, sustituyó BLOCK/UNKNOWN con raw 0/0, preservó resetCount=3 y navegación real usable en Frávega/Mimo. Siguiente orden: normalidad/performance y batería, no reabrir arquitectura H19/H20 ya cerrada.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "manual-codex-workflow",
+          "title": "Workflow manual ChatGPT → Codex",
+          "detail": "ChatGPT resuelve análisis/arquitectura/revisión; Codex se reserva principalmente para Mac/local, builds, tests, ADB, dispositivos, scripts y benchmarks.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "parallel-coordination-v2",
+          "title": "Endurecer coordinación paralela",
+          "detail": "Owner único, max 2 escritores, worktrees/rutas aisladas, PASS técnico separado de cierre Central y prohibición de pisar/limpiar trabajo ajeno.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "ai-auto-handoff-01",
+          "title": "Autorun experimental de Codex",
+          "detail": "Retirado del flujo normal.",
+          "status": "done",
+          "priority": "normal"
+        },
+        {
+          "id": "codex-effort-routing",
+          "title": "Elegir esfuerzo Codex por cada ticket",
+          "detail": "ChatGPT elige el menor esfuerzo suficiente.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "workflow-cost-optimization",
+          "title": "Optimizar workflow para bajar costos",
+          "detail": "DONE / AUDITADO 25-08-2026. Tickets delta, lectura mínima, lotes coherentes, tests proporcionales, evidencia heredable, handoff compacto y review/*-final en el mismo ticket. Docs-only no compila ni versiona Android.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "workflow-hygiene-01",
+          "title": "Reducir ruido de workflow y repo",
+          "detail": "DONE / CHATGPT REVIEWED. AGENTS prohíbe microcommits de gobernanza y ramas copy/check/v2 rutinarias; BACKLOG_PRODUCTO y HANDOFF_ACTUAL viejos quedan como stubs y sus snapshots íntegros se preservan en docs/archive. Control Center deja de compilar APK por cambios solo del tracker, agrega concurrency y retención 14 días. No se borraron ramas/PR.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "vercel-super-admin-trigger-isolation",
+          "title": "Evitar deploys innecesarios de Super Admin",
+          "detail": "MITIGATED / GLOBAL FIX BLOCKED. Control Center ya no dispara Vercel en su rama; ramas antiguas pueden seguir creando previews. Gmail mitigó notificaciones. Falta ajuste global de settings Vercel cuando haya acceso de escritura.",
+          "status": "blocked",
+          "priority": "important"
+        },
+        {
+          "id": "control-center-sync-rule",
+          "title": "Sincronizar siempre Glosh Central",
+          "detail": "AI_TASK_TRACKER.json es el estado que consume la app. Cambios materiales se reflejan en el mismo ciclo. Tracker-only no debe compilar APK; in_progress solo si hay owner/rutas activas persistentes.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "review-branch-handoff-rule",
+          "title": "Publicar review final en el mismo lote Codex",
+          "detail": "PASS técnico publica y verifica review/*-final en el mismo ticket. Evitar ramas intermedias innecesarias; PR/merge/main/Production/deploy/borrados/gastos siguen separados.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "gloshia-data-preservation-rule",
+          "title": "Blindar datos de entrenamiento/calibración",
+          "detail": "Datasets, muestras, labels, reviews, calibraciones, métricas y evidencia no se borran por resets operativos sin autorización separada.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "apps-account-product-batch-07",
+          "title": "Próximo lote Apps / cuentas",
+          "detail": "Usuario UX V4 pausado/preservado; Admin UX V4 visualmente implementado y pendiente gate técnico; Vite UI Lab Usuario preservado en review/apps-ui-lab-01-final @ 58c9ae2b63c7d010df2cc992044883e0ec269b30. Sin owner activo en Apps; al retomar, preflight + revisión del checkpoint antes de nueva escritura.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "clean-data-reset",
+          "title": "Reset limpio de datos Glosh",
+          "detail": "Datos operativos en cero; Super Admin/Auth raíz preservados. Evidencia IA excluida de resets operativos.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "control-center-v2",
+          "title": "Control Center V2",
+          "detail": "DONE / CHATGPT REVIEWED. Resumen superior filtra por estado; Prioridad/Secciones y sync preservados. APK v0.4.0 PASS, SHA-256 d6a8c59d…0883.",
+          "status": "done",
+          "priority": "normal"
+        },
+        {
+          "id": "pro-audit",
+          "title": "Auditoría Pro y mapa técnico",
+          "detail": "Auditoría integral completada; hallazgos se cierran por lotes auditables.",
+          "status": "done",
+          "priority": "important"
+        }
       ]
     },
     {
@@ -40,21 +202,111 @@
       "title": "Seguridad",
       "context": "Super Admin y legado innecesario cerrados; superficie pública revisada; scope de token cross-device validado dinámicamente; lógica de licencia validada con gates transaccionales",
       "tasks": [
-        {"id":"exact-hosts","title":"Allowlist exacta de Supabase","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
-        {"id":"atomic-sync","title":"Sync atómico de políticas","detail":"Aprobado en PR #95.","status":"done","priority":"critical"},
-        {"id":"backend-security-advisor-audit","title":"Auditar exposición real del backend","detail":"DONE read-only: 0 tablas public sin RLS accesibles por anon/authenticated; RPC anon restantes muestran auth.uid, device-token o pairing-code; SECURITY DEFINER public fija search_path.","status":"done","priority":"critical"},
-        {"id":"edge-functions-public-auth","title":"Auditar Edge Functions públicas","detail":"DONE read-only; rutas públicas revisadas. GloshIA review requiere cierre no destructivo antes de nueva calibración.","status":"done","priority":"critical"},
-        {"id":"rpc-permission-matrix","title":"Clasificar permisos reales de RPCs","detail":"DONE. Matriz en docs/RPC_PERMISSION_HARDENING_PLAN.md.","status":"done","priority":"critical"},
-        {"id":"rpc-execute-hardening","title":"Reducir permisos EXECUTE sobrantes","detail":"DONE en Production: super_admin_* cerrado a anon; activate_device anon revocado.","status":"done","priority":"critical"},
-        {"id":"default-function-privileges-hardening","title":"Cerrar auto-EXECUTE en funciones nuevas","detail":"DONE: nuevas funciones public quedan opt-in; service_role preservado.","status":"done","priority":"critical"},
-        {"id":"activation-code-single-use","title":"Impedir doble uso de códigos de activación","detail":"DONE en Production con índice único parcial.","status":"done","priority":"critical"},
-        {"id":"license-backend-gates","title":"Validar reglas backend de licencias","detail":"DONE con transacciones+ROLLBACK: estados, fechas y cupos validados.","status":"done","priority":"critical"},
-        {"id":"pairing-hardening","title":"Hardening de pairing","detail":"BLOQUEO VIGENTE. Internas cerradas y doble activación impedida; falta gate end-to-end transaccional real.","status":"blocked","priority":"critical"},
-        {"id":"device-token-scope","title":"Scope de token por dispositivo","detail":"DONE: gate dinámico A/B PASS; cross-device y credenciales incorrectas rechazadas.","status":"done","priority":"critical"},
-        {"id":"direct-auth-users-write","title":"Eliminar escritura directa en auth.users","detail":"BLOQUEO / DEPENDENCIA: pairing Admin aún crea auth.users/auth.identities manualmente; requiere migrar Auth antes.","status":"blocked","priority":"important"},
-        {"id":"pairing-rate-limit","title":"Agregar rate-limit específico al pairing","detail":"Pendiente: no existe aún límite específico de intentos fallidos.","status":"pending","priority":"important"},
-        {"id":"activate-device-legacy","title":"Cerrar acceso anónimo de activate_device legacy","detail":"DONE: anon revocado; authenticated/service_role preservados temporalmente.","status":"done","priority":"important"},
-        {"id":"leaked-password-protection","title":"Activar protección de contraseñas filtradas","detail":"Pendiente: Advisor la reporta desactivada y el conector actual no expone escritura Auth.","status":"pending","priority":"important"}
+        {
+          "id": "exact-hosts",
+          "title": "Allowlist exacta de Supabase",
+          "detail": "Aprobado en PR #95.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "atomic-sync",
+          "title": "Sync atómico de políticas",
+          "detail": "Aprobado en PR #95.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "backend-security-advisor-audit",
+          "title": "Auditar exposición real del backend",
+          "detail": "DONE read-only: 0 tablas public sin RLS accesibles por anon/authenticated; RPC anon restantes muestran auth.uid, device-token o pairing-code; SECURITY DEFINER public fija search_path.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "edge-functions-public-auth",
+          "title": "Auditar Edge Functions públicas",
+          "detail": "DONE read-only; rutas públicas revisadas. GloshIA review requiere cierre no destructivo antes de nueva calibración.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "rpc-permission-matrix",
+          "title": "Clasificar permisos reales de RPCs",
+          "detail": "DONE. Matriz en docs/RPC_PERMISSION_HARDENING_PLAN.md.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "rpc-execute-hardening",
+          "title": "Reducir permisos EXECUTE sobrantes",
+          "detail": "DONE en Production: super_admin_* cerrado a anon; activate_device anon revocado.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "default-function-privileges-hardening",
+          "title": "Cerrar auto-EXECUTE en funciones nuevas",
+          "detail": "DONE: nuevas funciones public quedan opt-in; service_role preservado.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "activation-code-single-use",
+          "title": "Impedir doble uso de códigos de activación",
+          "detail": "DONE en Production con índice único parcial.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "license-backend-gates",
+          "title": "Validar reglas backend de licencias",
+          "detail": "DONE con transacciones+ROLLBACK: estados, fechas y cupos validados.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "pairing-hardening",
+          "title": "Hardening de pairing",
+          "detail": "BLOQUEO VIGENTE. Internas cerradas y doble activación impedida; falta gate end-to-end transaccional real.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "device-token-scope",
+          "title": "Scope de token por dispositivo",
+          "detail": "DONE: gate dinámico A/B PASS; cross-device y credenciales incorrectas rechazadas.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "direct-auth-users-write",
+          "title": "Eliminar escritura directa en auth.users",
+          "detail": "BLOQUEO / DEPENDENCIA: pairing Admin aún crea auth.users/auth.identities manualmente; requiere migrar Auth antes.",
+          "status": "blocked",
+          "priority": "important"
+        },
+        {
+          "id": "pairing-rate-limit",
+          "title": "Agregar rate-limit específico al pairing",
+          "detail": "Pendiente: no existe aún límite específico de intentos fallidos.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "activate-device-legacy",
+          "title": "Cerrar acceso anónimo de activate_device legacy",
+          "detail": "DONE: anon revocado; authenticated/service_role preservados temporalmente.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "leaked-password-protection",
+          "title": "Activar protección de contraseñas filtradas",
+          "detail": "Pendiente: Advisor la reporta desactivada y el conector actual no expone escritura Auth.",
+          "status": "pending",
+          "priority": "important"
+        }
       ]
     },
     {
@@ -62,21 +314,116 @@
       "title": "Apps / cuentas",
       "context": "Usuario V4 pausado/preservado; Admin V4 visualmente implementado y pendiente gate técnico; Vite UI Lab Usuario preservado como checkpoint remoto. Sin owner activo.",
       "tasks": [
-        {"id":"apps-user-admin-ux-ui-audit-01","title":"Auditar UX/UI de Usuario y Admin","detail":"DONE en ChatGPT.","status":"done","priority":"important"},
-        {"id":"apps-user-admin-flow-wireframes-02","title":"Definir flujo objetivo y wireframes","detail":"DONE para primera dirección.","status":"done","priority":"important"},
-        {"id":"apps-ui-lab-01","title":"APPS-UI-LAB-01 — laboratorio Vite App Usuario","detail":"PAUSED / CHECKPOINT PRESERVED / PENDING CHATGPT REVIEW. Base 7ad5cd20b21c912f5eff74c610d3be472d8f2c30; review/apps-ui-lab-01-final @ 58c9ae2b63c7d010df2cc992044883e0ec269b30; scope exclusivo tools/apps-ui-lab/**; lab visual/mock, sin cambios productivos en app-user/** ni backend. No owner activo. Al retomar: preflight, revisar checkpoint remoto y recién después continuar iteración visual.","status":"pending","priority":"important","base":"7ad5cd20b21c912f5eff74c610d3be472d8f2c30","branch":"review/apps-ui-lab-01-final","paths":["tools/apps-ui-lab/**"]},
-        {"id":"apps-user-admin-ui-implementation-03","title":"Implementar UI/UX profesional Usuario y Admin","detail":"Pendiente de cierre general V4 y gates.","status":"pending","priority":"important"},
-        {"id":"user-ux-v4-05","title":"Rediseñar App Usuario UX V4","detail":"PAUSED; trabajo preservado en work/user-ux-v4-01. Al retomar requiere versionCode real, firma DEV estable y update in-place.","status":"pending","priority":"important"},
-        {"id":"admin-ux-v4-06","title":"Rediseñar App Admin UX V4","detail":"CODE COMPLETE VISUAL / PENDING TECH GATE.","status":"pending","priority":"important"},
-        {"id":"apps-user-admin-ui-build-gate-04","title":"Compilar y validar rediseño Usuario/Admin","detail":"Pendiente de build/tests/lint/smoke proporcionales.","status":"pending","priority":"important"},
-        {"id":"glosh-brand-mark-03","title":"Definir wordmark e isotipo Glosh","detail":"Wordmark aplicado; isotipo pausado, launcher icons placeholder.","status":"pending","priority":"important"},
-        {"id":"ai-app-approval-explanation","title":"IA explica la app antes de aprobar","detail":"Pendiente.","status":"pending","priority":"important"},
-        {"id":"license-expiry-flow","title":"Definir qué pasa al vencer la licencia","detail":"Backend validado; pendiente reacción/UX de apps y renovación.","status":"pending","priority":"important"},
-        {"id":"admin-password-purpose","title":"Aclarar para qué sirve la contraseña Admin","detail":"DONE en UI de activación.","status":"done","priority":"normal"},
-        {"id":"account-capacity-remaining","title":"Mostrar cupos disponibles","detail":"Backend límites validados; contrato actual no devuelve cupos restantes.","status":"pending","priority":"important"},
-        {"id":"user-relink","title":"Reenlazar usuario","detail":"UX ubicada en Seguridad > Más opciones; cierre backend aún pendiente.","status":"pending","priority":"important"},
-        {"id":"user-request-history-delete","title":"Borrar historial de pedidos en Usuario","detail":"Pendiente.","status":"pending","priority":"normal"},
-        {"id":"prevent-double-control-actions","title":"Evitar dos controles simultáneos","detail":"Backend evita doble consumo de códigos; quedan acciones/UI concurrentes cuando corresponda.","status":"pending","priority":"important"}
+        {
+          "id": "apps-user-admin-ux-ui-audit-01",
+          "title": "Auditar UX/UI de Usuario y Admin",
+          "detail": "DONE en ChatGPT.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "apps-user-admin-flow-wireframes-02",
+          "title": "Definir flujo objetivo y wireframes",
+          "detail": "DONE para primera dirección.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "apps-ui-lab-01",
+          "title": "APPS-UI-LAB-01 — laboratorio Vite App Usuario",
+          "detail": "PAUSED / CHECKPOINT PRESERVED / PENDING CHATGPT REVIEW. Base 7ad5cd20b21c912f5eff74c610d3be472d8f2c30; review/apps-ui-lab-01-final @ 58c9ae2b63c7d010df2cc992044883e0ec269b30; scope exclusivo tools/apps-ui-lab/**; lab visual/mock, sin cambios productivos en app-user/** ni backend. No owner activo. Al retomar: preflight, revisar checkpoint remoto y recién después continuar iteración visual.",
+          "status": "pending",
+          "priority": "important",
+          "base": "7ad5cd20b21c912f5eff74c610d3be472d8f2c30",
+          "branch": "review/apps-ui-lab-01-final",
+          "paths": [
+            "tools/apps-ui-lab/**"
+          ]
+        },
+        {
+          "id": "apps-user-admin-ui-implementation-03",
+          "title": "Implementar UI/UX profesional Usuario y Admin",
+          "detail": "Pendiente de cierre general V4 y gates.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "user-ux-v4-05",
+          "title": "Rediseñar App Usuario UX V4",
+          "detail": "PAUSED; trabajo preservado en work/user-ux-v4-01. Al retomar requiere versionCode real, firma DEV estable y update in-place.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "admin-ux-v4-06",
+          "title": "Rediseñar App Admin UX V4",
+          "detail": "CODE COMPLETE VISUAL / PENDING TECH GATE.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "apps-user-admin-ui-build-gate-04",
+          "title": "Compilar y validar rediseño Usuario/Admin",
+          "detail": "Pendiente de build/tests/lint/smoke proporcionales.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "glosh-brand-mark-03",
+          "title": "Definir wordmark e isotipo Glosh",
+          "detail": "Wordmark aplicado; isotipo pausado, launcher icons placeholder.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "ai-app-approval-explanation",
+          "title": "IA explica la app antes de aprobar",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "license-expiry-flow",
+          "title": "Definir qué pasa al vencer la licencia",
+          "detail": "Backend validado; pendiente reacción/UX de apps y renovación.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "admin-password-purpose",
+          "title": "Aclarar para qué sirve la contraseña Admin",
+          "detail": "DONE en UI de activación.",
+          "status": "done",
+          "priority": "normal"
+        },
+        {
+          "id": "account-capacity-remaining",
+          "title": "Mostrar cupos disponibles",
+          "detail": "Backend límites validados; contrato actual no devuelve cupos restantes.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "user-relink",
+          "title": "Reenlazar usuario",
+          "detail": "UX ubicada en Seguridad > Más opciones; cierre backend aún pendiente.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "user-request-history-delete",
+          "title": "Borrar historial de pedidos en Usuario",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "prevent-double-control-actions",
+          "title": "Evitar dos controles simultáneos",
+          "detail": "Backend evita doble consumo de códigos; quedan acciones/UI concurrentes cuando corresponda.",
+          "status": "pending",
+          "priority": "important"
+        }
       ]
     },
     {
@@ -84,9 +431,27 @@
       "title": "Super Admin",
       "context": "UX vigente integrada en main por PR #100/#101; RPC Super Admin cerradas a anon y guardas verificadas",
       "tasks": [
-        {"id":"super-admin-data-cleanup","title":"Actualizar y limpiar datos del Super Admin","detail":"DONE; funcionalidad fuente de #96 quedó integrada posteriormente en main mediante #100/#101.","status":"done","priority":"important"},
-        {"id":"license-management-review","title":"Revisar sistema completo de licencias","detail":"DONE funcional; integración vigente en main mediante #100/#101 y reglas backend validadas.","status":"done","priority":"important"},
-        {"id":"super-admin-ux-ui","title":"Mejorar UX/UI del Super Admin","detail":"DONE; UX vigente integrada en main mediante PR #100/#101.","status":"done","priority":"important"}
+        {
+          "id": "super-admin-data-cleanup",
+          "title": "Actualizar y limpiar datos del Super Admin",
+          "detail": "DONE; funcionalidad fuente de #96 quedó integrada posteriormente en main mediante #100/#101.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "license-management-review",
+          "title": "Revisar sistema completo de licencias",
+          "detail": "DONE funcional; integración vigente en main mediante #100/#101 y reglas backend validadas.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "super-admin-ux-ui",
+          "title": "Mejorar UX/UI del Super Admin",
+          "detail": "DONE; UX vigente integrada en main mediante PR #100/#101.",
+          "status": "done",
+          "priority": "important"
+        }
       ]
     },
     {
@@ -94,7 +459,13 @@
       "title": "Entrega / APKs",
       "context": "No hay gate de APK activo ahora.",
       "tasks": [
-        {"id":"apk-release-gates","title":"Gate de APK Usuario y Admin","detail":"Pendiente cuando se retome Apps; sin integración/publicación/Production.","status":"pending","priority":"important"}
+        {
+          "id": "apk-release-gates",
+          "title": "Gate de APK Usuario y Admin",
+          "detail": "Pendiente cuando se retome Apps; sin integración/publicación/Production.",
+          "status": "pending",
+          "priority": "important"
+        }
       ]
     },
     {
@@ -102,79 +473,582 @@
       "title": "Chrome Visual",
       "context": "Baseline canónica contiene Chrome passing 10A/10B/11A/12/12A/12B/13A/13B-R y GloshIA R3.1. R2A permanece PASS FINAL / CHATGPT REVIEWED sobre DEV375; R2B conserva authority atómica y matriz automática PASS. PRESENTATION_COMMIT_UNOBSERVABLE cierra screenshots; COVERAGE-17 y H18 preservan sus límites revisados. H19 queda BLOCKED / CHATGPT REVIEWED por FOREGROUND_DOCUMENT_BINDING_UNAVAILABLE_IN_STOCK_CHROME. H20 compatibility/Replace-All, RESET-INVARIANT-01 y SELECTIVE-R31-01 quedan PASS FINAL / CHATGPT REVIEWED. DEV413 @ cf72dc2767b83980c5fa27dae87dfa15a2ba25e7 con review 4a29135d9f50c5b166999bd55bcfbfb8bb1dcc45: SAFE originales, BLOCK/UNKNOWN placeholders, raw 0/0; Frávega/Mimo usables; Google mujer BLOCKED_BY_SITE; SW nuevo no adquirido; resetCount=3. Arquitectura práctica de fotos en stock Chrome queda cerrada. Próximo frente: normalidad/performance/batería y luego hardening de producto. No se autoriza otro clearApplicationUserData.",
       "tasks": [
-        {"id":"chrome-review-local","title":"Separar y revisar Chrome Visual local","detail":"PASS histórico; gate posterior detectó scroll/lazy y fue superado por arquitectura actual.","status":"done","priority":"critical"},
-        {"id":"chrome-a23-physical-images","title":"Validar imágenes reales en Chrome sobre A23","detail":"FAILED histórico superado por superficie protegida + data plane.","status":"done","priority":"critical"},
-        {"id":"chrome-concurrent-audit-06","title":"Auditar commits concurrentes de Chrome Visual","detail":"DONE; conceptos útiles preservados.","status":"done","priority":"critical"},
-        {"id":"chrome-atomic-scroll-replay","title":"CHROME-PHOTOS-PROTECTED-SURFACE-00 — superficie protegida única","detail":"PASS FINAL DEV318.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-data-plane-00","title":"CHROME-PHOTOS-DATA-PLANE-00 — filtrar imagen HTTPS antes del render","detail":"PASS FINAL DEV.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-presentation-independence-01","title":"CHROME-PHOTOS-PRESENTATION-INDEPENDENCE-01 — navegación sana sin screenshots","detail":"PASS FINAL DEV.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-real-web-batch-01","title":"CHROME-PHOTOS-REAL-WEB-BATCH-01 — HTTPS real multi-host antes de GloshIA","detail":"PASS FINAL DEV para hosts controlados.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-gloshia-real-web-batch-02","title":"CHROME-PHOTOS-GLOSHIA-REAL-WEB-BATCH-02 — GloshIA R3.1 sobre HTTPS real","detail":"SUPERADO histórico; integración útil preservada.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-cache-authority-03","title":"CHROME-PHOTOS-CACHE-AUTHORITY-03 — autoridad de sesión sobre cache de Chrome","detail":"SUPERADO histórico por bootstrap full-reset.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-trusted-bootstrap-04","title":"CHROME-PHOTOS-TRUSTED-BOOTSTRAP-04 — limpieza inicial cache-only","detail":"SUPERADO histórico; cache-only descartado.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-cache-strategy-decision-04","title":"Decidir estrategia tras límite de cache de Chrome","detail":"DONE: Chrome normal + reset completo inicial durante provisioning.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-full-reset-bootstrap-05","title":"CHROME-PHOTOS-FULL-RESET-BOOTSTRAP-05/05A — reset inicial completo y cierre dinámico","detail":"PASS FINAL DEV.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-general-web-audit-06","title":"CHROME-PHOTOS-GENERAL-WEB-AUDIT-06 — auditoría Pro Chrome + GloshIA","detail":"DONE; originó gates 10–15.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-connectivity-incident-06a","title":"CHROME-PHOTOS-CONNECTIVITY-INCIDENT-06A — Chrome sin conexión","detail":"DONE: allowlist exacta era la causa.","status":"done","priority":"critical"},
-        {"id":"chrome-photos-proxy-semantics-08a","title":"CHROME-PHOTOS-PROXY-SEMANTICS-08A — navegación general segura","detail":"SUPERADO por 08B + HEV.","status":"done","priority":"critical"},
-        {"id":"chrome-vpn-transport-architecture-08b","title":"CHROME-VPN-TRANSPORT-ARCHITECTURE-08B — único VPN con atribución por UID","detail":"PASS FINAL ARCHITECTURE.","status":"done","priority":"critical"},
-        {"id":"chrome-vpn-transport-engine-feasibility-09a","title":"CHROME-VPN-TRANSPORT-ENGINE-FEASIBILITY-09A — HEV controlado","detail":"DONE; HEV aceptado técnicamente para full-tunnel DEV.","status":"done","priority":"critical"},
-        {"id":"chrome-vpn-09a-udp-fixture-roundtrip-01","title":"CHROME-VPN-09A-UDP-FIXTURE-ROUNDTRIP-01 — cerrar UDP físico","detail":"PASS FINAL DEV337 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-vpn-full-tunnel-controlled-10a","title":"CHROME-VPN-FULL-TUNNEL-CONTROLLED-10A — full-tunnel seguro","detail":"PASS FINAL DEV340 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-vpn-process-death-guard-10b","title":"CHROME-VPN-PROCESS-DEATH-GUARD-10B — guard independiente","detail":"PASS FINAL DEV344 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-proxy-web-semantics-11a","title":"CHROME-PROXY-WEB-SEMANTICS-11A — web normal","detail":"PASS FINAL DEV348 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-image-content-authority-11b","title":"CHROME-IMAGE-CONTENT-AUTHORITY-11B — autoridad robusta de imágenes","detail":"PASS FINAL DEV350 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-image-content-authority-11b-sniff-stream-02","title":"11B — cerrar sniffing sin romper streaming","detail":"PASS FINAL DEV350 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-general-web-functional-12","title":"CHROME-GENERAL-WEB-FUNCTIONAL-12 — navegación general","detail":"PASS FINAL DEV / CHATGPT REVIEWED; 12B cerró bloqueadores de queue/TLS.","status":"done","priority":"critical"},
-        {"id":"chrome-general-web-functional-12b","title":"CHROME-GENERAL-WEB-FUNCTIONAL-12B — Proxy Admission + TLS Classification","detail":"PASS FINAL DEV353 / CHATGPT REVIEWED. Funcional 525238a1…, review 9b24c95b…; queueRejects0 y TLS clasificable.","status":"done","priority":"critical"},
-        {"id":"chrome-accessibility-event-backpressure-12a","title":"CHROME-ACCESSIBILITY-EVENT-BACKPRESSURE-12A — sacar scans del main thread","detail":"PASS FINAL DEV352 / CHATGPT REVIEWED.","status":"done","priority":"critical"},
-        {"id":"chrome-provenance-gap-13a","title":"CHROME-PROVENANCE-GAP-13A — procedencia de píxeles","detail":"PASS FINAL DEV355 / CHATGPT REVIEWED. Base e46fe65c36b3f0134cdad7fd3e620a50d481f5d4; fix functional 60ec269ea0ed9ef0ab179ae39668c50fd2276f3b; review final review/chrome-provenance-gap-13a-dev355-final @ 72a0430aedbaa6aaac3619bfd140229b3bd46a61. Fix remoto revisado: INLINE_SVG rasteriza el SVG real y exige muestras roja/negra; cleanup verifica postcondiciones. Automáticos PASS: 186 unitarios, focalizados 8/8+2/2, compile/ktlint/lint/assemble/diff-check. A23: dos runs consecutivos 10/10 RENDERED, fallbacks 0, cleanup PASS dos veces, 11B físico PASS, crash/ANR/OOM 0/0/0, DO/Affiliated/Accessibility/datos preservados. SIGTRAP previo preservado y no reproducido sin DevTools.","status":"done","priority":"critical"},
-        {"id":"chrome-provenance-gap-13a-validation","title":"CHROME-PROVENANCE-GAP-13A-V — validar DEV354 sin ampliar scope","detail":"DONE / RESULTADO FAILED / CHATGPT REVIEWED. Verificación detuvo el gate antes de A23 al encontrar dos bloqueos válidos: INLINE_SVG puede dar falso PASS porque sólo comprueba geometría, y ktlint falla por una infracción del fixture. Diff/check y tests focalizados PASS; compile alcanzado; lint/assemble posteriores y A23 no se ejecutaron tras el FAIL, conforme al contrato.","status":"done","priority":"critical"},
-        {"id":"chrome-provenance-gap-13a-integrity-fix","title":"CHROME-PROVENANCE-GAP-13A-F — corregir integridad de medición","detail":"DONE / PASS FIX / CHATGPT REVIEWED. Functional 60ec269ea0ed9ef0ab179ae39668c50fd2276f3b; evidencia 13A-F 00541f9f29b9a37f0efb096408351edfc432254c; final evidence 72a0430aedbaa6aaac3619bfd140229b3bd46a61. El primer gate físico terminó en SIGTRAP de Chrome, pero el fix quedó revisado remoto y 13A-C cerró el bloqueo con dos runs físicos limpios y 11B PASS.","status":"done","priority":"critical"},
-        {"id":"chrome-provenance-gap-13a-chrome-crash-triage","title":"CHROME-PROVENANCE-GAP-13A-C — diagnosticar crash nativo Chrome","detail":"DONE / PASS TRIAGE DEV355 / CHATGPT REVIEWED. Evidencia final en 72a0430aedbaa6aaac3619bfd140229b3bd46a61: tombstone/bugreport preservados; SIGTRAP del browser principal correlacionado con /json/protocol DevTools pero sin atribución causal demostrada. Control ordinario + dos runs 13A consecutivos + 11B físico no reprodujeron crash; health 0/0/0 y rollback limpio.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-fallback-13b","title":"CHROME-VISUAL-FALLBACK-13B — fallback regional selectivo","detail":"BLOCKED / FASE 0 / CHATGPT REVIEWED. Base 72a0430aedbaa6aaac3619bfd140229b3bd46a61; sin cambios funcionales de 13B. El data-plane no produce NON_INTERCEPTABLE+región autoritativa y Accessibility sólo ofrece regiones heurísticas/captura de ventana. La ruta de autoridad mediante extensión también quedó bloqueada en stock Chrome Android móvil tras Phase2 5194e3705ad195875ca05d01a14ac105a159fb77. Reemplazado como ruta activa por 13B-R Visual Shield, con contrato explícitamente distinto y autorización de captura transitoria de ventana en RAM.","status":"blocked","priority":"important"},
-        {"id":"chrome-provenance-region-authority-13b-p","title":"CHROME-ANDROID-EXTENSION-PROVENANCE-13B-P — validar autoridad browser-side","detail":"BLOCKED / CHATGPT REVIEWED. Base de Phase2: review/chrome-android-extension-provenance-13b-p-triage @ 4b8aa02f290079b285b5e414eef7d3ed6b811da8; functional 84f1039039eec972413de23139426b70aa7ed4ce; evidence/review review/chrome-android-extension-provenance-13b-p-phase2-triage @ 5194e3705ad195875ca05d01a14ac105a159fb77. A23/Chrome 152: ExtensionInstallForcelist aplicado correctamente como java.lang.String JSON, provider flush PASS, reverse/bridge preflight PASS, salud/restore PASS, pero Chrome no hizo GET /update.xml ni /extension.crx en 3m34s y no hubo heartbeat/installed/startup. Review de Chromium HEAD: enable_extensions excluye Android; enable_desktop_android_extensions sólo se activa con is_desktop_android y está documentado como build experimental, no estable. No seguir tanteando updater/policies en stock Chrome móvil.","status":"blocked","priority":"critical"},
-        {"id":"chrome-visual-shield-13b-r","title":"CHROME-VISUAL-SHIELD-13B-R — segunda capa visual selectiva","detail":"DONE / PASS FINAL DEV358 / CHATGPT REVIEWED. Base 72a0430aedbaa6aaac3619bfd140229b3bd46a61; functional 5f41053b48f72c74ad6fdcf1c8e08e5dfdd9617d; review/evidence review/chrome-visual-shield-13b-r-dev358-final @ 5c31b948a61edd21a600a14a6303531924df2356. Contrato separado session+window+content/viewport epoch+capture/region sequence; PROTECT→opaque commit→capture→crop→identity check; fullFrame 17/17 y crop 12/12 cerrados, outstanding 0; staleDropped=1 sin release; grabación principal 391 frames/51.118 s con sentinelVisibleFrames=0 y control positivo 28/34 tras release LAB; 64 tests focalizados, build/lint/diff PASS; 11B físico completo PASS; crash/ANR/OOM 0/0/0 y rollback limpio. No conecta GloshIA ni descubre regiones productivas.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-shield-13b-r1","title":"CHROME-VISUAL-SHIELD-13B-R1 — conectar GloshIA al crop vigente","detail":"BLOCKED / CANONICAL REGIONAL COVERAGE DOES NOT CONVERGE. Base y único review remoto vigente: review/chrome-visual-shield-13b-r1-viewport-automated @ 001be18d76418a1f5e4b54dc32d7c385711c2f37; functional R1 27166607d8f872aad9ffd7683a5d27d4e58582f9; DEV359. Diagnóstico DEV-only preservado localmente en 88804188c9e100f1f92165f95bd5a7308b43d6e4. Bajo RENDER_PROBE/NEVER RELEASE, full + tres regiones canónicas siguieron Safe/model_allow. STOP vigente; próxima ruta requiere decisión arquitectónica explícita.","status":"blocked","priority":"critical"},
-        {"id":"chrome-visual-shield-13b-r1-norm-probe","title":"CHROME-VISUAL-SHIELD-13B-R1-NORM-PROBE — resize directo diagnóstico","detail":"BLOCKED / CHATGPT REVIEWED / HYPOTHESIS INCONCLUSIVE. Primera corrida en review/chrome-visual-shield-13b-r1-norm-probe-final @ d150f80b6d25c741e9675d3894f434f858272130 midió SAFE portrait canonical/normalized 0.039147645/0.03846395 y SAFE landscape 0.05431226/0.23607704, ambos model_allow, pero BLOCK quedó NOT RUN por el defecto de ownership luego cerrado. Historia preservada; no promover esta rama como funcional.","status":"blocked","priority":"critical"},
-        {"id":"chrome-visual-shield-13b-r1-ownership-01","title":"CHROME-VISUAL-SHIELD-13B-R1-OWNERSHIP-01 — cerrar ownership de captura cancelada","detail":"DONE / PASS FINAL DEV361 / CHATGPT REVIEWED. Base 001be18d76418a1f5e4b54dc32d7c385711c2f37; functional e4d27df1f4eb6a205635988bfc0592fcc21737cf; review/chrome-visual-shield-13b-r1-ownership-01-final @ 10b84782cfac6e81f8c86ebbc16083e5a03094a8. Fix usa CancellableContinuation.resume(..., onCancellation) para cerrar el frame transferido si cancelación gana antes del consumo. Regresión determinista 4/4 + 48 Visual Shield PASS; físico A23 10/10 full frames, 4/4 crops, todos outstanding=0 tras 8 cancelaciones, navegación, portrait→landscape→portrait y STOP; crash/ANR/OOM 0/0/0. Sin residual de ownership.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-shield-13b-r1-norm-probe-02","title":"CHROME-VISUAL-SHIELD-13B-R1-NORM-PROBE-02 — completar SAFE/BLOCK portrait+landscape","detail":"BLOCKED / HYPOTHESIS REJECTED / CHATGPT REVIEWED. Base e4d27df1f4eb6a205635988bfc0592fcc21737cf; functional probe 45c84dc252b6d5eed834c0c4c362fba02ee74917; review/chrome-visual-shield-13b-r1-norm-probe-02-triage @ 0f802fd45c912de112fa4cae8a63e2f057914418; DEV362. Normalized SAFE portrait=allow 0.03846395, SAFE landscape=allow 0.23607704, BLOCK portrait=filter 0.9476602, BLOCK landscape=allow 0.029659301. Attestation 4/4, NEVER RELEASE, rawPresented=false, releaseCurrent=0, full/crop/inference outstanding=0, crash/ANR/OOM 0/0/0 y rollback limpio. STOP arquitectónico. La rama es evidencia diagnóstica y no debe promoverse como base funcional.","status":"blocked","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A — descubrimiento seguro de regiones productivas","detail":"PASS FINAL DEV375 / CHATGPT REVIEWED. Functional 999a5cc2a3982bad0fad3f34baeba54b30d4fd8f; review 892154613db1888046472c450ad8281a512213c3; APK 799c328901820cdebf5a5f66e5a7c7b006aa7cc07050aaccedffc18b0b19221b. Matriz completa, oracle/raster provenance/fullBleed adversarial/ownership/health PASS; NEVER RELEASE. R2B queda autorizado como siguiente ruta DEV.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a-raster-provenance-01","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-RASTER-PROVENANCE-01 — atribuir crop vacío","detail":"DONE / DIAGNOSED / CHATGPT REVIEWED. Base 1fc11d21cbaa47a3977f67a7fab02f87957eef6a; functional c905051a5f133ad3661a15b75013cead820610a7; review/chrome-visual-region-discovery-13b-r2a-raster-provenance-01-final @ 4a1c7530c9f2e6af568506a16877197878777059; DEV365. Diagnosticó EPOCH_MISMATCH E21/R21 contra E22/R22 y condujo al binding exacto posterior. Sin cambios de planner/GloshIA.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a-epoch-binding-01","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-EPOCH-BINDING-01 — ligar attestation a generación native","detail":"BLOCKED / CHATGPT REVIEWED. Base c905051a5f133ad3661a15b75013cead820610a7; functional f369f1236901e50ef9e6c19503d7d6c16b916591; review/chrome-visual-region-discovery-13b-r2a-epoch-binding-01-triage @ 34f2f00bbc51c9dcb57c81eb13a0ceb8d5f3a71c; DEV366. Binding/invalidación/capture barrier PASS y físicamente evitó cruces de generación; el blocker posterior de liveness fue cerrado por STALE-GENERATION-LIVENESS-01.","status":"blocked","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a-stale-generation-liveness-01","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-STALE-GENERATION-LIVENESS-01 — cerrar stale legítimo one-shot","detail":"BLOCKED / CHATGPT REVIEWED. Base f369f1236901e50ef9e6c19503d7d6c16b916591; functional 4b964b4566fdb47f11d7c84ffc24b4caecfc7423; review/chrome-visual-region-discovery-13b-r2a-stale-generation-liveness-01-triage @ 4a9b737e766aab35882453a8d5291189e6fe565c; DEV367. Transiciones tipadas/one-shot PASS; físico demostró invalidación única y reemplazo current. Blocker posterior errorCode=3 fue cerrado por CAPTURE-ADMISSION-01.","status":"blocked","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a-capture-admission-01","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-CAPTURE-ADMISSION-01 — serializar takeScreenshotOfWindow","detail":"DONE / PASS FIX / CHATGPT REVIEWED. Base 4b964b4566fdb47f11d7c84ffc24b4caecfc7423; functional 8e61de77f5e1f3794fe73ecae99f5ab098915ffc; review/chrome-visual-region-discovery-13b-r2a-capture-admission-01-triage @ f02e8b2bcc03fabf11c1efd9448a0fa9d9fad08a; DEV368 APK c3285286af81954ec4f6992696ce37bd13c9504bce46c655991e22450a2df165. Gate usa uptimeMillis y 334 ms por window; errorCode3=0 físico. Pipeline alcanzó Complete/R3.1; ticket se detuvo por blocker causal distinto oracle/provenance.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a-oracle-boundary-01","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-ORACLE-BOUNDARY-01 — atribuir mismatch Complete/oracle","detail":"DONE / SUPERADO por CLOSURE-01. El mismatch se atribuyó a espacios geométricos, inset de navegación, orden de presentación/opaque commit y una franja exterior de 2 px en landscape. Functional final 999a5cc2; sin cambios de GloshIA/modelo/thresholds.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a-closure-01","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-CLOSURE-01 — cierre técnico/físico","detail":"DONE / PASS FINAL / CHATGPT REVIEWED. Functional 999a5cc2a3982bad0fad3f34baeba54b30d4fd8f; review/chrome-visual-region-discovery-13b-r2a-closure-01-final @ 892154613db1888046472c450ad8281a512213c3; DEV375 APK 799c328901820cdebf5a5f66e5a7c7b006aa7cc07050aaccedffc18b0b19221b. NEVER RELEASE; matriz física completa, fullBleed adversarial, ownership y health PASS.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-region-discovery-13b-r2a-final-validation-01","title":"CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-FINAL-VALIDATION-01 — matriz faltante sobre DEV375 final","detail":"DONE / PASS FINAL VALIDATION / NO CODE CHANGE. El APK DEV375 instalado coincidió byte a byte con SHA 799c3289. Off-left/off-right Complete+model_filter; multi Complete con una allow y una filter; ambiguous Unknown/oracleMatch con 0 inferencias; rotation/stale/cancel/STOP PASS; fullBleed adversarial PASS; full/crop/inference outstanding=0; crash/ANR/OOM=0/0/0; rollback limpio. Evidence review @ 892154613db1888046472c450ad8281a512213c3.","status":"done","priority":"critical"},
-        {"id":"chrome-visual-region-set-authority-13b-r2b","title":"CHROME-VISUAL-REGION-SET-AUTHORITY-13B-R2B — release sólo con discovery completo","detail":"BLOCKED PHYSICAL / CHATGPT REVIEWED por PRESENTATION_COMMIT_UNOBSERVABLE. Authority funcional 342ff3b2af485a4bc70d7243615a8be97b432ffa mantiene matriz automática PASS. Functional del delta b815da41; review triage 3c12c2fd; DEV379 APK 72c3dce0. Attestation==capture, errorCode3=0 y ownership=0, pero cuatro bindings landscape current con recaptura de la misma generación siguieron marker absent/palette 0; planner/inference/release delta=0 y fail-close. No reabrir R2B ni habilitar real-web/product mode mientras falte autoridad post-render.","status":"blocked","priority":"critical"},
-        {"id":"chrome-real-web-provenance-coverage-17","title":"CHROME-REAL-WEB-PROVENANCE-COVERAGE-17 — medir cobertura pre-render en stock Chrome","detail":"BLOCKED / MEASUREMENT COMPLETE / CHATGPT REVIEWED. Base b815da4156771c91c349a68b85726e81fefd1a88; functional a5440ce43157130a1ba25914d73ca588cb89c1ca; review/chrome-real-web-provenance-coverage-17-triage @ 9be974ec4627a0c8b42966dbdec685a99d0ff0dd; DEV380 APK f2cace2e. Matriz 18 estados/71 medios visibles: authoritative=0, non-interceptable real-web probado=0, unknown=71; lower/upper por conteo y área 0%-100%. Ledger real-web: 516 recursos, inspected=298, SAFE=278, BLOCK=20, failclosed=215, cacheHit=59. Root blocker VISIBLE_CAUSALITY_INSUFFICIENT: falta binding browser-side request/body/verdict -> instancia visible. 11B físico PASS, sin bypass/crash, rollback limpio. No demuestra que Byte Gate + document shield sea inviable.","status":"blocked","priority":"critical"},
-        {"id":"chrome-stock-prerender-shield-18","title":"CHROME-STOCK-PRE-RENDER-SHIELD-18 — Byte Gate + document shield en Chrome oficial","detail":"BLOCKED / ARCHITECTURAL_SECURITY_COMPATIBILITY_CONFLICT / CHATGPT REVIEWED. Base a5440ce43157130a1ba25914d73ca588cb89c1ca; functional 17cac82e581e69c81fe5f435498269b313daa059; review/chrome-stock-prerender-shield-18-closure-01-triage @ 0a0c6455978ae2e7cc48f6f2e7aa287bc3b9a722; DEV381 APK 399265e5. Replace-All: candidates/replaced/raw=6/6/0. Compatible static y dynamic alcanzaron BOOT_READY y presentaron el raster DOM/CSS exacto 64/64; dynamic conservó script+fetch. Strict eliminó el raster, pero bloqueó CSS/JS normales. Root cause: CSS/DOM ordinario puede sintetizar cualquier raster sin body visual ni sink especial; stock Chrome no ofrece una frontera pre-presentación que lo distinga de layout legítimo. Decisión de producto H19: esa síntesis deliberada mediante primitivas CSS/HTML genéricas queda fuera del contrato de filtrado de fotos/medios; no se rompe CSS/JS normal para cubrirla. Rollback/health limpios; R2A/R2B/11B/modelo sin cambios.","status":"blocked","priority":"critical"},
-        {"id":"chrome-stock-media-authority-19","title":"CHROME-STOCK-MEDIA-AUTHORITY-19 — autoridad pre-render práctica para fotos/medios en Chrome oficial","detail":"BLOCKED / CHATGPT REVIEWED. Root cause exacta: FOREGROUND_DOCUMENT_BINDING_UNAVAILABLE_IN_STOCK_CHROME. Base 3e2a4540fa55e00cc831c81144bfb532a953afb1; functional 1ddc69fb6c1e5c538de9c268ee31ceb26e7e7f9d; review/chrome-stock-media-authority-19-active-document-handshake-01-triage @ 3105126781c3b7b68a55e7df76f766799e6913c5; DEV403 APK ace2e5f6af0ef2a11b3a49443b21ef362f9e11abe01eafba66d09268af1b2a14. A23/Chrome 152: dos documentos transformados y parser barrier 2/2, pero focus primordial sobre la cortina protegida no adquirió document.hasFocus(); activeHello/challenge/proof/present/release=0. Byte Gate de la sesión 4/4/0, raw BLOCK/UNKNOWN=0; la matriz revisada previa 13/13/0 se preserva. Sin screenshots/compositor/polling/CDP/extensión ni cambios de R3.1. Google Images/Frávega/Mimo/selective/normality no se ejecutaron porque falló el gate cold anterior. Producto cerrado; continuar stock Chrome requiere una nueva API oficial demostrable o una decisión explícita de integración controlada por navegador.","status":"blocked","priority":"critical"},
-        {"id":"chrome-stock-media-authority-19-active-document-handshake-01","title":"H19 ACTIVE-DOCUMENT CRYPTOGRAPHIC HANDSHAKE — documento current sin Accessibility marker","detail":"BLOCKED / CHATGPT REVIEWED. FOREGROUND_DOCUMENT_BINDING_UNAVAILABLE_IN_STOCK_CHROME. Base 3e2a4540fa55e00cc831c81144bfb532a953afb1; functional 1ddc69fb6c1e5c538de9c268ee31ceb26e7e7f9d; review/chrome-stock-media-authority-19-active-document-handshake-01-triage @ 3105126781c3b7b68a55e7df76f766799e6913c5; DEV403 APK ace2e5f6af0ef2a11b3a49443b21ef362f9e11abe01eafba66d09268af1b2a14. Contrato HELLO→challenge→PROVE→PRESENT permanece fail-close. En A23, parser barrier 2/2 y Chrome foreground/root/window current, pero document.hasFocus() siguió falso tras focus primordial: readyRequests=0, activeHello=0, crossTabRelease=0, release=0. Falta una identidad browser-side tabId+documentId+lifecycle con active check atómico; package/window/root/red/policy no la sustituyen. Byte Gate 4/4/0, raw BLOCK/UNKNOWN=0; crash/ANR/OOM=0/0/0, rollback limpio y DO/Affiliated/Accessibility/datos preservados.","status":"blocked","priority":"critical"},
-        {"id":"chrome-stock-document-self-shield-20-feasibility-01","title":"H20 DOCUMENT-SELF-SHIELD — cortina propia por documento sin release global","detail":"PASS PHYSICAL / CHATGPT REVIEWED para compatibility/Replace-All. Base e1b773db; functional 6e8a6dab2ac625dcda18b2a5c1a917661a6b4489; review 9dc38cdd97074503e5cca1e5c85dd7e2fe3b5f9f; DEV409 SHA 30bcdc1e3e7bb6e6836108843a620177953f16731e6e93a0dca3c323f33a365c. Controlled, Google sin query, Frávega y Mimo usables; 224/224/0; raw BLOCK/UNKNOWN=0. Security authority pendiente fue cerrada posteriormente por RESET-INVARIANT-01 bajo la regla de producto revisada.","status":"done","priority":"critical"},
-        {"id":"chrome-stock-document-self-shield-20-service-worker-boundary-01","title":"H20 SERVICE-WORKER-BOUNDARY — SW controlador contra capability y navegación","detail":"BLOCKED / CHATGPT REVIEWED como diagnóstico histórico. Base 6e8a6dab; functional 07112e2d; review 71619d50; DEV411 126f160a. PASS_THROUGH conservó transformación/SELF_READY/parser. SYNTHETIC_SELF_READY no interpuesto: el XHR síncrono llegó al proxy/registry. SYNTHETIC_NAVIGATION presentó sentinel SW sin curtain/bootstrap/SELF_READY ni claim current. Root cause SERVICE_WORKER_BYPASSES_DOCUMENT_TRANSFORM. La ruta de cierre se valida separadamente en RESET-INVARIANT-01.","status":"blocked","priority":"critical"},
-        {"id":"chrome-stock-document-self-shield-20-service-worker-reset-invariant-01","title":"H20 RESET-INVARIANT — reset único y bloqueo de futuros Service Workers","detail":"PASS FINAL / CHATGPT REVIEWED. Base 07112e2d; functional 01e4c800c4fcf5309fa5f1b61c31a540ea06fa2e; evidence/review 8cb13f1c56af9a438ecad5fd9728c6927653cab9; DEV412 c6cc40d4b5640a12b03299d4e122b694177aa32c24b6a801e77f8dc7d6f3ba63. Exactamente un clearApplicationUserData de Chrome: RESET_BASELINE_CLEAN=1, REGISTER_BLOCKED=1, REGISTER_SUCCEEDED=0, worker scripts=0, visuales replaced/raw=7/7/0, raw BLOCK/UNKNOWN=0/0, crash/ANR/OOM=0/0/0, DO/Affiliated/Accessibility/Glosh inode preservados y rollback completo. Regla adoptada para la ruta técnica: reset único por generación al activar la protección + impedir nuevas registraciones SW. No autoriza otros borrados ni Production.","status":"done","priority":"critical"},
-        {"id":"chrome-stock-document-self-shield-20-selective-r31-01","title":"H20 SELECTIVE R3.1 — SAFE original y BLOCK/UNKNOWN fail-close","detail":"PASS FINAL / CHATGPT REVIEWED. Base 01e4c800c4fcf5309fa5f1b61c31a540ea06fa2e; prep ChatGPT 7cde5e404323605a5c1fbf648f9fa82f91e7bee5; functional cf72dc2767b83980c5fa27dae87dfa15a2ba25e7; review 4a29135d9f50c5b166999bd55bcfbfb8bb1dcc45; DEV413 a0471c7389c5d9e4ecd009ea30a3db6605591a68a0fb7638174d175ea20eb132. SW: Window register bloqueado, script principal 0, Worker realm UNSUPPORTED en Chrome 152 y Worker ordinario cargó. Control: SAFE original, BLOCK model_filter placeholder, UNKNOWN/unsupported fail-close, cache por digest. Real web: SAFE raw 180, BLOCK replaced 5, UNKNOWN 13, unsupported 56, raw BLOCK/UNKNOWN 0/0; Frávega/Mimo navegables y scroll usable; Google mujer BLOCKED_BY_SITE sin evasión. Perf DEV: inferencia p50/p95/p99 149.541/548.574/631.898 ms; cache hit p50/p95 0.067/0.200 ms. Salud y rollback PASS; resetCount=3 sin borrado adicional. Residual menor: back/forward automatizado inconcluso, a cubrir junto a normalidad/performance.","status":"done","priority":"critical"},
-        {"id":"chrome-fravega-mimo-e2e","title":"Chrome fotos E2E — Frávega / Mimo","detail":"DONE / CHATGPT REVIEWED. Replace-All DEV409 y selective R3.1 DEV413 demostraron Frávega/Mimo usables, SAFE progresivas, BLOCK/UNKNOWN sustituidas y raw=0. Seguimiento restante pasa a normalidad/performance.","status":"done","priority":"important"},
-        {"id":"chrome-gloshia-realtime-scheduler-14a","title":"CHROME-GLOSHIA-REALTIME-SCHEDULER-14A — respuesta perceptual","detail":"ABSORBIDO por CHROME-H20-PERF-NORMALITY-14-CLOSURE-01. Un único owner/writer Codex medirá cache/concurrency, respuesta perceptual y normalidad sin cambiar R3.1/modelo/thresholds.","status":"pending","priority":"important"},
-        {"id":"chrome-general-web-perf-14","title":"CHROME-GENERAL-WEB-PERF-14 — rendimiento y batería","detail":"NORMALIDAD/PERFORMANCE GLOBAL 05B: PASS FINAL / CHATGPT REVIEWED. Sobre el fix 05A revisado, el A23 completó 46m10s H20 ON/R3.1 selective, ocho páginas públicas y navegación real sin runaway, crash/ANR/OOM/new LOW_MEMORY ni violación de seguridad; rollback completo. La batería aislada y el cierre técnico de producto Fotos pasan a CHROME-H20-GLOSHIA-PHOTOS-PRODUCT-CLOSURE-06. Product Hardening permanece fuera de scope.","status":"done","priority":"important"},
-        {"id":"chrome-h20-dynamic-document-cpu-attribution-04","title":"CHROME-H20-DYNAMIC-DOCUMENT-CPU-ATTRIBUTION-04 — atribuir CPU sostenida en documentos dinámicos","detail":"DIAGNOSTIC COMPLETE / NO CURRENT EVIDENCE OF H20 CPU AMPLIFICATION. El A/B limpio no reprodujo el outlier histórico; H20 ON fue más liviano que OFF (renderer avg/max 2.16%/9.3% vs 9.75%/20.3%). 04A cerró la ceguera instrumental con reports/rejected=3/0 y counters no nulos; una corrida dinámica adicional tampoco reprodujo CPU alta. No seguir cazando ese evento salvo que reaparezca en GLOBAL-WEB-NORMALITY-05. Reviews ee096a3d19dd4536f69f2bae8f33fd909c1cd682 y 5f988b285b7f0a48ead16f4ef2a606f5adcc6006.","status":"done","priority":"critical"},
-        {"id":"chrome-h20-renderer-metrics-liveness-04a","title":"CHROME-H20-RENDERER-METRICS-LIVENESS-04A — confiabilidad del snapshot renderer-side","detail":"PASS FINAL / CHATGPT REVIEWED. RENDERER_METRICS_LIVENESS_PASS. El one-shot confirma sent sólo tras response URL nativa válida + 204, reintenta tras fallo y usa visibilitychange hidden antes de pagehide; trigger explícito, replay rejection, token/identity y SELF_READY/release/parser/Byte Gate preservados. A23 reports/rejected=3/0 con counters no nulos; corrida focal Mimo sin runaway/ANR/LOW_MEMORY; rollback limpio y resetCount=3. Functional 9cd29a7ddb141874d0ae45a49fc920e73a18a348; review/chrome-h20-renderer-metrics-liveness-04a-final @ 5f988b285b7f0a48ead16f4ef2a606f5adcc6006; DEV417 4fc837a2ba17b9c2b6c3919561c4239b6715cb93e75e88c291c36a3a14e22d0f.","status":"done","priority":"critical"},
-        {"id":"chrome-h20-global-web-normality-05","title":"CHROME-H20-GLOBAL-WEB-NORMALITY-05 — normalidad global HTTPS real","detail":"BLOCKED PHYSICAL / CHATGPT REVIEWED. STOP temprano a ~25 min: renderer PID 25775 llegó a 254% CPU y ~860 MiB RSS; MemAvailable mínimo 331020 KiB. El snapshot reports=6/rejected=0 localizó el delta de un documento en 175121 scanCalls, 58356 guardedScans, 116704 markupScans y 175187 sanitizeElement, sin SVG/Shadow/internalMutations y con sólo 30 callbacks/74 childRecords/1 attributeRecord. Root blocker H20_DYNAMIC_DOCUMENT_DOM_GUARD_SCAN_AMPLIFICATION fue corregido técnicamente por 05A, pendiente revisión ChatGPT. Este gate permanece bloqueado hasta reejecutar sus 45 minutos sobre el candidato revisado. raw BLOCK/UNKNOWN 0/0, queue rejects/timeouts 0/0, protect/bypass 0, sin nuevos ANR/crash/OOM/LOW_MEMORY; rollback limpio, resetCount=3. Functional 9cd29a7ddb141874d0ae45a49fc920e73a18a348; review/chrome-h20-global-web-normality-05-triage @ d7680540d740121b856fb6b0033837253898a2e1; DEV417 4fc837a2ba17b9c2b6c3919561c4239b6715cb93e75e88c291c36a3a14e22d0f.","status":"blocked","priority":"critical","base":"9cd29a7ddb141874d0ae45a49fc920e73a18a348","branch":"review/chrome-h20-global-web-normality-05-triage","worktree":"/Users/yejielnehmad/Developer/glosh-chrome-h20-global-web-normality-05","paths":["docs/areas/protection"]},
-        {"id":"chrome-h20-dom-guard-markup-scan-amplification-05a","title":"CHROME-H20-DOM-GUARD-MARKUP-SCAN-AMPLIFICATION-05A — atribución y corrección causal de wrappers DOM/markup","detail":"PASS FINAL / CHATGPT REVIEWED. H20_DOM_WRAPPER_AMPLIFICATION_FIXED. Root cause: append/prepend/replaceChildren/before/after/replaceWith escaneaban el nodo insertado y luego el receptor completo, generando traversal creciente. CHILD final: OFF/ON 29.8/41.6 ms; scanNodes 42514→488, scanMicros 997683→7668, sanitizeElement 44315→969. MARKUP explicó exactamente por 240 operaciones: 240 guarded + 480 markup + 240 factory direct + 240 DOM direct; markup scan time 5471 us, sin tuning especulativo. Mimo/Frávega sin runaway; raw BLOCK/UNKNOWN 0/0, rejects/timeouts/protect/bypass 0, ANR/crash/OOM/new LOW_MEMORY 0/0/0/0, resetCount=3, rollback completo. Functional/review 8abd7762bc18261cff9c7512f9821da7b233a4b7; DEV420 3273aeed0579ac7fe20fdad05041573843f6d50beeeb609a00800b16abd6bac1.","status":"done","priority":"critical","base":"9cd29a7ddb141874d0ae45a49fc920e73a18a348","branch":"review/chrome-h20-dom-guard-markup-scan-amplification-05a-final","worktree":"/Users/yejielnehmad/Developer/glosh-chrome-h20-dom-wrapper-amplification-05a","paths":["app-user/src/dev/java/com/contentfilter/user/chromedataplane","app-user/src/testDev/kotlin/com/contentfilter/user/chromedataplane","app-user/build.gradle.kts","docs/areas/protection"]},
-        {"id":"chrome-h20-global-web-normality-05b","title":"CHROME-H20-GLOBAL-WEB-NORMALITY-05B — cierre global H20 + GloshIA R3.1 sobre 05A","detail":"PASS FINAL / CHATGPT REVIEWED. A23 DEV420 exacto completó 46m10s continuos H20 ON/R3.1 selective, ocho páginas públicas cubriendo search/editorial/reference/ecommerce/dynamic/image-heavy/lazy/responsive/multi-origin y todas las maniobras reales. Sin runaway: renderer RSS max ~363 MiB, MemAvailable min 625088 KiB con recuperación, thermal 0; crash/ANR/OOM/new LOW_MEMORY 0/0/0/0. SAFE raw 208; BLOCK/UNKNOWN/unsupported replaced 23/93/121; raw BLOCK/UNKNOWN 0/0; queue rejects/timeouts 0/0; protectFailure 0; QUIC/direct TCP 0/0; SELF_READY/release/parser y SW invariant sanos; resetCount=3 y rollback completo. Sin código/build/version/reset. Base 8abd7762bc18261cff9c7512f9821da7b233a4b7; evidence/review f21c8964e24c1b671df420e3a029f8755d163955; review/chrome-h20-global-web-normality-05b-final.","status":"done","priority":"critical","owner":"Codex — Chrome 05B","base":"8abd7762bc18261cff9c7512f9821da7b233a4b7","branch":"review/chrome-h20-global-web-normality-05b-final","worktree":"/Users/yejielnehmad/Developer/glosh-chrome-h20-global-web-normality-05b","paths":["docs/areas/protection"]},
-        {"id":"chrome-h20-gloshia-photos-product-closure-06","title":"CHROME-H20-GLOSHIA-PHOTOS-PRODUCT-CLOSURE-06 — cierre integral Fotos + GloshIA en Chrome","detail":"PASS FINAL / CHATGPT REVIEWED — CHROME_H20_GLOSHIA_PHOTOS_PRODUCT_CANDIDATE_PASS. Los blockers sucesivos de UI SVG y batería quedaron cerrados por 06A + 06B. Functional final 76f285be92945857e5de89423f5df7edf54fc7a9; DEV423 6388dd7904c94f76f65533200ccf17590c964c2651c619abcfe30727ef85024b; evidencia final review/chrome-h20-battery-baseline-control-06b-final @ 2d094e9b291da2049ca5c4274e16c449dfc54aac. UI original/real y SVG authority PASS; lifecycle/recovery PASS; long-run final 47m08s sin runaway/crash/ANR/OOM/new LOW_MEMORY; battery A/B equivalente 32m por brazo A 420.1 vs B 410.6 mAh/h, delta -2.3%, background -9.1% dentro de ruido; raw BLOCK/UNKNOWN 0/0, queues/timeouts 0/0, protectFailure 0, bypass 0/0, resetCount=3 y rollback completo. El harness OFF de batería quedó aislado sólo en la rama de medición y no integra el functional final.","status":"done","priority":"critical","owner":"Codex — Chrome Photos Product Closure 06","base":"8abd7762bc18261cff9c7512f9821da7b233a4b7","branch":"review/chrome-h20-battery-baseline-control-06b-final","worktree":"/Users/yejielnehmad/Developer/glosh-chrome-h20-gloshia-photos-product-closure-06","paths":["app-user/src/**/com/contentfilter/user/chromedataplane/**","core-domain/src/**/com/contentfilter/core/domain/chrome/**","app-user/build.gradle.kts","docs/areas/protection/**"]},
-        {"id":"chrome-h20-original-ui-svg-authority-06a","title":"CHROME-H20-ORIGINAL-UI-SVG-AUTHORITY-06A — autoridad SVG original + cierre producto Fotos","detail":"PASS FINAL / CHATGPT REVIEWED. ORIGINAL_UI_SVG_AUTHORITY, UI fidelity, compatibilidad, lifecycle, seguridad y long-run pasan sobre DEV423. Functional 76f285be92945857e5de89423f5df7edf54fc7a9; evidence/review 0136df6c42b015ac32706677413abc13b84696be. El único blocker histórico BATTERY_ARM_A_CONTROL_UNAVAILABLE quedó resuelto posteriormente por 06B sin alterar este functional.","status":"done","priority":"critical","owner":"Codex — Chrome Original UI SVG Authority 06A","base":"8abd7762bc18261cff9c7512f9821da7b233a4b7","branch":"review/chrome-h20-original-ui-svg-authority-06a-triage","worktree":"/Users/yejielnehmad/Developer/glosh-chrome-h20-original-ui-svg-authority-06a","paths":["app-user/src/**/com/contentfilter/user/chromedataplane/**","core-domain/src/**/com/contentfilter/core/domain/chrome/**","app-user/build.gradle.kts","docs/areas/protection/**"]},
-        {"id":"chrome-h20-battery-baseline-control-06b","title":"CHROME-H20-BATTERY-BASELINE-CONTROL-06B — control DEV de baseline y gate final de batería Fotos","detail":"PASS FINAL / CHATGPT REVIEWED — CHROME_H20_GLOSHIA_PHOTOS_BATTERY_GATE_PASS. A23, workload Frávega idéntico 30 ciclos/~32m por brazo: ARM A 225 mAh (420.1 mAh/h), ARM B 220 mAh (410.6 mAh/h), delta normalizado -2.3%; background screen-off 15m A/B 55/50 mAh, delta -9.1%, sin loop ni overhead patológico. SVG fixture 12/12; raw BLOCK/UNKNOWN 0/0; queues/timeouts 0/0; protectFailure 0; bypass 0/0; crash/ANR/OOM/new LOW_MEMORY 0; resetCount=3; rollback completo. Functional permanece 76f285be92945857e5de89423f5df7edf54fc7a9. Harness DEV temporal preservado únicamente en work/chrome-h20-battery-baseline-control-06b@3f7e52cb74005d757333bb4df2e5a2545ef8e5a9; review final evidence-only review/chrome-h20-battery-baseline-control-06b-final@2d094e9b291da2049ca5c4274e16c449dfc54aac.","status":"done","priority":"critical","owner":"Codex — Chrome Battery Baseline 06B","base":"76f285be92945857e5de89423f5df7edf54fc7a9","branch":"work/chrome-h20-battery-baseline-control-06b","worktree":"/Users/yejielnehmad/Developer/glosh-chrome-h20-battery-baseline-control-06b","paths":["app-user/src/dev/**","app-user/src/testDev/**","app-user/build.gradle.kts","docs/areas/protection/**"]},
-        {"id":"chrome-h20-cold-image-burst-latency-06c","title":"CHROME-H20-COLD-IMAGE-BURST-LATENCY-06C — Chrome full functionality: latencia, fotos, GIF y video","detail":"IN PROGRESS — EXPLICIT USER AUTHORIZATION. Physical A23 precondition is restored: intended SM-A235M is attached and awake, Chrome is foreground and unsuspended, Device Owner and ProtectorAccessibilityService are enabled/bound, resetCount=3, and no Chrome data/cache was cleared. The mandatory current gate is Phase 1 physical normal-browser validation on real web: Mercado Libre, Mimo, Frávega, Google and an ecommerce cart/form flow; a reproducible white screen is under diagnosis/fix before video work continues. Continue the authorized Chrome full-functionality implementation in the existing worktree, preserving validated photo/GIF behavior and fail-closed security. No raw BLOCK/UNKNOWN, QUIC/direct-TCP bypass, host hacks, model/weights/labels/threshold changes, release-authority changes, Production or license mutation. Diagnose DRM/EME separately. Owner routes remain isolated to the existing 06C worktree; no parallel writer is active. Functional base 76f285be92945857e5de89423f5df7edf54fc7a9; governance main @ 9323b126dde3b91e21e2136a11d087fa3c1f0ca1; review/evidence remains review/chrome-h20-cold-image-burst-latency-06c-final @ b045441e688ea6c51d8b5b6bab7901a6b60ae3e7.","status":"in_progress","priority":"critical","owner":"Codex — Chrome Full Functionality","base":"76f285be92945857e5de89423f5df7edf54fc7a9","governance":"main@9323b126dde3b91e21e2136a11d087fa3c1f0ca1","branch":"work/chrome-h20-cold-image-burst-latency-06c","worktree":"/Users/yejielnehmad/Developer/glosh-chrome-h20-cold-image-burst-latency-06c","paths":["app-user/src/dev/java/com/contentfilter/user/chromedataplane/**","app-user/src/testDev/kotlin/com/contentfilter/user/chromedataplane/**","app-user/build.gradle.kts","feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromeVisualVideoPolicy.kt","feature-accessibility/src/test/kotlin/com/contentfilter/feature/accessibility/chromevisual/**","docs/areas/protection/**"]},
-        {"id":"chrome-h20-anr-causal-attribution-14b-01","title":"CHROME-H20-ANR-CAUSAL-ATTRIBUTION-14B-01 — atribución focal del ANR","detail":"PASS DIAGNOSTIC / CHATGPT REVIEWED. Functional sin cambios c7d40a11f8f198a767514b48a538272296f3bfa9; review/chrome-h20-anr-causal-attribution-14b-01-final @ 7d1f53c1929c0c1c30c22c2f7ef6123c68df579f; DEV414 exacto. A H20 OFF 15m: ANR0, renderer RSS max 322716 KiB, MemAvailable min 699748 KiB. B H20 ON: ANR ~10m, input timeout 10004ms, renderer RSS max 858812KiB; two renderers ~490MiB+, high browser/renderer CPU; MemAvailable min127116KiB; renderer LOW_MEMORY/background kills. OFF processed more requests/inferences than ON; model/proxy/queue not primary. raw0/0; queue rejects/timeouts0/0. Causal class: H20_DOCUMENT_SELF_SHIELD_RENDERER_MEMORY_CPU_AMPLIFICATION.","status":"done","priority":"critical"},
-        {"id":"chrome-h20-self-shield-renderer-amplification-14c-01","title":"CHROME-H20-SELF-SHIELD-RENDERER-AMPLIFICATION-14C-01 — aislamiento y corrección renderer-side","detail":"PASS FINAL / CHATGPT REVIEWED. Base c7d40a11f8f198a767514b48a538272296f3bfa9; functional 65b27d2ea2f9cb988b127518cd34d5217e5a038d; review/chrome-h20-self-shield-renderer-amplification-14c-01-final @ 6b5490596bfed24fddce8e85ff483e89d27817eb; DEV416 462500ae255e73394f726a73a4558322a9f5e0e716c3e094ec103cb79081bdc2. Root cause: attribute MutationObserver ejecutaba sanitize(target)+scan(subtree) global y Shadow, duplicando traversal con guards y retroalimentación de mutaciones propias. Fix target-only preserva revalidación SVG y childList subtree scanning. A23 18 min: ANR=0, LOW_MEMORY nuevo=0, renderer RSS max ~344 MiB vs ~859 MiB old, MemAvailable min ~806 MiB vs ~127 MiB old, thermal 0, raw BLOCK/UNKNOWN=0/0, rejects/timeouts/protect/bypass=0. Frávega/Mimo/Google, back/forward, scroll/tabs/rotation usables; resetCount=3 y rollback limpio. No tuning ni cambios R3.1/Byte Gate.","status":"done","priority":"critical"},
-        {"id":"chrome-product-hardening-15","title":"CHROME-PRODUCT-HARDENING-15 — cierre de producto","detail":"Pendiente final: UX/consent, migration/versioning, AAB/ABI, privacidad/logging, SBOM, long-run, multi-OEM y soporte.","status":"pending","priority":"important"},
-        {"id":"chrome-update-compatibility-16","title":"CHROME-UPDATE-COMPATIBILITY-16 — compatibilidad automática con nuevas versiones de Chrome","detail":"FUTURE / PENDING. Después de cerrar Fotos/Video y antes de considerar Chrome product-ready: permitir actualización normal de Chrome, detectar versión instalada, mantener matriz de versiones validadas y entrar en modo seguro si aparece una versión no validada o rompe una dependencia real.","status":"pending","priority":"important"},
-        {"id":"chrome-video-a23","title":"Revalidar video en hardware","detail":"PAUSED; retomar sólo después de resolver/priorizar Chrome Fotos + GloshIA.","status":"pending","priority":"critical"},
-        {"id":"chrome-images","title":"Confirmar fotos estáticas en Chrome","detail":"PASS FINAL DEV para alcance HTTPS interceptable; H20 Selective R3.1 cerró la ruta productiva práctica en stock Chrome.","status":"done","priority":"important"},
-        {"id":"google-ai-field-visible","title":"Evitar que el teclado tape el campo de IA de Google","detail":"Pendiente.","status":"pending","priority":"normal"}
+        {
+          "id": "chrome-review-local",
+          "title": "Separar y revisar Chrome Visual local",
+          "detail": "PASS histórico; gate posterior detectó scroll/lazy y fue superado por arquitectura actual.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-a23-physical-images",
+          "title": "Validar imágenes reales en Chrome sobre A23",
+          "detail": "FAILED histórico superado por superficie protegida + data plane.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-concurrent-audit-06",
+          "title": "Auditar commits concurrentes de Chrome Visual",
+          "detail": "DONE; conceptos útiles preservados.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-atomic-scroll-replay",
+          "title": "CHROME-PHOTOS-PROTECTED-SURFACE-00 — superficie protegida única",
+          "detail": "PASS FINAL DEV318.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-data-plane-00",
+          "title": "CHROME-PHOTOS-DATA-PLANE-00 — filtrar imagen HTTPS antes del render",
+          "detail": "PASS FINAL DEV.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-presentation-independence-01",
+          "title": "CHROME-PHOTOS-PRESENTATION-INDEPENDENCE-01 — navegación sana sin screenshots",
+          "detail": "PASS FINAL DEV.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-real-web-batch-01",
+          "title": "CHROME-PHOTOS-REAL-WEB-BATCH-01 — HTTPS real multi-host antes de GloshIA",
+          "detail": "PASS FINAL DEV para hosts controlados.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-gloshia-real-web-batch-02",
+          "title": "CHROME-PHOTOS-GLOSHIA-REAL-WEB-BATCH-02 — GloshIA R3.1 sobre HTTPS real",
+          "detail": "SUPERADO histórico; integración útil preservada.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-cache-authority-03",
+          "title": "CHROME-PHOTOS-CACHE-AUTHORITY-03 — autoridad de sesión sobre cache de Chrome",
+          "detail": "SUPERADO histórico por bootstrap full-reset.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-trusted-bootstrap-04",
+          "title": "CHROME-PHOTOS-TRUSTED-BOOTSTRAP-04 — limpieza inicial cache-only",
+          "detail": "SUPERADO histórico; cache-only descartado.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-cache-strategy-decision-04",
+          "title": "Decidir estrategia tras límite de cache de Chrome",
+          "detail": "DONE: Chrome normal + reset completo inicial durante provisioning.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-full-reset-bootstrap-05",
+          "title": "CHROME-PHOTOS-FULL-RESET-BOOTSTRAP-05/05A — reset inicial completo y cierre dinámico",
+          "detail": "PASS FINAL DEV.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-general-web-audit-06",
+          "title": "CHROME-PHOTOS-GENERAL-WEB-AUDIT-06 — auditoría Pro Chrome + GloshIA",
+          "detail": "DONE; originó gates 10–15.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-connectivity-incident-06a",
+          "title": "CHROME-PHOTOS-CONNECTIVITY-INCIDENT-06A — Chrome sin conexión",
+          "detail": "DONE: allowlist exacta era la causa.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-photos-proxy-semantics-08a",
+          "title": "CHROME-PHOTOS-PROXY-SEMANTICS-08A — navegación general segura",
+          "detail": "SUPERADO por 08B + HEV.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-vpn-transport-architecture-08b",
+          "title": "CHROME-VPN-TRANSPORT-ARCHITECTURE-08B — único VPN con atribución por UID",
+          "detail": "PASS FINAL ARCHITECTURE.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-vpn-transport-engine-feasibility-09a",
+          "title": "CHROME-VPN-TRANSPORT-ENGINE-FEASIBILITY-09A — HEV controlado",
+          "detail": "DONE; HEV aceptado técnicamente para full-tunnel DEV.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-vpn-09a-udp-fixture-roundtrip-01",
+          "title": "CHROME-VPN-09A-UDP-FIXTURE-ROUNDTRIP-01 — cerrar UDP físico",
+          "detail": "PASS FINAL DEV337 / CHATGPT REVIEWED.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-vpn-full-tunnel-controlled-10a",
+          "title": "CHROME-VPN-FULL-TUNNEL-CONTROLLED-10A — full-tunnel seguro",
+          "detail": "PASS FINAL DEV340 / CHATGPT REVIEWED.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-vpn-process-death-guard-10b",
+          "title": "CHROME-VPN-PROCESS-DEATH-GUARD-10B — guard independiente",
+          "detail": "PASS FINAL DEV344 / CHATGPT REVIEWED.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-proxy-web-semantics-11a",
+          "title": "CHROME-PROXY-WEB-SEMANTICS-11A — web normal",
+          "detail": "PASS FINAL DEV348 / CHATGPT REVIEWED.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-image-content-authority-11b",
+          "title": "CHROME-IMAGE-CONTENT-AUTHORITY-11B — autoridad robusta de imágenes",
+          "detail": "PASS FINAL DEV350 / CHATGPT REVIEWED.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-image-content-authority-11b-sniff-stream-02",
+          "title": "11B — cerrar sniffing sin romper streaming",
+          "detail": "PASS FINAL DEV350 / CHATGPT REVIEWED.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-general-web-functional-12",
+          "title": "CHROME-GENERAL-WEB-FUNCTIONAL-12 — navegación general",
+          "detail": "PASS FINAL DEV / CHATGPT REVIEWED; 12B cerró bloqueadores de queue/TLS.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-general-web-functional-12b",
+          "title": "CHROME-GENERAL-WEB-FUNCTIONAL-12B — Proxy Admission + TLS Classification",
+          "detail": "PASS FINAL DEV353 / CHATGPT REVIEWED. Funcional 525238a1…, review 9b24c95b…; queueRejects0 y TLS clasificable.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-accessibility-event-backpressure-12a",
+          "title": "CHROME-ACCESSIBILITY-EVENT-BACKPRESSURE-12A — sacar scans del main thread",
+          "detail": "PASS FINAL DEV352 / CHATGPT REVIEWED.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-provenance-gap-13a",
+          "title": "CHROME-PROVENANCE-GAP-13A — procedencia de píxeles",
+          "detail": "PASS FINAL DEV355 / CHATGPT REVIEWED. Base e46fe65c36b3f0134cdad7fd3e620a50d481f5d4; fix functional 60ec269ea0ed9ef0ab179ae39668c50fd2276f3b; review final review/chrome-provenance-gap-13a-dev355-final @ 72a0430aedbaa6aaac3619bfd140229b3bd46a61. Fix remoto revisado: INLINE_SVG rasteriza el SVG real y exige muestras roja/negra; cleanup verifica postcondiciones. Automáticos PASS: 186 unitarios, focalizados 8/8+2/2, compile/ktlint/lint/assemble/diff-check. A23: dos runs consecutivos 10/10 RENDERED, fallbacks 0, cleanup PASS dos veces, 11B físico PASS, crash/ANR/OOM 0/0/0, DO/Affiliated/Accessibility/datos preservados. SIGTRAP previo preservado y no reproducido sin DevTools.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-provenance-gap-13a-validation",
+          "title": "CHROME-PROVENANCE-GAP-13A-V — validar DEV354 sin ampliar scope",
+          "detail": "DONE / RESULTADO FAILED / CHATGPT REVIEWED. Verificación detuvo el gate antes de A23 al encontrar dos bloqueos válidos: INLINE_SVG puede dar falso PASS porque sólo comprueba geometría, y ktlint falla por una infracción del fixture. Diff/check y tests focalizados PASS; compile alcanzado; lint/assemble posteriores y A23 no se ejecutaron tras el FAIL, conforme al contrato.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-provenance-gap-13a-integrity-fix",
+          "title": "CHROME-PROVENANCE-GAP-13A-F — corregir integridad de medición",
+          "detail": "DONE / PASS FIX / CHATGPT REVIEWED. Functional 60ec269ea0ed9ef0ab179ae39668c50fd2276f3b; evidencia 13A-F 00541f9f29b9a37f0efb096408351edfc432254c; final evidence 72a0430aedbaa6aaac3619bfd140229b3bd46a61. El primer gate físico terminó en SIGTRAP de Chrome, pero el fix quedó revisado remoto y 13A-C cerró el bloqueo con dos runs físicos limpios y 11B PASS.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-provenance-gap-13a-chrome-crash-triage",
+          "title": "CHROME-PROVENANCE-GAP-13A-C — diagnosticar crash nativo Chrome",
+          "detail": "DONE / PASS TRIAGE DEV355 / CHATGPT REVIEWED. Evidencia final en 72a0430aedbaa6aaac3619bfd140229b3bd46a61: tombstone/bugreport preservados; SIGTRAP del browser principal correlacionado con /json/protocol DevTools pero sin atribución causal demostrada. Control ordinario + dos runs 13A consecutivos + 11B físico no reprodujeron crash; health 0/0/0 y rollback limpio.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-fallback-13b",
+          "title": "CHROME-VISUAL-FALLBACK-13B — fallback regional selectivo",
+          "detail": "BLOCKED / FASE 0 / CHATGPT REVIEWED. Base 72a0430aedbaa6aaac3619bfd140229b3bd46a61; sin cambios funcionales de 13B. El data-plane no produce NON_INTERCEPTABLE+región autoritativa y Accessibility sólo ofrece regiones heurísticas/captura de ventana. La ruta de autoridad mediante extensión también quedó bloqueada en stock Chrome Android móvil tras Phase2 5194e3705ad195875ca05d01a14ac105a159fb77. Reemplazado como ruta activa por 13B-R Visual Shield, con contrato explícitamente distinto y autorización de captura transitoria de ventana en RAM.",
+          "status": "blocked",
+          "priority": "important"
+        },
+        {
+          "id": "chrome-provenance-region-authority-13b-p",
+          "title": "CHROME-ANDROID-EXTENSION-PROVENANCE-13B-P — validar autoridad browser-side",
+          "detail": "BLOCKED / CHATGPT REVIEWED. Base de Phase2: review/chrome-android-extension-provenance-13b-p-triage @ 4b8aa02f290079b285b5e414eef7d3ed6b811da8; functional 84f1039039eec972413de23139426b70aa7ed4ce; evidence/review review/chrome-android-extension-provenance-13b-p-phase2-triage @ 5194e3705ad195875ca05d01a14ac105a159fb77. A23/Chrome 152: ExtensionInstallForcelist aplicado correctamente como java.lang.String JSON, provider flush PASS, reverse/bridge preflight PASS, salud/restore PASS, pero Chrome no hizo GET /update.xml ni /extension.crx en 3m34s y no hubo heartbeat/installed/startup. Review de Chromium HEAD: enable_extensions excluye Android; enable_desktop_android_extensions sólo se activa con is_desktop_android y está documentado como build experimental, no estable. No seguir tanteando updater/policies en stock Chrome móvil.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-shield-13b-r",
+          "title": "CHROME-VISUAL-SHIELD-13B-R — segunda capa visual selectiva",
+          "detail": "DONE / PASS FINAL DEV358 / CHATGPT REVIEWED. Base 72a0430aedbaa6aaac3619bfd140229b3bd46a61; functional 5f41053b48f72c74ad6fdcf1c8e08e5dfdd9617d; review/evidence review/chrome-visual-shield-13b-r-dev358-final @ 5c31b948a61edd21a600a14a6303531924df2356. Contrato separado session+window+content/viewport epoch+capture/region sequence; PROTECT→opaque commit→capture→crop→identity check; fullFrame 17/17 y crop 12/12 cerrados, outstanding 0; staleDropped=1 sin release; grabación principal 391 frames/51.118 s con sentinelVisibleFrames=0 y control positivo 28/34 tras release LAB; 64 tests focalizados, build/lint/diff PASS; 11B físico completo PASS; crash/ANR/OOM 0/0/0 y rollback limpio. No conecta GloshIA ni descubre regiones productivas.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-shield-13b-r1",
+          "title": "CHROME-VISUAL-SHIELD-13B-R1 — conectar GloshIA al crop vigente",
+          "detail": "BLOCKED / CANONICAL REGIONAL COVERAGE DOES NOT CONVERGE. Base y único review remoto vigente: review/chrome-visual-shield-13b-r1-viewport-automated @ 001be18d76418a1f5e4b54dc32d7c385711c2f37; functional R1 27166607d8f872aad9ffd7683a5d27d4e58582f9; DEV359. Diagnóstico DEV-only preservado localmente en 88804188c9e100f1f92165f95bd5a7308b43d6e4. Bajo RENDER_PROBE/NEVER RELEASE, full + tres regiones canónicas siguieron Safe/model_allow. STOP vigente; próxima ruta requiere decisión arquitectónica explícita.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-shield-13b-r1-norm-probe",
+          "title": "CHROME-VISUAL-SHIELD-13B-R1-NORM-PROBE — resize directo diagnóstico",
+          "detail": "BLOCKED / CHATGPT REVIEWED / HYPOTHESIS INCONCLUSIVE. Primera corrida en review/chrome-visual-shield-13b-r1-norm-probe-final @ d150f80b6d25c741e9675d3894f434f858272130 midió SAFE portrait canonical/normalized 0.039147645/0.03846395 y SAFE landscape 0.05431226/0.23607704, ambos model_allow, pero BLOCK quedó NOT RUN por el defecto de ownership luego cerrado. Historia preservada; no promover esta rama como funcional.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-shield-13b-r1-ownership-01",
+          "title": "CHROME-VISUAL-SHIELD-13B-R1-OWNERSHIP-01 — cerrar ownership de captura cancelada",
+          "detail": "DONE / PASS FINAL DEV361 / CHATGPT REVIEWED. Base 001be18d76418a1f5e4b54dc32d7c385711c2f37; functional e4d27df1f4eb6a205635988bfc0592fcc21737cf; review/chrome-visual-shield-13b-r1-ownership-01-final @ 10b84782cfac6e81f8c86ebbc16083e5a03094a8. Fix usa CancellableContinuation.resume(..., onCancellation) para cerrar el frame transferido si cancelación gana antes del consumo. Regresión determinista 4/4 + 48 Visual Shield PASS; físico A23 10/10 full frames, 4/4 crops, todos outstanding=0 tras 8 cancelaciones, navegación, portrait→landscape→portrait y STOP; crash/ANR/OOM 0/0/0. Sin residual de ownership.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-shield-13b-r1-norm-probe-02",
+          "title": "CHROME-VISUAL-SHIELD-13B-R1-NORM-PROBE-02 — completar SAFE/BLOCK portrait+landscape",
+          "detail": "BLOCKED / HYPOTHESIS REJECTED / CHATGPT REVIEWED. Base e4d27df1f4eb6a205635988bfc0592fcc21737cf; functional probe 45c84dc252b6d5eed834c0c4c362fba02ee74917; review/chrome-visual-shield-13b-r1-norm-probe-02-triage @ 0f802fd45c912de112fa4cae8a63e2f057914418; DEV362. Normalized SAFE portrait=allow 0.03846395, SAFE landscape=allow 0.23607704, BLOCK portrait=filter 0.9476602, BLOCK landscape=allow 0.029659301. Attestation 4/4, NEVER RELEASE, rawPresented=false, releaseCurrent=0, full/crop/inference outstanding=0, crash/ANR/OOM 0/0/0 y rollback limpio. STOP arquitectónico. La rama es evidencia diagnóstica y no debe promoverse como base funcional.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A — descubrimiento seguro de regiones productivas",
+          "detail": "PASS FINAL DEV375 / CHATGPT REVIEWED. Functional 999a5cc2a3982bad0fad3f34baeba54b30d4fd8f; review 892154613db1888046472c450ad8281a512213c3; APK 799c328901820cdebf5a5f66e5a7c7b006aa7cc07050aaccedffc18b0b19221b. Matriz completa, oracle/raster provenance/fullBleed adversarial/ownership/health PASS; NEVER RELEASE. R2B queda autorizado como siguiente ruta DEV.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a-raster-provenance-01",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-RASTER-PROVENANCE-01 — atribuir crop vacío",
+          "detail": "DONE / DIAGNOSED / CHATGPT REVIEWED. Base 1fc11d21cbaa47a3977f67a7fab02f87957eef6a; functional c905051a5f133ad3661a15b75013cead820610a7; review/chrome-visual-region-discovery-13b-r2a-raster-provenance-01-final @ 4a1c7530c9f2e6af568506a16877197878777059; DEV365. Diagnosticó EPOCH_MISMATCH E21/R21 contra E22/R22 y condujo al binding exacto posterior. Sin cambios de planner/GloshIA.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a-epoch-binding-01",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-EPOCH-BINDING-01 — ligar attestation a generación native",
+          "detail": "BLOCKED / CHATGPT REVIEWED. Base c905051a5f133ad3661a15b75013cead820610a7; functional f369f1236901e50ef9e6c19503d7d6c16b916591; review/chrome-visual-region-discovery-13b-r2a-epoch-binding-01-triage @ 34f2f00bbc51c9dcb57c81eb13a0ceb8d5f3a71c; DEV366. Binding/invalidación/capture barrier PASS y físicamente evitó cruces de generación; el blocker posterior de liveness fue cerrado por STALE-GENERATION-LIVENESS-01.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a-stale-generation-liveness-01",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-STALE-GENERATION-LIVENESS-01 — cerrar stale legítimo one-shot",
+          "detail": "BLOCKED / CHATGPT REVIEWED. Base f369f1236901e50ef9e6c19503d7d6c16b916591; functional 4b964b4566fdb47f11d7c84ffc24b4caecfc7423; review/chrome-visual-region-discovery-13b-r2a-stale-generation-liveness-01-triage @ 4a9b737e766aab35882453a8d5291189e6fe565c; DEV367. Transiciones tipadas/one-shot PASS; físico demostró invalidación única y reemplazo current. Blocker posterior errorCode=3 fue cerrado por CAPTURE-ADMISSION-01.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a-capture-admission-01",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-CAPTURE-ADMISSION-01 — serializar takeScreenshotOfWindow",
+          "detail": "DONE / PASS FIX / CHATGPT REVIEWED. Base 4b964b4566fdb47f11d7c84ffc24b4caecfc7423; functional 8e61de77f5e1f3794fe73ecae99f5ab098915ffc; review/chrome-visual-region-discovery-13b-r2a-capture-admission-01-triage @ f02e8b2bcc03fabf11c1efd9448a0fa9d9fad08a; DEV368 APK c3285286af81954ec4f6992696ce37bd13c9504bce46c655991e22450a2df165. Gate usa uptimeMillis y 334 ms por window; errorCode3=0 físico. Pipeline alcanzó Complete/R3.1; ticket se detuvo por blocker causal distinto oracle/provenance.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a-oracle-boundary-01",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-ORACLE-BOUNDARY-01 — atribuir mismatch Complete/oracle",
+          "detail": "DONE / SUPERADO por CLOSURE-01. El mismatch se atribuyó a espacios geométricos, inset de navegación, orden de presentación/opaque commit y una franja exterior de 2 px en landscape. Functional final 999a5cc2; sin cambios de GloshIA/modelo/thresholds.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a-closure-01",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-CLOSURE-01 — cierre técnico/físico",
+          "detail": "DONE / PASS FINAL / CHATGPT REVIEWED. Functional 999a5cc2a3982bad0fad3f34baeba54b30d4fd8f; review/chrome-visual-region-discovery-13b-r2a-closure-01-final @ 892154613db1888046472c450ad8281a512213c3; DEV375 APK 799c328901820cdebf5a5f66e5a7c7b006aa7cc07050aaccedffc18b0b19221b. NEVER RELEASE; matriz física completa, fullBleed adversarial, ownership y health PASS.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-discovery-13b-r2a-final-validation-01",
+          "title": "CHROME-VISUAL-REGION-DISCOVERY-13B-R2A-FINAL-VALIDATION-01 — matriz faltante sobre DEV375 final",
+          "detail": "DONE / PASS FINAL VALIDATION / NO CODE CHANGE. El APK DEV375 instalado coincidió byte a byte con SHA 799c3289. Off-left/off-right Complete+model_filter; multi Complete con una allow y una filter; ambiguous Unknown/oracleMatch con 0 inferencias; rotation/stale/cancel/STOP PASS; fullBleed adversarial PASS; full/crop/inference outstanding=0; crash/ANR/OOM=0/0/0; rollback limpio. Evidence review @ 892154613db1888046472c450ad8281a512213c3.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-visual-region-set-authority-13b-r2b",
+          "title": "CHROME-VISUAL-REGION-SET-AUTHORITY-13B-R2B — release sólo con discovery completo",
+          "detail": "BLOCKED PHYSICAL / CHATGPT REVIEWED por PRESENTATION_COMMIT_UNOBSERVABLE. Authority funcional 342ff3b2af485a4bc70d7243615a8be97b432ffa mantiene matriz automática PASS. Functional del delta b815da41; review triage 3c12c2fd; DEV379 APK 72c3dce0. Attestation==capture, errorCode3=0 y ownership=0, pero cuatro bindings landscape current con recaptura de la misma generación siguieron marker absent/palette 0; planner/inference/release delta=0 y fail-close. No reabrir R2B ni habilitar real-web/product mode mientras falte autoridad post-render.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-real-web-provenance-coverage-17",
+          "title": "CHROME-REAL-WEB-PROVENANCE-COVERAGE-17 — medir cobertura pre-render en stock Chrome",
+          "detail": "BLOCKED / MEASUREMENT COMPLETE / CHATGPT REVIEWED. Base b815da4156771c91c349a68b85726e81fefd1a88; functional a5440ce43157130a1ba25914d73ca588cb89c1ca; review/chrome-real-web-provenance-coverage-17-triage @ 9be974ec4627a0c8b42966dbdec685a99d0ff0dd; DEV380 APK f2cace2e. Matriz 18 estados/71 medios visibles: authoritative=0, non-interceptable real-web probado=0, unknown=71; lower/upper por conteo y área 0%-100%. Ledger real-web: 516 recursos, inspected=298, SAFE=278, BLOCK=20, failclosed=215, cacheHit=59. Root blocker VISIBLE_CAUSALITY_INSUFFICIENT: falta binding browser-side request/body/verdict -> instancia visible. 11B físico PASS, sin bypass/crash, rollback limpio. No demuestra que Byte Gate + document shield sea inviable.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-stock-prerender-shield-18",
+          "title": "CHROME-STOCK-PRE-RENDER-SHIELD-18 — Byte Gate + document shield en Chrome oficial",
+          "detail": "BLOCKED / ARCHITECTURAL_SECURITY_COMPATIBILITY_CONFLICT / CHATGPT REVIEWED. Base a5440ce43157130a1ba25914d73ca588cb89c1ca; functional 17cac82e581e69c81fe5f435498269b313daa059; review/chrome-stock-prerender-shield-18-closure-01-triage @ 0a0c6455978ae2e7cc48f6f2e7aa287bc3b9a722; DEV381 APK 399265e5. Replace-All: candidates/replaced/raw=6/6/0. Compatible static y dynamic alcanzaron BOOT_READY y presentaron el raster DOM/CSS exacto 64/64; dynamic conservó script+fetch. Strict eliminó el raster, pero bloqueó CSS/JS normales. Root cause: CSS/DOM ordinario puede sintetizar cualquier raster sin body visual ni sink especial; stock Chrome no ofrece una frontera pre-presentación que lo distinga de layout legítimo. Decisión de producto H19: esa síntesis deliberada mediante primitivas CSS/HTML genéricas queda fuera del contrato de filtrado de fotos/medios; no se rompe CSS/JS normal para cubrirla. Rollback/health limpios; R2A/R2B/11B/modelo sin cambios.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-stock-media-authority-19",
+          "title": "CHROME-STOCK-MEDIA-AUTHORITY-19 — autoridad pre-render práctica para fotos/medios en Chrome oficial",
+          "detail": "BLOCKED / CHATGPT REVIEWED. Root cause exacta: FOREGROUND_DOCUMENT_BINDING_UNAVAILABLE_IN_STOCK_CHROME. Base 3e2a4540fa55e00cc831c81144bfb532a953afb1; functional 1ddc69fb6c1e5c538de9c268ee31ceb26e7e7f9d; review/chrome-stock-media-authority-19-active-document-handshake-01-triage @ 3105126781c3b7b68a55e7df76f766799e6913c5; DEV403 APK ace2e5f6af0ef2a11b3a49443b21ef362f9e11abe01eafba66d09268af1b2a14. A23/Chrome 152: dos documentos transformados y parser barrier 2/2, pero focus primordial sobre la cortina protegida no adquirió document.hasFocus(); activeHello/challenge/proof/present/release=0. Byte Gate de la sesión 4/4/0, raw BLOCK/UNKNOWN=0; la matriz revisada previa 13/13/0 se preserva. Sin screenshots/compositor/polling/CDP/extensión ni cambios de R3.1. Google Images/Frávega/Mimo/selective/normality no se ejecutaron porque falló el gate cold anterior. Producto cerrado; continuar stock Chrome requiere una nueva API oficial demostrable o una decisión explícita de integración controlada por navegador.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-stock-media-authority-19-active-document-handshake-01",
+          "title": "H19 ACTIVE-DOCUMENT CRYPTOGRAPHIC HANDSHAKE — documento current sin Accessibility marker",
+          "detail": "BLOCKED / CHATGPT REVIEWED. FOREGROUND_DOCUMENT_BINDING_UNAVAILABLE_IN_STOCK_CHROME. Base 3e2a4540fa55e00cc831c81144bfb532a953afb1; functional 1ddc69fb6c1e5c538de9c268ee31ceb26e7e7f9d; review/chrome-stock-media-authority-19-active-document-handshake-01-triage @ 3105126781c3b7b68a55e7df76f766799e6913c5; DEV403 APK ace2e5f6af0ef2a11b3a49443b21ef362f9e11abe01eafba66d09268af1b2a14. Contrato HELLO→challenge→PROVE→PRESENT permanece fail-close. En A23, parser barrier 2/2 y Chrome foreground/root/window current, pero document.hasFocus() siguió falso tras focus primordial: readyRequests=0, activeHello=0, crossTabRelease=0, release=0. Falta una identidad browser-side tabId+documentId+lifecycle con active check atómico; package/window/root/red/policy no la sustituyen. Byte Gate 4/4/0, raw BLOCK/UNKNOWN=0; crash/ANR/OOM=0/0/0, rollback limpio y DO/Affiliated/Accessibility/datos preservados.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-stock-document-self-shield-20-feasibility-01",
+          "title": "H20 DOCUMENT-SELF-SHIELD — cortina propia por documento sin release global",
+          "detail": "PASS PHYSICAL / CHATGPT REVIEWED para compatibility/Replace-All. Base e1b773db; functional 6e8a6dab2ac625dcda18b2a5c1a917661a6b4489; review 9dc38cdd97074503e5cca1e5c85dd7e2fe3b5f9f; DEV409 SHA 30bcdc1e3e7bb6e6836108843a620177953f16731e6e93a0dca3c323f33a365c. Controlled, Google sin query, Frávega y Mimo usables; 224/224/0; raw BLOCK/UNKNOWN=0. Security authority pendiente fue cerrada posteriormente por RESET-INVARIANT-01 bajo la regla de producto revisada.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-stock-document-self-shield-20-service-worker-boundary-01",
+          "title": "H20 SERVICE-WORKER-BOUNDARY — SW controlador contra capability y navegación",
+          "detail": "BLOCKED / CHATGPT REVIEWED como diagnóstico histórico. Base 6e8a6dab; functional 07112e2d; review 71619d50; DEV411 126f160a. PASS_THROUGH conservó transformación/SELF_READY/parser. SYNTHETIC_SELF_READY no interpuesto: el XHR síncrono llegó al proxy/registry. SYNTHETIC_NAVIGATION presentó sentinel SW sin curtain/bootstrap/SELF_READY ni claim current. Root cause SERVICE_WORKER_BYPASSES_DOCUMENT_TRANSFORM. La ruta de cierre se valida separadamente en RESET-INVARIANT-01.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-stock-document-self-shield-20-service-worker-reset-invariant-01",
+          "title": "H20 RESET-INVARIANT — reset único y bloqueo de futuros Service Workers",
+          "detail": "PASS FINAL / CHATGPT REVIEWED. Base 07112e2d; functional 01e4c800c4fcf5309fa5f1b61c31a540ea06fa2e; evidence/review 8cb13f1c56af9a438ecad5fd9728c6927653cab9; DEV412 c6cc40d4b5640a12b03299d4e122b694177aa32c24b6a801e77f8dc7d6f3ba63. Exactamente un clearApplicationUserData de Chrome: RESET_BASELINE_CLEAN=1, REGISTER_BLOCKED=1, REGISTER_SUCCEEDED=0, worker scripts=0, visuales replaced/raw=7/7/0, raw BLOCK/UNKNOWN=0/0, crash/ANR/OOM=0/0/0, DO/Affiliated/Accessibility/Glosh inode preservados y rollback completo. Regla adoptada para la ruta técnica: reset único por generación al activar la protección + impedir nuevas registraciones SW. No autoriza otros borrados ni Production.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-stock-document-self-shield-20-selective-r31-01",
+          "title": "H20 SELECTIVE R3.1 — SAFE original y BLOCK/UNKNOWN fail-close",
+          "detail": "PASS FINAL / CHATGPT REVIEWED. Base 01e4c800c4fcf5309fa5f1b61c31a540ea06fa2e; prep ChatGPT 7cde5e404323605a5c1fbf648f9fa82f91e7bee5; functional cf72dc2767b83980c5fa27dae87dfa15a2ba25e7; review 4a29135d9f50c5b166999bd55bcfbfb8bb1dcc45; DEV413 a0471c7389c5d9e4ecd009ea30a3db6605591a68a0fb7638174d175ea20eb132. SW: Window register bloqueado, script principal 0, Worker realm UNSUPPORTED en Chrome 152 y Worker ordinario cargó. Control: SAFE original, BLOCK model_filter placeholder, UNKNOWN/unsupported fail-close, cache por digest. Real web: SAFE raw 180, BLOCK replaced 5, UNKNOWN 13, unsupported 56, raw BLOCK/UNKNOWN 0/0; Frávega/Mimo navegables y scroll usable; Google mujer BLOCKED_BY_SITE sin evasión. Perf DEV: inferencia p50/p95/p99 149.541/548.574/631.898 ms; cache hit p50/p95 0.067/0.200 ms. Salud y rollback PASS; resetCount=3 sin borrado adicional. Residual menor: back/forward automatizado inconcluso, a cubrir junto a normalidad/performance.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-fravega-mimo-e2e",
+          "title": "Chrome fotos E2E — Frávega / Mimo",
+          "detail": "DONE / CHATGPT REVIEWED. Replace-All DEV409 y selective R3.1 DEV413 demostraron Frávega/Mimo usables, SAFE progresivas, BLOCK/UNKNOWN sustituidas y raw=0. Seguimiento restante pasa a normalidad/performance.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "chrome-gloshia-realtime-scheduler-14a",
+          "title": "CHROME-GLOSHIA-REALTIME-SCHEDULER-14A — respuesta perceptual",
+          "detail": "ABSORBIDO por CHROME-H20-PERF-NORMALITY-14-CLOSURE-01. Un único owner/writer Codex medirá cache/concurrency, respuesta perceptual y normalidad sin cambiar R3.1/modelo/thresholds.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "chrome-general-web-perf-14",
+          "title": "CHROME-GENERAL-WEB-PERF-14 — rendimiento y batería",
+          "detail": "NORMALIDAD/PERFORMANCE GLOBAL 05B: PASS FINAL / CHATGPT REVIEWED. Sobre el fix 05A revisado, el A23 completó 46m10s H20 ON/R3.1 selective, ocho páginas públicas y navegación real sin runaway, crash/ANR/OOM/new LOW_MEMORY ni violación de seguridad; rollback completo. La batería aislada y el cierre técnico de producto Fotos pasan a CHROME-H20-GLOSHIA-PHOTOS-PRODUCT-CLOSURE-06. Product Hardening permanece fuera de scope.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "chrome-h20-dynamic-document-cpu-attribution-04",
+          "title": "CHROME-H20-DYNAMIC-DOCUMENT-CPU-ATTRIBUTION-04 — atribuir CPU sostenida en documentos dinámicos",
+          "detail": "DIAGNOSTIC COMPLETE / NO CURRENT EVIDENCE OF H20 CPU AMPLIFICATION. El A/B limpio no reprodujo el outlier histórico; H20 ON fue más liviano que OFF (renderer avg/max 2.16%/9.3% vs 9.75%/20.3%). 04A cerró la ceguera instrumental con reports/rejected=3/0 y counters no nulos; una corrida dinámica adicional tampoco reprodujo CPU alta. No seguir cazando ese evento salvo que reaparezca en GLOBAL-WEB-NORMALITY-05. Reviews ee096a3d19dd4536f69f2bae8f33fd909c1cd682 y 5f988b285b7f0a48ead16f4ef2a606f5adcc6006.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-h20-renderer-metrics-liveness-04a",
+          "title": "CHROME-H20-RENDERER-METRICS-LIVENESS-04A — confiabilidad del snapshot renderer-side",
+          "detail": "PASS FINAL / CHATGPT REVIEWED. RENDERER_METRICS_LIVENESS_PASS. El one-shot confirma sent sólo tras response URL nativa válida + 204, reintenta tras fallo y usa visibilitychange hidden antes de pagehide; trigger explícito, replay rejection, token/identity y SELF_READY/release/parser/Byte Gate preservados. A23 reports/rejected=3/0 con counters no nulos; corrida focal Mimo sin runaway/ANR/LOW_MEMORY; rollback limpio y resetCount=3. Functional 9cd29a7ddb141874d0ae45a49fc920e73a18a348; review/chrome-h20-renderer-metrics-liveness-04a-final @ 5f988b285b7f0a48ead16f4ef2a606f5adcc6006; DEV417 4fc837a2ba17b9c2b6c3919561c4239b6715cb93e75e88c291c36a3a14e22d0f.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-h20-global-web-normality-05",
+          "title": "CHROME-H20-GLOBAL-WEB-NORMALITY-05 — normalidad global HTTPS real",
+          "detail": "BLOCKED PHYSICAL / CHATGPT REVIEWED. STOP temprano a ~25 min: renderer PID 25775 llegó a 254% CPU y ~860 MiB RSS; MemAvailable mínimo 331020 KiB. El snapshot reports=6/rejected=0 localizó el delta de un documento en 175121 scanCalls, 58356 guardedScans, 116704 markupScans y 175187 sanitizeElement, sin SVG/Shadow/internalMutations y con sólo 30 callbacks/74 childRecords/1 attributeRecord. Root blocker H20_DYNAMIC_DOCUMENT_DOM_GUARD_SCAN_AMPLIFICATION fue corregido técnicamente por 05A, pendiente revisión ChatGPT. Este gate permanece bloqueado hasta reejecutar sus 45 minutos sobre el candidato revisado. raw BLOCK/UNKNOWN 0/0, queue rejects/timeouts 0/0, protect/bypass 0, sin nuevos ANR/crash/OOM/LOW_MEMORY; rollback limpio, resetCount=3. Functional 9cd29a7ddb141874d0ae45a49fc920e73a18a348; review/chrome-h20-global-web-normality-05-triage @ d7680540d740121b856fb6b0033837253898a2e1; DEV417 4fc837a2ba17b9c2b6c3919561c4239b6715cb93e75e88c291c36a3a14e22d0f.",
+          "status": "blocked",
+          "priority": "critical",
+          "base": "9cd29a7ddb141874d0ae45a49fc920e73a18a348",
+          "branch": "review/chrome-h20-global-web-normality-05-triage",
+          "worktree": "/Users/yejielnehmad/Developer/glosh-chrome-h20-global-web-normality-05",
+          "paths": [
+            "docs/areas/protection"
+          ]
+        },
+        {
+          "id": "chrome-h20-dom-guard-markup-scan-amplification-05a",
+          "title": "CHROME-H20-DOM-GUARD-MARKUP-SCAN-AMPLIFICATION-05A — atribución y corrección causal de wrappers DOM/markup",
+          "detail": "PASS FINAL / CHATGPT REVIEWED. H20_DOM_WRAPPER_AMPLIFICATION_FIXED. Root cause: append/prepend/replaceChildren/before/after/replaceWith escaneaban el nodo insertado y luego el receptor completo, generando traversal creciente. CHILD final: OFF/ON 29.8/41.6 ms; scanNodes 42514→488, scanMicros 997683→7668, sanitizeElement 44315→969. MARKUP explicó exactamente por 240 operaciones: 240 guarded + 480 markup + 240 factory direct + 240 DOM direct; markup scan time 5471 us, sin tuning especulativo. Mimo/Frávega sin runaway; raw BLOCK/UNKNOWN 0/0, rejects/timeouts/protect/bypass 0, ANR/crash/OOM/new LOW_MEMORY 0/0/0/0, resetCount=3, rollback completo. Functional/review 8abd7762bc18261cff9c7512f9821da7b233a4b7; DEV420 3273aeed0579ac7fe20fdad05041573843f6d50beeeb609a00800b16abd6bac1.",
+          "status": "done",
+          "priority": "critical",
+          "base": "9cd29a7ddb141874d0ae45a49fc920e73a18a348",
+          "branch": "review/chrome-h20-dom-guard-markup-scan-amplification-05a-final",
+          "worktree": "/Users/yejielnehmad/Developer/glosh-chrome-h20-dom-wrapper-amplification-05a",
+          "paths": [
+            "app-user/src/dev/java/com/contentfilter/user/chromedataplane",
+            "app-user/src/testDev/kotlin/com/contentfilter/user/chromedataplane",
+            "app-user/build.gradle.kts",
+            "docs/areas/protection"
+          ]
+        },
+        {
+          "id": "chrome-h20-global-web-normality-05b",
+          "title": "CHROME-H20-GLOBAL-WEB-NORMALITY-05B — cierre global H20 + GloshIA R3.1 sobre 05A",
+          "detail": "PASS FINAL / CHATGPT REVIEWED. A23 DEV420 exacto completó 46m10s continuos H20 ON/R3.1 selective, ocho páginas públicas cubriendo search/editorial/reference/ecommerce/dynamic/image-heavy/lazy/responsive/multi-origin y todas las maniobras reales. Sin runaway: renderer RSS max ~363 MiB, MemAvailable min 625088 KiB con recuperación, thermal 0; crash/ANR/OOM/new LOW_MEMORY 0/0/0/0. SAFE raw 208; BLOCK/UNKNOWN/unsupported replaced 23/93/121; raw BLOCK/UNKNOWN 0/0; queue rejects/timeouts 0/0; protectFailure 0; QUIC/direct TCP 0/0; SELF_READY/release/parser y SW invariant sanos; resetCount=3 y rollback completo. Sin código/build/version/reset. Base 8abd7762bc18261cff9c7512f9821da7b233a4b7; evidence/review f21c8964e24c1b671df420e3a029f8755d163955; review/chrome-h20-global-web-normality-05b-final.",
+          "status": "done",
+          "priority": "critical",
+          "owner": "Codex — Chrome 05B",
+          "base": "8abd7762bc18261cff9c7512f9821da7b233a4b7",
+          "branch": "review/chrome-h20-global-web-normality-05b-final",
+          "worktree": "/Users/yejielnehmad/Developer/glosh-chrome-h20-global-web-normality-05b",
+          "paths": [
+            "docs/areas/protection"
+          ]
+        },
+        {
+          "id": "chrome-h20-gloshia-photos-product-closure-06",
+          "title": "CHROME-H20-GLOSHIA-PHOTOS-PRODUCT-CLOSURE-06 — cierre integral Fotos + GloshIA en Chrome",
+          "detail": "PASS FINAL / CHATGPT REVIEWED — CHROME_H20_GLOSHIA_PHOTOS_PRODUCT_CANDIDATE_PASS. Los blockers sucesivos de UI SVG y batería quedaron cerrados por 06A + 06B. Functional final 76f285be92945857e5de89423f5df7edf54fc7a9; DEV423 6388dd7904c94f76f65533200ccf17590c964c2651c619abcfe30727ef85024b; evidencia final review/chrome-h20-battery-baseline-control-06b-final @ 2d094e9b291da2049ca5c4274e16c449dfc54aac. UI original/real y SVG authority PASS; lifecycle/recovery PASS; long-run final 47m08s sin runaway/crash/ANR/OOM/new LOW_MEMORY; battery A/B equivalente 32m por brazo A 420.1 vs B 410.6 mAh/h, delta -2.3%, background -9.1% dentro de ruido; raw BLOCK/UNKNOWN 0/0, queues/timeouts 0/0, protectFailure 0, bypass 0/0, resetCount=3 y rollback completo. El harness OFF de batería quedó aislado sólo en la rama de medición y no integra el functional final.",
+          "status": "done",
+          "priority": "critical",
+          "owner": "Codex — Chrome Photos Product Closure 06",
+          "base": "8abd7762bc18261cff9c7512f9821da7b233a4b7",
+          "branch": "review/chrome-h20-battery-baseline-control-06b-final",
+          "worktree": "/Users/yejielnehmad/Developer/glosh-chrome-h20-gloshia-photos-product-closure-06",
+          "paths": [
+            "app-user/src/**/com/contentfilter/user/chromedataplane/**",
+            "core-domain/src/**/com/contentfilter/core/domain/chrome/**",
+            "app-user/build.gradle.kts",
+            "docs/areas/protection/**"
+          ]
+        },
+        {
+          "id": "chrome-h20-original-ui-svg-authority-06a",
+          "title": "CHROME-H20-ORIGINAL-UI-SVG-AUTHORITY-06A — autoridad SVG original + cierre producto Fotos",
+          "detail": "PASS FINAL / CHATGPT REVIEWED. ORIGINAL_UI_SVG_AUTHORITY, UI fidelity, compatibilidad, lifecycle, seguridad y long-run pasan sobre DEV423. Functional 76f285be92945857e5de89423f5df7edf54fc7a9; evidence/review 0136df6c42b015ac32706677413abc13b84696be. El único blocker histórico BATTERY_ARM_A_CONTROL_UNAVAILABLE quedó resuelto posteriormente por 06B sin alterar este functional.",
+          "status": "done",
+          "priority": "critical",
+          "owner": "Codex — Chrome Original UI SVG Authority 06A",
+          "base": "8abd7762bc18261cff9c7512f9821da7b233a4b7",
+          "branch": "review/chrome-h20-original-ui-svg-authority-06a-triage",
+          "worktree": "/Users/yejielnehmad/Developer/glosh-chrome-h20-original-ui-svg-authority-06a",
+          "paths": [
+            "app-user/src/**/com/contentfilter/user/chromedataplane/**",
+            "core-domain/src/**/com/contentfilter/core/domain/chrome/**",
+            "app-user/build.gradle.kts",
+            "docs/areas/protection/**"
+          ]
+        },
+        {
+          "id": "chrome-h20-battery-baseline-control-06b",
+          "title": "CHROME-H20-BATTERY-BASELINE-CONTROL-06B — control DEV de baseline y gate final de batería Fotos",
+          "detail": "PASS FINAL / CHATGPT REVIEWED — CHROME_H20_GLOSHIA_PHOTOS_BATTERY_GATE_PASS. A23, workload Frávega idéntico 30 ciclos/~32m por brazo: ARM A 225 mAh (420.1 mAh/h), ARM B 220 mAh (410.6 mAh/h), delta normalizado -2.3%; background screen-off 15m A/B 55/50 mAh, delta -9.1%, sin loop ni overhead patológico. SVG fixture 12/12; raw BLOCK/UNKNOWN 0/0; queues/timeouts 0/0; protectFailure 0; bypass 0/0; crash/ANR/OOM/new LOW_MEMORY 0; resetCount=3; rollback completo. Functional permanece 76f285be92945857e5de89423f5df7edf54fc7a9. Harness DEV temporal preservado únicamente en work/chrome-h20-battery-baseline-control-06b@3f7e52cb74005d757333bb4df2e5a2545ef8e5a9; review final evidence-only review/chrome-h20-battery-baseline-control-06b-final@2d094e9b291da2049ca5c4274e16c449dfc54aac.",
+          "status": "done",
+          "priority": "critical",
+          "owner": "Codex — Chrome Battery Baseline 06B",
+          "base": "76f285be92945857e5de89423f5df7edf54fc7a9",
+          "branch": "work/chrome-h20-battery-baseline-control-06b",
+          "worktree": "/Users/yejielnehmad/Developer/glosh-chrome-h20-battery-baseline-control-06b",
+          "paths": [
+            "app-user/src/dev/**",
+            "app-user/src/testDev/**",
+            "app-user/build.gradle.kts",
+            "docs/areas/protection/**"
+          ]
+        },
+        {
+          "id": "chrome-h20-cold-image-burst-latency-06c",
+          "title": "Chrome Astra — rebaseline coherente y cierre definitivo de Fotos + GloshIA",
+          "detail": "IN PROGRESS — transferencia autorizada al owner Codex Astra — Chrome 06C Photos Rebaseline. Scope: Chrome normal + Fotos + GloshIA + Latencia; GIF/video pausados en esta ejecución. Luna terminó; preserve/chrome-06c-luna-handoff-20260907 @ 288b9d7a02558f96bd7791ad63ae377c3cd57aec preservado y remoto verificado. WHITE_SCREEN_PRESENTATION_RELEASE RETIRADA: el blanco previo estuvo condicionado por Chrome suspendido tras interrupción de Accessibility; no existe actualmente una regresión H20 demostrada por ese episodio. 76f285be92945857e5de89423f5df7edf54fc7a9 sigue siendo el functional integral anchor; 06C posterior contiene experimentos/parciales que deben revisarse y reaplicarse selectivamente, sin importar GIF/video ni experimentos de parser/release/ready/curtain. Governance main @ 9323b126dde3b91e21e2136a11d087fa3c1f0ca1. Preflight: único task writer activo 06C, ejecutor Luna idle; transferencia sin duplicar task. A23 R58T34V31AE online. Gates físicos y source/APK exactos pendientes; no PASS declarado. Invariantes y restricciones del ticket vigentes; resetCount objetivo=3, sin borrado de Chrome data/cache ni cambio R3.1/authority.",
+          "status": "in_progress",
+          "priority": "critical",
+          "owner": "Codex Astra — Chrome 06C Photos Rebaseline",
+          "base": "76f285be92945857e5de89423f5df7edf54fc7a9",
+          "governance": "main@9323b126dde3b91e21e2136a11d087fa3c1f0ca1",
+          "branch": "work/chrome-h20-astra-rebaseline-06c",
+          "worktree": "/Users/yejielnehmad/Developer/glosh-chrome-h20-astra-rebaseline-06c",
+          "paths": [
+            "app-user/src/dev/**",
+            "app-user/src/testDev/**",
+            "app-user/build.gradle.kts",
+            "docs/areas/protection/**",
+            "feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/chromevisual/ChromePhotosProtectedSurface.kt",
+            "feature-accessibility/src/test/kotlin/com/contentfilter/feature/accessibility/chromevisual/**"
+          ]
+        },
+        {
+          "id": "chrome-h20-anr-causal-attribution-14b-01",
+          "title": "CHROME-H20-ANR-CAUSAL-ATTRIBUTION-14B-01 — atribución focal del ANR",
+          "detail": "PASS DIAGNOSTIC / CHATGPT REVIEWED. Functional sin cambios c7d40a11f8f198a767514b48a538272296f3bfa9; review/chrome-h20-anr-causal-attribution-14b-01-final @ 7d1f53c1929c0c1c30c22c2f7ef6123c68df579f; DEV414 exacto. A H20 OFF 15m: ANR0, renderer RSS max 322716 KiB, MemAvailable min 699748 KiB. B H20 ON: ANR ~10m, input timeout 10004ms, renderer RSS max 858812KiB; two renderers ~490MiB+, high browser/renderer CPU; MemAvailable min127116KiB; renderer LOW_MEMORY/background kills. OFF processed more requests/inferences than ON; model/proxy/queue not primary. raw0/0; queue rejects/timeouts0/0. Causal class: H20_DOCUMENT_SELF_SHIELD_RENDERER_MEMORY_CPU_AMPLIFICATION.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-h20-self-shield-renderer-amplification-14c-01",
+          "title": "CHROME-H20-SELF-SHIELD-RENDERER-AMPLIFICATION-14C-01 — aislamiento y corrección renderer-side",
+          "detail": "PASS FINAL / CHATGPT REVIEWED. Base c7d40a11f8f198a767514b48a538272296f3bfa9; functional 65b27d2ea2f9cb988b127518cd34d5217e5a038d; review/chrome-h20-self-shield-renderer-amplification-14c-01-final @ 6b5490596bfed24fddce8e85ff483e89d27817eb; DEV416 462500ae255e73394f726a73a4558322a9f5e0e716c3e094ec103cb79081bdc2. Root cause: attribute MutationObserver ejecutaba sanitize(target)+scan(subtree) global y Shadow, duplicando traversal con guards y retroalimentación de mutaciones propias. Fix target-only preserva revalidación SVG y childList subtree scanning. A23 18 min: ANR=0, LOW_MEMORY nuevo=0, renderer RSS max ~344 MiB vs ~859 MiB old, MemAvailable min ~806 MiB vs ~127 MiB old, thermal 0, raw BLOCK/UNKNOWN=0/0, rejects/timeouts/protect/bypass=0. Frávega/Mimo/Google, back/forward, scroll/tabs/rotation usables; resetCount=3 y rollback limpio. No tuning ni cambios R3.1/Byte Gate.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-product-hardening-15",
+          "title": "CHROME-PRODUCT-HARDENING-15 — cierre de producto",
+          "detail": "Pendiente final: UX/consent, migration/versioning, AAB/ABI, privacidad/logging, SBOM, long-run, multi-OEM y soporte.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "chrome-update-compatibility-16",
+          "title": "CHROME-UPDATE-COMPATIBILITY-16 — compatibilidad automática con nuevas versiones de Chrome",
+          "detail": "FUTURE / PENDING. Después de cerrar Fotos/Video y antes de considerar Chrome product-ready: permitir actualización normal de Chrome, detectar versión instalada, mantener matriz de versiones validadas y entrar en modo seguro si aparece una versión no validada o rompe una dependencia real.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "chrome-video-a23",
+          "title": "Revalidar video en hardware",
+          "detail": "PAUSED; retomar sólo después de resolver/priorizar Chrome Fotos + GloshIA.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "chrome-images",
+          "title": "Confirmar fotos estáticas en Chrome",
+          "detail": "PASS FINAL DEV para alcance HTTPS interceptable; H20 Selective R3.1 cerró la ruta productiva práctica en stock Chrome.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "google-ai-field-visible",
+          "title": "Evitar que el teclado tape el campo de IA de Google",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "normal"
+        }
       ]
     },
     {
@@ -182,18 +1056,98 @@
       "title": "Device Owner / instalación",
       "context": "Glosh Remote remoto v33/DEV35 está PASS físico en S22 para PIN, ADB/TLS, relay cifrado entre redes, whoami y owner-preflight. Functional DEV35 80669a01c3d91f5ce070318fef1dd2def5418106; review 4990f971590196029b546422f7fc6a21b5e04aeb. Manual operativo revisado en docs/remote-operator-runbook @ 5f85514ef8c2dc1e716d2eafd5a6118fb5efe2c9. El cierre Device Owner profesional queda detrás de dos residuales separados: fijar una política de confianza del artefacto (signer/version) y después ejecutar el gate físico completo sobre un teléfono elegible con cero cuentas.",
       "tasks": [
-        {"id":"glosh-device-owner-installer-00","title":"GLOSH-DEVICE-OWNER-INSTALLER-00 — instalador seguro de laboratorio","detail":"DONE para laboratorio; A23 DeviceOwner/Affiliated.","status":"done","priority":"critical"},
-        {"id":"remote-pin-only-19","title":"REMOTE-PIN-ONLY-19 — PIN-only estable","detail":"DONE / PASS PHYSICAL / CHATGPT REVIEWED para mantenimiento remoto. S22 Ultra Android 16: PIN RemoteInput, pairing, TLS local, whoami uid=2000(shell), relay E2E y cierre/revocación PASS. Functional físico v33 15bd598bd9d3e8d35c9c0660035f105e78557050; línea funcional actual DEV35 80669a01c3d91f5ce070318fef1dd2def5418106 conserva el core y owner-preflight secuencial pasó físico. v31/v32 invalidadas.","status":"done","priority":"critical"},
-        {"id":"remote-maintenance-device-owner-20","title":"REMOTE-MAINTENANCE-DEVICE-OWNER-20 — mantenimiento remoto + aprovisionamiento Device Owner","detail":"BLOCKED para cierre profesional por dos residuales. Functional DEV35 80669a01c3d91f5ce070318fef1dd2def5418106; review/remote-device-owner-provision-20-final @ 4990f971590196029b546422f7fc6a21b5e04aeb. Conexión, shell y owner-preflight están PASS físico; S22 devolvió eligible=false, ownerState=NONE, userCount=1, hasPrimaryUser=true y accountCount=19 sin crash/timeout. Provisioning implementa tamaño/SHA/package/receiver, exige un único firmante y continuidad signer staged→installed, pero DEV35 no fija todavía una allowlist de signer ni política de versionCode. Antes de declarar el instalador profesional cerrado: cerrar REMOTE-PROVISIONING-ARTIFACT-TRUST-20C y luego ejecutar el gate cero-cuentas transfer/validate/install/owner-commit/dpm/confirmación DO. Hasta entonces, cualquier prueba de laboratorio exige verificación manual externa del origen, versión y SHA exacto del APK.","status":"blocked","priority":"critical"},
-        {"id":"remote-provisioning-artifact-trust-20c","title":"REMOTE-PROVISIONING-ARTIFACT-TRUST-20C — fijar confianza del APK de Device Owner","detail":"PENDING / SECURITY HARDENING. DEV35 verifica SHA del archivo, package/receiver, un único firmante y continuidad signer staged→installed, pero el signerSha256 proviene del propio staged y no se compara contra una raíz/allowlist de confianza; versionCode se registra pero no se restringe. Antes del cierre profesional y preferentemente antes del gate físico irreversible con cero cuentas, fijar el signer DEV esperado y una política explícita de versión, con tests fail-closed para signer/version incorrectos.","status":"pending","priority":"critical"},
-        {"id":"remote-operator-runbook-01","title":"REMOTE-OPERATOR-RUNBOOK-01 — manual operativo Glosh Remote","detail":"DONE / CHATGPT REVIEWED. docs/remote-operator-runbook @ 5f85514ef8c2dc1e716d2eafd5a6118fb5efe2c9. README + OPERATOR_RUNBOOK alineados con DEV35 real: PIN/session, broker vs agente vs ADB, whoami, TLS recovery, solicitudes múltiples, locks/cleanup, identidad ADB persistente cifrada, shell/logcat, transferencia/provisioning y Device Owner. Secret scan previo PASS. Review final contrastó código real de credencial 0600, AES-GCM/Keystore, console parser, leases y provisioning; se corrigió la redacción para dejar explícito que DEV35 aún no pinnea signer/version.","status":"done","priority":"important"},
-        {"id":"device-owner-app-protection-00","title":"Endurecer protección de apps con Device Owner","detail":"PAUSED / CHECKPOINT PRESERVED / PENDING CHATGPT REVIEW. Base 9c3fffa36cefc3a0bab01c549d4a7c53b05f80d1; review/device-owner-app-protection-00-final @ 7ad5cd20b21c912f5eff74c610d3be472d8f2c30 contiene enforcement de visibilidad vía Device Owner y coordinación de política. No owner activo y no se declara PASS FINAL hasta revisión. Antes de retomar Protection Core: revisar este HEAD remoto y reconciliar su disposición definitiva.","status":"pending","priority":"important","base":"9c3fffa36cefc3a0bab01c549d4a7c53b05f80d1","branch":"review/device-owner-app-protection-00-final","paths":["app-user/src/main/java/com/contentfilter/user/UserApplication.kt","app-user/src/main/java/com/contentfilter/user/apps/DeviceOwnerAppPolicyCoordinator.kt","app-user/src/main/java/com/contentfilter/user/apps/PackageChangeReceiver.kt","feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/DeviceOwnerAppVisibilityController.kt"]},
-        {"id":"remote-install-connection-00","title":"REMOTE-INSTALL-CONNECTION-00 — probar acceso remoto sin PC del cliente","detail":"DONE / PASS PHYSICAL S22. Mac y teléfono en redes distintas mediante Quick Tunnel; broker abrió solicitud, autoaceptación PASS, agente autenticado, ADB remoto uid=2000(shell), dispositivo correcto y cierre/revocación PASS.","status":"done","priority":"critical"},
-        {"id":"remote-install-ux-01","title":"Pulir UX/UI de Glosh Remote","detail":"Ruta principal funcional: apertura directa de Depuración inalámbrica + PIN por notificación. Pulido visual/producto adicional sigue pendiente.","status":"pending","priority":"critical"},
-        {"id":"remote-adaptive-install-pilot-01","title":"Pilotos de instalación remota adaptativa","detail":"Pendiente de REMOTE-PROVISIONING-ARTIFACT-TRUST-20C y del cierre físico de Device Owner automático sobre dispositivo elegible.","status":"pending","priority":"critical"},
-        {"id":"device-owner-professional-installer-01","title":"Instalador inteligente remoto Glosh","detail":"Canal remoto, transferencia/provisioning y preflight robusto están implementados hasta DEV35. Para cierre profesional faltan pin de confianza signer/version y luego un único gate físico completo con cero cuentas.","status":"pending","priority":"important"},
-        {"id":"remote-support-agent-00","title":"Agente remoto seguro para instalación y soporte","detail":"Canal de mantenimiento remoto cifrado quedó PASS físico en v33/DEV35; sigue pendiente decidir persistencia y UX de producto post-instalación.","status":"pending","priority":"important"},
-        {"id":"remote-device-diagnostics-00","title":"Diagnóstico remoto de dispositivos","detail":"Shell remoto y diagnósticos base quedaron PASS físico en S22; recetas/UX de diagnóstico de producto siguen pendientes.","status":"pending","priority":"important"}
+        {
+          "id": "glosh-device-owner-installer-00",
+          "title": "GLOSH-DEVICE-OWNER-INSTALLER-00 — instalador seguro de laboratorio",
+          "detail": "DONE para laboratorio; A23 DeviceOwner/Affiliated.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "remote-pin-only-19",
+          "title": "REMOTE-PIN-ONLY-19 — PIN-only estable",
+          "detail": "DONE / PASS PHYSICAL / CHATGPT REVIEWED para mantenimiento remoto. S22 Ultra Android 16: PIN RemoteInput, pairing, TLS local, whoami uid=2000(shell), relay E2E y cierre/revocación PASS. Functional físico v33 15bd598bd9d3e8d35c9c0660035f105e78557050; línea funcional actual DEV35 80669a01c3d91f5ce070318fef1dd2def5418106 conserva el core y owner-preflight secuencial pasó físico. v31/v32 invalidadas.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "remote-maintenance-device-owner-20",
+          "title": "REMOTE-MAINTENANCE-DEVICE-OWNER-20 — mantenimiento remoto + aprovisionamiento Device Owner",
+          "detail": "BLOCKED para cierre profesional por dos residuales. Functional DEV35 80669a01c3d91f5ce070318fef1dd2def5418106; review/remote-device-owner-provision-20-final @ 4990f971590196029b546422f7fc6a21b5e04aeb. Conexión, shell y owner-preflight están PASS físico; S22 devolvió eligible=false, ownerState=NONE, userCount=1, hasPrimaryUser=true y accountCount=19 sin crash/timeout. Provisioning implementa tamaño/SHA/package/receiver, exige un único firmante y continuidad signer staged→installed, pero DEV35 no fija todavía una allowlist de signer ni política de versionCode. Antes de declarar el instalador profesional cerrado: cerrar REMOTE-PROVISIONING-ARTIFACT-TRUST-20C y luego ejecutar el gate cero-cuentas transfer/validate/install/owner-commit/dpm/confirmación DO. Hasta entonces, cualquier prueba de laboratorio exige verificación manual externa del origen, versión y SHA exacto del APK.",
+          "status": "blocked",
+          "priority": "critical"
+        },
+        {
+          "id": "remote-provisioning-artifact-trust-20c",
+          "title": "REMOTE-PROVISIONING-ARTIFACT-TRUST-20C — fijar confianza del APK de Device Owner",
+          "detail": "PENDING / SECURITY HARDENING. DEV35 verifica SHA del archivo, package/receiver, un único firmante y continuidad signer staged→installed, pero el signerSha256 proviene del propio staged y no se compara contra una raíz/allowlist de confianza; versionCode se registra pero no se restringe. Antes del cierre profesional y preferentemente antes del gate físico irreversible con cero cuentas, fijar el signer DEV esperado y una política explícita de versión, con tests fail-closed para signer/version incorrectos.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "remote-operator-runbook-01",
+          "title": "REMOTE-OPERATOR-RUNBOOK-01 — manual operativo Glosh Remote",
+          "detail": "DONE / CHATGPT REVIEWED. docs/remote-operator-runbook @ 5f85514ef8c2dc1e716d2eafd5a6118fb5efe2c9. README + OPERATOR_RUNBOOK alineados con DEV35 real: PIN/session, broker vs agente vs ADB, whoami, TLS recovery, solicitudes múltiples, locks/cleanup, identidad ADB persistente cifrada, shell/logcat, transferencia/provisioning y Device Owner. Secret scan previo PASS. Review final contrastó código real de credencial 0600, AES-GCM/Keystore, console parser, leases y provisioning; se corrigió la redacción para dejar explícito que DEV35 aún no pinnea signer/version.",
+          "status": "done",
+          "priority": "important"
+        },
+        {
+          "id": "device-owner-app-protection-00",
+          "title": "Endurecer protección de apps con Device Owner",
+          "detail": "PAUSED / CHECKPOINT PRESERVED / PENDING CHATGPT REVIEW. Base 9c3fffa36cefc3a0bab01c549d4a7c53b05f80d1; review/device-owner-app-protection-00-final @ 7ad5cd20b21c912f5eff74c610d3be472d8f2c30 contiene enforcement de visibilidad vía Device Owner y coordinación de política. No owner activo y no se declara PASS FINAL hasta revisión. Antes de retomar Protection Core: revisar este HEAD remoto y reconciliar su disposición definitiva.",
+          "status": "pending",
+          "priority": "important",
+          "base": "9c3fffa36cefc3a0bab01c549d4a7c53b05f80d1",
+          "branch": "review/device-owner-app-protection-00-final",
+          "paths": [
+            "app-user/src/main/java/com/contentfilter/user/UserApplication.kt",
+            "app-user/src/main/java/com/contentfilter/user/apps/DeviceOwnerAppPolicyCoordinator.kt",
+            "app-user/src/main/java/com/contentfilter/user/apps/PackageChangeReceiver.kt",
+            "feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/DeviceOwnerAppVisibilityController.kt"
+          ]
+        },
+        {
+          "id": "remote-install-connection-00",
+          "title": "REMOTE-INSTALL-CONNECTION-00 — probar acceso remoto sin PC del cliente",
+          "detail": "DONE / PASS PHYSICAL S22. Mac y teléfono en redes distintas mediante Quick Tunnel; broker abrió solicitud, autoaceptación PASS, agente autenticado, ADB remoto uid=2000(shell), dispositivo correcto y cierre/revocación PASS.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "remote-install-ux-01",
+          "title": "Pulir UX/UI de Glosh Remote",
+          "detail": "Ruta principal funcional: apertura directa de Depuración inalámbrica + PIN por notificación. Pulido visual/producto adicional sigue pendiente.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "remote-adaptive-install-pilot-01",
+          "title": "Pilotos de instalación remota adaptativa",
+          "detail": "Pendiente de REMOTE-PROVISIONING-ARTIFACT-TRUST-20C y del cierre físico de Device Owner automático sobre dispositivo elegible.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "device-owner-professional-installer-01",
+          "title": "Instalador inteligente remoto Glosh",
+          "detail": "Canal remoto, transferencia/provisioning y preflight robusto están implementados hasta DEV35. Para cierre profesional faltan pin de confianza signer/version y luego un único gate físico completo con cero cuentas.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "remote-support-agent-00",
+          "title": "Agente remoto seguro para instalación y soporte",
+          "detail": "Canal de mantenimiento remoto cifrado quedó PASS físico en v33/DEV35; sigue pendiente decidir persistencia y UX de producto post-instalación.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "remote-device-diagnostics-00",
+          "title": "Diagnóstico remoto de dispositivos",
+          "detail": "Shell remoto y diagnósticos base quedaron PASS físico en S22; recetas/UX de diagnóstico de producto siguen pendientes.",
+          "status": "pending",
+          "priority": "important"
+        }
       ]
     },
     {
@@ -201,13 +1155,55 @@
       "title": "GloshIA",
       "context": "R3.1 es el runtime canónico. Evidencia útil preservada; recuperación/calibración y experimentos quedan pausados hasta retomarlos explícitamente.",
       "tasks": [
-        {"id":"gloshia-training-data-preservation","title":"Blindar datos de entrenamiento/calibración","detail":"DONE: datos/evidencia fuera de resets operativos.","status":"done","priority":"critical"},
-        {"id":"gloshia-r3-evidence-recovery","title":"Recuperar evidencia GloshIA local/remota","detail":"PAUSADO; inventario read-only al retomar calibración.","status":"pending","priority":"critical"},
-        {"id":"gloshia-review-close-preservation","title":"Hacer no destructivo el cierre de revisión GloshIA","detail":"Pendiente antes de próxima calibración.","status":"pending","priority":"critical"},
-        {"id":"gloshia-visual-version-dag","title":"Mostrar versión de GloshIA Visual en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
-        {"id":"gloshia-textual","title":"GloshIA textual","detail":"Pendiente.","status":"pending","priority":"important"},
-        {"id":"gloshia-help-both-apps","title":"GloshIA asistente real en ambas apps","detail":"Pendiente.","status":"pending","priority":"important"},
-        {"id":"shared-gloshia-engine","title":"Motor GloshIA compartido","detail":"R3.1 shared core integrado en baseline; expansión a otros consumidores queda pendiente según prioridad.","status":"pending","priority":"normal"}
+        {
+          "id": "gloshia-training-data-preservation",
+          "title": "Blindar datos de entrenamiento/calibración",
+          "detail": "DONE: datos/evidencia fuera de resets operativos.",
+          "status": "done",
+          "priority": "critical"
+        },
+        {
+          "id": "gloshia-r3-evidence-recovery",
+          "title": "Recuperar evidencia GloshIA local/remota",
+          "detail": "PAUSADO; inventario read-only al retomar calibración.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "gloshia-review-close-preservation",
+          "title": "Hacer no destructivo el cierre de revisión GloshIA",
+          "detail": "Pendiente antes de próxima calibración.",
+          "status": "pending",
+          "priority": "critical"
+        },
+        {
+          "id": "gloshia-visual-version-dag",
+          "title": "Mostrar versión de GloshIA Visual en DAG",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "gloshia-textual",
+          "title": "GloshIA textual",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "gloshia-help-both-apps",
+          "title": "GloshIA asistente real en ambas apps",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "shared-gloshia-engine",
+          "title": "Motor GloshIA compartido",
+          "detail": "R3.1 shared core integrado en baseline; expansión a otros consumidores queda pendiente según prioridad.",
+          "status": "pending",
+          "priority": "normal"
+        }
       ]
     },
     {
@@ -215,14 +1211,62 @@
       "title": "DAG",
       "context": "PAUSED / RESERVE. Baseline conserva DAG DEV211 de main; trabajo posterior está preservado pero no promovido. Sin owner activo; retomar sólo por decisión explícita.",
       "tasks": [
-        {"id":"dag-local-review","title":"Revisar integración DAG local","detail":"Pendiente sólo si se reactiva DAG.","status":"pending","priority":"important"},
-        {"id":"dag-update-section-move","title":"Mover sección de actualización en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
-        {"id":"dag-hide-http-scheme","title":"Ocultar http/https en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
-        {"id":"dag-self-update","title":"Actualizar desde DAG","detail":"Pendiente.","status":"pending","priority":"important"},
-        {"id":"dag-tab-memory","title":"Ahorrar memoria de pestañas DAG","detail":"Pendiente.","status":"pending","priority":"important"},
-        {"id":"dag-desktop-mobile-mode","title":"Modo escritorio y móvil en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
-        {"id":"dag-icons-fix","title":"Corregir iconos de DAG","detail":"Pendiente.","status":"pending","priority":"normal"},
-        {"id":"dag-image-scroll-loading","title":"Revisar comportamiento de fotos al bajar","detail":"Pendiente de aclaración funcional.","status":"pending","priority":"normal"}
+        {
+          "id": "dag-local-review",
+          "title": "Revisar integración DAG local",
+          "detail": "Pendiente sólo si se reactiva DAG.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "dag-update-section-move",
+          "title": "Mover sección de actualización en DAG",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "dag-hide-http-scheme",
+          "title": "Ocultar http/https en DAG",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "dag-self-update",
+          "title": "Actualizar desde DAG",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "dag-tab-memory",
+          "title": "Ahorrar memoria de pestañas DAG",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "important"
+        },
+        {
+          "id": "dag-desktop-mobile-mode",
+          "title": "Modo escritorio y móvil en DAG",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "dag-icons-fix",
+          "title": "Corregir iconos de DAG",
+          "detail": "Pendiente.",
+          "status": "pending",
+          "priority": "normal"
+        },
+        {
+          "id": "dag-image-scroll-loading",
+          "title": "Revisar comportamiento de fotos al bajar",
+          "detail": "Pendiente de aclaración funcional.",
+          "status": "pending",
+          "priority": "normal"
+        }
       ]
     }
   ]
