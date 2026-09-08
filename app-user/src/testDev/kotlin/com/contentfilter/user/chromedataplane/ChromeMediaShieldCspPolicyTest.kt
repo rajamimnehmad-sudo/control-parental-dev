@@ -9,6 +9,22 @@ class ChromeMediaShieldCspPolicyTest {
     private val policy = ChromeMediaShieldCspPolicy()
 
     @Test
+    fun `detached shield authorizes exact CSS under strict header and meta CSP`() {
+        val hash = java.util.Base64.getEncoder().encodeToString(java.security.MessageDigest.getInstance("SHA-256").digest(ChromeMediaShieldBootstrap.css.toByteArray()))
+        val source = "'sha256-$hash'"
+        val header = policy.admitBootstrap("default-src 'none'; style-src 'none'; object-src 'none'", ScriptNonce, StyleNonce)
+        val meta = policy.rewriteMetaPolicy("style-src-elem 'none'; script-src 'none'")!!
+        assertTrue(header.contains(source))
+        assertTrue(header.contains("object-src 'none'"))
+        assertTrue(meta.contains("style-src-elem $source"))
+        assertTrue(meta.contains("script-src 'none'"))
+        assertFalse(header.contains("'unsafe-inline'"))
+        assertFalse(meta.contains("'unsafe-inline'"))
+        assertEquals("style-src 'unsafe-inline'", policy.rewriteMetaPolicy("style-src 'unsafe-inline'"))
+    }
+
+
+    @Test
     fun `self shield admits same-origin capability channel without fixed fixture origin`() {
         val rewritten =
             ChromeMediaShieldCspPolicy(sameOriginReady = true).admitBootstrap(

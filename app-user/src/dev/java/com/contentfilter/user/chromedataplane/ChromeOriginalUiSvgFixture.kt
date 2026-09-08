@@ -12,6 +12,8 @@ internal class ChromeOriginalUiSvgFixture {
     fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse? {
         val path = request.target.substringBefore('?').substringBefore('#')
         return when (path) {
+            "/svg06a/shadow" -> response("ui-shadow-page", "text/html; charset=utf-8", ChromeDetachedShadowFixture.page().toByteArray(),
+                headers = listOf(ChromeHttpHeader("Content-Security-Policy", "style-src 'none'; script-src 'unsafe-inline'")))
             PagePath -> response("ui-svg-page", "text/html; charset=utf-8", page().toByteArray())
             CssPath ->
                 response(

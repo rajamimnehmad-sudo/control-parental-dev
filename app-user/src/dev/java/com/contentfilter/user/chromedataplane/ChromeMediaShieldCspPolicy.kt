@@ -2,6 +2,8 @@ package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
 import java.util.Locale
+import java.security.MessageDigest
+import java.util.Base64
 
 internal class ChromeMediaShieldCspPolicy(
     private val sameOriginReady: Boolean = false,
@@ -44,6 +46,7 @@ internal class ChromeMediaShieldCspPolicy(
         val directives = parse(policy)
         admitNonceFor(directives, "script-src-elem", "script-src", scriptNonce)
         admitNonceFor(directives, "style-src-elem", "style-src", styleNonce)
+        admitProtectedStyleHash(directives)
         admitReadyOrigin(directives)
         admitOriginalUiSvgOrigin(directives)
         return serialize(directives)
@@ -53,9 +56,28 @@ internal class ChromeMediaShieldCspPolicy(
         if (policy.isBlank() || '&' in policy || '<' in policy || '>' in policy) return null
         val directives = parse(policy)
         if (directives.isEmpty()) return null
+        admitProtectedStyleHash(directives)
         admitReadyOrigin(directives)
         admitOriginalUiSvgOrigin(directives)
         return serialize(directives)
+    }
+
+    // Detached shadow styles acquire a CSSStyleSheet only when connected. Authorize exactly
+    // the immutable shield bytes without retaining a readable nonce or broadening inline CSS.
+    private fun admitProtectedStyleHash(directives: LinkedHashMap<String, Directive>) {
+        val key = when {
+            directives.containsKey("style-src-elem") -> "style-src-elem"
+            directives.containsKey("style-src") -> "style-src"
+            directives.containsKey("default-src") -> "style-src"
+            else -> return
+        }
+        val inherited = directives[key]?.sources ?: directives["default-src"]!!.sources
+        if (inherited.authorizesUnrestrictedInline()) return
+        val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
+        val hash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(ChromeMediaShieldBootstrap.css.toByteArray(Charsets.UTF_8)))
+        val source = "'sha256-$hash'"
+        if (source !in sources) sources += source
+        directives[key] = Directive(directives[key]?.name ?: key, sources)
     }
 
     private fun serialize(directives: LinkedHashMap<String, Directive>): String =

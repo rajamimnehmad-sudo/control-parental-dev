@@ -317,6 +317,7 @@ internal object ChromeMediaShieldBootstrap {
         const cssParentSheetProperty=self.CSSRule?propertyDescriptor(CSSRule.prototype,'parentStyleSheet'):null;
         const styleSheetDisabledProperty=self.StyleSheet?propertyDescriptor(StyleSheet.prototype,'disabled'):null;
         const styleSheetMediaProperty=self.StyleSheet?propertyDescriptor(StyleSheet.prototype,'media'):null;
+        const styleSheetOwnerProperty=self.StyleSheet?propertyDescriptor(StyleSheet.prototype,'ownerNode'):null;
         const mediaTextProperty=self.MediaList?propertyDescriptor(MediaList.prototype,'mediaText'):null;
         const cssRulesProperty=self.CSSStyleSheet?propertyDescriptor(CSSStyleSheet.prototype,'cssRules'):null;
         const cssRuleListLength=self.CSSRuleList?propertyDescriptor(CSSRuleList.prototype,'length'):null;
@@ -335,7 +336,7 @@ internal object ChromeMediaShieldBootstrap {
         if(!styleSheetProperty)failInstall('STYLE_SHEET_DESCRIPTOR_MISSING');else if(!shieldSheet)failInstall('SHIELD_SHEET_MISSING');
         else if(HAS_CURTAIN&&!curtainSheet)failInstall('CURTAIN_SHEET_MISSING');else if(!styleNonceProperty||!styleNonceProperty.get||!styleNonceProperty.set||
         !styleElementDisabledProperty||!styleElementMediaProperty||!styleElementTypeProperty||!cssParentRuleProperty||!cssParentSheetProperty||
-        !styleSheetDisabledProperty||!styleSheetMediaProperty||!mediaTextProperty||(self.CSSStyleRule&&!ruleStyleProperty)||(self.Range&&!rangeAncestorProperty))failInstall('STYLE_CAPABILITY_MISSING');
+        !styleSheetDisabledProperty||!styleSheetMediaProperty||!styleSheetOwnerProperty||!mediaTextProperty||(self.CSSStyleRule&&!ruleStyleProperty)||(self.Range&&!rangeAncestorProperty))failInstall('STYLE_CAPABILITY_MISSING');
         const clearStyleNonce=(style)=>{try{invoke(styleNonceProperty.set,style,['']);nativeRemove.call(style,'nonce');
         return read(styleNonceProperty,style)===''&&!nativeHas.call(style,'nonce')}catch(_){return false}};
         let curtainRequired=HAS_CURTAIN;
@@ -534,7 +535,8 @@ internal object ChromeMediaShieldBootstrap {
         [self.HTMLFormElement&&HTMLFormElement.prototype,'target'],[self.HTMLBaseElement&&HTMLBaseElement.prototype,'target'],
         [self.HTMLButtonElement&&HTMLButtonElement.prototype,'formTarget'],[self.HTMLInputElement&&HTMLInputElement.prototype,'formTarget']])
         installed=forceSelfTarget(pair[0],pair[1])&&installed;
-        const protectedSheet=(value)=>!!value&&invoke(WeakSetHas,protectedSheets,[value]);
+        const protectedSheet=(value)=>{if(!value)return false;if(invoke(WeakSetHas,protectedSheets,[value]))return true;try{if(protectedNode(read(styleSheetOwnerProperty,value))){registerProtectedSheet(value);return true}}catch(_){}return false};
+        for(const name of ['cssRules','rules']){const owner=propertyOwner(CSSStyleSheet.prototype,name),entry=owner&&descriptor(owner,name);if(!entry||!entry.get){if(name==='cssRules')installed=false;continue}try{ObjectDefine(owner,name,{get:function(){protectedSheet(this);return invoke(entry.get,this,[])},enumerable:entry.enumerable,configurable:false})}catch(_){installed=false}}
         const protectedRule=(value)=>{try{return !!value&&protectedSheet(read(cssParentSheetProperty,value))}catch(_){return false}};
         const protectedDeclaration=(value)=>{const owner=invoke(WeakMapGet,styleOwners,[value]);if(owner&&(protectedNode(owner)||invoke(WeakSetHas,protectedMediaNodes,[owner])||nativeGet.call(owner,'data-glosh-media-blocked')==='1'))return true;
         try{const rule=read(cssParentRuleProperty,value);return !!rule&&protectedRule(rule)}catch(_){return false}};
@@ -653,7 +655,7 @@ internal object ChromeMediaShieldBootstrap {
         const style=create.call(DOC,'style');invoke(WeakSetAdd,protectedNodes,[style]);invoke(WeakMapSet,protectedDescendants,[root,style]);
         nativeSet.call(style,'nonce',NONCE);invoke(nodeText.set,style,[CSS]);nodeAppend.call(root,style);
         if(!clearStyleNonce(style)){nodeRemove.call(root,style);failClosedDocument();deny()}
-        watchStyle(style);const shadowSheet=read(styleSheetProperty,style);if(!shadowSheet){nodeRemove.call(root,style);failClosedDocument();deny()}registerProtectedSheet(shadowSheet);
+        watchStyle(style);const shadowSheet=read(styleSheetProperty,style);if(!shadowSheet&&connected(this)){nodeRemove.call(root,style);failClosedDocument();deny()}registerProtectedSheet(shadowSheet);
         rendererMetric(30);rendererMetric(31);const shadowObserver=new NativeMutationObserver(records=>{rendererMetric(32);rendererMetric(33,records.length);for(let index=0;index<records.length;index+=1){const record=records[index],type=read(mutationTypeProperty,record);
         if(type==='childList'){const added=copyList(read(mutationAddedProperty,record),nodeListLength);for(let addedIndex=0;addedIndex<added.length;addedIndex+=1){rendererMetric(34);scan(added[addedIndex],RM_SHADOW)}}
         else{const target=read(mutationTargetProperty,record);if(target){if(localNameOf(target)==='svg'||elementClosest.call(target,'svg'))rendererMetric(29);sanitizeContainer(target)}}}restoreMappedProtected(root)});
