@@ -16,12 +16,14 @@ internal fun ChromePhotosFixtureResponse.asUpstreamResponse(): ChromePhotosUpstr
         protocol = "fixture",
     )
 
-internal fun ChromeMediaShieldDocumentResult.asSanitizedResponse(): ChromePhotosSanitizedResponse =
+internal fun ChromeMediaShieldDocumentResult.asSanitizedResponse(
+    upstream: ChromePhotosUpstreamResponse,
+): ChromePhotosSanitizedResponse =
     when (this) {
         is ChromeMediaShieldDocumentResult.Transformed ->
             ChromePhotosSanitizedResponse(
-                statusCode = 200,
-                statusText = "OK",
+                statusCode = upstream.statusCode,
+                statusText = upstream.statusText,
                 headers = document.headers,
                 bytes = document.bytes,
                 decision = ChromePhotosResourceDecision.Passthrough,

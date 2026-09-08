@@ -553,7 +553,7 @@ internal class ChromePhotosHttpsProxy(
                 requests.incrementAndGet()
                 originalBytes.addAndGet(response.originalBytes.size.toLong())
                 responseStarted = true
-                val sanitized = documentResult.asSanitizedResponse()
+                val sanitized = documentResult.asSanitizedResponse(fixtureUpstream)
                 val result = responseWriter.writeBuffered(clientOutput, request, sanitized, forceChunked = false)
                 deliveredBytes.addAndGet(result.bytesWritten)
                 latencies.add(System.nanoTime() - started)
@@ -732,7 +732,7 @@ internal class ChromePhotosHttpsProxy(
                             ),
                         )
                     responseStarted = true
-                    val sanitized = documentResult.asSanitizedResponse()
+                    val sanitized = documentResult.asSanitizedResponse(response)
                     val decisionNanos = System.nanoTime() - decisionStarted
                     val writeStarted = System.nanoTime()
                     val result = responseWriter.writeBuffered(clientOutput, request, sanitized)

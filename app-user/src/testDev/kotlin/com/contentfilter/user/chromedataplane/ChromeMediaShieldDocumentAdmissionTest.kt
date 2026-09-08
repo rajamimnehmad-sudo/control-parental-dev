@@ -132,6 +132,24 @@ class ChromeMediaShieldDocumentAdmissionTest {
         )
     }
 
+    @Test
+    fun `HTTP errors still require supported unambiguous HTML and document intent`() {
+        val document = request("GET", ChromeHttpHeader("Sec-Fetch-Dest", "document"))
+        listOf(400, 403, 404, 429, 500, 503, 599).forEach { status ->
+            assertIs<ChromeMediaShieldDocumentDisposition.Transform>(
+                admission.disposition(document, response("text/html").copy(statusCode = status)),
+            )
+            listOf("application/pdf", "application/xhtml+xml", "text/html; charset=utf-16").forEach { mime ->
+                assertIs<ChromeMediaShieldDocumentDisposition.FailClosed>(
+                    admission.disposition(document, response(mime).copy(statusCode = status)),
+                )
+            }
+            assertIs<ChromeMediaShieldDocumentDisposition.FailClosed>(
+                admission.disposition(document, responseWithoutContentType().copy(statusCode = status)),
+            )
+        }
+    }
+
     private fun request(
         method: String,
         vararg headers: ChromeHttpHeader,

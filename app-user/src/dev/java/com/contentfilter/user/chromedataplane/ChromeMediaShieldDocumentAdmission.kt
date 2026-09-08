@@ -74,7 +74,9 @@ internal class ChromeMediaShieldDocumentAdmission {
         if (response.statusCode in RedirectCodes) {
             return ChromeMediaShieldDocumentDisposition.FailClosed(kind, "document_redirect_requires_proxy_path")
         }
-        if (response.statusCode != 200) {
+        // Complete error documents need the same parser-first protection as successful HTML.
+        // Partial, cache-only and bodyless responses still cannot establish a document.
+        if (response.statusCode != 200 && response.statusCode !in 400..599) {
             return ChromeMediaShieldDocumentDisposition.FailClosed(kind, "document_status_${response.statusCode}")
         }
         if (!response.headers.hasIdentityContentEncoding()) {

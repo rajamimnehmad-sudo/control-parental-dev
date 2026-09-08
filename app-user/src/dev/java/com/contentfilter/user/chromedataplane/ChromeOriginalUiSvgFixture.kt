@@ -32,6 +32,11 @@ internal class ChromeOriginalUiSvgFixture(placeholderBytes: ByteArray) {
                             ),
                         ),
                 )
+            "/svg06a/http403", "/svg06a/http429" ->
+                response("ui-svg-http-error", "text/html; charset=utf-8", page().toByteArray()).copy(
+                    statusCode = if (path.endsWith("403")) 403 else 429,
+                    statusText = if (path.endsWith("403")) "Forbidden" else "Too Many Requests",
+                )
             PagePath -> response("ui-svg-page", "text/html; charset=utf-8", page().toByteArray())
             CssPath ->
                 response(

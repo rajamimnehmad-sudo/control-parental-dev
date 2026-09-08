@@ -75,8 +75,8 @@ class ChromeMediaShieldDocumentTransformerTest {
             assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
         }
         assertEquals(
-            "document_status_429",
-            assertIs<ChromeMediaShieldDocumentResult.FailClosed>(gzipDocumentResponse(bytes, status = 429)).reason,
+            "document_status_206",
+            assertIs<ChromeMediaShieldDocumentResult.FailClosed>(gzipDocumentResponse(bytes, status = 206)).reason,
         )
         assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
     }
@@ -113,7 +113,7 @@ class ChromeMediaShieldDocumentTransformerTest {
     fun `rejected top level shows local explanation without releasing upstream markup or authority`() {
         val authority = ChromeMediaShieldDocumentAuthority(ChromeMediaShieldDocumentAdmission(), transformer)
         val unsafe = "<script>alert('upstream')</script><img src='https://unsafe.test/original'>".toByteArray()
-        listOf(403, 404, 429, 500, 503).forEach { status ->
+        listOf(204, 205, 206, 304).forEach { status ->
             val response =
                 ChromePhotosUpstreamResponse(
                     host = "example.test",
@@ -151,6 +151,37 @@ class ChromeMediaShieldDocumentTransformerTest {
                     ),
                 )
             assertEquals("<!doctype html><html><body></body></html>", frame.bytes.toString(Charsets.UTF_8))
+        }
+    }
+
+    @Test
+    fun `HTTP error HTML retains UI and status under the original parser first shield`() {
+        listOf(403, 404, 429, 500, 503).forEach { status ->
+            val result =
+                assertIs<ChromeMediaShieldDocumentResult.Transformed>(
+                    gzipDocumentResponse(gzipBytes(Source.toByteArray()), status = status),
+                )
+            val html = result.document.bytes.toString(Charsets.UTF_8)
+            assertContains(html, "site-original")
+            assertTrue(html.indexOf(ChromeMediaShieldBootstrap.CurtainStyleElementId) < html.indexOf("site-original"))
+            assertEquals(
+                result.document.identity,
+                ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel,
+            )
+            val upstream =
+                ChromePhotosUpstreamResponse(
+                    "example.test",
+                    status,
+                    "Original Error",
+                    emptyList(),
+                    byteArrayOf().inputStream(),
+                    0L,
+                    "http/1.1",
+                )
+            val downstream = result.asSanitizedResponse(upstream)
+            assertEquals(status, downstream.statusCode)
+            assertEquals("Original Error", downstream.statusText)
+            assertTrue(downstream.bytes.contentEquals(result.document.bytes))
         }
     }
 
