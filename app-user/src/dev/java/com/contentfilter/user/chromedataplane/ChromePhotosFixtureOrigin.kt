@@ -59,6 +59,7 @@ internal class ChromePhotosFixtureOrigin(
     private val serviceWorkerBoundaryFixture = ChromeServiceWorkerBoundaryFixture()
     private val rendererAmplificationFixture = ChromeH20RendererAmplificationFixture()
     private val originalUiSvgFixture = ChromeOriginalUiSvgFixture()
+    private val localPhotoFixture = ChromeLocalPhotoFixture(safeImageBytes)
 
     override fun webSemanticsReport(): String = report.get()
 
@@ -72,6 +73,7 @@ internal class ChromePhotosFixtureOrigin(
 
     override fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse {
         originalUiSvgFixture.responseFor(request)?.let { return it }
+        localPhotoFixture.responseFor(request)?.let { return it }
         ChromeVisualShieldFixture.responseFor(request)?.let { return it }
         rendererAmplificationFixture.responseFor(request)?.let { return it }
         serviceWorkerBoundaryFixture.responseFor(request)?.let { return it }

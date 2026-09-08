@@ -44,6 +44,11 @@ internal class ChromePhotosHttpsProxy(
             imageAuthority = imageAuthority,
             visualDeliveryGate = visualDeliveryGate,
         )
+    private val localPhotos =
+        ChromeLocalPhotoEndpoint(
+            sanitize = { response -> responseSanitizer.sanitize("GET", response) },
+            authorize = visualDeliveryGate::isCandidateDeliveryAuthorized,
+        )
     private val requestReader = ChromeHttp1RequestReader()
     private val responseWriter = ChromeHttp1ResponseWriter()
     private val running = AtomicBoolean(false)
@@ -163,6 +168,7 @@ internal class ChromePhotosHttpsProxy(
         resources.acceptThread?.interrupt()
         val cleanupFailure =
             listOf(
+                runCatching { localPhotos.close() },
                 runCatching { transformer.close() },
                 runCatching { originalUiSvgAuthority?.close() },
                 runCatching { coverageLedger?.close() },
@@ -516,10 +522,16 @@ internal class ChromePhotosHttpsProxy(
             }
         return try {
             val started = System.nanoTime()
-            readyEndpoint?.handle(request)?.let { readyResponse ->
+            (localPhotos.handle(ChromeLocalPhotoEndpoint.AssetOrigin, request) ?: readyEndpoint?.handle(request))?.let {
+                    readyResponse ->
                 requests.incrementAndGet()
                 responseStarted = true
                 val result = responseWriter.writeBuffered(clientOutput, request, readyResponse)
+                if (request.target.startsWith(ChromeLocalPhotoEndpoint.AssetPath) && readyResponse.statusCode == 200) {
+                    visualDeliveryGate.recordCandidateDelivery(readyResponse)
+                    recordDecision(readyResponse)
+                }
+                infoLog("phase=local_photo_transport ${localPhotos.metrics()}")
                 deliveredBytes.addAndGet(result.bytesWritten)
                 latencies.add(System.nanoTime() - started)
                 infoLog(
@@ -653,10 +665,16 @@ internal class ChromePhotosHttpsProxy(
         val started = System.nanoTime()
         var responseStarted = false
         var upstreamExchangeReady = false
-        readyEndpoint?.handle(request)?.let { readyResponse ->
+        (localPhotos.handle("${endpoint.scheme.wireName}://${endpoint.host}" + if (endpoint.port == if (endpoint.scheme == ChromePhotosUpstreamScheme.Https) 443 else 80) "" else ":${endpoint.port}", request) ?: readyEndpoint?.handle(request))?.let {
+                readyResponse ->
             requests.incrementAndGet()
             responseStarted = true
             val result = responseWriter.writeBuffered(clientOutput, request, readyResponse)
+            if (request.target.startsWith(ChromeLocalPhotoEndpoint.AssetPath) && readyResponse.statusCode == 200) {
+                visualDeliveryGate.recordCandidateDelivery(readyResponse)
+                recordDecision(readyResponse)
+            }
+            infoLog("phase=local_photo_transport ${localPhotos.metrics()}")
             deliveredBytes.addAndGet(result.bytesWritten)
             infoLog(
                 "phase=media_shield_ready origin=same_origin result=${readyResponse.statusCode} bytesOut=${result.bytesWritten}",

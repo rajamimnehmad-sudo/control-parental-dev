@@ -159,7 +159,7 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
         val output = ChromeMediaShieldStaticMarkupNeutralizer.neutralize(source)
 
         assertFalse(output.contains("<source srcset", ignoreCase = true))
-        assertContains(output, "data-glosh-blocked-srcset=\"1\"")
+        assertContains(output, "data-glosh-local-srcset='data:image/png;base64,AAAA 1x, https://example.test/a.png 2x'")
         assertContains(output, "data-glosh-media-blocked=\"1\"")
         assertContains(output, "<img src='https://example.test/fallback.png'>")
     }

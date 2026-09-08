@@ -135,6 +135,15 @@ internal class ChromeHttp1RequestReader(
                 ?: throw ChromeHttpProtocolException(400, "Malformed request line")
         val headers = readHeaders(input)
         val framing = bodyFraming(headers)
+        val bodyLimit =
+            if ((parsed.absoluteHttpTargetOrNull()?.originForm ?: parsed.target) == ChromeLocalPhotoEndpoint.SubmitPath) {
+                minOf(
+                    maximumBodyBytes,
+                    ChromeLocalPhotoEndpoint.MaximumRequestBytes,
+                )
+            } else {
+                maximumBodyBytes
+            }
         if (
             headers.values("Expect").any { it.equals("100-continue", ignoreCase = true) } &&
             framing != ChromeHttpBodyFraming.None
@@ -146,10 +155,10 @@ internal class ChromeHttp1RequestReader(
                 ChromeHttpBodyFraming.None -> ByteArray(0)
                 ChromeHttpBodyFraming.ContentLength -> {
                     val length = contentLength(headers)
-                    if (length > maximumBodyBytes) throw ChromeHttpProtocolException(413, "Request body too large")
+                    if (length > bodyLimit) throw ChromeHttpProtocolException(413, "Request body too large")
                     input.readExactly(length)
                 }
-                ChromeHttpBodyFraming.Chunked -> readChunked(input)
+                ChromeHttpBodyFraming.Chunked -> readChunked(input, bodyLimit)
             }
         val close =
             headers.connectionTokens().any { it == "close" } ||
@@ -220,7 +229,10 @@ internal class ChromeHttp1RequestReader(
         return parsed.single()!!.toInt()
     }
 
-    private fun readChunked(input: InputStream): ByteArray {
+    private fun readChunked(
+        input: InputStream,
+        bodyLimit: Int,
+    ): ByteArray {
         val output = ByteArrayOutputStream()
         while (true) {
             val line =
@@ -236,7 +248,7 @@ internal class ChromeHttp1RequestReader(
                 requireEmptyTrailers(input)
                 return output.toByteArray()
             }
-            if (output.size().toLong() + length > maximumBodyBytes) {
+            if (output.size().toLong() + length > bodyLimit) {
                 throw ChromeHttpProtocolException(413, "Request body too large")
             }
             output.write(input.readExactly(length.toInt()))

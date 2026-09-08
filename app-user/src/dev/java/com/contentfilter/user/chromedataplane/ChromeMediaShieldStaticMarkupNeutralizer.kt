@@ -188,7 +188,7 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
         if (localRanges.isEmpty()) return this
         return localRanges.asReversed().fold(this) { value, range ->
             val name = substring(range).lowercase(Locale.US)
-            value.replaceAttribute(range, "data-glosh-blocked-$name=\"1\"")
+            value.replaceRange(range, "data-glosh-local-$name")
         }.protectInitialMedia()
     }
 

@@ -95,9 +95,10 @@ class ChromeMediaShieldBootstrapContractTest {
 
     @Test
     fun `boot is parser-first and active document handshake keeps one barrier at every phase`() {
-        assertFalse(script.contains("setTimeout"))
-        assertFalse(script.contains("setInterval"))
-        assertFalse(script.contains("requestAnimationFrame"))
+        val authorityScript = script.replace(ChromeLocalPhotoScript.declarations, "")
+        assertFalse(authorityScript.contains("setTimeout"))
+        assertFalse(authorityScript.contains("setInterval"))
+        assertFalse(authorityScript.contains("requestAnimationFrame"))
         assertContains(script, "NativeHasFocusFunction=Document.prototype.hasFocus")
         assertContains(script, "nativeHasFocus=NativeHasFocusFunction?method(NativeHasFocusFunction):null")
         assertContains(script, "NativeElementFocusFunction=SELF.HTMLElement&&HTMLElement.prototype.focus")

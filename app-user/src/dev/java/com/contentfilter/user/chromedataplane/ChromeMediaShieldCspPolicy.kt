@@ -108,6 +108,10 @@ internal class ChromeMediaShieldCspPolicy(
         val inherited = directives["img-src"]?.sources ?: directives["default-src"]?.sources ?: return
         val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
         if (OriginalUiSvgOrigin !in sources) sources += OriginalUiSvgOrigin
+        if (sameOriginReady) {
+            val localPhotoSource = ChromeLocalPhotoEndpoint.AssetOrigin + ChromeLocalPhotoEndpoint.AssetPath
+            if (localPhotoSource !in sources) sources += localPhotoSource
+        }
         directives["img-src"] = Directive(directives["img-src"]?.name ?: "img-src", sources)
     }
 

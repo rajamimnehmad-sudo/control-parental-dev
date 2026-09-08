@@ -50,6 +50,7 @@ internal object ChromeMediaShieldBootstrap {
             .replace(RendererMetricsUrlPlaceholder, endpoints.rendererMetrics)
             .replace(SvgRewritePathPlaceholder, ChromePhotosDataPlaneLabContract.OriginalUiSvgRewritePath)
             .replace(RendererMetricsDeclarationsPlaceholder, ChromeMediaShieldRendererMetricsScript.declarations)
+            .replace("__GLOSH_LOCAL_PHOTO_DECLARATIONS__", ChromeLocalPhotoScript.declarations)
             .replace(RendererMetricsReportingPlaceholder, ChromeMediaShieldRendererMetricsScript.reporting)
             .replace(ParserBarrierUrlPlaceholder, ChromePhotosDataPlaneLabContract.MediaShieldParserBarrierUrl)
             .replace(TopLevelPlaceholder, topLevel.toString())
@@ -259,6 +260,7 @@ internal object ChromeMediaShieldBootstrap {
         return protocol==='https:'||protocol==='http:'}catch(_){return false}};
         /* A rejected form destination must not become a top-level submission. Assigned targets remain _self. */
         const FORM_TARGET_BLOCKED='data-glosh-form-target-blocked';
+        __GLOSH_LOCAL_PHOTO_DECLARATIONS__
         const nonSelfTarget=value=>{const target=lower(stringOf(value||''));return target!==''&&target!=='_self'};
         const setSelfTarget=(element,name,value)=>{const tag=localNameOf(element);if(tag==='form'||name==='formtarget'){
         if(nonSelfTarget(value))nativeSet.call(element,FORM_TARGET_BLOCKED,'1');else nativeRemove.call(element,FORM_TARGET_BLOCKED)}return nativeSet.call(element,name,'_self')};
@@ -298,7 +300,7 @@ internal object ChromeMediaShieldBootstrap {
         if(nativeHas.call(element,'srcdoc'))nativeRemove.call(element,'srcdoc');
         if(!networkUrl(nativeGet.call(element,'src'))){nativeRemove.call(element,'data-glosh-network-frame');if(nativeGet.call(element,'src')!=='about:blank')nativeSet.call(element,'src','about:blank');hide(element)}
         else{if(nativeGet.call(element,'data-glosh-network-frame')!=='1')nativeSet.call(element,'data-glosh-network-frame','1');unhide(element)}return}
-        if(tag==='img'||tag==='source'||(tag==='input'&&lower(nativeGet.call(element,'type')||'')==='image')){const values=lower((nativeGet.call(element,'src')||'')+' '+(nativeGet.call(element,'srcset')||''));
+        if(tag==='img'||tag==='source'||(tag==='input'&&lower(nativeGet.call(element,'type')||'')==='image')){const localSrc=localPhotoRewrite(element,'src'),localSet=localPhotoRewrite(element,'srcset');if(localSrc||localSet){hide(element);return}const values=lower((nativeGet.call(element,'src')||'')+' '+(nativeGet.call(element,'srcset')||''));
         const structurallyBlocked=tag==='source'&&(nativeHas.call(element,'data-glosh-blocked-src')||nativeHas.call(element,'data-glosh-blocked-srcset'));
         const retainedLocalBlock=values.trim()===''&&nativeGet.call(element,'data-glosh-media-blocked')==='1'&&invoke(WeakSetHas,protectedMediaNodes,[element]);
         if(structurallyBlocked||retainedLocalBlock||includes(values,'data:')||includes(values,'blob:')){nativeRemove.call(element,'src');nativeRemove.call(element,'srcset');hide(element)}else unhide(element)}
@@ -469,12 +471,12 @@ internal object ChromeMediaShieldBootstrap {
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);nativeSet.call(this,'src','about:blank');hide(this);return}
         let admittedValue=attributeValue;if(key==='style')admittedValue=rewriteCssCandidate(admittedValue);else if(key==='src'&&(tag==='img'||(tag==='input'&&lower(nativeGet.call(this,'type')||'')==='image')))admittedValue=rewriteDataSvgValue(admittedValue);
         else if(key==='href'&&tag==='link'&&includes(' '+lower(nativeGet.call(this,'rel')||' ')+' ',' icon '))admittedValue=rewriteDataSvgValue(admittedValue);
-        const result=nativeSet.call(this,attributeName,admittedValue);sanitizeContainer(this);return result})&&installed;
+        localPhotoCancel(this,key);const result=nativeSet.call(this,attributeName,admittedValue);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'removeAttribute',function(name){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
         if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
         if((tag==='form'&&key==='target')||(oneOf(tag,['button','input'])&&key==='formtarget'))nativeRemove.call(this,FORM_TARGET_BLOCKED);
-        const result=nativeRemove.call(this,attributeName);sanitizeContainer(this);return result})&&installed;
+        localPhotoCancel(this,key);const result=nativeRemove.call(this,attributeName);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'toggleAttribute',function(name,force){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
         if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&(key==='sandbox'||key==='srcdoc')){sanitizeElement(this);return nativeHas.call(this,key)}
@@ -487,10 +489,10 @@ internal object ChromeMediaShieldBootstrap {
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);
-        nativeSet.call(this,'src','about:blank');hide(this);return}const result=nativeSetNS.call(this,namespaceValue,attributeName,attributeValue);sanitizeContainer(this);return result})&&installed;
+        nativeSet.call(this,'src','about:blank');hide(this);return}localPhotoCancel(this,key);const result=nativeSetNS.call(this,namespaceValue,attributeName,attributeValue);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'removeAttributeNS',function(namespace,name){const namespaceValue=namespace===null?null:stringOf(namespace),attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
         if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
-        const result=nativeRemoveNS.call(this,namespaceValue,attributeName);sanitizeContainer(this);return result})&&installed;
+        localPhotoCancel(this,key);const result=nativeRemoveNS.call(this,namespaceValue,attributeName);sanitizeContainer(this);return result})&&installed;
         const guardedSetAttribute=Element.prototype.setAttribute,guardedSetAttributeNS=Element.prototype.setAttributeNS;
         const guardedRemoveAttribute=Element.prototype.removeAttribute,guardedRemoveAttributeNS=Element.prototype.removeAttributeNS;
         for(const name of ['setAttributeNode','setAttributeNodeNS']){const original=Element.prototype[name];if(original)installed=seal(Element.prototype,name,function(attribute){
@@ -531,7 +533,7 @@ internal object ChromeMediaShieldBootstrap {
         const sealedEntry=descriptor(owner,'sandbox');return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
         if(self.HTMLIFrameElement)installed=guardFrameSandbox()&&installed;
         const guardMediaAccessor=(prototype,name)=>{const owner=prototype&&propertyOwner(prototype,name),entry=owner&&descriptor(owner,name);
-        if(!owner||!entry||!entry.get||!entry.set)return false;try{const guardedGet=entry.get,guardedSet=function(value){const admitted=name==='src'?rewriteDataSvgValue(value):value;const result=invoke(entry.set,this,[admitted]);sanitizeElement(this);return result};
+        if(!owner||!entry||!entry.get||!entry.set)return false;try{const guardedGet=entry.get,guardedSet=function(value){localPhotoCancel(this,name);const admitted=name==='src'?rewriteDataSvgValue(value):value;const result=invoke(entry.set,this,[admitted]);sanitizeElement(this);return result};
         ObjectDefine(owner,name,{get:guardedGet,set:guardedSet,enumerable:entry.enumerable,configurable:false});const sealedEntry=descriptor(owner,name);
         return !!sealedEntry&&!sealedEntry.configurable&&sealedEntry.get===guardedGet&&sealedEntry.set===guardedSet}catch(_){return false}};
         for(const pair of [[self.HTMLImageElement&&HTMLImageElement.prototype,'src'],[self.HTMLImageElement&&HTMLImageElement.prototype,'srcset'],

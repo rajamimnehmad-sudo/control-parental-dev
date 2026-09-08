@@ -41,7 +41,8 @@ class ChromeMediaShieldCspPolicyTest {
             )
 
         assertTrue(rewritten.contains("connect-src 'self'"))
-        assertFalse(rewritten.contains("https://glosh-photos.test"))
+        assertFalse(rewritten.substringAfter("connect-src ").substringBefore(';').contains("https://glosh-photos.test"))
+        assertTrue(rewritten.contains(ChromeLocalPhotoEndpoint.AssetOrigin + ChromeLocalPhotoEndpoint.AssetPath))
     }
 
     @Test
