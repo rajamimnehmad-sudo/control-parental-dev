@@ -27,6 +27,89 @@ class ChromeMediaShieldDocumentTransformerTest {
     fun tearDown() = ChromeMediaShieldDocumentAuthorityRegistry.clear()
 
     @Test
+    fun `gzip HTML re-enters original parser and media gates`() {
+        val result = assertIs<ChromeMediaShieldDocumentResult.Transformed>(gzipDocument(Source.toByteArray()))
+        val html = result.document.bytes.toString(Charsets.UTF_8)
+        assertContains(html, ChromeMediaShieldBootstrap.CurtainStyleElementId)
+        assertContains(html, "site-original")
+        assertTrue(html.indexOf(ChromeMediaShieldBootstrap.CurtainStyleElementId) < html.indexOf("site-original"))
+        assertFalse(result.document.headers.any { it.name.equals("Content-Encoding", true) })
+        assertEquals(result.document.identity, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
+    }
+
+    @Test
+    fun `gzip corruption and expansion overflow never issue document authority`() {
+        val corrupt =
+            gzipBytes(Source.toByteArray()).also {
+                it[it.lastIndex - 5] = (it[it.lastIndex - 5].toInt() xor 255).toByte()
+            }
+        assertEquals(
+            "document_gzip_invalid",
+            assertIs<ChromeMediaShieldDocumentResult.FailClosed>(gzipDocumentResponse(corrupt)).reason,
+        )
+        assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
+        val bomb = ByteArray(ChromeMediaShieldMaximumDocumentBytes + 1) { 65 }
+        assertEquals(
+            "document_too_large",
+            assertIs<ChromeMediaShieldDocumentResult.FailClosed>(gzipDocument(bomb)).reason,
+        )
+        assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
+    }
+
+    @Test
+    fun `gzip does not override ambiguous encoding unsupported mime or rejected status`() {
+        val bytes = gzipBytes(Source.toByteArray())
+        listOf(
+            listOf(ChromeHttpHeader("Content-Encoding", "gzip, br"), ChromeHttpHeader("Content-Type", "text/html")),
+            listOf(
+                ChromeHttpHeader("Content-Encoding", "gzip"),
+                ChromeHttpHeader("Content-Encoding", "gzip"),
+                ChromeHttpHeader("Content-Type", "text/html"),
+            ),
+            listOf(
+                ChromeHttpHeader("Content-Encoding", "gzip"),
+                ChromeHttpHeader("Content-Type", "application/xhtml+xml"),
+            ),
+        ).forEach { headers ->
+            assertIs<ChromeMediaShieldDocumentResult.FailClosed>(gzipDocumentResponse(bytes, headers))
+            assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
+        }
+        assertEquals(
+            "document_status_429",
+            assertIs<ChromeMediaShieldDocumentResult.FailClosed>(gzipDocumentResponse(bytes, status = 429)).reason,
+        )
+        assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
+    }
+
+    private fun gzipBytes(bytes: ByteArray): ByteArray {
+        val output = java.io.ByteArrayOutputStream()
+        java.util.zip.GZIPOutputStream(output).use { it.write(bytes) }
+        return output.toByteArray()
+    }
+
+    private fun gzipDocument(bytes: ByteArray) = gzipDocumentResponse(gzipBytes(bytes))
+
+    private fun gzipDocumentResponse(
+        bytes: ByteArray,
+        headers: List<ChromeHttpHeader> =
+            listOf(ChromeHttpHeader("Content-Encoding", "gzip"), ChromeHttpHeader("Content-Type", "text/html")),
+        status: Int = 200,
+    ): ChromeMediaShieldDocumentResult? =
+        ChromeMediaShieldDocumentAuthority(ChromeMediaShieldDocumentAdmission(), transformer).processBuffered(
+            ChromePhotosProxyRequest("GET", "/", headers = listOf(ChromeHttpHeader("Sec-Fetch-Dest", "document"))),
+            ChromePhotosUpstreamResponse(
+                "example.test",
+                status,
+                "test",
+                headers,
+                bytes.inputStream(),
+                bytes.size.toLong(),
+                "http/1.1",
+            ),
+            bytes,
+        )
+
+    @Test
     fun `rejected top level shows local explanation without releasing upstream markup or authority`() {
         val authority = ChromeMediaShieldDocumentAuthority(ChromeMediaShieldDocumentAdmission(), transformer)
         val unsafe = "<script>alert('upstream')</script><img src='https://unsafe.test/original'>".toByteArray()

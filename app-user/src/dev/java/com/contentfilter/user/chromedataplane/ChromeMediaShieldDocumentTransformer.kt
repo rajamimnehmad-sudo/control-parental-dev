@@ -227,9 +227,51 @@ internal class ChromeMediaShieldDocumentAuthority(
                     transformer.transform(bytes, response.headers, disposition)
                 }
             is ChromeMediaShieldDocumentDisposition.FailClosed ->
-                failClosed(disposition.reason, disposition.kind)
+                if (
+                    disposition.reason == "document_encoding_unsupported" &&
+                    response.headers.filter { it.name.equals("Content-Encoding", true) }
+                        .map { it.value.trim().lowercase(java.util.Locale.US) } == listOf("gzip")
+                ) {
+                    processGzipDocument(request, response, bytes, bodyExceeded, disposition.kind)
+                } else {
+                    failClosed(disposition.reason, disposition.kind)
+                }
             ChromeMediaShieldDocumentDisposition.NotDocument -> null
         }
+
+    private fun processGzipDocument(
+        request: ChromePhotosProxyRequest,
+        response: ChromePhotosUpstreamResponse,
+        bytes: ByteArray,
+        bodyExceeded: Boolean,
+        kind: ChromeMediaShieldDocumentKind,
+    ): ChromeMediaShieldDocumentResult? {
+        if (bodyExceeded || bytes.size > ChromeMediaShieldMaximumDocumentBytes) {
+            return failClosed("document_too_large", kind)
+        }
+        val decoded =
+            try {
+                java.util.zip.GZIPInputStream(bytes.inputStream()).use {
+                    it.readBounded(ChromeMediaShieldMaximumDocumentBytes)
+                }
+            } catch (_: java.io.IOException) {
+                return failClosed("document_gzip_invalid", kind)
+            }
+        if (decoded.exceeded) return failClosed("document_too_large", kind)
+        // Re-enter the same admission and parser gates with the decoded entity.
+        // No compressed bytes or original markup can be delivered by this path.
+        return processBuffered(
+            request,
+            response.copy(
+                headers =
+                    response.headers.filterNot {
+                        it.name.equals("Content-Encoding", true) || it.name.equals("Content-Length", true)
+                    },
+                bodyLength = decoded.bytes.size.toLong(),
+            ),
+            decoded.bytes,
+        )
+    }
 
     fun metrics(): ChromeMediaShieldDocumentMetrics =
         transformer.metrics().let { metrics ->
