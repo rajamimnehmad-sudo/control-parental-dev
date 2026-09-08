@@ -14,3 +14,7 @@ The Mac rebooted at2026-09-08 14:20:44 ART, interrupting the first assembly. Tem
 ADB has no connected device after restart; the user was asked to reconnect the A23. No462 installation or physical PASS is claimed. DEV461 remains the last verified installed candidate, but current device state cannot be verified while disconnected.
 
 DEV461 completed46min/47 health samples before the reboot. See `health-summary-461.json`: thermal0, raw BLOCK/UNKNOWN0/0, queue rejects/timeouts0/0, protectFailure0, bypass0/0, reset3, Chrome not suspended at the last sample. Ten upstream failures require separate attribution; do not reinterpret them as queue success or expected cancellation. App RSS returned to144580KiB after a234528KiB peak; the mixed workload is not a matched memory A/B. DEV462 changes scheduling and needs its own final physical and prolonged health gate.
+
+Recovered assembly PASS in4m17s. Verified local APK462 identity is in `apk-462.json`; it has not been installed. Platform concurrency semantics checked against [Android Condition](https://developer.android.com/reference/java/util/concurrent/locks/Condition) and [Java17 ReentrantLock](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/concurrent/locks/ReentrantLock.html).
+
+Lint PASS in1m45s. ADB remains empty across repeated checks after recovery; physical installation and final gate are BLOCKED by the external connection.
