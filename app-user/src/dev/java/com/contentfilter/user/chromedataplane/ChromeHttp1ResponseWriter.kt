@@ -42,6 +42,7 @@ internal class ChromeHttp1ResponseWriter(
             headers = response.headers,
             body = response.bytes.inputStream(),
             bodyLength = if (forceChunked) -1L else response.bytes.size.toLong(),
+            flushHeaders = false,
         )
 
     fun writeStreaming(
@@ -57,6 +58,7 @@ internal class ChromeHttp1ResponseWriter(
             headers = response.headers,
             body = response.body,
             bodyLength = response.bodyLength,
+            flushHeaders = true,
         )
 
     private fun write(
@@ -67,6 +69,7 @@ internal class ChromeHttp1ResponseWriter(
         headers: List<ChromeHttpHeader>,
         body: InputStream,
         bodyLength: Long,
+        flushHeaders: Boolean,
     ): ChromeStreamResult {
         val bodyAllowed = responseMayHaveBody(request.method, statusCode)
         val originalContentLength = headers.firstValue("Content-Length")?.toLongOrNull()?.takeIf { it >= 0 }
@@ -92,7 +95,10 @@ internal class ChromeHttp1ResponseWriter(
             output,
             "Connection: ${if (request.closeAfterResponse) "close" else "keep-alive"}\r\n\r\n",
         )
-        output.flush()
+        // Complete sanitized responses already have their body available. Flushing only the
+        // headers splits small TLS responses and can incur a delayed-ACK wait for the body.
+        // Upstream streaming still exposes headers immediately, before a potentially slow read.
+        if (flushHeaders || !bodyAllowed) output.flush()
         if (!bodyAllowed) return ChromeStreamResult(0, chunked = false)
 
         val total =

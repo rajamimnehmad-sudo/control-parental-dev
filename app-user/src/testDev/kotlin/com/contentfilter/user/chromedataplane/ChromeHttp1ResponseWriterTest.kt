@@ -1,5 +1,6 @@
 package com.contentfilter.user.chromedataplane
 
+import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
@@ -11,6 +12,52 @@ import kotlin.test.assertTrue
 
 class ChromeHttp1ResponseWriterTest {
     private val writer = ChromeHttp1ResponseWriter(streamBufferBytes = 2)
+
+    @Test
+    fun `complete small responses reach the transport with their body in the first flush`() {
+        for (method in listOf("GET", "HEAD")) {
+            val snapshots = mutableListOf<String>()
+            val transport =
+                object : ByteArrayOutputStream() {
+                    override fun flush() {
+                        snapshots += toString(Charsets.US_ASCII.name())
+                    }
+                }
+            val response =
+                ChromePhotosSanitizedResponse(
+                    200,
+                    "OK",
+                    emptyList(),
+                    "abc".toByteArray(),
+                    ChromePhotosResourceDecision.Passthrough,
+                    false,
+                    null,
+                    0,
+                )
+            writer.writeBuffered(BufferedOutputStream(transport), request(method), response)
+            assertEquals(1, snapshots.size)
+            assertTrue(snapshots.single().contains("\r\n\r\n"))
+            assertEquals(if (method == "GET") "abc" else "", transport.bodyText())
+        }
+    }
+
+    @Test
+    fun `streaming headers reach transport before waiting for upstream body`() {
+        val transport = ByteArrayOutputStream()
+        val upstream =
+            object : InputStream() {
+                private var sent = false
+
+                override fun read(): Int {
+                    assertTrue(transport.toString(Charsets.US_ASCII.name()).contains("\r\n\r\n"))
+                    if (sent) return -1
+                    sent = true
+                    return 'a'.code
+                }
+            }
+        writer.writeStreaming(BufferedOutputStream(transport), request(), response(upstream, 1))
+        assertEquals("a", transport.bodyText())
+    }
 
     @Test
     fun `fixed length exact body succeeds`() {
@@ -130,8 +177,7 @@ class ChromeHttp1ResponseWriterTest {
         protocol = "h2",
     )
 
-    private fun ByteArrayOutputStream.bodyText(): String =
-        toString(Charsets.US_ASCII.name()).substringAfter("\r\n\r\n")
+    private fun ByteArrayOutputStream.bodyText(): String = toString(Charsets.US_ASCII.name()).substringAfter("\r\n\r\n")
 
     private class FailingAfterPrefixInputStream(
         private val prefix: ByteArray,
