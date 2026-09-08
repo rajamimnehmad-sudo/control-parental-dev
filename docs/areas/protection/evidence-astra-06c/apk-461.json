@@ -1,0 +1,11 @@
+{
+  "functionalSha": "7046808b10b0426a9389e900412d2f74d8d546c0",
+  "versionCode": 461,
+  "package": "com.contentfilter.user.dev",
+  "signerSha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "localSha256": "b87b01f951129364237f280323f13983cb5cacb718055fc354913f023753ac74",
+  "installedSha256": "b87b01f951129364237f280323f13983cb5cacb718055fc354913f023753ac74",
+  "tests": 423,
+  "build": "PASS",
+  "lint": "PASS"
+}

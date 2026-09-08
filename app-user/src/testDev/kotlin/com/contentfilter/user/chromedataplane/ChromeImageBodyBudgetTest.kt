@@ -4,12 +4,43 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class ChromeImageBodyBudgetTest {
+    @Test
+    fun `interrupted waiter preserves interruption without borrowing or leaking permits`() {
+        val budget = ChromeImageBodyBudget(16)
+        val attempted = CountDownLatch(1)
+        val rejectedWithInterrupt = AtomicBoolean()
+        val admitted = AtomicBoolean()
+        val waiter = Thread {
+            attempted.countDown()
+            budget.withReservation(16, {
+                rejectedWithInterrupt.set(Thread.currentThread().isInterrupted)
+            }) { admitted.set(true) }
+        }
+        try {
+            budget.withReservation(16, { error("holder rejected") }) {
+                waiter.start()
+                assertTrue(attempted.await(2, TimeUnit.SECONDS))
+                waiter.interrupt()
+                waiter.join(2000)
+                assertTrue(!waiter.isAlive)
+                assertTrue(rejectedWithInterrupt.get())
+                assertTrue(!admitted.get())
+            }
+            assertEquals(16, budget.withReservation(16, { -1 }) { 16 })
+            assertEquals(16, budget.peakBytes())
+        } finally {
+            waiter.interrupt()
+            waiter.join(2000)
+        }
+    }
+
     @Test
     fun `weighted reservations never exceed capacity and release on completion`() {
         val budget = ChromeImageBodyBudget(128)
