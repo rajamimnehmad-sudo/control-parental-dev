@@ -144,6 +144,11 @@ class ChromeOriginalUiSvgAuthorityTest {
         assertEquals(ChromePhotosResourceDecision.Passthrough, accepted.decision)
         assertArrayEquals(safeSvg, accepted.bytes)
 
+        val acceptedWithCharset =
+            checkNotNull(authority.processNetworkSvg(request, upstream("image/svg+xml; charset=utf-8", safeSvg)))
+        assertEquals(ChromePhotosResourceDecision.Passthrough, acceptedWithCharset.decision)
+        assertArrayEquals(safeSvg, acceptedWithCharset.bytes)
+
         val active = "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><script/></svg>".toByteArray()
         val rejected = checkNotNull(authority.processNetworkSvg(request, upstream("image/svg+xml", active)))
         assertEquals(ChromePhotosResourceDecision.Unknown, rejected.decision)

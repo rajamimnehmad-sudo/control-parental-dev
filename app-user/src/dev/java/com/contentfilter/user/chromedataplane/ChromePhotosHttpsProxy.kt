@@ -613,25 +613,43 @@ internal class ChromePhotosHttpsProxy(
         return try {
             val upstreamRequest = normalizeUpstreamRequest(request)
             require(endpoint.host == host)
+            val upstreamStarted = System.nanoTime()
             upstream.execute(endpoint, upstreamRequest).use { exchange ->
                 upstreamExchangeReady = true
                 val response = exchange.response
+                val upstreamHeadersNanos = System.nanoTime() - upstreamStarted
                 requests.incrementAndGet()
                 if (response.statusCode in RedirectCodes) {
+                    val sanitizeStarted = System.nanoTime()
                     val sanitized = responseSanitizer.sanitizeRedirect(response)
+                    val sanitizeNanos = System.nanoTime() - sanitizeStarted
                     responseStarted = true
+                    val writeStarted = System.nanoTime()
                     val result = responseWriter.writeBuffered(output, request, sanitized)
+                    val writeNanos = System.nanoTime() - writeStarted
                     deliveredBytes.addAndGet(result.bytesWritten)
                     recordDecision(sanitized)
                     if (coverageToken != null) {
                         coverageLedger.recordRedirect(coverageToken, response.statusCode, sanitized.location)
                     }
-                    logRealResponse(host, request, clientProtocol, response, sanitized, result, started)
+                    logRealResponse(
+                        host = host,
+                        request = request,
+                        clientProtocol = clientProtocol,
+                        response = response,
+                        sanitized = sanitized,
+                        result = result,
+                        started = started,
+                        upstreamHeadersNanos = upstreamHeadersNanos,
+                        sanitizeNanos = sanitizeNanos,
+                        writeNanos = writeNanos,
+                    )
                     latencies.add(System.nanoTime() - started)
                     return request.successDisposition()
                 }
                 if (documentAuthority?.requiresBufferedDecision(upstreamRequest, response) == true) {
                     val bounded = response.body.readBounded(ChromeMediaShieldMaximumDocumentBytes)
+                    val decisionStarted = System.nanoTime()
                     val documentResult =
                         checkNotNull(
                             documentAuthority.processBuffered(
@@ -643,14 +661,18 @@ internal class ChromePhotosHttpsProxy(
                         )
                     responseStarted = true
                     val sanitized = documentResult.asSanitizedResponse()
+                    val decisionNanos = System.nanoTime() - decisionStarted
+                    val writeStarted = System.nanoTime()
                     val result = responseWriter.writeBuffered(output, request, sanitized)
+                    val writeNanos = System.nanoTime() - writeStarted
                     originalBytes.addAndGet(if (bounded.exceeded) 0L else bounded.bytes.size.toLong())
                     deliveredBytes.addAndGet(result.bytesWritten)
                     infoLog(
                         "phase=media_shield_document origin=real " +
                             "hostClass=${ChromeProxyLogPrivacy.hostClass(host)} " +
                             "hostHash=${ChromeProxyLogPrivacy.digest(host)} result=${documentResult.logValue()} " +
-                            "bytesOut=${result.bytesWritten}",
+                            "bytesOut=${result.bytesWritten} upstreamHeadersMs=${upstreamHeadersNanos.toPhaseMillis()} " +
+                            "documentDecisionMs=${decisionNanos.toPhaseMillis()} downstreamWriteMs=${writeNanos.toPhaseMillis()}",
                     )
                     latencies.add(System.nanoTime() - started)
                     return request.successDisposition()
@@ -675,12 +697,16 @@ internal class ChromePhotosHttpsProxy(
                 }
                 val inspection = imageAuthority.inspect(request, response)
                 if (inspection is ChromeImageContentInspection.Candidate) {
+                    val sanitizeStarted = System.nanoTime()
                     val sanitized = responseSanitizer.sanitizeCandidate(request.method, inspection)
+                    val sanitizeNanos = System.nanoTime() - sanitizeStarted
                     if (!visualDeliveryGate.isCandidateDeliveryAuthorized(sanitized)) {
                         error("candidate_wire_authority_rejected")
                     }
                     responseStarted = true
+                    val writeStarted = System.nanoTime()
                     val result = responseWriter.writeBuffered(output, request, sanitized)
+                    val writeNanos = System.nanoTime() - writeStarted
                     originalBytes.addAndGet(sanitized.inputBytes.toLong())
                     deliveredBytes.addAndGet(result.bytesWritten)
                     visualDeliveryGate.recordCandidateDelivery(sanitized)
@@ -693,12 +719,25 @@ internal class ChromePhotosHttpsProxy(
                             response = sanitized,
                         )
                     }
-                    logRealResponse(host, request, clientProtocol, response, sanitized, result, started)
+                    logRealResponse(
+                        host = host,
+                        request = request,
+                        clientProtocol = clientProtocol,
+                        response = response,
+                        sanitized = sanitized,
+                        result = result,
+                        started = started,
+                        upstreamHeadersNanos = upstreamHeadersNanos,
+                        sanitizeNanos = sanitizeNanos,
+                        writeNanos = writeNanos,
+                    )
                 } else {
                     val streamingResponse =
                         (inspection as? ChromeImageContentInspection.Passthrough)?.response ?: response
                     responseStarted = true
+                    val writeStarted = System.nanoTime()
                     val result = responseWriter.writeStreaming(output, request, streamingResponse)
+                    val writeNanos = System.nanoTime() - writeStarted
                     streamedResponses.incrementAndGet()
                     originalBytes.addAndGet(result.bytesWritten)
                     deliveredBytes.addAndGet(result.bytesWritten)
@@ -709,7 +748,8 @@ internal class ChromePhotosHttpsProxy(
                             "clientProtocol=$clientProtocol " +
                             "upstreamProtocol=${streamingResponse.protocol} status=${streamingResponse.statusCode} " +
                             "contentType=${streamingResponse.headers.firstValue("Content-Type").safeLogContentType()} " +
-                            "bytesOut=${result.bytesWritten} transfer=${if (result.chunked) "chunked" else "fixed"}",
+                            "bytesOut=${result.bytesWritten} transfer=${if (result.chunked) "chunked" else "fixed"} " +
+                            "upstreamHeadersMs=${upstreamHeadersNanos.toPhaseMillis()} downstreamWriteMs=${writeNanos.toPhaseMillis()}",
                     )
                 }
             }
@@ -762,6 +802,9 @@ internal class ChromePhotosHttpsProxy(
         sanitized: ChromePhotosSanitizedResponse,
         result: ChromeStreamResult,
         started: Long,
+        upstreamHeadersNanos: Long = 0L,
+        sanitizeNanos: Long = 0L,
+        writeNanos: Long = 0L,
     ) {
         infoLog(
             "origin=real hostClass=${ChromeProxyLogPrivacy.hostClass(host)} " +
@@ -770,7 +813,9 @@ internal class ChromePhotosHttpsProxy(
                 "contentType=${sanitized.contentType.safeLogContentType()} bytesIn=${sanitized.inputBytes} " +
                 "bytesOut=${result.bytesWritten} cache=${if (sanitized.cacheHit) "hit" else "miss"} " +
                 "decision=${sanitized.decision.name.lowercase(Locale.US)} ${sanitized.decisionResult.logFields()} " +
-                "requestToDeliveryMs=${started.elapsedMillis(System.nanoTime())}",
+                "requestToDeliveryMs=${started.elapsedMillis(System.nanoTime())} " +
+                "upstreamHeadersMs=${upstreamHeadersNanos.toPhaseMillis()} sanitizeMs=${sanitizeNanos.toPhaseMillis()} " +
+                "downstreamWriteMs=${writeNanos.toPhaseMillis()}",
         )
     }
 
@@ -836,6 +881,8 @@ internal class ChromePhotosHttpsProxy(
     ) = writeChromeProxyPlainError(output, code, message)
 
     private fun Long.elapsedMillis(end: Long): String = "%.3f".format(Locale.US, (end - this) / NanosPerMillis)
+
+    private fun Long.toPhaseMillis(): String = "%.3f".format(Locale.US, this / NanosPerMillis)
 
     private companion object {
         const val HttpsPort = 443

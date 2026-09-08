@@ -87,7 +87,7 @@ internal class ChromeOriginalUiSvgAuthority(
         response: ChromePhotosUpstreamResponse,
     ): ChromePhotosSanitizedResponse? {
         val contentTypes = response.headers.filter { it.name.equals("Content-Type", true) }.map { it.value }
-        if (contentTypes.size != 1 || contentTypes.single().trim().lowercase(Locale.US) != SvgMimeType) return null
+        if (contentTypes.size != 1 || contentTypes.single().substringBefore(';').trim().lowercase(Locale.US) != SvgMimeType) return null
         if (request.method == ChromePhotosProxyRequest.Head) {
             return if (response.statusCode == 200) {
                 ChromePhotosSanitizedResponse(
