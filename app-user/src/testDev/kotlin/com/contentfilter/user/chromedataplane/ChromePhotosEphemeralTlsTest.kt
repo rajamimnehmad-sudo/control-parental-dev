@@ -7,6 +7,7 @@ import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
+import java.security.interfaces.ECPublicKey
 import java.time.Instant
 import java.util.concurrent.Callable
 import java.util.concurrent.CountDownLatch
@@ -32,43 +33,59 @@ class ChromePhotosEphemeralTlsTest {
             ) as X509Certificate
 
         assertTrue(ca.basicConstraints >= 0)
+        assertEquals("RSA", ca.publicKey.algorithm)
         assertEquals(64, material.caFingerprint.length)
 
         val httpBingo = material.serverMaterialFor(ChromePhotosRealWebLabConfig.HttpBingoHost)
         val google = material.serverMaterialFor(ChromePhotosRealWebLabConfig.GoogleStaticHost)
 
-        assertTrue(httpBingo.leafCertificate.sanDnsNames().contains(ChromePhotosRealWebLabConfig.HttpBingoHost))
-        assertTrue(google.leafCertificate.sanDnsNames().contains(ChromePhotosRealWebLabConfig.GoogleStaticHost))
+        assertEquals(setOf(ChromePhotosRealWebLabConfig.HttpBingoHost), httpBingo.leafCertificate.sanDnsNames())
+        assertEquals(setOf(ChromePhotosRealWebLabConfig.GoogleStaticHost), google.leafCertificate.sanDnsNames())
         assertNotEquals(httpBingo.leafCertificate.serialNumber, google.leafCertificate.serialNumber)
+        val leafKey = httpBingo.leafCertificate.publicKey as ECPublicKey
+        assertEquals(256, leafKey.params.curve.field.fieldSize)
+        assertNotEquals(leafKey.w, (google.leafCertificate.publicKey as ECPublicKey).w)
+        assertTrue(httpBingo.leafCertificate.keyUsage[0])
+        assertTrue(!httpBingo.leafCertificate.keyUsage[2])
+        assertEquals("SHA256withRSA", httpBingo.leafCertificate.sigAlgName)
         httpBingo.leafCertificate.verify(ca.publicKey)
         google.leafCertificate.verify(ca.publicKey)
         assertSame(httpBingo, material.serverMaterialFor(ChromePhotosRealWebLabConfig.HttpBingoHost))
 
-        val server = httpBingo.sslContext.serverSocketFactory.createServerSocket(0, 1, InetAddress.getLoopbackAddress())
-        val executor = Executors.newSingleThreadExecutor()
-        val accepted =
-            executor.submit {
-                server.accept().use { socket ->
-                    (socket as SSLSocket).apply {
-                        useClientMode = false
-                        startHandshake()
+        for (protocol in listOf("TLSv1.2", "TLSv1.3")) {
+            val server =
+                httpBingo.sslContext.serverSocketFactory.createServerSocket(
+                    0,
+                    1,
+                    InetAddress.getLoopbackAddress(),
+                )
+            val executor = Executors.newSingleThreadExecutor()
+            val accepted =
+                executor.submit {
+                    server.accept().use { socket ->
+                        (socket as SSLSocket).apply {
+                            useClientMode = false
+                            startHandshake()
+                        }
                     }
                 }
-            }
-        val raw = Socket(InetAddress.getLoopbackAddress(), server.localPort)
-        val client =
-            clientContext(ca).socketFactory.createSocket(
-                raw,
-                ChromePhotosRealWebLabConfig.HttpBingoHost,
-                server.localPort,
-                true,
-            ) as SSLSocket
-        client.sslParameters = client.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
-        client.startHandshake()
-        client.close()
-        accepted.get()
-        server.close()
-        executor.shutdownNow()
+            val raw = Socket(InetAddress.getLoopbackAddress(), server.localPort)
+            val client =
+                clientContext(ca).socketFactory.createSocket(
+                    raw,
+                    ChromePhotosRealWebLabConfig.HttpBingoHost,
+                    server.localPort,
+                    true,
+                ) as SSLSocket
+            client.sslParameters = client.sslParameters.apply { endpointIdentificationAlgorithm = "HTTPS" }
+            client.enabledProtocols = arrayOf(protocol)
+            client.startHandshake()
+            assertEquals(protocol, client.session.protocol)
+            client.close()
+            accepted.get(5, TimeUnit.SECONDS)
+            server.close()
+            executor.shutdownNow()
+        }
     }
 
     @Test

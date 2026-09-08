@@ -18,6 +18,7 @@ import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import java.security.spec.ECGenParameterSpec
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.Date
@@ -95,7 +96,7 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
     }
 
     private fun createServerMaterial(hostname: String): ChromePhotosTlsServerMaterial {
-        val leafKeyPair = rsaKeyPair(random)
+        val leafKeyPair = ecLeafKeyPair(random)
         val extensions = JcaX509ExtensionUtils()
         val leafName = X500Name("CN=$hostname,O=Glosh DEV Lab")
         val leafBuilder =
@@ -111,7 +112,7 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
                 addExtension(
                     Extension.keyUsage,
                     true,
-                    KeyUsage(KeyUsage.digitalSignature or KeyUsage.keyEncipherment),
+                    KeyUsage(KeyUsage.digitalSignature),
                 )
                 addExtension(
                     Extension.extendedKeyUsage,
@@ -223,6 +224,12 @@ private fun JcaX509v3CertificateBuilder.signWith(signerKeyPair: KeyPair): X509Ce
 
 private fun rsaKeyPair(random: SecureRandom): KeyPair =
     KeyPairGenerator.getInstance("RSA").apply { initialize(RsaBits, random) }.generateKeyPair()
+
+// A unique P-256 key per host avoids serial RSA prime generation on cold multi-origin pages.
+private fun ecLeafKeyPair(random: SecureRandom): KeyPair =
+    KeyPairGenerator.getInstance("EC").apply {
+        initialize(ECGenParameterSpec("secp256r1"), random)
+    }.generateKeyPair()
 
 private fun positiveSerial(random: SecureRandom): BigInteger =
     BigInteger(SerialBits, random)
