@@ -15,7 +15,7 @@ internal data class ChromePhotoDecisionBenchmarkConfig(
     val timeoutMillis: Long = FixedTimeoutMillis
 
     internal companion object {
-        const val DefaultCacheEntries = 64
+        const val DefaultCacheEntries = 256
         const val DefaultConcurrentInferences = 1
         const val FixedQueueEntries = 2
         const val FixedTimeoutMillis = 5_000L

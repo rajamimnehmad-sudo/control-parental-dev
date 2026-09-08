@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class ChromePhotoDecisionSessionTest {
     @Test
     fun `benchmark config accepts only the bounded DEV matrix`() {
-        assertEquals(64, ChromePhotoDecisionBenchmarkConfig().maximumCacheEntries)
+        assertEquals(256, ChromePhotoDecisionBenchmarkConfig().maximumCacheEntries)
         assertEquals(1, ChromePhotoDecisionBenchmarkConfig().maximumConcurrentInferences)
         assertEquals(2, ChromePhotoDecisionBenchmarkConfig().maximumQueueEntries)
         assertEquals(5_000L, ChromePhotoDecisionBenchmarkConfig().timeoutMillis)
