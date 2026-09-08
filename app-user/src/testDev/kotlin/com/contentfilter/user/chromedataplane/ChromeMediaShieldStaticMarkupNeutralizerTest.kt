@@ -91,6 +91,18 @@ class ChromeMediaShieldStaticMarkupNeutralizerTest {
     }
 
     @Test
+    fun `non self forms retain a submission block instead of redirecting the main page`() {
+        val output =
+            ChromeMediaShieldStaticMarkupNeutralizer.neutralize(
+                "<form target='worker'></form><button formtarget='_blank'></button><input formtarget='named'>" +
+                    "<form target='_self'></form><form target=''></form><input formtarget='_SELF'>",
+            )
+        assertEquals(3, "data-glosh-form-target-blocked=\"1\"".toRegex().findAll(output).count())
+        assertFalse(output.contains("target='worker'"))
+        assertFalse(output.contains("target='_blank'"))
+    }
+
+    @Test
     fun `author markup cannot forge reserved Glosh authority attributes`() {
         val source =
             "<svg data-glosh-icon-safe='1' DATA-GLOSH-MEDIA-BLOCKED=0><foreignObject></foreignObject></svg>" +

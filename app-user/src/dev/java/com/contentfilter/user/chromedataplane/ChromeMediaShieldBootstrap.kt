@@ -257,6 +257,13 @@ internal object ChromeMediaShieldBootstrap {
         const style=styleOf(element);nativeStyleRemove.call(style,'visibility');nativeStyleRemove.call(style,'opacity')}invoke(WeakSetDelete,protectedMediaNodes,[element])};
         const networkUrl=(value)=>{if(!value)return false;try{const u=new NativeURL(stringOf(value),read(baseUriProperty,DOC));const protocol=read(urlProtocolProperty,u);
         return protocol==='https:'||protocol==='http:'}catch(_){return false}};
+        /* A rejected form destination must not become a top-level submission. Assigned targets remain _self. */
+        const FORM_TARGET_BLOCKED='data-glosh-form-target-blocked';
+        const nonSelfTarget=value=>{const target=lower(stringOf(value||''));return target!==''&&target!=='_self'};
+        const setSelfTarget=(element,name,value)=>{const tag=localNameOf(element);if(tag==='form'||name==='formtarget'){
+        if(nonSelfTarget(value))nativeSet.call(element,FORM_TARGET_BLOCKED,'1');else nativeRemove.call(element,FORM_TARGET_BLOCKED)}return nativeSet.call(element,name,'_self')};
+        const blockedFormTarget=(form,submitter)=>{const owner=submitter&&nativeHas.call(submitter,'formtarget')?submitter:form;
+        return nativeGet.call(owner,FORM_TARGET_BLOCKED)==='1'||nonSelfTarget(nativeGet.call(owner,owner===form?'target':'formtarget'))};
         const TOP_LAYER_ATTRIBUTE_NAMES=['popover','popovertarget','popovertargetaction','commandfor','command'],TOP_LAYER_ATTRIBUTES=new Set(TOP_LAYER_ATTRIBUTE_NAMES);
         const ICON_TAGS=new Set(['svg','g','defs','symbol','use','path','rect','circle','ellipse','line','polyline','polygon','title','desc','clippath','mask','lineargradient','radialgradient','stop','marker']);
         const ICON_GLOBAL_ATTRS=new Set(['id','class','style','transform','display','overflow','fill','fill-opacity','fill-rule','clip-rule','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-miterlimit','stroke-dasharray','stroke-dashoffset','stroke-opacity','opacity','clip-path','mask','role','aria-label','aria-labelledby','aria-hidden','focusable','tabindex','pointer-events','vector-effect','version','xml:space','data-component','data-view-component','data-skapa','data-name','data-glosh-icon-safe','data-glosh-media-blocked']);
@@ -455,8 +462,8 @@ internal object ChromeMediaShieldBootstrap {
         const adopt=Document.prototype.adoptNode;installed=seal(Document.prototype,'adoptNode',function(node){rendererApiCall(RMA_ADOPT,RMF_DOM_GUARD);if(containsProtected(node))deny();const result=invoke(adopt,this,[node]);scan(result,RM_GUARDED,RMA_ADOPT,RMF_DOM_GUARD);return result})&&installed;
         installSection('ATTRIBUTE_GUARDS');const protectedCurtainAttribute=(element,key)=>element===documentElement()&&key===CURTAIN_RELEASE_ATTRIBUTE;
         installed=seal(Element.prototype,'setAttribute',function(name,value){const attributeName=stringOf(name),attributeValue=stringOf(value),key=lower(attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
-        if(oneOf(tag,['button','input'])&&key==='formtarget')return nativeSet.call(this,'formtarget','_self');
+        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return setSelfTarget(this,'target',attributeValue);
+        if(oneOf(tag,['button','input'])&&key==='formtarget')return setSelfTarget(this,'formtarget',attributeValue);
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);nativeSet.call(this,'src','about:blank');hide(this);return}
@@ -466,6 +473,7 @@ internal object ChromeMediaShieldBootstrap {
         installed=seal(Element.prototype,'removeAttribute',function(name){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
         if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||protectedCurtainAttribute(this,key))deny();
         if(tag==='iframe'&&key==='sandbox'){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return}
+        if((tag==='form'&&key==='target')||(oneOf(tag,['button','input'])&&key==='formtarget'))nativeRemove.call(this,FORM_TARGET_BLOCKED);
         const result=nativeRemove.call(this,attributeName);sanitizeContainer(this);return result})&&installed;
         installed=seal(Element.prototype,'toggleAttribute',function(name,force){const attributeName=stringOf(name),key=lower(attributeName),tag=localNameOf(this);
         if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();
@@ -474,8 +482,8 @@ internal object ChromeMediaShieldBootstrap {
         const nativeSetNS=method(Element.prototype.setAttributeNS),nativeRemoveNS=method(Element.prototype.removeAttributeNS);
         installed=seal(Element.prototype,'setAttributeNS',function(namespace,name,value){const namespaceValue=namespace===null?null:stringOf(namespace),attributeName=stringOf(name),attributeValue=stringOf(value);
         const colon=lastIndex(attributeName,':'),key=lower(colon>=0?slice(attributeName,colon+1):attributeName),tag=localNameOf(this);
-        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return nativeSet.call(this,'target','_self');
-        if(oneOf(tag,['button','input'])&&key==='formtarget')return nativeSet.call(this,'formtarget','_self');
+        if(protectedNode(this)||invoke(WeakSetHas,protectedIconNodes,[this])||invoke(SetHas,TOP_LAYER_ATTRIBUTES,[key])||protectedCurtainAttribute(this,key))deny();if(oneOf(tag,['a','area','form','base'])&&key==='target')return setSelfTarget(this,'target',attributeValue);
+        if(oneOf(tag,['button','input'])&&key==='formtarget')return setSelfTarget(this,'formtarget',attributeValue);
         if(tag==='iframe'&&key==='sandbox'){const result=nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);return result}
         if(tag==='iframe'&&key==='srcdoc'){hide(this);return}
         if(tag==='iframe'&&key==='src'&&!networkUrl(attributeValue)){nativeSet.call(this,'sandbox',FRAME_SANDBOX);invoke(WeakSetAdd,lockedSandboxes,[sandboxOf(this)]);
@@ -530,7 +538,7 @@ internal object ChromeMediaShieldBootstrap {
         [self.HTMLSourceElement&&HTMLSourceElement.prototype,'src'],[self.HTMLSourceElement&&HTMLSourceElement.prototype,'srcset'],
         [self.HTMLInputElement&&HTMLInputElement.prototype,'src']])installed=guardMediaAccessor(pair[0],pair[1])&&installed;
         const forceSelfTarget=(owner,name)=>{if(!owner)return true;const entry=descriptor(owner,name);if(!entry||!entry.get||!entry.set)return false;
-        try{ObjectDefine(owner,name,{get:entry.get,set:function(){invoke(entry.set,this,['_self'])},configurable:false});return true}catch(_){return false}};
+        try{ObjectDefine(owner,name,{get:entry.get,set:function(value){setSelfTarget(this,lower(name),stringOf(value))},configurable:false});return true}catch(_){return false}};
         for(const pair of [[self.HTMLAnchorElement&&HTMLAnchorElement.prototype,'target'],[self.HTMLAreaElement&&HTMLAreaElement.prototype,'target'],
         [self.HTMLFormElement&&HTMLFormElement.prototype,'target'],[self.HTMLBaseElement&&HTMLBaseElement.prototype,'target'],
         [self.HTMLButtonElement&&HTMLButtonElement.prototype,'formTarget'],[self.HTMLInputElement&&HTMLInputElement.prototype,'formTarget']])
@@ -673,8 +681,14 @@ internal object ChromeMediaShieldBootstrap {
         if(commandName==='inserthtml')scan(documentElement(),RM_MARKUP,RMA_EXEC_INSERT_HTML,RMF_MARKUP);return result})&&installed}
         installSection('NAVIGATION_GUARDS');const openOwner=propertyOwner(self,'open'),originalOpen=openOwner&&openOwner.open;if(originalOpen)installed=seal(openOwner,'open',function(url,target,features){
         const urlValue=stringOf(url);if(!networkUrl(urlValue))return null;invoke(originalOpen,this,[urlValue,target?stringOf(target):'_blank','noopener=yes,noreferrer=yes']);return null})&&installed;else installed=false;
-        const guardNavigation=(event)=>{const initial=eventTarget(event),target=initial&&nodeTypeOf(initial)===1?elementClosest.call(initial,'a[href],area[href],form[action]'):null;
-        if(!target)return;const value=nativeGet.call(target,'href')||nativeGet.call(target,'action');if(!networkUrl(value)){invoke(EventPrevent,event,[]);invoke(EventStopImmediate,event,[]);return}
+        const eventTypeProperty=propertyDescriptor(NativeEvent.prototype,'type');
+        const submitterProperty=self.SubmitEvent?propertyDescriptor(SubmitEvent.prototype,'submitter'):null;
+        if(self.HTMLFormElement){for(const name of ['submit','requestSubmit']){const original=HTMLFormElement.prototype[name];if(!original){installed=false;continue}
+        installed=seal(HTMLFormElement.prototype,name,function(...args){const submitter=name==='requestSubmit'&&args.length?args[0]:null;
+        if(blockedFormTarget(this,submitter))return;return invoke(original,this,args)})&&installed}}else installed=false;
+        const guardNavigation=(event)=>{const initial=eventTarget(event),target=initial&&nodeTypeOf(initial)===1?elementClosest.call(initial,'a[href],area[href],form'):null;
+        if(!target)return;if(localNameOf(target)==='form'&&blockedFormTarget(target,submitterProperty&&read(eventTypeProperty,event)==='submit'?read(submitterProperty,event):null)){if(read(eventTypeProperty,event)==='submit')invoke(EventPrevent,event,[]);return}
+        const value=nativeGet.call(target,'href')||nativeGet.call(target,'action')||(localNameOf(target)==='form'?read(baseUriProperty,DOC):null);if(!networkUrl(value)){invoke(EventPrevent,event,[]);invoke(EventStopImmediate,event,[]);return}
         nativeSet.call(target,'target','_self');if(localNameOf(target)!=='form')nativeSet.call(target,'rel','noopener')};
         nativeAddEvent.call(DOC,'click',guardNavigation,true);nativeAddEvent.call(DOC,'submit',guardNavigation,true);
         installSection('IFRAME_GUARDS');if(self.HTMLIFrameElement){const frameSrc=descriptor(HTMLIFrameElement.prototype,'src');

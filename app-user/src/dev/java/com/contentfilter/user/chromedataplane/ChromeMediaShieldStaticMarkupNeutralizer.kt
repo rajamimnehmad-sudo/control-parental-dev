@@ -69,7 +69,8 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
                             normalized
                         }
                     }
-                    "a", "area", "form", "base" -> authorityNeutralizedTag.forceSameContextTarget()
+                    "form" -> authorityNeutralizedTag.forceSameContextTarget(markBlockedForm = true)
+                    "a", "area", "base" -> authorityNeutralizedTag.forceSameContextTarget()
                     "button" -> authorityNeutralizedTag.forceSameContextFormTarget()
                     "meta" -> authorityNeutralizedTag.rewriteMetaCsp(metaCspRewriter)
                     else ->
@@ -389,14 +390,17 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
             .asReversed()
             .fold(this) { value, range -> value.replaceAttribute(range, "") }
 
-    private fun String.forceSameContextTarget(): String {
+    private fun String.forceSameContextTarget(markBlockedForm: Boolean = false): String {
         val targets =
             attributeNameRanges().filter { range ->
                 substring(range).equals("target", ignoreCase = true)
             }
-        return targets.asReversed().fold(this) { value, range ->
-            value.replaceAttribute(range, "target=\"_self\"")
-        }
+        val blocked = markBlockedForm && targets.any { range -> attributeValue(range).isNonSelfTarget() }
+        val normalized =
+            targets.asReversed().fold(this) { value, range ->
+                value.replaceAttribute(range, "target=\"_self\"")
+            }
+        return if (blocked) normalized.insertAttribute("data-glosh-form-target-blocked=\"1\"") else normalized
     }
 
     private fun String.forceSameContextFormTarget(): String {
@@ -404,10 +408,15 @@ internal object ChromeMediaShieldStaticMarkupNeutralizer {
             attributeNameRanges().filter { range ->
                 substring(range).equals("formtarget", ignoreCase = true)
             }
-        return targets.asReversed().fold(this) { value, range ->
-            value.replaceAttribute(range, "formtarget=\"_self\"")
-        }
+        val blocked = targets.any { range -> attributeValue(range).isNonSelfTarget() }
+        val normalized =
+            targets.asReversed().fold(this) { value, range ->
+                value.replaceAttribute(range, "formtarget=\"_self\"")
+            }
+        return if (blocked) normalized.insertAttribute("data-glosh-form-target-blocked=\"1\"") else normalized
     }
+
+    private fun String?.isNonSelfTarget(): Boolean = !isNullOrEmpty() && !equals("_self", ignoreCase = true)
 
     private fun String.renameAllAttributes(
         sourceName: String,

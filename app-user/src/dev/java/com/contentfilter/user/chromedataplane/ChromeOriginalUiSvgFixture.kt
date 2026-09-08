@@ -12,6 +12,12 @@ internal class ChromeOriginalUiSvgFixture {
     fun responseFor(request: ChromePhotosProxyRequest): ChromePhotosFixtureResponse? {
         val path = request.target.substringBefore('?').substringBefore('#')
         return when (path) {
+            "/svg06a/forms" ->
+                response(
+                    "ui-form-target-page",
+                    "text/html; charset=utf-8",
+                    ChromeFormTargetFixture.page().toByteArray(),
+                )
             "/svg06a/shadow" ->
                 response(
                     "ui-shadow-page",
