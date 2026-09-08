@@ -84,6 +84,19 @@ class ChromePhotosRealResponseSanitizerTest {
     }
 
     @Test
+    fun `late cache recheck retains original SAFE and replacements for BLOCK and UNKNOWN`() {
+        listOf("image/png" to safe, "image/webp" to blocked, "image/jpeg" to jpeg("unknown")).forEach { (mime, bytes) ->
+            val probe = transformer.probeCache(mime, bytes)
+            assertNull(probe.result)
+            val original = transformer.transform(mime, bytes)
+            val cached = requireNotNull(probe.recheck())
+            assertTrue(cached.cacheHit)
+            assertEquals(original.decision, cached.decision)
+            assertContentEquals(original.bytes, cached.bytes)
+        }
+    }
+
+    @Test
     fun `SAFE image remains byte identical while transformed entity headers are coherent`() {
         val result = sanitizer.sanitize("GET", upstream("image/png", safe, extraHeaders = entityHeaders()))
 

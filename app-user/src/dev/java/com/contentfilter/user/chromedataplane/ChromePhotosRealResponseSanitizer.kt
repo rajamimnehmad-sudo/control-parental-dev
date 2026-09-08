@@ -101,6 +101,11 @@ internal class ChromePhotosRealResponseSanitizer(
                                 val processingStarted = System.nanoTime()
                                 imageAuthority.withBodyAdmission(
                                     onRejected = { null },
+                                    cached = {
+                                        probe.recheck()?.also {
+                                            processingWaitMillis = (System.nanoTime() - processingStarted) / 1_000_000.0
+                                        }
+                                    },
                                 ) {
                                     processingWaitMillis = (System.nanoTime() - processingStarted) / 1_000_000.0
                                     transformer.transform(mime, bounded.bytes).let {

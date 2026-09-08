@@ -20,10 +20,13 @@ internal data class ChromePhotosTransformResult(
     val hashMs: Double = 0.0,
 )
 
-internal data class ChromePhotosCacheProbe(
+internal class ChromePhotosCacheProbe(
     val result: ChromePhotosTransformResult?,
     val hashMs: Double,
-)
+    private val lookup: () -> ChromePhotosTransformResult?,
+) {
+    fun recheck(): ChromePhotosTransformResult? = lookup()
+}
 
 /** Applies a content-identity decision session before any image body reaches Chrome. */
 internal class ChromePhotosResourceTransformer private constructor(
@@ -81,7 +84,11 @@ internal class ChromePhotosResourceTransformer private constructor(
         val hash = sha256(candidateBytes)
         val hashMs = (System.nanoTime() - started) / 1_000_000.0
         val cached = decisionSession.cachedDecision(hash, contentType.normalizedImageMimeType())
-        return ChromePhotosCacheProbe(cached?.let { transformed(candidateBytes, hash, hashMs, it) }, hashMs)
+        return ChromePhotosCacheProbe(cached?.let { transformed(candidateBytes, hash, hashMs, it) }, hashMs) {
+            decisionSession.cachedDecision(hash, contentType.normalizedImageMimeType())?.let {
+                transformed(candidateBytes, hash, hashMs, it)
+            }
+        }
     }
 
     private fun transformed(

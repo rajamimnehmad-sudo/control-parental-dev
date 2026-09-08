@@ -6,8 +6,6 @@ import java.io.InputStream
 import java.io.SequenceInputStream
 import java.nio.charset.StandardCharsets
 import java.util.Locale
-import java.util.concurrent.Semaphore
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 internal enum class ChromeImageFormat(
@@ -83,17 +81,14 @@ internal class ChromeImageContentAuthority(
     private val maximumSniffBytes: Int = DefaultMaximumSniffBytes,
     private val stockMediaAuthority: Boolean = false,
 ) {
-    private val bodyPermits = Semaphore(maximumConcurrentBodies, true)
+    private val processingAdmission = ChromeImageProcessingAdmission(maximumConcurrentBodies)
     private val bodyBudget =
         ChromeImageBodyBudget(
             Math.multiplyExact(maximumConcurrentBodies, ChromePhotosRealUpstream.DefaultMaximumBodyBytes),
         )
-    private val activeBodies = AtomicInteger()
-    private val bodyAdmissionPeak = AtomicInteger()
     private val candidates = AtomicLong()
     private val prefixPeeks = AtomicLong()
     private val magicCandidates = AtomicLong()
-    private val bodyAdmissionRejects = AtomicLong()
 
     init {
         require(maximumConcurrentBodies > 0)
@@ -242,32 +237,17 @@ internal class ChromeImageContentAuthority(
 
     fun <T> withBodyAdmission(
         onRejected: () -> T,
+        cached: () -> T? = { null },
         block: () -> T,
-    ): T {
-        try {
-            bodyPermits.acquire()
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            bodyAdmissionRejects.incrementAndGet()
-            return onRejected()
-        }
-        val active = activeBodies.incrementAndGet()
-        bodyAdmissionPeak.accumulateAndGet(active, ::maxOf)
-        return try {
-            block()
-        } finally {
-            activeBodies.decrementAndGet()
-            bodyPermits.release()
-        }
-    }
+    ): T = processingAdmission.run(onRejected, cached, block)
 
     fun metrics(): ChromeImageAuthorityMetrics =
         ChromeImageAuthorityMetrics(
             candidates = candidates.get(),
             prefixPeeks = prefixPeeks.get(),
             magicCandidates = magicCandidates.get(),
-            bodyAdmissionPeak = bodyAdmissionPeak.get(),
-            bodyAdmissionRejects = bodyAdmissionRejects.get(),
+            bodyAdmissionPeak = processingAdmission.peak(),
+            bodyAdmissionRejects = processingAdmission.rejections(),
             bufferedBytesPeak = bodyBudget.peakBytes(),
             bufferedBytesCapacity = bodyBudget.capacity,
         )
