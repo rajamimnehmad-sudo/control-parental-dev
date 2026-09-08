@@ -20,6 +20,11 @@ internal data class ChromePhotosTransformResult(
     val hashMs: Double = 0.0,
 )
 
+internal data class ChromePhotosCacheProbe(
+    val result: ChromePhotosTransformResult?,
+    val hashMs: Double,
+)
+
 /** Applies a content-identity decision session before any image body reaches Chrome. */
 internal class ChromePhotosResourceTransformer private constructor(
     private val placeholderBytes: ByteArray,
@@ -65,6 +70,26 @@ internal class ChromePhotosResourceTransformer private constructor(
         val hash = sha256(candidateBytes)
         val hashMs = (System.nanoTime() - hashStarted) / 1_000_000.0
         val result = decisionSession.decide(hash, candidateBytes, contentType.normalizedImageMimeType())
+        return transformed(candidateBytes, hash, hashMs, result)
+    }
+
+    fun probeCache(
+        contentType: String,
+        candidateBytes: ByteArray,
+    ): ChromePhotosCacheProbe {
+        val started = System.nanoTime()
+        val hash = sha256(candidateBytes)
+        val hashMs = (System.nanoTime() - started) / 1_000_000.0
+        val cached = decisionSession.cachedDecision(hash, contentType.normalizedImageMimeType())
+        return ChromePhotosCacheProbe(cached?.let { transformed(candidateBytes, hash, hashMs, it) }, hashMs)
+    }
+
+    private fun transformed(
+        candidateBytes: ByteArray,
+        hash: String,
+        hashMs: Double,
+        result: ChromePhotoDecisionResult,
+    ): ChromePhotosTransformResult {
         val decision =
             when (result.decision) {
                 ChromePhotoDecision.Safe -> ChromePhotosResourceDecision.Safe
@@ -144,6 +169,15 @@ private class HashRegistryDecisionSession(
             source = if (cached == null) ChromePhotoDecisionSource.Engine else ChromePhotoDecisionSource.Cache,
         )
     }
+
+    @Synchronized
+    override fun cachedDecision(
+        contentHash: String,
+        mimeType: String,
+    ): ChromePhotoDecisionResult? =
+        cache[HashRegistryKey(contentHash, mimeType.normalizedImageMimeType())]?.let {
+            ChromePhotoDecisionResult(it, "deterministic_hash_${it.name.lowercase()}", ChromePhotoDecisionSource.Cache)
+        }
 
     @Synchronized
     override fun clear() {

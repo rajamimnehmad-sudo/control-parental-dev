@@ -14,6 +14,27 @@ import kotlin.test.assertTrue
 
 class ChromePhotoDecisionSessionTest {
     @Test
+    fun `cache probe never schedules work and respects MIME identity generation and close`() {
+        val engine = FakeEngine { safeResult() }
+        val session = session(engine)
+        val bytes = "cache-probe".toByteArray()
+        val hash = sha256(bytes)
+        kotlin.test.assertNull(session.cachedDecision(hash, "image/png"))
+        assertEquals(0L, session.metrics().engineCalls)
+        session.decide(hash, bytes, "image/png")
+        assertEquals(ChromePhotoDecisionSource.Cache, session.cachedDecision(hash, "image/png")?.source)
+        kotlin.test.assertNull(session.cachedDecision(hash, "image/jpeg"))
+        engine.identityVersion = "R3.1-other-policy"
+        kotlin.test.assertNull(session.cachedDecision(hash, "image/png"))
+        session.decide(hash, bytes, "image/png")
+        session.clear()
+        kotlin.test.assertNull(session.cachedDecision(hash, "image/png"))
+        session.decide(hash, bytes, "image/png")
+        session.close()
+        kotlin.test.assertNull(session.cachedDecision(hash, "image/png"))
+    }
+
+    @Test
     fun `benchmark config accepts only the bounded DEV matrix`() {
         assertEquals(256, ChromePhotoDecisionBenchmarkConfig().maximumCacheEntries)
         assertEquals(1, ChromePhotoDecisionBenchmarkConfig().maximumConcurrentInferences)

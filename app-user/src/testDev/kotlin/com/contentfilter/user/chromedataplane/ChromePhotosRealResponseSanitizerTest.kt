@@ -33,6 +33,57 @@ class ChromePhotosRealResponseSanitizerTest {
         )
 
     @Test
+    fun `cached SAFE BLOCK and UNKNOWN bypass occupied processing slots while cold work stays bounded`() {
+        val imageAuthority = ChromeImageContentAuthority(maximumConcurrentBodies = 2)
+        val local = ChromePhotosRealResponseSanitizer(transformer, authority, placeholder, 64, imageAuthority)
+        val unknown = jpeg("uncached-policy-unknown")
+        listOf("image/png" to safe, "image/webp" to blocked, "image/jpeg" to unknown).forEach { (mime, bytes) ->
+            local.sanitize("GET", upstream(mime, bytes))
+        }
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(5)
+        val occupied = java.util.concurrent.CountDownLatch(2)
+        val release = java.util.concurrent.CountDownLatch(1)
+        try {
+            repeat(2) {
+                pool.submit {
+                    imageAuthority.withBodyAdmission(onRejected = { Unit }) {
+                        occupied.countDown()
+                        release.await()
+                    }
+                }
+            }
+            assertTrue(occupied.await(2, java.util.concurrent.TimeUnit.SECONDS))
+            val warm =
+                pool.submit<List<ChromePhotosSanitizedResponse>> {
+                    listOf("image/png" to safe, "image/webp" to blocked, "image/jpeg" to unknown).map { (mime, bytes) ->
+                        local.sanitize("GET", upstream(mime, bytes))
+                    }
+                }.get(2, java.util.concurrent.TimeUnit.SECONDS)
+            assertTrue(warm.all { it.cacheHit })
+            assertContentEquals(safe, warm[0].bytes)
+            assertContentEquals(placeholder, warm[1].bytes)
+            assertContentEquals(placeholder, warm[2].bytes)
+            val cold =
+                pool.submit<ChromePhotosSanitizedResponse> {
+                    local.sanitize("GET", upstream("image/jpeg", jpeg("new-cold")))
+                }
+            kotlin.test.assertFailsWith<java.util.concurrent.TimeoutException> {
+                cold.get(100, java.util.concurrent.TimeUnit.MILLISECONDS)
+            }
+            release.countDown()
+            assertEquals(
+                ChromePhotosResourceDecision.Unknown,
+                cold.get(2, java.util.concurrent.TimeUnit.SECONDS).decision,
+            )
+            assertEquals(2, imageAuthority.metrics().bodyAdmissionPeak)
+            assertTrue(imageAuthority.metrics().bufferedBytesPeak <= imageAuthority.metrics().bufferedBytesCapacity)
+        } finally {
+            release.countDown()
+            pool.shutdownNow()
+        }
+    }
+
+    @Test
     fun `SAFE image remains byte identical while transformed entity headers are coherent`() {
         val result = sanitizer.sanitize("GET", upstream("image/png", safe, extraHeaders = entityHeaders()))
 

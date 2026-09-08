@@ -31,6 +31,8 @@ internal data class ChromeImageAuthorityMetrics(
     val magicCandidates: Long = 0,
     val bodyAdmissionPeak: Int = 0,
     val bodyAdmissionRejects: Long = 0,
+    val bufferedBytesPeak: Int = 0,
+    val bufferedBytesCapacity: Int = 0,
 )
 
 internal sealed interface ChromeImageContentInspection {
@@ -82,6 +84,10 @@ internal class ChromeImageContentAuthority(
     private val stockMediaAuthority: Boolean = false,
 ) {
     private val bodyPermits = Semaphore(maximumConcurrentBodies, true)
+    private val bodyBudget =
+        ChromeImageBodyBudget(
+            Math.multiplyExact(maximumConcurrentBodies, ChromePhotosRealUpstream.DefaultMaximumBodyBytes),
+        )
     private val activeBodies = AtomicInteger()
     private val bodyAdmissionPeak = AtomicInteger()
     private val candidates = AtomicLong()
@@ -228,6 +234,12 @@ internal class ChromeImageContentAuthority(
         return ChromeImageContentResolution.Inspect(format)
     }
 
+    fun <T> withBufferedBodyBudget(
+        bytes: Int,
+        onRejected: () -> T,
+        block: () -> T,
+    ): T = bodyBudget.withReservation(bytes, onRejected, block)
+
     fun <T> withBodyAdmission(
         onRejected: () -> T,
         block: () -> T,
@@ -256,6 +268,8 @@ internal class ChromeImageContentAuthority(
             magicCandidates = magicCandidates.get(),
             bodyAdmissionPeak = bodyAdmissionPeak.get(),
             bodyAdmissionRejects = bodyAdmissionRejects.get(),
+            bufferedBytesPeak = bodyBudget.peakBytes(),
+            bufferedBytesCapacity = bodyBudget.capacity,
         )
 
     internal fun sniffFormat(bytes: ByteArray): ChromeImageFormat? {

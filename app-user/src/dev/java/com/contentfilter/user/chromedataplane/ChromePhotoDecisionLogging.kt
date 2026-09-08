@@ -21,6 +21,11 @@ internal fun ChromePhotoDecisionResult?.logFields(): String {
 }
 
 internal fun ChromePhotosSanitizedResponse.imagePhaseFields(): String =
-    listOf("bodyAdmissionMs" to bodyAdmissionMs, "bodyReadMs" to bodyReadMs, "hashMs" to hashMs)
+    listOf(
+        "bodyAdmissionMs" to bodyAdmissionMs,
+        "bodyReadMs" to bodyReadMs,
+        "processingAdmissionMs" to processingAdmissionMs,
+        "hashMs" to hashMs,
+    )
         .mapNotNull { (name, value) -> value?.let { "$name=${"%.3f".format(Locale.US, it)}" } }
         .joinToString(" ")

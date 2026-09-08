@@ -679,6 +679,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "imageCandidates=${images.candidates} imagePrefixPeeks=${images.prefixPeeks} " +
                 "imageMagicCandidates=${images.magicCandidates} imageBodyAdmissionPeak=${images.bodyAdmissionPeak} " +
                 "imageBodyAdmissionRejects=${images.bodyAdmissionRejects} " +
+                "imageBufferedBytesPeak=${images.bufferedBytesPeak} imageBufferedBytesCapacity=${images.bufferedBytesCapacity} " +
                 "networkVisualCandidates=${networkVisuals.candidates} " +
                 "networkVisualReplaced=${networkVisuals.replaced} " +
                 "networkVisualRawDelivered=${networkVisuals.rawDelivered} " +

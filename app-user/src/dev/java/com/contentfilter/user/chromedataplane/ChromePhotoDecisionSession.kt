@@ -58,6 +58,12 @@ internal interface ChromePhotoDecisionSession : AutoCloseable {
         mimeType: String,
     ): ChromePhotoDecisionResult
 
+    /** A miss does not schedule inference or count as a decision request. */
+    fun cachedDecision(
+        contentHash: String,
+        mimeType: String,
+    ): ChromePhotoDecisionResult? = null
+
     fun cacheSize(): Int
 
     fun clear()
@@ -212,6 +218,28 @@ internal class ChromePhotosBoundedDecisionSession(
         } else {
             record(unknown(StaleGenerationReason, ChromePhotoDecisionSource.Unavailable), started)
         }
+    }
+
+    override fun cachedDecision(
+        contentHash: String,
+        mimeType: String,
+    ): ChromePhotoDecisionResult? {
+        val started = nanoTime()
+        if (closed.get()) return null
+        val decisionGeneration = generation.get()
+        val key =
+            DecisionKey(engine.identity.cacheKey, decisionGeneration, mimeType.normalizedImageMimeType(), contentHash)
+        val cached = synchronized(cacheLock) { cache[key] } ?: return null
+        if (closed.get() || generation.get() != decisionGeneration) return null
+        requests.incrementAndGet()
+        cacheHits.incrementAndGet()
+        val result =
+            cached.copy(
+                source = ChromePhotoDecisionSource.Cache,
+                timings = ChromePhotoDecisionTimings(totalLocalMs = (nanoTime() - started).toMillis()),
+            )
+        cacheHitSamples.add(result.timings.totalLocalMs)
+        return record(result, started, replaceTotal = false)
     }
 
     override fun cacheSize(): Int = synchronized(cacheLock) { cache.size }
