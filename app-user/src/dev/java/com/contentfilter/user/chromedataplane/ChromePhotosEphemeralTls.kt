@@ -53,10 +53,30 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
         require(maximumLeafCertificates > 0)
     }
 
-    @Synchronized
-    fun serverMaterialFor(rawHostname: String): ChromePhotosTlsServerMaterial {
+    fun serverMaterialFor(
+        rawHostname: String,
+        onTiming: (cacheHit: Boolean, waitMillis: Double, creationMillis: Double) -> Unit = { _, _, _ -> },
+    ): ChromePhotosTlsServerMaterial {
         val hostname = normalizeDnsHost(rawHostname)
-        return leafCache[hostname] ?: createServerMaterial(hostname).also { leafCache[hostname] = it }
+        val started = System.nanoTime()
+        var waited = 0.0
+        var created = 0.0
+        var hit = false
+        val material =
+            synchronized(this) {
+                waited = (System.nanoTime() - started) / 1_000_000.0
+                val cached = leafCache[hostname]
+                hit = cached != null
+                cached ?: run {
+                    val creating = System.nanoTime()
+                    createServerMaterial(hostname).also {
+                        created = (System.nanoTime() - creating) / 1_000_000.0
+                        leafCache[hostname] = it
+                    }
+                }
+            }
+        onTiming(hit, waited, created)
+        return material
     }
 
     @Synchronized

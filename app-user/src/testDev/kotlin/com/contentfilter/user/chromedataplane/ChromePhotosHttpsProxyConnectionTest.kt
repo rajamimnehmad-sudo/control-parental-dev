@@ -6,8 +6,8 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
-import java.net.SocketException
 import java.net.InetAddress
+import java.net.SocketException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -447,9 +447,10 @@ class ChromePhotosHttpsProxyConnectionTest {
 
     @Test
     fun `upstream socket reset while streaming remains a failure not client cancellation`() {
-        val body = object : InputStream() {
-            override fun read(): Int = throw SocketException("upstream reset")
-        }
+        val body =
+            object : InputStream() {
+                override fun read(): Int = throw SocketException("upstream reset")
+            }
         val result = runSession(ScriptedUpstream(Reply(response(body, -1))), twoRequests())
         assertEquals(1, result.failures)
         assertEquals(0, result.clientDisconnects)

@@ -383,10 +383,15 @@ internal class ChromePhotosBoundedDecisionSession(
         private val taskGeneration: Long,
         private val discarded: AtomicBoolean,
     ) : Callable<ChromePhotoDecisionResult> {
-        override fun call(): ChromePhotoDecisionResult =
-            runEngine(bytes, mimeType).also { result ->
-                cacheIfCurrent(key, result, taskGeneration, discarded.get())
-            }
+        private val queuedAt = nanoTime()
+
+        override fun call(): ChromePhotoDecisionResult {
+            val queueWaitMs = (nanoTime() - queuedAt).toMillis()
+            val result = runEngine(bytes, mimeType)
+            val measured = result.copy(timings = result.timings.copy(queueWaitMs = queueWaitMs))
+            cacheIfCurrent(key, measured, taskGeneration, discarded.get())
+            return measured
+        }
     }
 
     private data class DecisionKey(

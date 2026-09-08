@@ -16,5 +16,11 @@ internal fun ChromePhotoDecisionResult?.logFields(): String {
         "probability=${filterProbability ?: -1f} basis=${basis.take(32)} " +
         "decodeMs=${"%.3f".format(Locale.US, timings.decodeAndPreprocessMs)} " +
         "inferenceMs=${"%.3f".format(Locale.US, timings.inferenceMs)} " +
+        "inferenceQueueMs=${"%.3f".format(Locale.US, timings.queueWaitMs)} " +
         "localDecisionMs=${"%.3f".format(Locale.US, timings.totalLocalMs)} "
 }
+
+internal fun ChromePhotosSanitizedResponse.imagePhaseFields(): String =
+    listOf("bodyAdmissionMs" to bodyAdmissionMs, "bodyReadMs" to bodyReadMs, "hashMs" to hashMs)
+        .mapNotNull { (name, value) -> value?.let { "$name=${"%.3f".format(Locale.US, it)}" } }
+        .joinToString(" ")

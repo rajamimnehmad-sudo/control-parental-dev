@@ -28,6 +28,22 @@ class ChromeOriginalUiSvgAuthorityTest {
     }
 
     @Test
+    fun unreferencedExportIdsAreInertButAmbiguousReferencesFailClosed() {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><g><path id="export-id" data-name="Exported path" d="M0 0"/></g><g><path id="export-id" d="M1 1"/></g></svg>"""
+        val original = svg.toByteArray()
+        val valid = ChromeOriginalUiSvgValidator().validate(original, "image/svg+xml")
+        assertTrue(valid is ChromeOriginalUiSvgValidation.Valid)
+        assertArrayEquals(original, (valid as ChromeOriginalUiSvgValidation.Valid).bytes)
+        val ambiguous = svg.replace("</svg>", "<use href='#export-id'/></svg>")
+        assertTrue(
+            ChromeOriginalUiSvgValidator().validate(
+                ambiguous.toByteArray(),
+                "image/svg+xml",
+            ) is ChromeOriginalUiSvgValidation.Invalid,
+        )
+    }
+
+    @Test
     fun validatorAcceptsBoundedInertFrameworkMetadataWithoutChangingBytes() {
         val svg =
             """<svg xmlns="http://www.w3.org/2000/svg" version="1.1" data-component="Icon" data-view-component="true" viewBox="0 0 16 16"><path d="M1 1h14v14H1z"/></svg>"""

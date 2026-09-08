@@ -31,6 +31,7 @@ internal data class ChromePhotoDecisionTimings(
     val decodeAndPreprocessMs: Double = 0.0,
     val inferenceMs: Double = 0.0,
     val totalLocalMs: Double = 0.0,
+    val queueWaitMs: Double = 0.0,
 )
 
 internal data class ChromePhotoDecisionResult(

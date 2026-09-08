@@ -15,6 +15,9 @@ internal data class ChromePhotosSanitizedResponse(
     val inputBytes: Int,
     val observedBodyDigest: String? = null,
     val decisionResult: ChromePhotoDecisionResult? = null,
+    val bodyAdmissionMs: Double? = null,
+    val bodyReadMs: Double? = null,
+    val hashMs: Double? = null,
 ) {
     val contentType: String?
         get() = headers.firstValue("Content-Type")
@@ -65,29 +68,40 @@ internal class ChromePhotosRealResponseSanitizer(
         if (!upstream.headers.hasIdentityContentEncoding()) {
             return placeholderUnknown(upstream, EncodedImageReason)
         }
-        return imageAuthority.withBodyAdmission(
-            onRejected = { placeholderUnknown(upstream, BodyAdmissionReason) },
-        ) {
-            val bounded = upstream.body.readBounded(maximumImageBytes)
-            if (bounded.exceeded) return@withBodyAdmission placeholderUnknown(upstream, ImageByteLimitReason)
-            when (val resolution = imageAuthority.resolve(candidate, bounded.bytes)) {
-                is ChromeImageContentResolution.Reject ->
-                    placeholderUnknown(
-                        upstream = upstream,
-                        reason = resolution.reason,
-                        inputBytes = bounded.bytes.size,
-                        observedBodyDigest = sha256(bounded.bytes),
-                    )
-                is ChromeImageContentResolution.Inspect -> {
-                    val transformed =
-                        transformer.transform(
-                            contentType = resolution.format.canonicalMimeType,
-                            candidateBytes = bounded.bytes,
+        val admissionStarted = System.nanoTime()
+        var admittedAt: Long? = null
+        var readMillis: Double? = null
+        val response =
+            imageAuthority.withBodyAdmission(
+                onRejected = { placeholderUnknown(upstream, BodyAdmissionReason) },
+            ) {
+                admittedAt = System.nanoTime()
+                val readStarted = System.nanoTime()
+                val bounded = upstream.body.readBounded(maximumImageBytes)
+                readMillis = (System.nanoTime() - readStarted) / 1_000_000.0
+                if (bounded.exceeded) return@withBodyAdmission placeholderUnknown(upstream, ImageByteLimitReason)
+                when (val resolution = imageAuthority.resolve(candidate, bounded.bytes)) {
+                    is ChromeImageContentResolution.Reject ->
+                        placeholderUnknown(
+                            upstream = upstream,
+                            reason = resolution.reason,
+                            inputBytes = bounded.bytes.size,
+                            observedBodyDigest = sha256(bounded.bytes),
                         )
-                    transformedResponse(upstream, bounded.bytes.size, resolution.format, transformed)
+                    is ChromeImageContentResolution.Inspect -> {
+                        val transformed =
+                            transformer.transform(
+                                contentType = resolution.format.canonicalMimeType,
+                                candidateBytes = bounded.bytes,
+                            )
+                        transformedResponse(upstream, bounded.bytes.size, resolution.format, transformed)
+                    }
                 }
             }
-        }
+        return response.copy(
+            bodyAdmissionMs = admittedAt?.let { (it - admissionStarted) / 1_000_000.0 },
+            bodyReadMs = readMillis,
+        )
     }
 
     private fun sanitizePassthrough(
@@ -194,6 +208,7 @@ internal class ChromePhotosRealResponseSanitizer(
             inputBytes = inputBytes,
             observedBodyDigest = transformed.contentHash,
             decisionResult = transformed.decisionResult,
+            hashMs = transformed.hashMs,
         )
     }
 

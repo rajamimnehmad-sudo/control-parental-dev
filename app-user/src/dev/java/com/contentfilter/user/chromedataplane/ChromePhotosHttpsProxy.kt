@@ -188,7 +188,11 @@ internal class ChromePhotosHttpsProxy(
                     admission.dispatch(
                         onDiscard = { runCatching { client.close() } },
                         block = {
-                            infoLog("phase=worker_ready correlationId=$correlationId admissionWaitMs=${acceptedAt.elapsedMillis(System.nanoTime())}")
+                            infoLog(
+                                "phase=worker_ready correlationId=$correlationId admissionWaitMs=${acceptedAt.elapsedMillis(
+                                    System.nanoTime(),
+                                )}",
+                            )
                             handleClient(client, correlationId)
                         },
                     )
@@ -290,7 +294,19 @@ internal class ChromePhotosHttpsProxy(
         connectTarget: ChromePhotosConnectTarget,
         correlationId: String,
     ) {
-        val serverMaterial = tls.serverMaterialFor(connectTarget.host)
+        val materialStarted = System.nanoTime()
+        val serverMaterial =
+            tls.serverMaterialFor(connectTarget.host) { cacheHit, waitMillis, creationMillis ->
+                infoLog(
+                    "phase=tls_certificate correlationId=$correlationId tlsCacheHit=$cacheHit " +
+                        "tlsCacheWaitMs=${"%.3f".format(Locale.US, waitMillis)} tlsCreationMs=${"%.3f".format(Locale.US, creationMillis)}",
+                )
+            }
+        infoLog(
+            "phase=tls_material correlationId=$correlationId tlsMaterialMs=${materialStarted.elapsedMillis(
+                System.nanoTime(),
+            )}",
+        )
         val tlsSocket =
             try {
                 serverMaterial.sslContext.socketFactory.createSocket(
@@ -831,7 +847,7 @@ internal class ChromePhotosHttpsProxy(
                 "contentType=${sanitized.contentType.safeLogContentType()} bytesIn=${sanitized.inputBytes} " +
                 "bytesOut=${result.bytesWritten} cache=${if (sanitized.cacheHit) "hit" else "miss"} " +
                 "decision=${sanitized.decision.name.lowercase(Locale.US)} ${sanitized.decisionResult.logFields()} " +
-                "requestToDeliveryMs=${started.elapsedMillis(System.nanoTime())} " +
+                "${sanitized.imagePhaseFields()} requestToDeliveryMs=${started.elapsedMillis(System.nanoTime())} " +
                 "upstreamHeadersMs=${upstreamHeadersNanos.toPhaseMillis()} sanitizeMs=${sanitizeNanos.toPhaseMillis()} " +
                 "downstreamWriteMs=${writeNanos.toPhaseMillis()}",
         )
@@ -904,6 +920,7 @@ internal class ChromePhotosHttpsProxy(
 
     private companion object {
         const val HttpsPort = 443
+
         // Real multi-origin traces showed >19s admission tail at 8 workers and >10s at 32.
         // Keep queue/body/inference limits unchanged; bound connection workers at 64.
         const val WorkerCount = 64

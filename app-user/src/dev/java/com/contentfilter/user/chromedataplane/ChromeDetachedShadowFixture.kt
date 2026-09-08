@@ -2,7 +2,8 @@ package com.contentfilter.user.chromedataplane
 
 /** Strict CSP and synchronous CSSOM attacks before any MutationObserver can run. */
 internal object ChromeDetachedShadowFixture {
-    fun page(): String = """
+    fun page(): String =
+        """
         <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SHADOW_RUNNING</title></head>
         <body><h1>Detached shadow lifecycle</h1><pre id="result">RUNNING</pre><script>
         (()=>{const out=[],check=(n,v)=>out.push(n+':'+(v?'PASS':'FAIL')),denied=f=>{try{f();return false}catch(_){return true}};
@@ -20,5 +21,5 @@ internal object ChromeDetachedShadowFixture {
         }
         document.getElementById('result').textContent=out.join('\n');document.title=out.every(x=>x.endsWith('PASS'))?'SHADOW_PASS':'SHADOW_FAIL';})();
         </script>${ChromePhotosFixtureLeaseContract.ScriptTag}</body></html>
-    """.trimIndent()
+        """.trimIndent()
 }

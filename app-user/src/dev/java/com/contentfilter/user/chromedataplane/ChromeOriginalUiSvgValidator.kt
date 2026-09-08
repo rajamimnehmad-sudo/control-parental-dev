@@ -52,7 +52,7 @@ internal class ChromeOriginalUiSvgValidator(
         val state = State()
         if (!visit(root, 1, state)) return invalid(state.reason)
         if (!dimensionsValid(root)) return invalid("dimensions")
-        if (!state.references.all(state.ids::contains)) return invalid("reference")
+        if (!state.references.all { it in state.ids && it !in state.ambiguousIds }) return invalid("reference")
         return ChromeOriginalUiSvgValidation.Valid(bytes.copyOf())
     }
 
@@ -80,7 +80,8 @@ internal class ChromeOriginalUiSvgValidator(
             }
             if (!attributeAllowed(name, qualifiedName)) return state.fail("attribute")
             if (attributeName == "id") {
-                if (!SafeId.matches(value) || !state.ids.add(value)) return state.fail("id")
+                if (!SafeId.matches(value)) return state.fail("id")
+                if (!state.ids.add(value)) state.ambiguousIds += value
             }
             if (qualifiedName == "href" || qualifiedName == "xlink:href") {
                 if (!value.startsWith('#') || !SafeId.matches(value.drop(1))) return state.fail("href")
@@ -94,7 +95,7 @@ internal class ChromeOriginalUiSvgValidator(
             if (qualifiedName == "xml:space" && value != "default" && value != "preserve") {
                 return state.fail("xml_space")
             }
-            if (qualifiedName == "data-skapa" && (value.isEmpty() || value.length > MaximumMetadataBytes)) {
+            if (qualifiedName in setOf("data-skapa", "data-name") && (value.isEmpty() || value.length > MaximumMetadataBytes)) {
                 return state.fail("metadata")
             }
             if (qualifiedName in UrlReferenceAttributes) {
@@ -192,6 +193,7 @@ internal class ChromeOriginalUiSvgValidator(
         var attributeBytes = 0
         var reason = "invalid"
         val ids = linkedSetOf<String>()
+        val ambiguousIds = linkedSetOf<String>()
         val references = linkedSetOf<String>()
 
         fun fail(value: String): Boolean {
@@ -228,7 +230,7 @@ internal class ChromeOriginalUiSvgValidator(
                 "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit", "stroke-dasharray",
                 "stroke-dashoffset", "stroke-opacity", "opacity", "clip-path", "mask", "role", "aria-label",
                 "aria-labelledby", "aria-hidden", "focusable", "tabindex", "pointer-events", "vector-effect",
-                "version", "xml:space", "data-component", "data-view-component", "data-skapa",
+                "version", "xml:space", "data-component", "data-view-component", "data-skapa", "data-name",
             )
         val UrlReferenceAttributes =
             setOf("fill", "stroke", "clip-path", "mask", "marker-start", "marker-mid", "marker-end")

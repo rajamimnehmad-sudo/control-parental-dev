@@ -461,7 +461,9 @@ internal class ChromePhotosFixtureOrigin(
         paint.textAlign = Paint.Align.CENTER
         paint.typeface = Typeface.DEFAULT_BOLD
         paint.textSize = 30f
-        canvas.drawText(kind.label, ImageWidth / 2f, ImageHeight / 2f + 10f, paint)
+        if (kind != VisualKind.Placeholder) {
+            canvas.drawText(kind.label, ImageWidth / 2f, ImageHeight / 2f + 10f, paint)
+        }
         return ByteArrayOutputStream().use { output ->
             check(bitmap.compress(Bitmap.CompressFormat.PNG, PngQuality, output))
             bitmap.recycle()

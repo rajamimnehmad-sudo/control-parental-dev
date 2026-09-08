@@ -5,11 +5,13 @@ internal object ChromeOriginalUiSvgStylePolicy {
     private const val MaximumBytes = 8192
     private val rule = Regex("([.#][A-Za-z_][A-Za-z0-9_-]*(?:\\s*,\\s*[.#][A-Za-z_][A-Za-z0-9_-]*)*)\\s*\\{([^{}]+)\\}")
     private val declaration = Regex("([a-z-]+)\\s*:\\s*(.+)", RegexOption.DOT_MATCHES_ALL)
-    private val literal = Regex("(?:#[A-Fa-f0-9]{3,8}|[A-Za-z]+|[-+0-9.,%\\s]+(?:px|em|rem)?|(?:rgb|rgba|hsl|hsla)\\([-+0-9.,%\\s]+\\))")
-    private val properties = setOf(
-        "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit",
-        "stroke-dasharray", "stroke-dashoffset", "opacity", "fill-opacity", "stroke-opacity", "fill-rule", "clip-rule",
-    )
+    private val literal =
+        Regex("(?:#[A-Fa-f0-9]{3,8}|[A-Za-z]+|[-+0-9.,%\\s]+(?:px|em|rem)?|(?:rgb|rgba|hsl|hsla)\\([-+0-9.,%\\s]+\\))")
+    private val properties =
+        setOf(
+            "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-miterlimit",
+            "stroke-dasharray", "stroke-dashoffset", "opacity", "fill-opacity", "stroke-opacity", "fill-rule", "clip-rule",
+        )
 
     fun accepts(css: String): Boolean {
         if (css.isBlank() || css.length > MaximumBytes) return false

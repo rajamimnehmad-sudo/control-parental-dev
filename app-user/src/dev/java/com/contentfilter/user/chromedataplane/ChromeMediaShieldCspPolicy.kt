@@ -1,9 +1,9 @@
 package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract
-import java.util.Locale
 import java.security.MessageDigest
 import java.util.Base64
+import java.util.Locale
 
 internal class ChromeMediaShieldCspPolicy(
     private val sameOriginReady: Boolean = false,
@@ -65,16 +65,20 @@ internal class ChromeMediaShieldCspPolicy(
     // Detached shadow styles acquire a CSSStyleSheet only when connected. Authorize exactly
     // the immutable shield bytes without retaining a readable nonce or broadening inline CSS.
     private fun admitProtectedStyleHash(directives: LinkedHashMap<String, Directive>) {
-        val key = when {
-            directives.containsKey("style-src-elem") -> "style-src-elem"
-            directives.containsKey("style-src") -> "style-src"
-            directives.containsKey("default-src") -> "style-src"
-            else -> return
-        }
+        val key =
+            when {
+                directives.containsKey("style-src-elem") -> "style-src-elem"
+                directives.containsKey("style-src") -> "style-src"
+                directives.containsKey("default-src") -> "style-src"
+                else -> return
+            }
         val inherited = directives[key]?.sources ?: directives["default-src"]!!.sources
         if (inherited.authorizesUnrestrictedInline()) return
         val sources = inherited.filterNot { it.equals("'none'", ignoreCase = true) }.toMutableList()
-        val hash = Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(ChromeMediaShieldBootstrap.css.toByteArray(Charsets.UTF_8)))
+        val hash =
+            Base64.getEncoder().encodeToString(
+                MessageDigest.getInstance("SHA-256").digest(ChromeMediaShieldBootstrap.css.toByteArray(Charsets.UTF_8)),
+            )
         val source = "'sha256-$hash'"
         if (source !in sources) sources += source
         directives[key] = Directive(directives[key]?.name ?: key, sources)

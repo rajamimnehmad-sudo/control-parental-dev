@@ -10,7 +10,17 @@ internal class ChromeClientResponseDisconnected(cause: SocketException) : IOExce
 internal class ChromeClientResponseOutput(private val delegate: OutputStream) : OutputStream() {
     override fun write(value: Int) = downstream { delegate.write(value) }
 
-    override fun write(bytes: ByteArray, offset: Int, length: Int) = downstream { delegate.write(bytes, offset, length) }
+    override fun write(
+        bytes: ByteArray,
+        offset: Int,
+        length: Int,
+    ) = downstream {
+        delegate.write(
+            bytes,
+            offset,
+            length,
+        )
+    }
 
     override fun flush() = downstream { delegate.flush() }
 

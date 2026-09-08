@@ -17,6 +17,7 @@ internal data class ChromePhotosTransformResult(
     val contentHash: String?,
     val cacheHit: Boolean,
     val decisionResult: ChromePhotoDecisionResult? = null,
+    val hashMs: Double = 0.0,
 )
 
 /** Applies a content-identity decision session before any image body reaches Chrome. */
@@ -60,7 +61,9 @@ internal class ChromePhotosResourceTransformer private constructor(
             )
         }
 
+        val hashStarted = System.nanoTime()
         val hash = sha256(candidateBytes)
+        val hashMs = (System.nanoTime() - hashStarted) / 1_000_000.0
         val result = decisionSession.decide(hash, candidateBytes, contentType.normalizedImageMimeType())
         val decision =
             when (result.decision) {
@@ -75,6 +78,7 @@ internal class ChromePhotosResourceTransformer private constructor(
             contentHash = hash,
             cacheHit = result.source == ChromePhotoDecisionSource.Cache,
             decisionResult = result,
+            hashMs = hashMs,
         )
     }
 
@@ -111,8 +115,7 @@ private class HashRegistryDecisionSession(
         object : LinkedHashMap<HashRegistryKey, ChromePhotoDecision>(maximumEntries, LoadFactor, true) {
             override fun removeEldestEntry(
                 eldest: MutableMap.MutableEntry<HashRegistryKey, ChromePhotoDecision>?,
-            ): Boolean =
-                size > maximumEntries
+            ): Boolean = size > maximumEntries
         }
 
     init {
