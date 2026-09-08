@@ -230,17 +230,21 @@ internal class ChromePhotosHttpsProxy(
         try {
             client.use { socket ->
                 socket.soTimeout = SocketTimeoutMillis
-                val requestLine = socket.getInputStream().readChromeConnectLine(MaxLineBytes) ?: return
+                val connectInput = requestIdleInput(socket.getInputStream(), socket)
+                connectInput.beginRequest()
+                val requestLine = connectInput.readChromeConnectLine(MaxLineBytes) ?: return
                 if (!requestLine.startsWith("CONNECT ")) {
                     val prefixedInput =
                         SequenceInputStream(
                             ByteArrayInputStream("$requestLine\r\n".toByteArray(Charsets.US_ASCII)),
                             socket.getInputStream(),
                         )
+                    val requestInput = requestIdleInput(prefixedInput, socket)
                     handleAbsoluteHttp11Session(
-                        input = prefixedInput,
+                        input = requestInput,
                         output = BufferedOutputStream(socket.getOutputStream()),
                         connectionCorrelationId = correlationId,
+                        beforeRequestRead = requestInput::beginRequest,
                     )
                     return
                 }
@@ -261,6 +265,8 @@ internal class ChromePhotosHttpsProxy(
                 socket.getOutputStream().flush()
                 handleTlsTunnel(socket, admittedTarget, correlationId)
             }
+        } catch (_: ChromeHttpIdleTimeoutException) {
+            infoLog("phase=connect_idle_closed correlationId=$correlationId")
         } catch (error: Throwable) {
             failures.incrementAndGet()
             val target = connectTarget
@@ -320,6 +326,7 @@ internal class ChromePhotosHttpsProxy(
             }
         tlsSocket.use { secureSocket ->
             secureSocket.useClientMode = false
+            secureSocket.soTimeout = SocketTimeoutMillis
             secureSocket.sslParameters = secureSocket.sslParameters.apply { applicationProtocols = arrayOf(Http11) }
             try {
                 secureSocket.startHandshake()
@@ -333,15 +340,27 @@ internal class ChromePhotosHttpsProxy(
                     "hostHash=${ChromeProxyLogPrivacy.digest(connectTarget.host)} clientProtocol=$protocol " +
                     "ca=${tls.caFingerprint.take(FingerprintLogLength)}",
             )
+            val requestInput = requestIdleInput(secureSocket.inputStream, secureSocket)
             handleHttp11Session(
-                input = secureSocket.inputStream,
+                input = requestInput,
                 output = BufferedOutputStream(secureSocket.outputStream),
                 connectTargetHost = connectTarget.host,
                 protocol = protocol,
                 connectionCorrelationId = correlationId,
+                beforeRequestRead = requestInput::beginRequest,
             )
         }
     }
+
+    private fun requestIdleInput(
+        input: InputStream,
+        socket: Socket,
+    ) = ChromeHttpRequestIdleInputStream(
+        input = input,
+        setReadTimeoutMillis = { socket.soTimeout = it },
+        idleTimeoutMillis = IdleSocketTimeoutMillis,
+        activeTimeoutMillis = SocketTimeoutMillis,
+    )
 
     internal fun handleHttp11Session(
         input: InputStream,
@@ -350,16 +369,19 @@ internal class ChromePhotosHttpsProxy(
         protocol: String,
         shouldContinue: () -> Boolean = { running.get() },
         connectionCorrelationId: String = StandaloneConnectionId,
+        beforeRequestRead: () -> Unit = {},
     ) {
         var requestNumber = 0L
         while (shouldContinue()) {
             val request =
                 try {
+                    beforeRequestRead()
                     requestReader.read(input) {
                         ChromeHttp1Wire.writeAscii(output, "HTTP/1.1 100 Continue\r\n\r\n")
                         output.flush()
                     } ?: break
                 } catch (_: ChromeHttpIdleTimeoutException) {
+                    infoLog("phase=http_idle_closed correlationId=$connectionCorrelationId")
                     break
                 } catch (error: ChromeHttpProtocolException) {
                     writePlainError(output, error.statusCode, error.message ?: "Invalid request")
@@ -402,16 +424,19 @@ internal class ChromePhotosHttpsProxy(
         output: OutputStream,
         shouldContinue: () -> Boolean = { running.get() },
         connectionCorrelationId: String = StandaloneConnectionId,
+        beforeRequestRead: () -> Unit = {},
     ) {
         var requestNumber = 0L
         while (shouldContinue()) {
             val request =
                 try {
+                    beforeRequestRead()
                     requestReader.read(input) {
                         ChromeHttp1Wire.writeAscii(output, "HTTP/1.1 100 Continue\r\n\r\n")
                         output.flush()
                     } ?: break
                 } catch (_: ChromeHttpIdleTimeoutException) {
+                    infoLog("phase=http_idle_closed correlationId=$connectionCorrelationId")
                     break
                 } catch (error: ChromeHttpProtocolException) {
                     writePlainError(output, error.statusCode, error.message ?: "Invalid request")
@@ -926,6 +951,10 @@ internal class ChromePhotosHttpsProxy(
         const val WorkerCount = 64
         const val WorkerQueueCapacity = 32
         const val SocketBacklog = 32
+
+        // DEV452 traces: idle sockets held all 64 workers for 20s, queuing new work for 7.4s.
+        // The shorter deadline applies only before the first request byte, never to uploads/handshakes.
+        const val IdleSocketTimeoutMillis = 2_000
         const val SocketTimeoutMillis = 20_000
         const val MaxLineBytes = 8 * 1024
         const val MaxConnectHeaderCount = 100
