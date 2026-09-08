@@ -58,7 +58,7 @@ internal class ChromePhotosFixtureOrigin(
     private val stockMediaAuthorityFixture = ChromeStockMediaAuthorityFixture(sentinelImageBytes)
     private val serviceWorkerBoundaryFixture = ChromeServiceWorkerBoundaryFixture()
     private val rendererAmplificationFixture = ChromeH20RendererAmplificationFixture()
-    private val originalUiSvgFixture = ChromeOriginalUiSvgFixture()
+    private val originalUiSvgFixture = ChromeOriginalUiSvgFixture(placeholderImageBytes)
     private val localPhotoFixture = ChromeLocalPhotoFixture(safeImageBytes)
 
     override fun webSemanticsReport(): String = report.get()

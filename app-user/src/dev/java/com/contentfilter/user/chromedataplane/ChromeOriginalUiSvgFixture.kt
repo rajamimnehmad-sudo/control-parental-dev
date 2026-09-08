@@ -4,7 +4,8 @@ import java.util.Base64
 import java.util.concurrent.atomic.AtomicReference
 
 /** Controlled end-to-end authority and fidelity fixture; public sites remain compatibility evidence. */
-internal class ChromeOriginalUiSvgFixture {
+internal class ChromeOriginalUiSvgFixture(placeholderBytes: ByteArray) {
+    private val placeholderSha256 = sha256(placeholderBytes)
     private val report = AtomicReference("not_run")
 
     fun state(): String = report.get()
@@ -74,7 +75,7 @@ internal class ChromeOriginalUiSvgFixture {
         const style=document.createElement('style');style.textContent='.dynamic-rule{background-image:url(data:image/svg+xml;base64,$safeSvgBase64)}';document.head.appendChild(style);dynamic.classList.add('dynamic-rule');
         const sheet=new CSSStyleSheet();sheet.replaceSync('.constructed{mask:url(data:image/svg+xml;base64,$safeSvgBase64)}');document.adoptedStyleSheets=[...document.adoptedStyleSheets,sheet];dynamic.classList.add('constructed');
         const internal='${com.contentfilter.core.domain.chrome.ChromePhotosDataPlaneLabContract.OriginalUiSvgOrigin}';const attr=(id,name)=>document.getElementById(id).getAttribute(name)||'';const computed=id=>getComputedStyle(document.getElementById(id));
-        setTimeout(()=>{const inline=document.getElementById('inline'),path=inline.querySelector('path');
+        setTimeout(async()=>{const inline=document.getElementById('inline'),path=inline.querySelector('path');
         check('INLINE_ORIGINAL',path.getAttribute('d')==='M2 3h20v18H2z'&&path.getAttribute('fill')==='#123456'&&path.getAttribute('stroke')==='#654321'&&inline.getAttribute('data-glosh-icon-safe')==='1');check('INLINE_CLICK',clicks===1);
         check('SPRITE_ORIGINAL',attr('sprite-owner','data-glosh-icon-safe')==='1'&&attr('sprite-use','data-glosh-icon-safe')==='1'&&document.querySelector('#sprite-use use').getAttribute('href')==='#sprite-shape');check('UNSAFE_SPRITE_FAIL_CLOSED',attr('unsafe-sprite','data-glosh-media-blocked')==='1'&&attr('unsafe-sprite-use','data-glosh-media-blocked')==='1');
         check('AMBIGUOUS_REFERENCE_FAIL_CLOSED',attr('ambiguous-reference','data-glosh-media-blocked')==='1');
@@ -82,7 +83,9 @@ internal class ChromeOriginalUiSvgFixture {
         check('DATA_IMAGE',attr('data-image','src').startsWith(internal)&&document.getElementById('data-image').naturalWidth>0);check('FAVICON',document.querySelector('link[rel~=icon]').href.startsWith(internal));
         const shield=document.getElementById('glosh-h19-media-shield'),shieldText=shield.textContent;let headRemovalOk=true;try{shield.parentNode.removeChild(shield);shield.remove()}catch(_){headRemovalOk=false}let rewriteDenied=false;try{shield.textContent=''}catch(_){rewriteDenied=true}check('PROTECTED_HEAD_RETENTION',headRemovalOk&&shield.isConnected&&shield.textContent===shieldText&&rewriteDenied);
         check('NETWORK_SVG',document.getElementById('network-image').naturalWidth===24);check('UNSAFE_NETWORK_FAIL_CLOSED',document.getElementById('unsafe-network').naturalWidth>24);check('DYNAMIC_CSS',computed('dynamic').maskImage.includes(internal)&&computed('dynamic').backgroundImage.includes(internal));
-        check('RASTER_FAIL_CLOSED',document.getElementById('raster-negative').getAttribute('data-glosh-media-blocked')==='1');check('UNSAFE_INLINE_FAIL_CLOSED',document.getElementById('unsafe-inline').getAttribute('data-glosh-media-blocked')==='1');
+        const raster=document.getElementById('raster-negative');let rasterClosed=raster.getAttribute('data-glosh-media-blocked')==='1';
+        if(!rasterClosed){try{const r=await fetch(raster.currentSrc),bytes=await r.arrayBuffer(),hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(x=>x.toString(16).padStart(2,'0')).join('');rasterClosed=r.status===200&&raster.currentSrc.startsWith('${ChromeLocalPhotoEndpoint.AssetOrigin}${ChromeLocalPhotoEndpoint.AssetPath}')&&hash==='$placeholderSha256'}catch(_){}}
+        check('RASTER_FAIL_CLOSED',rasterClosed);check('UNSAFE_INLINE_FAIL_CLOSED',document.getElementById('unsafe-inline').getAttribute('data-glosh-media-blocked')==='1');
         const value=checks.join(',');document.getElementById('result').textContent=checks.join('\n');document.title=checks.every(x=>x.endsWith('PASS'))?'SVG06A_PASS':'SVG06A_FAIL';fetch('$ReportPath',{method:'POST',headers:{'Content-Type':'text/plain'},body:value});},1200);})();
         </script>${ChromePhotosFixtureLeaseContract.ScriptTag}</body></html>
         """.trimIndent()
