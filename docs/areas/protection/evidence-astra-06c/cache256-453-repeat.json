@@ -1,0 +1,53 @@
+[
+  {
+    "run": 0,
+    "result": {
+      "id": 1,
+      "result": {
+        "result": {
+          "type": "object",
+          "value": {
+            "ttfb": 2057,
+            "dcl": 5891.5,
+            "load": 0,
+            "decoded": 460
+          }
+        }
+      }
+    }
+  },
+  {
+    "run": 1,
+    "result": {
+      "id": 1,
+      "result": {
+        "result": {
+          "type": "object",
+          "value": {
+            "ttfb": 1975.300000011921,
+            "dcl": 5652.600000023842,
+            "load": 0,
+            "decoded": 471
+          }
+        }
+      }
+    }
+  },
+  {
+    "run": 2,
+    "result": {
+      "id": 1,
+      "result": {
+        "result": {
+          "type": "object",
+          "value": {
+            "ttfb": 1349.5,
+            "dcl": 4991.800000011921,
+            "load": 0,
+            "decoded": 479
+          }
+        }
+      }
+    }
+  }
+]

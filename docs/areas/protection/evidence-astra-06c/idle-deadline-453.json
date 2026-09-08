@@ -1,0 +1,18 @@
+{
+  "utc": "2026-09-08T12:27:23.427532+00:00",
+  "version_code": 453,
+  "results": [
+    {
+      "case": "TLS idle before request",
+      "elapsed_s": 2.01,
+      "clean_eof": true
+    },
+    {
+      "case": "active partial headers and upload",
+      "elapsed_s": 6.037,
+      "status": "HTTP/1.1 201 Created",
+      "body_exact": true,
+      "body_sha256": "bb52e8908b5106910eda0165d2fbaa1c6a0e9c9b2feb3b3e21a00afaceab4117"
+    }
+  ]
+}

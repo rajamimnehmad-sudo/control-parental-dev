@@ -1,0 +1,39 @@
+{
+  "functional_sha": "d88853be815a0ef66770d9fc85ffadb7e4ce3a57",
+  "version_code": 452,
+  "pid": 18435,
+  "first_utc": "2026-09-08T11:33:03.194107+00:00",
+  "last_utc": "2026-09-08T12:19:03.146855+00:00",
+  "duration_s": 2760.0,
+  "samples": 47,
+  "mem_available_kib": {
+    "min": 602240,
+    "final": 834060
+  },
+  "app_rss_kib": {
+    "min": 106644,
+    "max": 324588,
+    "final": 119248
+  },
+  "app_pss_kib": {
+    "min": 145312,
+    "max": 276521,
+    "final": 148134
+  },
+  "thermal_observed": [
+    "Thermal Status: 0"
+  ],
+  "cpu_percent_one_core_last10": {
+    "median": 7.2165,
+    "min": 6.4,
+    "max": 9.433,
+    "clock_ticks_per_second": 100
+  },
+  "limitations": [
+    "Includes deliberate guard expiry, PREPARE_UPDATE/STOP/START, navigation, rotation and idle; not uninterrupted proxy-service time.",
+    "Read-only monitoring contributes some load. USB-powered; not a battery discharge gate.",
+    "This run exposed 64-worker idle retention with7.4s admission tail; it is NOT an integral normality/latency PASS.",
+    "Final candidate453 is being built to address idle retention and requires its own proportional physical/health validation.",
+    "Actual FD/socket enumeration not available in the stock-device evidence; FDSize is capacity, not open-FD count."
+  ]
+}

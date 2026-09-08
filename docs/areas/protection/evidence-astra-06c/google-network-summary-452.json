@@ -1,0 +1,8 @@
+{
+  "note": "Passive CDP request-to-loadingFinished including Google scroll; no cache overrides. Sample includes replacements and originals; not an ON/OFF comparison.",
+  "image_count": 32,
+  "image_p50_ms": 393.752,
+  "image_p95_ms": 1296.986,
+  "image_p99_ms": 1460.486,
+  "failures": []
+}

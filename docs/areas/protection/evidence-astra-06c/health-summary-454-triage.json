@@ -1,0 +1,22 @@
+{
+  "status": "PARTIAL_NOT_FINAL_GATE",
+  "reason": "Stopped host recorder at architecture approval boundary; device protection remains active",
+  "pid": 8375,
+  "samples": 15,
+  "elapsed_minutes": 14.0,
+  "MemAvailable_min_KiB": 656860,
+  "MemAvailable_last_KiB": 716636,
+  "thermal_values": [
+    "Thermal Status: 0"
+  ],
+  "last5_cpu_percent_one_core": [
+    8.016666666666667,
+    7.866666666666666,
+    6.733333333333333,
+    6.416666666666667,
+    6.616666666666666
+  ],
+  "median_last5_cpu_percent_one_core": 6.733333333333333,
+  "fd_socket_count": "unavailable on non-debuggable package; FDSize is not descriptor count",
+  "battery": "USB powered; not a discharge gate"
+}

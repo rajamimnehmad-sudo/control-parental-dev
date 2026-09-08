@@ -1,0 +1,22 @@
+--------- beginning of main
+09-08 08:33:36.475 18286 18286 I ChromeProcessGuard: action=suspend verified=true reason=main_process_lost attempt=1
+09-08 08:33:36.486 18286 18286 W ChromeProcessGuard: event=lease_expired reason=main_process_lost at=545739885
+09-08 08:33:36.487 18286 18286 I ChromeProcessGuard: event=expired state=suspended generation=0 session= leaseExpiry=0 reason=main_process_lost accepted=129 staleRejects=0 wrongCallerRejects=0 guardRestarts=570 pid=18286 chromeSuspended=true
+09-08 08:33:38.123 18286 18286 I ChromeProcessGuard: event=session_opened generation=549 session=b9f8972f mainPidHint=18435 guardPid=18286
+09-08 08:33:38.266 18286 18286 I ChromeProcessGuard: action=release verified=true reason=lease_current attempt=1
+09-08 08:33:38.272 18286 18286 I ChromeProcessGuard: event=first_lease state=released generation=549 session=b9f8972f leaseExpiry=545743217 reason=lease_current accepted=130 staleRejects=0 wrongCallerRejects=0 guardRestarts=570 pid=18286 chromeSuspended=false
+09-08 08:41:17.509 18435 18435 I ChromeProcessGuard: action=suspend verified=true reason=boot_guard attempt=1
+09-08 08:41:17.535 18286 18286 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=package_replaced_guard accepted=948 staleRejects=0 wrongCallerRejects=0 guardRestarts=570 pid=18286 chromeSuspended=true
+09-08 08:41:24.912 18286 18286 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=manual_stop accepted=948 staleRejects=0 wrongCallerRejects=0 guardRestarts=570 pid=18286 chromeSuspended=true
+09-08 08:41:25.176 18286 18286 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=guard_stop accepted=948 staleRejects=0 wrongCallerRejects=0 guardRestarts=570 pid=18286 chromeSuspended=true
+09-08 08:41:28.672 18286 18286 I ChromeProcessGuard: event=created state=suspended generation=0 session= leaseExpiry=0 reason=guard_start accepted=0 staleRejects=0 wrongCallerRejects=0 guardRestarts=571 pid=18286 chromeSuspended=true
+09-08 08:41:28.679 18286 18286 I ChromeProcessGuard: event=session_opened generation=550 session=410485be mainPidHint=18435 guardPid=18286
+09-08 08:41:29.980 18286 18286 I ChromeProcessGuard: action=release verified=true reason=lease_current attempt=1
+09-08 08:41:29.982 18286 18286 I ChromeProcessGuard: event=first_lease state=released generation=550 session=410485be leaseExpiry=546214915 reason=lease_current accepted=1 staleRejects=0 wrongCallerRejects=0 guardRestarts=571 pid=18286 chromeSuspended=false
+09-08 09:25:52.287 18435 18435 I ChromeProcessGuard: action=suspend verified=true reason=boot_guard attempt=1
+09-08 09:25:52.307 18286 18286 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=package_replaced_guard accepted=4737 staleRejects=0 wrongCallerRejects=0 guardRestarts=571 pid=18286 chromeSuspended=true
+09-08 09:26:01.796 26210 26210 I ChromeProcessGuard: event=created state=suspended generation=0 session= leaseExpiry=0 reason=guard_start accepted=0 staleRejects=0 wrongCallerRejects=0 guardRestarts=572 pid=26210 chromeSuspended=true
+09-08 09:26:01.810 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=package_replaced_guard accepted=0 staleRejects=0 wrongCallerRejects=0 guardRestarts=572 pid=26210 chromeSuspended=true
+09-08 09:26:01.821 26210 26210 I ChromeProcessGuard: event=session_opened generation=551 session=01e73619 mainPidHint=26092 guardPid=26210
+09-08 09:26:04.967 26210 26210 I ChromeProcessGuard: action=release verified=true reason=lease_current attempt=1
+09-08 09:26:04.985 26210 26210 I ChromeProcessGuard: event=first_lease state=released generation=551 session=01e73619 leaseExpiry=548889897 reason=lease_current accepted=1 staleRejects=0 wrongCallerRejects=0 guardRestarts=572 pid=26210 chromeSuspended=false

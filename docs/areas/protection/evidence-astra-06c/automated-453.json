@@ -1,0 +1,14 @@
+{
+  "functional_sha": "8e39ba034318e4ac9b500182f5fe81224b22726b",
+  "tests": 404,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "lint": "PASS",
+  "build": "PASS",
+  "build_duration": "3m51s",
+  "lint_duration": "1m2s",
+  "focused_idle_proxy_tests": 24,
+  "physical": "in_progress",
+  "health": "in_progress"
+}

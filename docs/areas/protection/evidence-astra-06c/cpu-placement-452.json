@@ -1,0 +1,19 @@
+{
+  "pid": 18435,
+  "cpuset": [
+    "7:freezer:/",
+    "6:schedtune:/foreground",
+    "5:memory:/",
+    "4:cpuset:/foreground",
+    "3:cpuacct:/",
+    "2:cpu:/",
+    "1:blkio:/",
+    "0::/uid_10447/pid_18435"
+  ],
+  "cpu_allowed": "0-7",
+  "inference_thread_observation": "TID20983 chrome-photos-g nice0 last CPU6; foreground and top-app cpusets both0-7; background0-3. Read-only, no affinity/priority changes.",
+  "cpu_max_khz": {
+    "cpu0": 1900800,
+    "cpu6": 2400000
+  }
+}

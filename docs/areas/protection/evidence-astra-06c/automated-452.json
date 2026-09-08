@@ -1,0 +1,14 @@
+{
+  "functional_sha": "d88853be",
+  "chrome_guard_tests": 398,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "lint": "PASS",
+  "build": "PASS",
+  "build_duration": "4m56s",
+  "lint_duration": "2m6s",
+  "vpn_tests": "38 inherited unchanged from prior approved fix; not rerun452",
+  "physical": "in_progress",
+  "health": "in_progress; includes explicit fault injection and STOP/START, not uninterrupted proxy service"
+}

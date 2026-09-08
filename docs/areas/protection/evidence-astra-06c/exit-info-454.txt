@@ -1,0 +1,73 @@
+ACTIVITY MANAGER PROCESS EXIT INFO (dumpsys activity exit-info)
+Last Timestamp of Persistence Into Persistent Storage: 2026-09-08 10:18:41.437
+  package: com.contentfilter.user.dev
+    Historical Process Exit for uid=0
+        ApplicationExitInfo #0:
+          timestamp=2026-07-27 17:06:43.359 pid=4800 realUid=99085 packageUid=10447 definingUid=10225 user=0
+          process=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0 reason=1 (EXIT_SELF) subreason=0 (UNKNOWN) status=0
+          importance=400 pss=117MB rss=39MB description=null state=empty trace=null
+    Historical Process Exit for uid=10447
+        ApplicationExitInfo #0:
+          timestamp=2026-09-08 10:04:20.873 pid=26210 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=57MB rss=51MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #1:
+          timestamp=2026-09-08 10:04:20.864 pid=26092 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=168MB rss=176MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #2:
+          timestamp=2026-09-08 09:25:58.474 pid=18286 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=61MB rss=50MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #3:
+          timestamp=2026-09-08 09:25:57.894 pid=18435 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=144MB rss=113MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #4:
+          timestamp=2026-09-08 08:32:16.185 pid=23847 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=102MB rss=40MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #5:
+          timestamp=2026-09-08 08:32:16.172 pid=24100 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=153MB rss=149MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #6:
+          timestamp=2026-09-08 07:59:12.789 pid=23925 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=54MB rss=36MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #7:
+          timestamp=2026-09-08 07:59:12.261 pid=24072 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=167MB rss=159MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #8:
+          timestamp=2026-09-08 02:42:12.022 pid=20061 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=57MB rss=53MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #9:
+          timestamp=2026-09-08 02:42:11.453 pid=20204 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=155MB rss=215MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #10:
+          timestamp=2026-09-08 02:25:31.480 pid=15685 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=56MB rss=44MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #11:
+          timestamp=2026-09-08 02:25:30.984 pid=15801 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=159MB rss=160MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #12:
+          timestamp=2026-09-08 02:07:29.711 pid=10429 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=103MB rss=48MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #13:
+          timestamp=2026-09-08 02:07:29.179 pid=10510 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=163MB rss=151MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #14:
+          timestamp=2026-09-08 01:42:13.085 pid=2763 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev:chrome_guard reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=57MB rss=45MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null
+        ApplicationExitInfo #15:
+          timestamp=2026-09-08 01:42:13.067 pid=3095 realUid=10447 packageUid=10447 definingUid=10447 user=0
+          process=com.contentfilter.user.dev reason=16 (PACKAGE UPDATED) subreason=0 (UNKNOWN) status=0
+          importance=125 pss=146MB rss=127MB description=stop com.contentfilter.user.dev due to installPackageLI state=empty trace=null

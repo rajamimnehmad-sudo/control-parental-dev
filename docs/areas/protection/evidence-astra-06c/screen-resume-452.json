@@ -1,0 +1,8 @@
+{
+  "sleep_requested_utc": "2026-09-08T12:02:28.358708+00:00",
+  "idle_page": "https://example.com/",
+  "wake": "Awake",
+  "wake_utc": "2026-09-08T12:05:06.127340+00:00",
+  "chrome_suspended": false,
+  "manual_restart_after_wake": false
+}

@@ -1,0 +1,252 @@
+[
+  {
+    "action": "navigate",
+    "snapshot": {
+      "url": "https://glosh-photos.test/svg06a",
+      "title": "SVG06A_PASS",
+      "ready": "complete",
+      "viewport": {
+        "width": 384,
+        "height": 761
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0,
+        "max": 219
+      },
+      "timing": {
+        "ttfb": 81.80000001192093,
+        "dcl": 470.69999998807907,
+        "load": 501.69999998807907
+      },
+      "images": [
+        {
+          "index": 0,
+          "complete": true,
+          "width": 24,
+          "height": 24,
+          "loading": "auto",
+          "visible": true,
+          "viewport": true,
+          "rect": {
+            "x": 267.4666748046875,
+            "y": 150.10000610351562,
+            "width": 32,
+            "height": 32
+          },
+          "resourceEnd": 523.8000000119209
+        },
+        {
+          "index": 1,
+          "complete": true,
+          "width": 24,
+          "height": 24,
+          "loading": "auto",
+          "visible": true,
+          "viewport": true,
+          "rect": {
+            "x": 315.4666748046875,
+            "y": 150.10000610351562,
+            "width": 32,
+            "height": 32
+          },
+          "resourceEnd": 284.19999998807907
+        },
+        {
+          "index": 2,
+          "complete": true,
+          "width": 320,
+          "height": 180,
+          "loading": "auto",
+          "visible": true,
+          "viewport": true,
+          "rect": {
+            "x": 28,
+            "y": 202.6555633544922,
+            "width": 32,
+            "height": 32
+          },
+          "resourceEnd": 296.30000001192093
+        },
+        {
+          "index": 3,
+          "complete": true,
+          "width": 0,
+          "height": 0,
+          "loading": "auto",
+          "visible": false,
+          "viewport": true,
+          "rect": {
+            "x": 76,
+            "y": 218.6555633544922,
+            "width": 0,
+            "height": 0
+          },
+          "resourceEnd": null
+        }
+      ],
+      "fixture": "ORIGINAL UI SVG AUTHORITY 06A\nInline\nINLINE_ORIGINAL:PASS\nINLINE_CLICK:PASS\nSPRITE_ORIGINAL:PASS\nUNSAFE_SPRITE_FAIL_CLOSED:PASS\nAMBIGUOUS_REFERENCE_FAIL_CLOSED:PASS\nSTATIC_CSS:PASS\nEXTERNAL_CSS:PASS\nSTYLE_ATTRIBUTE:PASS\nDATA_IMAGE:PASS\nFAVICON:PASS\nPROTECTED_HEAD_RETENTION:PASS\nNETWORK_SVG:PASS\nUNSAFE_NETWORK_FAIL_CLOSED:PASS\nDYNAMIC_CSS:PASS\nRASTER_FAIL_CLOSED:PASS\nUNSAFE_INLINE_FAIL_CLOSED:PASS"
+    }
+  },
+  {
+    "action": "navigate",
+    "snapshot": {
+      "url": "https://glosh-photos.test/svg06a/shadow",
+      "title": "SHADOW_PASS",
+      "ready": "complete",
+      "viewport": {
+        "width": 384,
+        "height": 761
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0,
+        "max": 0
+      },
+      "timing": {
+        "ttfb": 63.19999998807907,
+        "dcl": 160.5,
+        "load": 161
+      },
+      "images": [],
+      "fixture": "Detached shadow lifecycle\nOPEN_DETACHED:PASS\nOPEN_CSP_SHEET:PASS\nOPEN_TEXT_VISIBLE:PASS\nOPEN_CSSOM_LOCKED:PASS\nOPEN_CANVAS_FAIL_CLOSED:PASS\nOPEN_REATTACH:PASS\nCLOSED_DETACHED:PASS\nCLOSED_CSP_SHEET:PASS\nCLOSED_TEXT_VISIBLE:PASS\nCLOSED_CSSOM_LOCKED:PASS\nCLOSED_CANVAS_FAIL_CLOSED:PASS\nCLOSED_REATTACH:PASS"
+    }
+  },
+  {
+    "action": "back",
+    "snapshot": {
+      "url": "https://glosh-photos.test/svg06a",
+      "title": "SVG06A_PASS",
+      "ready": "complete",
+      "viewport": {
+        "width": 384,
+        "height": 761
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0,
+        "max": 219
+      },
+      "timing": {
+        "ttfb": 82.79999995231628,
+        "dcl": 344.89999997615814,
+        "load": 345.39999997615814
+      },
+      "images": [
+        {
+          "index": 0,
+          "complete": true,
+          "width": 24,
+          "height": 24,
+          "loading": "auto",
+          "visible": true,
+          "viewport": true,
+          "rect": {
+            "x": 267.4666748046875,
+            "y": 150.10000610351562,
+            "width": 32,
+            "height": 32
+          },
+          "resourceEnd": 326.2999999523163
+        },
+        {
+          "index": 1,
+          "complete": true,
+          "width": 24,
+          "height": 24,
+          "loading": "auto",
+          "visible": true,
+          "viewport": true,
+          "rect": {
+            "x": 315.4666748046875,
+            "y": 150.10000610351562,
+            "width": 32,
+            "height": 32
+          },
+          "resourceEnd": 109.29999995231628
+        },
+        {
+          "index": 2,
+          "complete": true,
+          "width": 320,
+          "height": 180,
+          "loading": "auto",
+          "visible": true,
+          "viewport": true,
+          "rect": {
+            "x": 28,
+            "y": 202.6555633544922,
+            "width": 32,
+            "height": 32
+          },
+          "resourceEnd": 109.39999997615814
+        },
+        {
+          "index": 3,
+          "complete": true,
+          "width": 0,
+          "height": 0,
+          "loading": "auto",
+          "visible": false,
+          "viewport": true,
+          "rect": {
+            "x": 76,
+            "y": 218.6555633544922,
+            "width": 0,
+            "height": 0
+          },
+          "resourceEnd": null
+        }
+      ],
+      "fixture": "ORIGINAL UI SVG AUTHORITY 06A\nInline\nINLINE_ORIGINAL:PASS\nINLINE_CLICK:PASS\nSPRITE_ORIGINAL:PASS\nUNSAFE_SPRITE_FAIL_CLOSED:PASS\nAMBIGUOUS_REFERENCE_FAIL_CLOSED:PASS\nSTATIC_CSS:PASS\nEXTERNAL_CSS:PASS\nSTYLE_ATTRIBUTE:PASS\nDATA_IMAGE:PASS\nFAVICON:PASS\nPROTECTED_HEAD_RETENTION:PASS\nNETWORK_SVG:PASS\nUNSAFE_NETWORK_FAIL_CLOSED:PASS\nDYNAMIC_CSS:PASS\nRASTER_FAIL_CLOSED:PASS\nUNSAFE_INLINE_FAIL_CLOSED:PASS"
+    }
+  },
+  {
+    "action": "forward",
+    "snapshot": {
+      "url": "https://glosh-photos.test/svg06a/shadow",
+      "title": "SHADOW_PASS",
+      "ready": "complete",
+      "viewport": {
+        "width": 384,
+        "height": 761
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0,
+        "max": 0
+      },
+      "timing": {
+        "ttfb": 54.30000001192093,
+        "dcl": 139,
+        "load": 139.20000004768372
+      },
+      "images": [],
+      "fixture": "Detached shadow lifecycle\nOPEN_DETACHED:PASS\nOPEN_CSP_SHEET:PASS\nOPEN_TEXT_VISIBLE:PASS\nOPEN_CSSOM_LOCKED:PASS\nOPEN_CANVAS_FAIL_CLOSED:PASS\nOPEN_REATTACH:PASS\nCLOSED_DETACHED:PASS\nCLOSED_CSP_SHEET:PASS\nCLOSED_TEXT_VISIBLE:PASS\nCLOSED_CSSOM_LOCKED:PASS\nCLOSED_CANVAS_FAIL_CLOSED:PASS\nCLOSED_REATTACH:PASS"
+    }
+  },
+  {
+    "action": "reload",
+    "snapshot": {
+      "url": "https://glosh-photos.test/svg06a/shadow",
+      "title": "SHADOW_PASS",
+      "ready": "complete",
+      "viewport": {
+        "width": 384,
+        "height": 761
+      },
+      "scroll": {
+        "x": 0,
+        "y": 0,
+        "max": 0
+      },
+      "timing": {
+        "ttfb": 60.90000003576279,
+        "dcl": 143.5,
+        "load": 143.80000001192093
+      },
+      "images": [],
+      "fixture": "Detached shadow lifecycle\nOPEN_DETACHED:PASS\nOPEN_CSP_SHEET:PASS\nOPEN_TEXT_VISIBLE:PASS\nOPEN_CSSOM_LOCKED:PASS\nOPEN_CANVAS_FAIL_CLOSED:PASS\nOPEN_REATTACH:PASS\nCLOSED_DETACHED:PASS\nCLOSED_CSP_SHEET:PASS\nCLOSED_TEXT_VISIBLE:PASS\nCLOSED_CSSOM_LOCKED:PASS\nCLOSED_CANVAS_FAIL_CLOSED:PASS\nCLOSED_REATTACH:PASS"
+    }
+  }
+]

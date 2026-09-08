@@ -1,0 +1,38 @@
+[
+  {
+    "run": 0,
+    "result": {
+      "id": 1,
+      "result": {
+        "result": {
+          "type": "string",
+          "value": "{\"navigation\":{\"name\":\"https://www.fravega.com/\",\"entryType\":\"navigation\",\"startTime\":0,\"duration\":0,\"navigationId\":6156,\"initiatorType\":\"navigation\",\"deliveryType\":\"\",\"nextHopProtocol\":\"http/1.1\",\"renderBlockingStatus\":\"non-blocking\",\"contentType\":\"text/html\",\"contentEncoding\":\"\",\"workerStart\":0,\"workerRouterEvaluationStart\":0,\"workerCacheLookupStart\":0,\"workerMatchedSourceType\":\"\",\"workerFinalSourceType\":\"\",\"redirectStart\":0,\"redirectEnd\":0,\"fetchStart\":8.800000011920929,\"domainLookupStart\":8.800000011920929,\"domainLookupEnd\":8.800000011920929,\"connectStart\":8.800000011920929,\"secureConnectionStart\":8.800000011920929,\"connectEnd\":8.800000011920929,\"requestStart\":112.19999998807907,\"responseStart\":2557.800000011921,\"firstInterimResponseStart\":0,\"finalResponseHeadersStart\":2557.800000011921,\"responseEnd\":2575.399999976158,\"transferSize\":994231,\"encodedBodySize\":993931,\"decodedBodySize\":993931,\"responseStatus\":200,\"serverTiming\":[],\"unloadEventStart\":2614.100000023842,\"unloadEventEnd\":2614.100000023842,\"domInteractive\":3972.300000011921,\"domContentLoadedEventStart\":7078.899999976158,\"domContentLoadedEventEnd\":7119.699999988079,\"domComplete\":0,\"loadEventStart\":0,\"loadEventEnd\":0,\"type\":\"navigate\",\"redirectCount\":0,\"activationStart\":0,\"criticalCHRestart\":0,\"notRestoredReasons\":null,\"confidence\":{\"randomizedTriggerRate\":0.4994798,\"value\":\"high\"}},\"decoded\":395}"
+        }
+      }
+    }
+  },
+  {
+    "run": 1,
+    "result": {
+      "id": 1,
+      "result": {
+        "result": {
+          "type": "string",
+          "value": "{\"navigation\":{\"name\":\"https://www.fravega.com/\",\"entryType\":\"navigation\",\"startTime\":0,\"duration\":0,\"navigationId\":1049,\"initiatorType\":\"navigation\",\"deliveryType\":\"\",\"nextHopProtocol\":\"http/1.1\",\"renderBlockingStatus\":\"non-blocking\",\"contentType\":\"text/html\",\"contentEncoding\":\"\",\"workerStart\":0,\"workerRouterEvaluationStart\":0,\"workerCacheLookupStart\":0,\"workerMatchedSourceType\":\"\",\"workerFinalSourceType\":\"\",\"redirectStart\":0,\"redirectEnd\":0,\"fetchStart\":11.200000047683716,\"domainLookupStart\":11.200000047683716,\"domainLookupEnd\":11.200000047683716,\"connectStart\":45.30000001192093,\"secureConnectionStart\":66.5,\"connectEnd\":81.40000003576279,\"requestStart\":98.30000001192093,\"responseStart\":1012.2000000476837,\"firstInterimResponseStart\":0,\"finalResponseHeadersStart\":1012.2000000476837,\"responseEnd\":1074.9000000357628,\"transferSize\":994232,\"encodedBodySize\":993932,\"decodedBodySize\":993932,\"responseStatus\":200,\"serverTiming\":[],\"unloadEventStart\":1113.800000011921,\"unloadEventEnd\":1113.800000011921,\"domInteractive\":2544.5,\"domContentLoadedEventStart\":5529.800000011921,\"domContentLoadedEventEnd\":5569.900000035763,\"domComplete\":0,\"loadEventStart\":0,\"loadEventEnd\":0,\"type\":\"navigate\",\"redirectCount\":0,\"activationStart\":0,\"criticalCHRestart\":0,\"notRestoredReasons\":null,\"confidence\":{\"randomizedTriggerRate\":0.4994798,\"value\":\"high\"}},\"decoded\":384}"
+        }
+      }
+    }
+  },
+  {
+    "run": 2,
+    "result": {
+      "id": 1,
+      "result": {
+        "result": {
+          "type": "string",
+          "value": "{\"navigation\":{\"name\":\"https://www.fravega.com/\",\"entryType\":\"navigation\",\"startTime\":0,\"duration\":0,\"navigationId\":3319,\"initiatorType\":\"navigation\",\"deliveryType\":\"\",\"nextHopProtocol\":\"http/1.1\",\"renderBlockingStatus\":\"non-blocking\",\"contentType\":\"text/html\",\"contentEncoding\":\"\",\"workerStart\":0,\"workerRouterEvaluationStart\":0,\"workerCacheLookupStart\":0,\"workerMatchedSourceType\":\"\",\"workerFinalSourceType\":\"\",\"redirectStart\":0,\"redirectEnd\":0,\"fetchStart\":5.5,\"domainLookupStart\":5.5,\"domainLookupEnd\":5.5,\"connectStart\":5.5,\"secureConnectionStart\":5.5,\"connectEnd\":5.5,\"requestStart\":92.30000001192093,\"responseStart\":2000.9000000357628,\"firstInterimResponseStart\":0,\"finalResponseHeadersStart\":2000.9000000357628,\"responseEnd\":2028,\"transferSize\":994232,\"encodedBodySize\":993932,\"decodedBodySize\":993932,\"responseStatus\":200,\"serverTiming\":[],\"unloadEventStart\":2081.400000035763,\"unloadEventEnd\":2081.400000035763,\"domInteractive\":3376,\"domContentLoadedEventStart\":6181.100000023842,\"domContentLoadedEventEnd\":6223.400000035763,\"domComplete\":0,\"loadEventStart\":0,\"loadEventEnd\":0,\"type\":\"navigate\",\"redirectCount\":0,\"activationStart\":0,\"criticalCHRestart\":0,\"notRestoredReasons\":null,\"confidence\":{\"randomizedTriggerRate\":0.4994798,\"value\":\"low\"}},\"decoded\":339}"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "functionalSha": "e971662c9f9d77c2605bfb5aad70bc04c7fe557b",
+  "groups": "Chrome data plane and process guard",
+  "results": {
+    "tests": 395,
+    "failures": 0,
+    "errors": 0
+  },
+  "physical": "in progress after A23 reconnected",
+  "scope": "Guard authority, verifier, TTL, model and VPN code unchanged",
+  "lint": "PASS",
+  "build": "PASS 10m27s"
+}

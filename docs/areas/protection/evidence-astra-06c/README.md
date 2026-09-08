@@ -1,3 +1,7 @@
+> **Current checkpoint: DEV454, BLOCKED at architecture authorization (2026-09-08).** Functional `c2fd21586ea20b4d404a049a87ea81ad11d90c23`, exact installed APK `f2076615b524054eef66c2405ffdf845fded9d3f9dabce34a26fd05f27b85e79`.404 tests, lint and SVG/forms/Shadow physical checks passed; final health and user trial remain pending. See [current handoff](HANDOFF_454_TRIAGE.md). Global recovery451/452, idle-admission453 and bounded decision-cache454 follow-ups supersede the450 result below. See [idle diagnosis](IDLE_ADMISSION_453.md), [cache comparison](CACHE_DECISION_454.md), [recovery](RECOVERY-451.md), and [pending local raster architecture](LOCAL_RASTER_DECISION.md). No current integral PASS or product acceptance is claimed.
+
+> Superseded by a post-gate recovery failure: the integral DEV450 PASS is suspended. See [DEV451 recovery follow-up](RECOVERY-451.md). The report below preserves the earlier gate, not current product acceptance.
+
 # Chrome Astra 06C — DEV450 technical review
 
 STATUS: **CHROME_ASTRA_PHOTOS_NORMALITY_PASS — PASS TECHNICAL / PENDING CHATGPT REVIEW** for the tested Chrome/network-photo contract. This is not final product acceptance. The user rejected DEV446; DEV450 was offered for a new trial and no acceptance response has arrived. No GIF/video continuation is authorized by this result.

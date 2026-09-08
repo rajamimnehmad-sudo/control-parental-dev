@@ -1,0 +1,26 @@
+--------- beginning of main
+09-08 09:49:49.032 26210 26210 I ChromeProcessGuard: action=suspend verified=true reason=manual_stop attempt=1
+09-08 09:49:49.066 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=manual_stop accepted=2543 staleRejects=0 wrongCallerRejects=0 guardRestarts=572 pid=26210 chromeSuspended=true
+09-08 09:49:49.386 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=guard_stop accepted=2543 staleRejects=0 wrongCallerRejects=0 guardRestarts=572 pid=26210 chromeSuspended=true
+09-08 09:50:06.107 26210 26210 I ChromeProcessGuard: event=created state=suspended generation=0 session= leaseExpiry=0 reason=guard_start accepted=0 staleRejects=0 wrongCallerRejects=0 guardRestarts=573 pid=26210 chromeSuspended=true
+09-08 09:50:06.119 26210 26210 I ChromeProcessGuard: event=session_opened generation=552 session=13de2dad mainPidHint=26092 guardPid=26210
+09-08 09:50:07.314 26210 26210 I ChromeProcessGuard: action=release verified=true reason=lease_current attempt=1
+09-08 09:50:07.317 26210 26210 I ChromeProcessGuard: event=first_lease state=released generation=552 session=13de2dad leaseExpiry=550332252 reason=lease_current accepted=1 staleRejects=0 wrongCallerRejects=0 guardRestarts=573 pid=26210 chromeSuspended=false
+09-08 09:52:53.255 26092 29058 I ChromeProcessGuard: action=suspend verified=true reason=manual_stop attempt=1
+09-08 09:52:53.264 26210 26210 I ChromeProcessGuard: action=suspend verified=true reason=manual_stop attempt=1
+09-08 09:52:53.270 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=manual_stop accepted=298 staleRejects=0 wrongCallerRejects=0 guardRestarts=573 pid=26210 chromeSuspended=true
+09-08 09:52:53.435 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=guard_stop accepted=298 staleRejects=0 wrongCallerRejects=0 guardRestarts=573 pid=26210 chromeSuspended=true
+09-08 09:52:55.279 26210 26210 I ChromeProcessGuard: event=created state=suspended generation=0 session= leaseExpiry=0 reason=guard_start accepted=0 staleRejects=0 wrongCallerRejects=0 guardRestarts=574 pid=26210 chromeSuspended=true
+09-08 09:52:55.285 26210 26210 I ChromeProcessGuard: event=session_opened generation=553 session=22ee5c78 mainPidHint=26092 guardPid=26210
+09-08 09:52:56.663 26210 26210 I ChromeProcessGuard: action=release verified=true reason=lease_current attempt=1
+09-08 09:52:56.669 26210 26210 I ChromeProcessGuard: event=first_lease state=released generation=553 session=22ee5c78 leaseExpiry=550501601 reason=lease_current accepted=1 staleRejects=0 wrongCallerRejects=0 guardRestarts=574 pid=26210 chromeSuspended=false
+09-08 09:54:15.082 26210 26210 I ChromeProcessGuard: action=suspend verified=true reason=manual_stop attempt=1
+09-08 09:54:15.088 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=manual_stop accepted=142 staleRejects=0 wrongCallerRejects=0 guardRestarts=574 pid=26210 chromeSuspended=true
+09-08 09:54:15.100 26092 32104 I ChromeProcessGuard: action=suspend verified=true reason=manual_stop attempt=1
+09-08 09:54:15.855 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=guard_stop accepted=142 staleRejects=0 wrongCallerRejects=0 guardRestarts=574 pid=26210 chromeSuspended=true
+09-08 09:54:17.108 26210 26210 I ChromeProcessGuard: event=created state=suspended generation=0 session= leaseExpiry=0 reason=guard_start accepted=0 staleRejects=0 wrongCallerRejects=0 guardRestarts=575 pid=26210 chromeSuspended=true
+09-08 09:54:17.118 26210 26210 I ChromeProcessGuard: event=session_opened generation=554 session=30a45459 mainPidHint=26092 guardPid=26210
+09-08 09:54:18.542 26210 26210 I ChromeProcessGuard: action=release verified=true reason=lease_current attempt=1
+09-08 09:54:18.547 26210 26210 I ChromeProcessGuard: event=first_lease state=released generation=554 session=30a45459 leaseExpiry=550583491 reason=lease_current accepted=1 staleRejects=0 wrongCallerRejects=0 guardRestarts=575 pid=26210 chromeSuspended=false
+09-08 10:04:08.121 26092 26092 I ChromeProcessGuard: action=suspend verified=true reason=boot_guard attempt=1
+09-08 10:04:08.155 26210 26210 I ChromeProcessGuard: event=invalidated state=suspended generation=0 session= leaseExpiry=0 reason=package_replaced_guard accepted=1056 staleRejects=0 wrongCallerRejects=0 guardRestarts=575 pid=26210 chromeSuspended=true

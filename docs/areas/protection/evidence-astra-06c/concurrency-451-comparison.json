@@ -1,0 +1,56 @@
+{
+  "candidate": "DEV451",
+  "functional_sha": "e971662c9f9d77c2605bfb5aad70bc04c7fe557b",
+  "method": "Alternating existing concurrency 2,1,2,1; same app process; STOP/START clears lab decision cache, Chrome cache retained; controlled fixture through official Chrome. Not process-cold or Chrome-cache-cold.",
+  "runs": [
+    {
+      "file": "control-451-repeat-0-c2.json",
+      "concurrency": 2,
+      "timing_ms": {
+        "ttfb": 695.3000000119209,
+        "dcl": 984.3000000119209,
+        "load": 2719.699999988079
+      },
+      "first8_completion_ms": 2718,
+      "memory_kib": "TOTAL PSS:   164347            TOTAL RSS:   167092       TOTAL SWAP PSS:    55906"
+    },
+    {
+      "file": "control-451-repeat-1-c1.json",
+      "concurrency": 1,
+      "timing_ms": {
+        "ttfb": 417.60000002384186,
+        "dcl": 660.2000000476837,
+        "load": 2164.2000000476837
+      },
+      "first8_completion_ms": 2163,
+      "memory_kib": "TOTAL PSS:   157722            TOTAL RSS:   161268       TOTAL SWAP PSS:    55532"
+    },
+    {
+      "file": "control-451-repeat-2-c2.json",
+      "concurrency": 2,
+      "timing_ms": {
+        "ttfb": 376.89999997615814,
+        "dcl": 759.6999999880791,
+        "load": 2072.899999976158
+      },
+      "first8_completion_ms": 2071.199999988079,
+      "memory_kib": "TOTAL PSS:   163386            TOTAL RSS:   167212       TOTAL SWAP PSS:    55336"
+    },
+    {
+      "file": "control-451-repeat-3-c1.json",
+      "concurrency": 1,
+      "timing_ms": {
+        "ttfb": 427.89999997615814,
+        "dcl": 783.5999999642372,
+        "load": 2306.899999976158
+      },
+      "first8_completion_ms": 2305.399999976158,
+      "memory_kib": "TOTAL PSS:   155920            TOTAL RSS:   159832       TOTAL SWAP PSS:    55228"
+    }
+  ],
+  "conclusion": "Do not adopt concurrency2 by default: initial improvement did not repeat consistently, shared-process memory is confounded and c2 offers no demonstrated stable critical-path improvement. Keep default1 and fixed body admission2/cache64/queue2.",
+  "median_load_ms": {
+    "1": 2235.550000011921,
+    "2": 2396.2999999821186
+  }
+}

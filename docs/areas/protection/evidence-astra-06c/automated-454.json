@@ -1,0 +1,13 @@
+{
+  "functional_sha": "c2fd21586ea20b4d404a049a87ea81ad11d90c23",
+  "tests": 404,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "lint": "PASS",
+  "build": "PASS",
+  "build_duration": "3m53s",
+  "lint_duration": "1m35s",
+  "physical": "PARTIAL_BLOCKED_ARCHITECTURE",
+  "health": "PARTIAL_NOT_45_MIN_FINAL_GATE"
+}

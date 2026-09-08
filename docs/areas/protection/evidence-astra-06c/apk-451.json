@@ -1,0 +1,10 @@
+{
+  "functionalSha": "e971662c9f9d77c2605bfb5aad70bc04c7fe557b",
+  "versionCode": 451,
+  "package": "com.contentfilter.user.dev",
+  "signerSha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "localSha256": "d4a476ae006e50cdfe89dcce95326e30067d3acb3defcb7e65878165565733bc",
+  "installedSha256": "d4a476ae006e50cdfe89dcce95326e30067d3acb3defcb7e65878165565733bc",
+  "sourceApkMatch": true,
+  "physical": "in progress"
+}

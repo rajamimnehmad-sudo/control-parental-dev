@@ -1,0 +1,13 @@
+{
+  "functional_sha": "8e39ba034318e4ac9b500182f5fe81224b22726b",
+  "version_code": 453,
+  "version_name": "1.0.1-dev",
+  "package": "com.contentfilter.user.dev",
+  "signer_sha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "local_apk_sha256": "cebec9b1d7f04ac9ce53875a78029a82187140ab63efb96fce8622f658b8a90a",
+  "installed_apk_sha256": "cebec9b1d7f04ac9ce53875a78029a82187140ab63efb96fce8622f658b8a90a",
+  "source_apk_match": true,
+  "serial": "R58T34V31AE",
+  "installed_device_time": "2026-09-08 09:25:57",
+  "physical": "in_progress"
+}
