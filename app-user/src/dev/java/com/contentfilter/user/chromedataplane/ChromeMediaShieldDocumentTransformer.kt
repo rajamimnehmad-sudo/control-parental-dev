@@ -222,12 +222,12 @@ internal class ChromeMediaShieldDocumentAuthority(
         when (val disposition = admission.disposition(request, response)) {
             is ChromeMediaShieldDocumentDisposition.Transform ->
                 if (bodyExceeded) {
-                    failClosed("document_too_large")
+                    failClosed("document_too_large", disposition.kind)
                 } else {
                     transformer.transform(bytes, response.headers, disposition)
                 }
             is ChromeMediaShieldDocumentDisposition.FailClosed ->
-                failClosed(disposition.reason)
+                failClosed(disposition.reason, disposition.kind)
             ChromeMediaShieldDocumentDisposition.NotDocument -> null
         }
 
@@ -236,11 +236,19 @@ internal class ChromeMediaShieldDocumentAuthority(
             metrics.copy(failClosed = metrics.failClosed + admissionFailClosed.get())
         }
 
-    private fun failClosed(reason: String): ChromeMediaShieldDocumentResult.FailClosed {
+    private fun failClosed(
+        reason: String,
+        kind: ChromeMediaShieldDocumentKind,
+    ): ChromeMediaShieldDocumentResult.FailClosed {
         admissionFailClosed.incrementAndGet()
         return ChromeMediaShieldDocumentResult.FailClosed(
             reason = reason,
-            bytes = FailClosedDocumentBytes,
+            bytes =
+                if (kind == ChromeMediaShieldDocumentKind.TopLevel) {
+                    ChromeDocumentFailurePage.bytes(reason)
+                } else {
+                    FailClosedDocumentBytes
+                },
             headers = FailClosedDocumentHeaders,
         )
     }

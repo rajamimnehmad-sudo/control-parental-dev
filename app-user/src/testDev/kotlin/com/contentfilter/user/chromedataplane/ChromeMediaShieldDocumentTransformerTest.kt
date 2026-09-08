@@ -27,6 +27,51 @@ class ChromeMediaShieldDocumentTransformerTest {
     fun tearDown() = ChromeMediaShieldDocumentAuthorityRegistry.clear()
 
     @Test
+    fun `rejected top level shows local explanation without releasing upstream markup or authority`() {
+        val authority = ChromeMediaShieldDocumentAuthority(ChromeMediaShieldDocumentAdmission(), transformer)
+        val unsafe = "<script>alert('upstream')</script><img src='https://unsafe.test/original'>".toByteArray()
+        listOf(403, 404, 429, 500, 503).forEach { status ->
+            val response =
+                ChromePhotosUpstreamResponse(
+                    host = "example.test",
+                    statusCode = status,
+                    statusText = "Error",
+                    headers = listOf(ChromeHttpHeader("Content-Type", "text/html")),
+                    body = java.io.ByteArrayInputStream(unsafe),
+                    bodyLength = unsafe.size.toLong(),
+                    protocol = "http/1.1",
+                )
+            val request =
+                ChromePhotosProxyRequest(
+                    "GET",
+                    "/",
+                    headers = listOf(ChromeHttpHeader("Sec-Fetch-Dest", "document")),
+                )
+            val result =
+                assertIs<ChromeMediaShieldDocumentResult.FailClosed>(
+                    authority.processBuffered(request, response, unsafe),
+                )
+            val html = result.bytes.toString(Charsets.UTF_8)
+            assertContains(html, "No se pudo cargar la página")
+            assertFalse(html.contains("unsafe.test"))
+            assertFalse(html.contains("<script"))
+            assertFalse(html.contains("<img"))
+            assertEquals("document_status_$status", result.reason)
+            assertTrue(result.headers.contains(ChromeHttpHeader("Content-Security-Policy", "default-src 'none'")))
+            assertEquals(null, ChromeMediaShieldDocumentAuthorityRegistry.snapshot().currentTopLevel)
+            val frame =
+                assertIs<ChromeMediaShieldDocumentResult.FailClosed>(
+                    authority.processBuffered(
+                        request.copy(headers = listOf(ChromeHttpHeader("Sec-Fetch-Dest", "iframe"))),
+                        response,
+                        unsafe,
+                    ),
+                )
+            assertEquals("<!doctype html><html><body></body></html>", frame.bytes.toString(Charsets.UTF_8))
+        }
+    }
+
+    @Test
     fun `local photo physical fixture passes the actual document transformer`() {
         val fixture =
             ChromeLocalPhotoFixture(byteArrayOf(1, 2, 3))
