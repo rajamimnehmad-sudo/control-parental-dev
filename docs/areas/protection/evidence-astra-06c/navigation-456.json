@@ -1,0 +1,46 @@
+{
+  "version": 456,
+  "local_fixture": "11/11 PASS",
+  "forms": "13/13 PASS",
+  "pending_navigation": {
+    "queued_safe_images": 40,
+    "destination": "fixture forms",
+    "return": "reloaded original fixture and passed",
+    "bfcache_observed": false
+  },
+  "google_landscapes": {
+    "preview": "opened960x1277 original-sized SAFE result; back returned to listing",
+    "rotation": {
+      "portrait_before": [
+        384,
+        761
+      ],
+      "landscape": [
+        832,
+        288
+      ],
+      "portrait_after": [
+        384,
+        761
+      ],
+      "pending_after": 0,
+      "decoded_images_after": 22
+    }
+  },
+  "limitations": [
+    "No bfcache restoration was observed in the pending-navigation case.",
+    "DOM geometry is not a paint timestamp.",
+    "This intermediate version is being superseded for measured response-body delay."
+  ],
+  "mimo": {
+    "menu": "opened, original logo/icons and categories physically visible",
+    "images_decoded": 10,
+    "images_total": 10,
+    "ttfb_ms": 2616.3,
+    "dcl_ms": 3507.7,
+    "load_ms": 7913.6,
+    "upstream_headers_ms": 614.706,
+    "document_transform_ms": 170.507,
+    "limitation": "Browser TTFB includes upstream body wait and Glosh; remainder not assigned to one cause. reCAPTCHA service connection warning observed; no challenge or personal form submitted."
+  }
+}

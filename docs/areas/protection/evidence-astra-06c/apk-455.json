@@ -1,0 +1,17 @@
+{
+  "functional_sha": "88d6d4cd2ceb10b8e3d3e5a772a3633d1237958d",
+  "base_sha": "76f285be92945857e5de89423f5df7edf54fc7a9",
+  "governance_sha": "9323b126dde3b91e21e2136a11d087fa3c1f0ca1",
+  "version_code": 455,
+  "package": "com.contentfilter.user.dev",
+  "signer_sha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "local_apk_sha256": "81f98e929e9d178eb1be23b3a5e93f36b64051e473f494d6ceacf3847dffe1d5",
+  "installed_apk_sha256": "81f98e929e9d178eb1be23b3a5e93f36b64051e473f494d6ceacf3847dffe1d5",
+  "source_apk_match": true,
+  "tests": {
+    "count": 412,
+    "failures": 0
+  },
+  "lint": "PASS",
+  "physical_status": "INTERIM: Google local images delivered; fixture rejected because missing html tag. Corrected in next candidate. Not integral PASS."
+}

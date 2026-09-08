@@ -1,0 +1,37 @@
+{
+  "candidate": 457,
+  "functionalSha": "8ce43414432eff26c1f682ea52e56881262d813b",
+  "elapsedSeconds": 2760.0,
+  "samples": 47,
+  "minMemAvailableKiB": 564308,
+  "thermalStates": [
+    "Thermal Status: 0"
+  ],
+  "finalCounters": {
+    "active": "true",
+    "ready": "true",
+    "chromeSuspended": "false",
+    "bootstrapResetCount": "3",
+    "networkVisualRawBlockedDelivered": "0",
+    "networkVisualRawUnknownDelivered": "0",
+    "protectFailure": "0",
+    "queueRejects": "0",
+    "timeouts": "0",
+    "proxyQueueRejects": "0",
+    "quicAttempts": "0",
+    "directTcpAttempts": "0",
+    "failures": "7",
+    "clientDisconnects": "8"
+  },
+  "limitations": [
+    "Health observation is not Chrome normality PASS; blank-page failures remain.",
+    "USB powered; not a battery-discharge gate.",
+    "FDSize is capacity, not an open FD count.",
+    "Does not cover DEV460 gzip runtime yet."
+  ],
+  "failureAccountingAtHealthEnd": {
+    "expectedServiceWorkerGateRejections": 4,
+    "dnsResolutionFailures": 3,
+    "note": "Failure counter is not zero; these are request failures, not demonstrated crashes. No blanket health PASS inferred."
+  }
+}

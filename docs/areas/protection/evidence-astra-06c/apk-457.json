@@ -1,0 +1,17 @@
+{
+  "functional_sha": "8ce43414432eff26c1f682ea52e56881262d813b",
+  "base_sha": "76f285be92945857e5de89423f5df7edf54fc7a9",
+  "governance_sha": "9323b126dde3b91e21e2136a11d087fa3c1f0ca1",
+  "version_code": 457,
+  "package": "com.contentfilter.user.dev",
+  "signer_sha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "local_apk_sha256": "edc40628fb4e9adbad4628f9ac72a3e7f56d7d525802eb9c452c0d605b9fbd6e",
+  "installed_apk_sha256": "edc40628fb4e9adbad4628f9ac72a3e7f56d7d525802eb9c452c0d605b9fbd6e",
+  "source_apk_match": true,
+  "tests": {
+    "count": 415,
+    "failures": 0
+  },
+  "lint": "PASS",
+  "physical_status": "IN_PROGRESS: local11/11 + exact UNKNOWN gray replacement, forms13/13, Shadow12/12 PASS. SVG15/16; obsolete hidden-only negative raster assertion superseded by planned458 exact-placeholder assertion. Body delivery benchmark improved. Health ongoing."
+}

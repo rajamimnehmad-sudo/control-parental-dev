@@ -1,0 +1,40 @@
+{
+  "duration_s": 2760.0,
+  "samples": 47,
+  "appRssKiB": {
+    "min": 120496,
+    "median": 147336,
+    "max": 234528,
+    "last": 144580
+  },
+  "minMemAvailableKiB": 474992,
+  "thermal": [
+    "Thermal Status: 0"
+  ],
+  "lastCounters": {
+    "active": "true",
+    "ready": "true",
+    "failures": "10",
+    "proxyQueueRejects": "0",
+    "protectFailure": "0",
+    "queueRejects": "0",
+    "timeouts": "0",
+    "quicAttempts": "0",
+    "directTcpAttempts": "0",
+    "networkVisualRawBlockedDelivered": "0",
+    "networkVisualRawUnknownDelivered": "0",
+    "bootstrapResetCount": "3",
+    "chromeSuspended": "false",
+    "imageBufferedBytesPeak": "25165824"
+  },
+  "upstreamFailureKinds": {
+    "InterruptedIOException": 5,
+    "UnknownServiceException": 1,
+    "IOException": 4
+  },
+  "limitations": [
+    "USB powered; not battery discharge gate",
+    "Mixed user and controlled browsing; not matched memory A/B",
+    "Superseded by pending DEV462; not its final health gate"
+  ]
+}

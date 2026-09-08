@@ -1,0 +1,9 @@
+# Complete-response delivery timing
+
+DEV456 official A23 Chrome Resource Timing separates request-to-response-header from response-header-to-body-complete. On20 sequential same-origin GETs of the already authorized6768-byte SAFE local asset, median TTFB10.75ms, body39.95ms, total55.85ms. The local fixture also showed similar38–42ms body intervals for100-byte submission receipts. These are browser resource intervals, not screenshot/paint times. Files: local-body-delay-456.json and local-asset-repeat-456.json.
+
+Code inspection: ChromeHttp1ResponseWriter flushed headers before writing every body, including already complete sanitized byte arrays. The actual proxy wraps the TLS output in BufferedOutputStream. Two small flushes can interact with TCP delayed acknowledgment; this is the causal hypothesis being tested, not a packet-capture proof. Reference: [RFC9293 TCP](https://www.rfc-editor.org/rfc/rfc9293.html#name-delayed-acknowledgments-when-).
+
+DEV457 combines headers with an already available sanitized body in the existing output buffer. Streaming upstream bodies still flush headers before reading the body; HEAD/no-body responses still flush immediately. No added buffer, TCP option tuning, body-admission/concurrency/model/authority changes, or host-specific logic. Tests cover complete small transport output, HEAD delivery, streaming headers before slow body, plus existing framing/integrity/security suite. Physical before/after, normal forms, original bytes and final health remain to be validated.
+
+Physical result: DEV457 same20-request SAFE asset probe preserves6768 bytes each; median TTFB10.85ms, body3.30ms, total19.90ms. The header-to-body delay fell while TTFB stayed essentially unchanged, supporting the split-write causal hypothesis. Local fixture11/11 including original byte identity passed on the exact457 APK. Full quantiles: body-delivery-comparison-457.json. Final long-run remains in progress.

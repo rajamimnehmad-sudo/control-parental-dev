@@ -1,0 +1,21 @@
+{
+  "functionalSha": "cdcbcd007dbe49f79ce5b476ed702c47b2ca6926",
+  "versionCode": 460,
+  "package": "com.contentfilter.user.dev",
+  "versionName": "1.0.1-dev",
+  "signerSha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "localSha256": "1707de7a882a1d3ddbc5f2a55a66da4730d4a5521d11d4ea53a5f980a2b828f3",
+  "installedSha256": "1707de7a882a1d3ddbc5f2a55a66da4730d4a5521d11d4ea53a5f980a2b828f3",
+  "sourceApkMatch": true,
+  "tests": 419,
+  "failures": 0,
+  "errors": 0,
+  "physicalStart": {
+    "active": true,
+    "ready": true,
+    "chromeSuspended": false,
+    "resetCount": 3
+  },
+  "integralPass": false,
+  "lint": "PASS"
+}
