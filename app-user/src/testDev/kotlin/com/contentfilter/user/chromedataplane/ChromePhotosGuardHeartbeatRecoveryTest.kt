@@ -1,12 +1,45 @@
 package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.user.chromeguard.ChromeGuardContract
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ChromePhotosGuardHeartbeatRecoveryTest {
+    @Test
+    fun `IPC timeout leaves the caller alive for a later fresh session`() =
+        runBlocking<Unit> {
+            val noReply = CompletableDeferred<Int>()
+            assertNull(openGuardSessionOrRetry { withTimeout(10L) { noReply.await() } })
+            assertEquals(7, openGuardSessionOrRetry { 7 })
+        }
+
+    @Test
+    fun `parent timeout cancels recovery instead of becoming a retry`() =
+        runBlocking<Unit> {
+            assertFailsWith<TimeoutCancellationException> {
+                withTimeout(10L) {
+                    openGuardSessionOrRetry { CompletableDeferred<Int>().await() }
+                }
+            }
+        }
+
+    @Test
+    fun `external cancellation never becomes a recovery retry`() =
+        runBlocking<Unit> {
+            assertFailsWith<CancellationException> {
+                openGuardSessionOrRetry<Int> { throw CancellationException("manual_stop") }
+            }
+        }
+
     @Test
     fun `live session is retained but elapsed lease requires a fresh generation`() {
         val recovery = ChromePhotosGuardHeartbeatRecovery()

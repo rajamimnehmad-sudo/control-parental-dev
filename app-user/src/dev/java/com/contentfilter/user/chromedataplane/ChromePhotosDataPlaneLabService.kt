@@ -577,12 +577,19 @@ class ChromePhotosDataPlaneLabService : Service() {
             // suspended; the next health-loop iteration must freshly verify all health before release.
             labPreferences().edit().putBoolean(ChromePhotosDataPlaneLabContract.KeyPresentationReady, false).apply()
             try {
-                guardSession =
-                    guardClient.openSession(
-                        sessionId = session.sessionId,
-                        mainProcessNonce = UUID.randomUUID().toString(),
-                        bootstrapGeneration = session.bootstrapGeneration,
-                    )
+                val renewed =
+                    openGuardSessionOrRetry {
+                        guardClient.openSession(
+                            sessionId = session.sessionId,
+                            mainProcessNonce = UUID.randomUUID().toString(),
+                            bootstrapGeneration = session.bootstrapGeneration,
+                        )
+                    }
+                if (renewed == null) {
+                    Log.w(LogTag, "phase=guard_session_renewal_timeout action=retry_after_health")
+                    return false
+                }
+                guardSession = renewed
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

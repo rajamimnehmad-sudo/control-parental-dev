@@ -1,10 +1,13 @@
 package com.contentfilter.user.chromedataplane
 
 import com.contentfilter.user.chromeguard.ChromeGuardContract
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-/** Reopens only a locally expired session; the existing guard still authorizes every release. */
+/** Detects expired or persistently suspended sessions; the existing guard authorizes every release. */
 internal class ChromePhotosGuardHeartbeatRecovery {
     private val enabled = AtomicBoolean(false)
     private val pendingDelay = AtomicLong(0L)
@@ -47,3 +50,12 @@ internal class ChromePhotosGuardHeartbeatRecovery {
 }
 
 internal val chromePhotosGuardHeartbeatRecovery = ChromePhotosGuardHeartbeatRecovery()
+
+/** A bounded IPC timeout permits a later health-checked retry; external cancellation propagates. */
+internal suspend fun <T> openGuardSessionOrRetry(openSession: suspend () -> T): T? =
+    try {
+        openSession()
+    } catch (_: TimeoutCancellationException) {
+        currentCoroutineContext().ensureActive()
+        null
+    }
