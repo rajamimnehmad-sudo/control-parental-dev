@@ -1,0 +1,12 @@
+{
+  "functionalSha": "1598f3683435caf09614622197bc7b9c991ed50e",
+  "versionCode": 450,
+  "versionName": "1.0.1-dev",
+  "package": "com.contentfilter.user.dev",
+  "signerSha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "localSha256": "bb7bcd78dbb8973d1aafe90c4dbd8d16b9ce7c509f3fd7843caba558d42d1c99",
+  "installedSha256": "bb7bcd78dbb8973d1aafe90c4dbd8d16b9ce7c509f3fd7843caba558d42d1c99",
+  "sourceApkMatch": true,
+  "deviceSerial": "R58T34V31AE",
+  "status": "physical technical gates passed; user acceptance and ChatGPT review pending"
+}

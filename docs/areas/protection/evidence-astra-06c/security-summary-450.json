@@ -1,0 +1,97 @@
+{
+  "networkVisualRawBlockedDelivered": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "networkVisualRawUnknownDelivered": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "protectFailure": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "proxyQueueRejects": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "queueRejects": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "timeouts": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "imageBodyAdmissionRejects": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "quicAttempts": {
+    "min": 0,
+    "max": 0,
+    "median": 0,
+    "last": 0
+  },
+  "directTcpAttempts": {
+    "min": 0,
+    "max": 0,
+    "median": 0,
+    "last": 0
+  },
+  "bootstrapResetCount": {
+    "min": 3,
+    "max": 3,
+    "median": 3,
+    "last": 3
+  },
+  "resetCount": {
+    "min": 3,
+    "max": 3,
+    "median": 3,
+    "last": 3
+  },
+  "documentTransformOutstanding": {
+    "min": 0,
+    "max": 0,
+    "median": 0.0,
+    "last": 0
+  },
+  "readyTokensOutstanding": {
+    "min": 0,
+    "max": 44,
+    "median": 6.0,
+    "last": 6
+  },
+  "note": "Counters restart on intentional service recovery; maxima cover both sessions. Ready-token outstanding is bounded registry occupancy, not a request queue.",
+  "warnings": [
+    "09-08 02:43:23.646 24072 24926 W ChromePhotosDataPlane: phase=connection_failed correlationId=c27 error=UnknownHostException",
+    "09-08 02:43:52.175 24072 25031 W ChromePhotosDataPlane: phase=connection_failed correlationId=c75 error=SocketException",
+    "09-08 02:44:01.999 24072 24948 W ChromePhotosDataPlane: phase=connection_failed correlationId=c33 error=SocketException",
+    "09-08 02:44:22.540 24072 24940 W ChromePhotosDataPlane: phase=connection_failed correlationId=c98 error=UnknownHostException",
+    "09-08 02:45:02.118 24072 25085 W ChromePhotosDataPlane: phase=connection_failed correlationId=c153 error=SocketException",
+    "09-08 02:45:19.528 24072 25106 W ChromePhotosDataPlane: phase=connection_failed correlationId=c221 error=UnknownHostException",
+    "09-08 02:45:19.751 24072 25031 W ChromePhotosDataPlane: phase=tls_failed side=upstream stage=connect_tls correlationId=c222-r1 hostClass=network hostHash=eedd08875a718839 authorityHash=937231c63cb04b3c sniHash=eedd08875a718839 error=SSLPeerUnverifiedException rootCause=SSLPeerUnverifiedException causeChain=SSLPeerUnverifiedException responseStarted=false errorResponseWritten=true",
+    "09-08 02:46:49.901 24072 25024 W ChromePhotosDataPlane: phase=connection_failed correlationId=c304 error=UnknownHostException",
+    "09-08 02:46:50.077 24072 25030 W ChromePhotosDataPlane: phase=upstream_failed correlationId=c305-r1 hostClass=network hostHash=eedd08875a718839 responseStarted=false errorResponseWritten=true error=SocketException",
+    "09-08 02:47:58.527 24072 25120 W ChromePhotosDataPlane: phase=upstream_failed correlationId=c334-r1 hostClass=network hostHash=56084097deee1131 responseStarted=false errorResponseWritten=true error=InterruptedIOException",
+    "09-08 02:48:49.734 24072 25071 W ChromePhotosDataPlane: phase=upstream_failed correlationId=c394-r3 hostClass=network hostHash=a817ab236a289c0c responseStarted=false errorResponseWritten=true error=IOException",
+    "09-08 02:49:04.641 24072 24764 W ChromePhotosDataPlane: phase=connection_failed correlationId=c417 error=SocketException",
+    "09-08 03:06:22.427 24072 24686 W ChromePhotosDataPlane: phase=connection_failed correlationId=c581 error=SocketException",
+    "09-08 03:11:08.439 24072 31199 W ChromePhotosDataPlane: phase=upstream_failed correlationId=c58-r5 hostClass=network hostHash=a817ab236a289c0c responseStarted=false errorResponseWritten=true error=IOException"
+  ]
+}

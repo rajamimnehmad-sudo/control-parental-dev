@@ -1,0 +1,10 @@
+{
+  "functionalSha": "0d427c08208098b4315f80d74b96f919932d93bc",
+  "command": ":app-user:testDevDebugUnitTest --tests com.contentfilter.user.chromedataplane.*",
+  "results": {
+    "tests": 365,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

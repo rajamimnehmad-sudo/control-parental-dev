@@ -1,0 +1,422 @@
+{
+  "connection/admissionWaitMs": {
+    "count": 705,
+    "p50": 0.505,
+    "p95": 4.767,
+    "p99": 9.703,
+    "max": 19.744
+  },
+  "connection/tlsCacheWaitMs": {
+    "count": 701,
+    "p50": 0.018,
+    "p95": 42.039,
+    "p99": 150.132,
+    "max": 317.168
+  },
+  "connection/tlsCreationMs": {
+    "count": 701,
+    "p50": 0.0,
+    "p95": 49.621,
+    "p99": 77.844,
+    "max": 107.917
+  },
+  "connection/tlsMaterialMs": {
+    "count": 701,
+    "p50": 0.542,
+    "p95": 79.165,
+    "p99": 169.542,
+    "max": 398.887
+  },
+  "document/documentDecisionMs": {
+    "count": 36,
+    "p50": 63.702,
+    "p95": 234.95,
+    "p99": 496.293,
+    "max": 496.293
+  },
+  "document/downstreamWriteMs": {
+    "count": 36,
+    "p50": 1.408,
+    "p95": 5.254,
+    "p99": 5.711,
+    "max": 5.711
+  },
+  "document/upstreamHeadersMs": {
+    "count": 36,
+    "p50": 198.118,
+    "p95": 1068.381,
+    "p99": 1418.426,
+    "max": 1418.426
+  },
+  "image/bodyAdmissionMs": {
+    "count": 472,
+    "p50": 26.364,
+    "p95": 1191.579,
+    "p99": 2083.366,
+    "max": 2326.264
+  },
+  "image/bodyReadMs": {
+    "count": 472,
+    "p50": 0.46,
+    "p95": 102.605,
+    "p99": 212.68,
+    "max": 560.006
+  },
+  "image/decodeMs": {
+    "count": 504,
+    "p50": 0.0,
+    "p95": 39.646,
+    "p99": 95.259,
+    "max": 447.41
+  },
+  "image/downstreamWriteMs": {
+    "count": 568,
+    "p50": 1.554,
+    "p95": 17.95,
+    "p99": 44.397,
+    "max": 52.736
+  },
+  "image/hashMs": {
+    "count": 347,
+    "p50": 0.852,
+    "p95": 5.235,
+    "p99": 9.175,
+    "max": 14.213
+  },
+  "image/inferenceMs": {
+    "count": 504,
+    "p50": 0.0,
+    "p95": 539.458,
+    "p99": 634.035,
+    "max": 865.208
+  },
+  "image/inferenceQueueMs": {
+    "count": 504,
+    "p50": 0.0,
+    "p95": 539.306,
+    "p99": 612.654,
+    "max": 732.452
+  },
+  "image/localDecisionMs": {
+    "count": 504,
+    "p50": 0.319,
+    "p95": 756.917,
+    "p99": 1157.423,
+    "max": 1261.316
+  },
+  "image/requestToDeliveryMs": {
+    "count": 568,
+    "p50": 507.221,
+    "p95": 2020.757,
+    "p99": 2951.492,
+    "max": 4150.697
+  },
+  "image/sanitizeMs": {
+    "count": 568,
+    "p50": 155.178,
+    "p95": 1703.176,
+    "p99": 2443.695,
+    "max": 3445.165
+  },
+  "image/upstreamHeadersMs": {
+    "count": 568,
+    "p50": 188.276,
+    "p95": 700.811,
+    "p99": 1015.952,
+    "max": 1200.845
+  },
+  "image_cache/bodyAdmissionMs": {
+    "count": 95,
+    "p50": 0.023,
+    "p95": 667.185,
+    "p99": 953.742,
+    "max": 953.742
+  },
+  "image_cache/bodyReadMs": {
+    "count": 95,
+    "p50": 12.714,
+    "p95": 184.759,
+    "p99": 276.156,
+    "max": 276.156
+  },
+  "image_cache/decodeMs": {
+    "count": 95,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "image_cache/downstreamWriteMs": {
+    "count": 95,
+    "p50": 1.823,
+    "p95": 26.917,
+    "p99": 47.003,
+    "max": 47.003
+  },
+  "image_cache/hashMs": {
+    "count": 95,
+    "p50": 0.789,
+    "p95": 7.842,
+    "p99": 11.826,
+    "max": 11.826
+  },
+  "image_cache/inferenceMs": {
+    "count": 95,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "image_cache/inferenceQueueMs": {
+    "count": 95,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "image_cache/localDecisionMs": {
+    "count": 95,
+    "p50": 0.056,
+    "p95": 0.134,
+    "p99": 0.319,
+    "max": 0.319
+  },
+  "image_cache/requestToDeliveryMs": {
+    "count": 95,
+    "p50": 245.435,
+    "p95": 994.752,
+    "p99": 1297.748,
+    "max": 1297.748
+  },
+  "image_cache/sanitizeMs": {
+    "count": 95,
+    "p50": 31.811,
+    "p95": 669.649,
+    "p99": 955.96,
+    "max": 955.96
+  },
+  "image_cache/upstreamHeadersMs": {
+    "count": 95,
+    "p50": 181.265,
+    "p95": 546.259,
+    "p99": 1015.952,
+    "max": 1015.952
+  },
+  "image_engine/bodyAdmissionMs": {
+    "count": 252,
+    "p50": 355.785,
+    "p95": 1494.293,
+    "p99": 2083.366,
+    "max": 2309.173
+  },
+  "image_engine/bodyReadMs": {
+    "count": 252,
+    "p50": 0.422,
+    "p95": 68.055,
+    "p99": 216.588,
+    "max": 560.006
+  },
+  "image_engine/decodeMs": {
+    "count": 252,
+    "p50": 5.853,
+    "p95": 71.898,
+    "p99": 127.7,
+    "max": 447.41
+  },
+  "image_engine/downstreamWriteMs": {
+    "count": 252,
+    "p50": 1.791,
+    "p95": 23.133,
+    "p99": 49.883,
+    "max": 52.736
+  },
+  "image_engine/hashMs": {
+    "count": 252,
+    "p50": 0.873,
+    "p95": 5.045,
+    "p99": 9.175,
+    "max": 14.213
+  },
+  "image_engine/inferenceMs": {
+    "count": 252,
+    "p50": 134.698,
+    "p95": 555.07,
+    "p99": 659.836,
+    "max": 865.208
+  },
+  "image_engine/inferenceQueueMs": {
+    "count": 252,
+    "p50": 130.153,
+    "p95": 565.378,
+    "p99": 679.784,
+    "max": 732.452
+  },
+  "image_engine/localDecisionMs": {
+    "count": 252,
+    "p50": 271.706,
+    "p95": 1104.555,
+    "p99": 1258.104,
+    "max": 1261.316
+  },
+  "image_engine/requestToDeliveryMs": {
+    "count": 252,
+    "p50": 902.451,
+    "p95": 2168.569,
+    "p99": 3048.288,
+    "max": 4150.697
+  },
+  "image_engine/sanitizeMs": {
+    "count": 252,
+    "p50": 754.747,
+    "p95": 1897.499,
+    "p99": 2861.414,
+    "max": 3445.165
+  },
+  "image_engine/upstreamHeadersMs": {
+    "count": 252,
+    "p50": 169.547,
+    "p95": 691.202,
+    "p99": 1001.449,
+    "max": 1120.438
+  },
+  "image_error/bodyAdmissionMs": {
+    "count": 125,
+    "p50": 0.027,
+    "p95": 1013.224,
+    "p99": 2144.728,
+    "max": 2326.264
+  },
+  "image_error/bodyReadMs": {
+    "count": 125,
+    "p50": 0.34,
+    "p95": 2.136,
+    "p99": 12.102,
+    "max": 12.378
+  },
+  "image_error/decodeMs": {
+    "count": 157,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "image_error/downstreamWriteMs": {
+    "count": 157,
+    "p50": 1.359,
+    "p95": 3.742,
+    "p99": 11.632,
+    "max": 13.181
+  },
+  "image_error/inferenceMs": {
+    "count": 157,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "image_error/inferenceQueueMs": {
+    "count": 157,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "image_error/localDecisionMs": {
+    "count": 157,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "image_error/requestToDeliveryMs": {
+    "count": 157,
+    "p50": 255.074,
+    "p95": 1074.158,
+    "p99": 2450.33,
+    "max": 3062.672
+  },
+  "image_error/sanitizeMs": {
+    "count": 157,
+    "p50": 1.486,
+    "p95": 722.791,
+    "p99": 2149.356,
+    "max": 2338.224
+  },
+  "image_error/upstreamHeadersMs": {
+    "count": 157,
+    "p50": 217.836,
+    "p95": 873.733,
+    "p99": 1025.379,
+    "max": 1030.009
+  },
+  "other/decodeMs": {
+    "count": 20,
+    "p50": 0.0,
+    "p95": 18.59,
+    "p99": 18.59,
+    "max": 18.59
+  },
+  "other/downstreamWriteMs": {
+    "count": 512,
+    "p50": 1.157,
+    "p95": 50.535,
+    "p99": 101.927,
+    "max": 124.659
+  },
+  "other/inferenceMs": {
+    "count": 20,
+    "p50": 0.0,
+    "p95": 201.653,
+    "p99": 212.015,
+    "max": 212.015
+  },
+  "other/inferenceQueueMs": {
+    "count": 20,
+    "p50": 0.0,
+    "p95": 2.793,
+    "p99": 131.251,
+    "max": 131.251
+  },
+  "other/localDecisionMs": {
+    "count": 20,
+    "p50": 0.041,
+    "p95": 224.55,
+    "p99": 269.566,
+    "max": 269.566
+  },
+  "other/upstreamHeadersMs": {
+    "count": 512,
+    "p50": 201.889,
+    "p95": 925.188,
+    "p99": 1281.754,
+    "max": 2818.329
+  },
+  "tls_hit/tlsCacheWaitMs": {
+    "count": 555,
+    "p50": 0.017,
+    "p95": 2.589,
+    "p99": 43.419,
+    "max": 150.132
+  },
+  "tls_hit/tlsCreationMs": {
+    "count": 555,
+    "p50": 0.0,
+    "p95": 0.0,
+    "p99": 0.0,
+    "max": 0.0
+  },
+  "tls_miss/tlsCacheWaitMs": {
+    "count": 146,
+    "p50": 0.03,
+    "p95": 124.647,
+    "p99": 266.522,
+    "max": 317.168
+  },
+  "tls_miss/tlsCreationMs": {
+    "count": 146,
+    "p50": 39.859,
+    "p95": 77.844,
+    "p99": 105.385,
+    "max": 107.917
+  }
+}

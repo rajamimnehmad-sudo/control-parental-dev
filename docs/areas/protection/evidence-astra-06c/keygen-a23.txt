@@ -1,0 +1,12 @@
+RSA keygenMs=196.264375
+RSA keygenMs=273.371614
+RSA keygenMs=544.055104
+RSA keygenMs=498.906146
+RSA keygenMs=115.625468
+RSA keygenMs=214.884583
+EC keygenMs=0.186823
+EC keygenMs=0.136406
+EC keygenMs=0.138437
+EC keygenMs=0.145625
+EC keygenMs=0.143906
+EC keygenMs=0.134792

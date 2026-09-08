@@ -1,0 +1,242 @@
+{
+  "startUtc": "2026-09-08T05:42:51.933662+00:00",
+  "endUtc": "2026-09-08T06:28:51.858650+00:00",
+  "minutes": 46.0,
+  "samples": 47,
+  "pid": 24072,
+  "processSurvived": true,
+  "workload": "Mixed normal browsing, controlled bursts, forms/cart, navigation, rotation, intentional service STOP/START at 03:06 local, then passive idle. Same APK/process throughout; not 46 minutes of uninterrupted proxy service. Screen entered Dozing in passive interval and was awakened before final foreground verification.",
+  "memAvailableKiB": {
+    "min": 518480,
+    "max": 837152,
+    "median": 746808,
+    "last": 674784
+  },
+  "appRssKiB": {
+    "min": 141576,
+    "max": 226516,
+    "median": 165780,
+    "last": 155284
+  },
+  "threads": {
+    "min": 62,
+    "max": 164,
+    "median": 133,
+    "last": 133
+  },
+  "thermalStatus": [
+    "Thermal Status: 0"
+  ],
+  "temperatureC": {
+    "min": 22.8,
+    "max": 24.6,
+    "median": 24.4,
+    "last": 23.1
+  },
+  "cpuIntervalSamples": [
+    {
+      "end_s": 60.0,
+      "oneCorePercent": 97.35
+    },
+    {
+      "end_s": 120.0,
+      "oneCorePercent": 34.15
+    },
+    {
+      "end_s": 180.0,
+      "oneCorePercent": 30.817
+    },
+    {
+      "end_s": 240.0,
+      "oneCorePercent": 32.15
+    },
+    {
+      "end_s": 300.0,
+      "oneCorePercent": 10.567
+    },
+    {
+      "end_s": 360.0,
+      "oneCorePercent": 26.35
+    },
+    {
+      "end_s": 420.0,
+      "oneCorePercent": 9.717
+    },
+    {
+      "end_s": 480.0,
+      "oneCorePercent": 7.05
+    },
+    {
+      "end_s": 540.0,
+      "oneCorePercent": 7.867
+    },
+    {
+      "end_s": 600.0,
+      "oneCorePercent": 6.65
+    },
+    {
+      "end_s": 660.0,
+      "oneCorePercent": 7.1
+    },
+    {
+      "end_s": 720.0,
+      "oneCorePercent": 6.517
+    },
+    {
+      "end_s": 780.0,
+      "oneCorePercent": 6.583
+    },
+    {
+      "end_s": 840.0,
+      "oneCorePercent": 8.217
+    },
+    {
+      "end_s": 900.0,
+      "oneCorePercent": 10.917
+    },
+    {
+      "end_s": 960.0,
+      "oneCorePercent": 17.083
+    },
+    {
+      "end_s": 1020.0,
+      "oneCorePercent": 26.017
+    },
+    {
+      "end_s": 1080.0,
+      "oneCorePercent": 12.65
+    },
+    {
+      "end_s": 1140.0,
+      "oneCorePercent": 41.867
+    },
+    {
+      "end_s": 1200.0,
+      "oneCorePercent": 40.433
+    },
+    {
+      "end_s": 1260.0,
+      "oneCorePercent": 9.317
+    },
+    {
+      "end_s": 1320.0,
+      "oneCorePercent": 9.117
+    },
+    {
+      "end_s": 1380.0,
+      "oneCorePercent": 20.183
+    },
+    {
+      "end_s": 1440.0,
+      "oneCorePercent": 20.933
+    },
+    {
+      "end_s": 1500.0,
+      "oneCorePercent": 9.883
+    },
+    {
+      "end_s": 1560.0,
+      "oneCorePercent": 9.217
+    },
+    {
+      "end_s": 1620.0,
+      "oneCorePercent": 8.933
+    },
+    {
+      "end_s": 1680.0,
+      "oneCorePercent": 11.2
+    },
+    {
+      "end_s": 1740.0,
+      "oneCorePercent": 24.117
+    },
+    {
+      "end_s": 1800.0,
+      "oneCorePercent": 6.417
+    },
+    {
+      "end_s": 1860.0,
+      "oneCorePercent": 6.767
+    },
+    {
+      "end_s": 1920.0,
+      "oneCorePercent": 15.317
+    },
+    {
+      "end_s": 1980.0,
+      "oneCorePercent": 10.633
+    },
+    {
+      "end_s": 2040.0,
+      "oneCorePercent": 7.483
+    },
+    {
+      "end_s": 2100.0,
+      "oneCorePercent": 6.633
+    },
+    {
+      "end_s": 2160.0,
+      "oneCorePercent": 6.583
+    },
+    {
+      "end_s": 2220.0,
+      "oneCorePercent": 6.583
+    },
+    {
+      "end_s": 2280.0,
+      "oneCorePercent": 6.4
+    },
+    {
+      "end_s": 2340.0,
+      "oneCorePercent": 8.983
+    },
+    {
+      "end_s": 2400.0,
+      "oneCorePercent": 8.85
+    },
+    {
+      "end_s": 2460.0,
+      "oneCorePercent": 8.45
+    },
+    {
+      "end_s": 2520.0,
+      "oneCorePercent": 8.933
+    },
+    {
+      "end_s": 2580.0,
+      "oneCorePercent": 8.683
+    },
+    {
+      "end_s": 2640.0,
+      "oneCorePercent": 9.3
+    },
+    {
+      "end_s": 2700.0,
+      "oneCorePercent": 8.567
+    },
+    {
+      "end_s": 2760.0,
+      "oneCorePercent": 6.517
+    }
+  ],
+  "passiveLast10IntervalsOneCorePercent": {
+    "min": 6.4,
+    "max": 9.3,
+    "median": 8.625,
+    "last": 6.517
+  },
+  "fdObservation": "FDSize capacity 512, not actual FD count. Stock-device procfs/netlink restrictions prevent complete per-process FD/socket enumeration. No claim of zero FDs/socket leaks.",
+  "battery": "USB charging at 100%; no new mAh/h discharge claim. 06B remains reference with proportional runtime/CPU/memory/thermal check.",
+  "rendererPssKiB": {
+    "min": 69023,
+    "max": 155323,
+    "median": 108385,
+    "last": 110372
+  },
+  "rendererRssKiB": {
+    "min": 141048,
+    "max": 230068,
+    "median": 176076,
+    "last": 176076
+  }
+}

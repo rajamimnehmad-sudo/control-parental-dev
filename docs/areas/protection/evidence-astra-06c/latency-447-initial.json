@@ -1,0 +1,142 @@
+{
+  "connection/admissionWaitMs": {
+    "count": 137,
+    "p50": 0.633,
+    "p95": 10.238,
+    "p99": 432.774,
+    "max": 1339.649
+  },
+  "connection/tlsCacheWaitMs": {
+    "count": 136,
+    "p50": 1100.059,
+    "p95": 8778.6,
+    "p99": 9208.42,
+    "max": 9243.451
+  },
+  "connection/tlsCreationMs": {
+    "count": 136,
+    "p50": 255.842,
+    "p95": 689.683,
+    "p99": 814.509,
+    "max": 1022.983
+  },
+  "connection/tlsMaterialMs": {
+    "count": 136,
+    "p50": 1390.372,
+    "p95": 8871.98,
+    "p99": 9323.988,
+    "max": 9387.642
+  },
+  "document/documentDecisionMs": {
+    "count": 9,
+    "p50": 37.527,
+    "p95": 149.515,
+    "p99": 149.515,
+    "max": 149.515
+  },
+  "document/downstreamWriteMs": {
+    "count": 9,
+    "p50": 1.554,
+    "p95": 5.76,
+    "p99": 5.76,
+    "max": 5.76
+  },
+  "document/upstreamHeadersMs": {
+    "count": 9,
+    "p50": 222.786,
+    "p95": 1841.03,
+    "p99": 1841.03,
+    "max": 1841.03
+  },
+  "image/bodyAdmissionMs": {
+    "count": 18,
+    "p50": 0.057,
+    "p95": 409.938,
+    "p99": 409.938,
+    "max": 409.938
+  },
+  "image/bodyReadMs": {
+    "count": 18,
+    "p50": 0.479,
+    "p95": 100.378,
+    "p99": 100.378,
+    "max": 100.378
+  },
+  "image/decodeMs": {
+    "count": 25,
+    "p50": 0.0,
+    "p95": 51.106,
+    "p99": 55.793,
+    "max": 55.793
+  },
+  "image/downstreamWriteMs": {
+    "count": 30,
+    "p50": 1.269,
+    "p95": 4.645,
+    "p99": 9.548,
+    "max": 9.548
+  },
+  "image/hashMs": {
+    "count": 13,
+    "p50": 0.571,
+    "p95": 2.657,
+    "p99": 2.657,
+    "max": 2.657
+  },
+  "image/inferenceMs": {
+    "count": 25,
+    "p50": 0.0,
+    "p95": 273.475,
+    "p99": 587.134,
+    "max": 587.134
+  },
+  "image/inferenceQueueMs": {
+    "count": 25,
+    "p50": 0.0,
+    "p95": 46.598,
+    "p99": 143.982,
+    "max": 143.982
+  },
+  "image/localDecisionMs": {
+    "count": 25,
+    "p50": 0.098,
+    "p95": 318.277,
+    "p99": 638.518,
+    "max": 638.518
+  },
+  "image/requestToDeliveryMs": {
+    "count": 30,
+    "p50": 214.698,
+    "p95": 935.325,
+    "p99": 1035.688,
+    "max": 1035.688
+  },
+  "image/sanitizeMs": {
+    "count": 30,
+    "p50": 1.501,
+    "p95": 640.065,
+    "p99": 754.336,
+    "max": 754.336
+  },
+  "image/upstreamHeadersMs": {
+    "count": 30,
+    "p50": 157.602,
+    "p95": 769.806,
+    "p99": 876.779,
+    "max": 876.779
+  },
+  "other/downstreamWriteMs": {
+    "count": 107,
+    "p50": 1.332,
+    "p95": 67.976,
+    "p99": 86.086,
+    "max": 115.313
+  },
+  "other/upstreamHeadersMs": {
+    "count": 107,
+    "p50": 189.591,
+    "p95": 1015.408,
+    "p99": 1150.19,
+    "max": 1172.112
+  }
+}

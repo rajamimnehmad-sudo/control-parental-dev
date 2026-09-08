@@ -1,0 +1,361 @@
+{
+  "source": "75e31590491f22598c4d50eec0eab9f6018b6f66",
+  "suites": [
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosTrustedBootstrapPolicyTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldActiveDocumentReplayContractTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosFixtureOriginTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldRendererMetricsTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosDataPlaneLifecycleTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosLabPolicyControllerTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosRealWebHostPolicyTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosHttpsProxyTlsLoggingTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeHttp1ResponseWriterTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeVisualShieldFixtureTest",
+      "tests": "20",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldStaticMarkupNeutralizerTest",
+      "tests": "17",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldDocumentTransformerTest",
+      "tests": "7",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosProxyRequestTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeVisualShieldRegionDiscoveryHandshakeTest",
+      "tests": "15",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeOriginalUiSvgStylePolicyTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeStockMediaRuntimeModeTest",
+      "tests": "9",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosRealResponseSanitizerTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldBootstrapContractTest",
+      "tests": "25",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldBootstrapDiagnosticsTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeServiceWorkerScriptGateTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotoDecisionSessionTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosRealUpstreamTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeVisualShieldRegionDiscoveryFixtureTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldSelfShieldLivenessTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldHtmlPrefixParserTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosEphemeralTlsTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosHttpsProxyCleanupTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosHttpsProxyConnectionTest",
+      "tests": "18",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosVpnRollbackPolicyTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeStockMediaAuthorityFixtureTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldDocumentAdmissionTest",
+      "tests": "5",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosGloshiaDecisionEngineTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldCspPolicyTest",
+      "tests": "13",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeH20RendererAmplificationFixtureTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosResourceTransformerTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeStockPreRenderShieldFixtureTest",
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeOriginalUiSvgAuthorityTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeProtectedSocketFactoryTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeProxyTlsDiagnosticsTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePixelProvenanceFixtureTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePreRenderDocumentTransformerTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeNetworkVisualDeliveryGateTest",
+      "tests": "10",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeImageContentAuthorityTest",
+      "tests": "23",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeProvenanceCoverageFixtureTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeServiceWorkerBoundaryFixtureTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeRealWebProvenanceCoverageTest",
+      "tests": "11",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeProxyAdmissionTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePhotosRealWebRouteResolverTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromeMediaShieldReadyEndpointTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.contentfilter.user.chromedataplane.ChromePixelProvenanceRoutingTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "totals": {
+    "tests": 370,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  }
+}

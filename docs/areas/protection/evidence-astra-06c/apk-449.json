@@ -1,0 +1,12 @@
+{
+  "functionalSha": "2ee1e5276ec78f7dffff12a40e61156098e535ba",
+  "versionCode": 449,
+  "versionName": "1.0.1-dev",
+  "package": "com.contentfilter.user.dev",
+  "signerSha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "localSha256": "da8498a3178f95a552615daa8e8dda55473f9307e169846b10ab9b5dee531d43",
+  "installedSha256": "da8498a3178f95a552615daa8e8dda55473f9307e169846b10ab9b5dee531d43",
+  "sourceApkMatch": true,
+  "deviceSerial": "R58T34V31AE",
+  "state": "superseded\u2014not final PASS"
+}

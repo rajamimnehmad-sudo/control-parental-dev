@@ -1,0 +1,6 @@
+{"breakpointScript":"3","line":3,"column":1357}
+{"breakpointScript":"5","line":3,"column":98358}
+{"breakpointScript":"99","line":3,"column":1357}
+{"breakpointScript":"100","line":3,"column":98358}
+{"frames":[{"name":"failClosedDocument","location":{"scriptId":"100","lineNumber":3,"columnNumber":98358},"url":""},{"name":"","location":{"scriptId":"100","lineNumber":3,"columnNumber":86992},"url":""},{"name":"g","location":{"scriptId":"123","lineNumber":6,"columnNumber":110966},"url":""},{"name":"invoke","location":{"scriptId":"100","lineNumber":3,"columnNumber":6267},"url":""},{"name":"call","location":{"scriptId":"100","lineNumber":3,"columnNumber":6332},"url":""},{"name":"","location":{"scriptId":"100","lineNumber":3,"columnNumber":82921},"url":""},{"name":"","location":{"scriptId":"127","lineNumber":1,"columnNumber":39},"url":""}]}
+{"result":{"type":"string","value":"{\"stage\":\"RUNTIME\",\"reason\":\"UNCLASSIFIED\"}"}}

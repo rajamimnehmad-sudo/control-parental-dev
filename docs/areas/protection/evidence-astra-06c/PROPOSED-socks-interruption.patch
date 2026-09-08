@@ -1,0 +1,28 @@
+--- a/feature-vpn/src/main/java/com/contentfilter/feature/vpn/transport/VpnLocalSocks5Server.kt
++++ b/feature-vpn/src/main/java/com/contentfilter/feature/vpn/transport/VpnLocalSocks5Server.kt
+@@ -212,7 +212,11 @@
+             reverse.start()
+             relay(client, upstream.socket)
+             runCatching { upstream.socket.shutdownOutput() }
+-            reverse.join(RelayJoinTimeoutMillis)
++            try {
++                reverse.join(RelayJoinTimeoutMillis)
++            } catch (_: InterruptedException) {
++                Thread.currentThread().interrupt()
++            }
+         } finally {
+             sessions -= upstream
+             upstream.close()
+@@ -339,7 +343,11 @@
+             relay.close()
+             relayResource.close()
+             upstream.close()
+-            controlWatcher.join(ControlWatcherJoinMillis)
++            try {
++                controlWatcher.join(ControlWatcherJoinMillis)
++            } catch (_: InterruptedException) {
++                Thread.currentThread().interrupt()
++            }
+             activeUdpAssociations.decrementAndGet()
+         }
+     }

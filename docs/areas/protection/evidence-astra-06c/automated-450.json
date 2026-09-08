@@ -1,0 +1,18 @@
+{
+  "functionalSha": "1598f3683435caf09614622197bc7b9c991ed50e",
+  "groups": {
+    "Chrome DEV": {
+      "tests": 373,
+      "failures": 0,
+      "errors": 0
+    },
+    "VPN transport": {
+      "tests": 38,
+      "failures": 0,
+      "errors": 0
+    }
+  },
+  "lintDevDebug": "PASS",
+  "formatChangedPaths": "PASS",
+  "gitDiffCheck": "PASS"
+}

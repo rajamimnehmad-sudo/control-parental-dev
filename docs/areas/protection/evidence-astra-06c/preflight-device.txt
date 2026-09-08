@@ -1,0 +1,16 @@
+  mWakefulness=Awake
+  Device Owner:
+    admin=ComponentInfo{com.contentfilter.user.dev/com.contentfilter.feature.accessibility.service.ProtectionDeviceAdminReceiver}
+    isOrganizationOwnedDevice=true
+    mAffiliationIds={}
+     Bound services:{Service[label=Content Filter, id=com.contentfilter.user.dev/com.contentfilter.feature.accessibility.service.ProtectorAccessibilityService, isDefault=false, requestTouchExplorationMode=false, requestFilterKeyEvents=false, retrieveInteractiveWindows=true, captureFingerprintGestures=false, requestAccessibilityButton=false, receivedAccessibilityButtonCallbackSinceBind=false, lastAccessibilityButtonCallbackState=false, fetchFlags=256, nonInteractiveUiTimeout=0, interactiveUiTimeout=0, feedbackType[FEEDBACK_GENERIC], capabilities=129, eventTypes=[TYPE_VIEW_CLICKED, TYPE_VIEW_FOCUSED, TYPE_VIEW_TEXT_CHANGED, TYPE_WINDOW_STATE_CHANGED, TYPE_WINDOW_CONTENT_CHANGED, TYPE_VIEW_SCROLLED, TYPE_WINDOWS_CHANGED], notificationTimeout=0, requestA11yBtn=false]}
+     Enabled services:{{com.contentfilter.user.dev/com.contentfilter.feature.accessibility.service.ProtectorAccessibilityService}}
+    versionCode=439 minSdk=29 targetSdk=36
+    versionName=1.0.1-dev
+    User 0: ceDataInode=1239519 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+    versionCode=797707504 minSdk=32 targetSdk=36
+    versionName=152.0.7977.75
+    User 0: ceDataInode=6090 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
+    versionCode=609919331 minSdk=29 targetSdk=34
+    versionName=120.0.6099.193
+    User 0: ceDataInode=0 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false
