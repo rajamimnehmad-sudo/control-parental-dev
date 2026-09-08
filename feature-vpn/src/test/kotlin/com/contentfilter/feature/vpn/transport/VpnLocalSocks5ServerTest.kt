@@ -11,10 +11,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.concurrent.thread
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class VpnLocalSocks5ServerTest {
@@ -144,6 +146,113 @@ class VpnLocalSocks5ServerTest {
             fixtureThread.join(1_000)
             socks.close()
         }
+    }
+
+    @Test
+    fun `interrupted reverse relay join stays contained and releases TCP resources`() {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        val resources = VpnOwnedResourceTracker()
+        val fixture = ServerSocket(0, 1, loopback)
+        val release = CountDownLatch(1)
+        val worker = AtomicReference<Thread>()
+        val uncaught = AtomicReference<Throwable>()
+        val fixtureThread =
+            thread(name = "SocksInterruptedJoinFixture") {
+                fixture.accept().use { release.await(5, TimeUnit.SECONDS) }
+            }
+        val socks =
+            VpnLocalSocks5Server(
+                protectedSockets =
+                    VpnProtectedSocketFactory(
+                        protectTcp = {
+                            worker.set(Thread.currentThread())
+                            Thread.currentThread().uncaughtExceptionHandler =
+                                Thread.UncaughtExceptionHandler {
+                                        _,
+                                        error,
+                                    ->
+                                    uncaught.set(error)
+                                }
+                            true
+                        },
+                        protectUdp = { true },
+                        resources = resources,
+                    ),
+                allowedAddresses = setOf(loopback.hostAddress.orEmpty()),
+                allowedPorts = setOf(fixture.localPort),
+                resources = resources,
+            )
+        var client: Socket? = null
+        try {
+            socks.start()
+            client = Socket(loopback, socks.port)
+            authenticate(client, socks)
+            client.getOutputStream().write(connectRequest(loopback, fixture.localPort))
+            assertEquals(Socks5Protocol.Success, readReply(client.getInputStream()))
+            client.shutdownOutput()
+            assertTrue(
+                waitUntil {
+                    worker.get()?.stackTrace?.any { it.className == "java.lang.Thread" && it.methodName == "join" } == true
+                },
+            )
+            worker.get().interrupt()
+            assertTrue(waitUntil { socks.metrics().activeSessions == 0 })
+            assertTrue(waitUntil { worker.get().state == Thread.State.WAITING || !worker.get().isAlive })
+            assertNull(uncaught.get())
+            assertTrue(worker.get().isAlive, "The session worker must survive interrupted cleanup")
+            assertEquals(0, resources.snapshot().ownedFdResources - 1) // Listener remains owned until shutdown.
+        } finally {
+            client?.close()
+            release.countDown()
+            fixture.close()
+            fixtureThread.join(1_000)
+            socks.close()
+        }
+        assertEquals(0, resources.snapshot().ownedFdResources)
+    }
+
+    @Test
+    fun `interrupted UDP worker completes association accounting during shutdown`() {
+        val loopback = InetAddress.getByName("127.0.0.1")
+        val resources = VpnOwnedResourceTracker()
+        val worker = AtomicReference<Thread>()
+        val uncaught = AtomicReference<Throwable>()
+        val socks =
+            VpnLocalSocks5Server(
+                protectedSockets =
+                    VpnProtectedSocketFactory(
+                        protectTcp = { true },
+                        protectUdp = {
+                            worker.set(Thread.currentThread())
+                            Thread.currentThread().uncaughtExceptionHandler =
+                                Thread.UncaughtExceptionHandler {
+                                        _,
+                                        error,
+                                    ->
+                                    uncaught.set(error)
+                                }
+                            true
+                        },
+                        resources = resources,
+                    ),
+                allowedAddresses = setOf(loopback.hostAddress.orEmpty()),
+                resources = resources,
+            )
+        try {
+            socks.start()
+            Socket(loopback, socks.port).use { control ->
+                authenticate(control, socks)
+                control.getOutputStream().write(udpAssociateRequest())
+                readReplyPort(control.getInputStream())
+                assertEquals(1, socks.metrics().activeUdpAssociations)
+                worker.get().interrupt()
+            }
+            assertTrue(waitUntil { socks.metrics().activeUdpAssociations == 0 && socks.metrics().activeSessions == 0 })
+            assertNull(uncaught.get())
+        } finally {
+            socks.close()
+        }
+        assertEquals(0, resources.snapshot().ownedFdResources)
     }
 
     @Test

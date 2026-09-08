@@ -42,6 +42,7 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
 ) : AutoCloseable {
     val caCertificateDer: ByteArray = caCertificate.encoded
     val caFingerprint: String = sha256(caCertificateDer)
+    private val creationLock = Any()
     private val leafCache =
         object : LinkedHashMap<String, ChromePhotosTlsServerMaterial>(maximumLeafCertificates, LoadFactor, true) {
             override fun removeEldestEntry(
@@ -59,19 +60,23 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
     ): ChromePhotosTlsServerMaterial {
         val hostname = normalizeDnsHost(rawHostname)
         val started = System.nanoTime()
+        synchronized(leafCache) { leafCache[hostname] }?.let { cached ->
+            onTiming(true, (System.nanoTime() - started) / 1_000_000.0, 0.0)
+            return cached
+        }
         var waited = 0.0
         var created = 0.0
         var hit = false
         val material =
-            synchronized(this) {
+            synchronized(creationLock) {
                 waited = (System.nanoTime() - started) / 1_000_000.0
-                val cached = leafCache[hostname]
+                val cached = synchronized(leafCache) { leafCache[hostname] }
                 hit = cached != null
                 cached ?: run {
                     val creating = System.nanoTime()
                     createServerMaterial(hostname).also {
                         created = (System.nanoTime() - creating) / 1_000_000.0
-                        leafCache[hostname] = it
+                        synchronized(leafCache) { leafCache[hostname] = it }
                     }
                 }
             }
@@ -79,15 +84,14 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
         return material
     }
 
-    @Synchronized
-    fun cachedLeafCount(): Int = leafCache.size
+    fun cachedLeafCount(): Int = synchronized(leafCache) { leafCache.size }
 
-    @Synchronized
-    fun cachedHosts(): Set<String> = leafCache.keys.toSet()
+    fun cachedHosts(): Set<String> = synchronized(leafCache) { leafCache.keys.toSet() }
 
-    @Synchronized
     override fun close() {
-        leafCache.clear()
+        synchronized(creationLock) {
+            synchronized(leafCache) { leafCache.clear() }
+        }
     }
 
     private fun createServerMaterial(hostname: String): ChromePhotosTlsServerMaterial {
@@ -160,8 +164,8 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
         internal fun create(
             now: Instant = Instant.now(),
             maximumLeafCertificates: Int = DefaultMaximumLeafCertificates,
+            random: SecureRandom = SecureRandom(),
         ): ChromePhotosEphemeralTlsMaterial {
-            val random = SecureRandom()
             val caKeyPair = rsaKeyPair(random)
             val notBefore = Date.from(now.minus(ClockSkewMinutes, ChronoUnit.MINUTES))
             val notAfter = Date.from(now.plus(CertificateLifetimeHours, ChronoUnit.HOURS))
@@ -231,5 +235,7 @@ private const val ClockSkewMinutes = 5L
 private const val CertificateLifetimeHours = 12L
 private const val LeafAlias = "glosh-chrome-photos-leaf"
 private const val SignatureAlgorithm = "SHA256withRSA"
-private const val DefaultMaximumLeafCertificates = 8
+
+// Real multi-origin pages exceed eight hosts; retain bounded reuse without parallel key generation.
+private const val DefaultMaximumLeafCertificates = 64
 private const val LoadFactor = 0.75f

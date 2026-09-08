@@ -4,10 +4,15 @@ import java.io.ByteArrayInputStream
 import java.net.InetAddress
 import java.net.Socket
 import java.security.KeyStore
+import java.security.SecureRandom
 import java.security.cert.CertificateFactory
 import java.security.cert.X509Certificate
 import java.time.Instant
+import java.util.concurrent.Callable
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManagerFactory
@@ -64,6 +69,42 @@ class ChromePhotosEphemeralTlsTest {
         accepted.get()
         server.close()
         executor.shutdownNow()
+    }
+
+    @Test
+    fun `cached TLS material does not wait for unrelated certificate creation`() {
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val block = AtomicBoolean(false)
+        val delegate = SecureRandom()
+        val random =
+            object : SecureRandom() {
+                override fun nextBytes(bytes: ByteArray) {
+                    if (block.compareAndSet(true, false)) {
+                        entered.countDown()
+                        check(release.await(5, TimeUnit.SECONDS))
+                    }
+                    delegate.nextBytes(bytes)
+                }
+            }
+        val material = ChromePhotosEphemeralTlsMaterial.create(random = random)
+        val cached = material.serverMaterialFor("cached.example")
+        val workers = Executors.newFixedThreadPool(2)
+        try {
+            block.set(true)
+            val creating = workers.submit(Callable { material.serverMaterialFor("cold.example") })
+            assertTrue(entered.await(2, TimeUnit.SECONDS))
+            val hit = workers.submit(Callable { material.serverMaterialFor("cached.example") })
+            assertSame(cached, hit.get(1, TimeUnit.SECONDS))
+            release.countDown()
+            creating.get(5, TimeUnit.SECONDS)
+            assertEquals(2, material.cachedLeafCount())
+        } finally {
+            release.countDown()
+            workers.shutdownNow()
+            workers.awaitTermination(5, TimeUnit.SECONDS)
+            material.close()
+        }
     }
 
     @Test

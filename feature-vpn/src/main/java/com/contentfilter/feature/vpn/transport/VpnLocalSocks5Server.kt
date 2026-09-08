@@ -212,7 +212,11 @@ internal class VpnLocalSocks5Server(
             reverse.start()
             relay(client, upstream.socket)
             runCatching { upstream.socket.shutdownOutput() }
-            reverse.join(RelayJoinTimeoutMillis)
+            try {
+                reverse.join(RelayJoinTimeoutMillis)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
         } finally {
             sessions -= upstream
             upstream.close()
@@ -339,7 +343,11 @@ internal class VpnLocalSocks5Server(
             relay.close()
             relayResource.close()
             upstream.close()
-            controlWatcher.join(ControlWatcherJoinMillis)
+            try {
+                controlWatcher.join(ControlWatcherJoinMillis)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
             activeUdpAssociations.decrementAndGet()
         }
     }
