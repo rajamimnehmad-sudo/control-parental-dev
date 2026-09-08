@@ -6,6 +6,7 @@ import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.SocketException
 import java.net.InetAddress
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
@@ -410,6 +411,55 @@ class ChromePhotosHttpsProxyConnectionTest {
         assertEquals(1, failures)
     }
 
+    @Test
+    fun `client socket reset after response is lifecycle cancellation not proxy failure`() {
+        val fixture = FakeFixtureSource()
+        val proxy =
+            ChromePhotosHttpsProxy(
+                tls = ChromePhotosEphemeralTls.create(),
+                origin = fixture,
+                onFixtureHeartbeat = {},
+                onFatalFailure = {},
+                upstream = ScriptedUpstream(),
+                transformer = chromePhotosDeterministicTransformer(fixture),
+                lifecycleLog = { _, _ -> },
+                infoLog = {},
+                warningLog = {},
+            )
+
+        proxy.use {
+            it.handleHttp11Session(
+                input =
+                    ByteArrayInputStream(
+                        "GET /first HTTP/1.1\r\nHost: ${ChromePhotosDataPlaneLabContract.FixtureHost}\r\n\r\n"
+                            .toByteArray(Charsets.US_ASCII),
+                    ),
+                output = ClientDisconnectOutputStream(),
+                connectTargetHost = ChromePhotosDataPlaneLabContract.FixtureHost,
+                protocol = "http/1.1",
+                shouldContinue = { true },
+            )
+
+            assertEquals(0, it.metrics().failures)
+            assertEquals(1, it.metrics().clientDisconnects)
+        }
+    }
+
+    @Test
+    fun `upstream socket reset while streaming remains a failure not client cancellation`() {
+        val body = object : InputStream() {
+            override fun read(): Int = throw SocketException("upstream reset")
+        }
+        val result = runSession(ScriptedUpstream(Reply(response(body, -1))), twoRequests())
+        assertEquals(1, result.failures)
+        assertEquals(0, result.clientDisconnects)
+        assertEquals(1, result.output.responseCount())
+    }
+
+    private class ClientDisconnectOutputStream : OutputStream() {
+        override fun write(value: Int) = throw SocketException("connection reset")
+    }
+
     private fun runSession(
         upstream: ScriptedUpstream,
         input: String,
@@ -441,6 +491,7 @@ class ChromePhotosHttpsProxyConnectionTest {
             SessionResult(
                 output = output.toString(Charsets.US_ASCII.name()),
                 failures = it.metrics().failures,
+                clientDisconnects = it.metrics().clientDisconnects,
             )
         }
     }
@@ -517,6 +568,7 @@ class ChromePhotosHttpsProxyConnectionTest {
     private data class SessionResult(
         val output: String,
         val failures: Long,
+        val clientDisconnects: Long = 0,
     )
 
     private sealed interface Script

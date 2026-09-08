@@ -64,6 +64,7 @@ internal class ChromeOriginalUiSvgValidator(
         if (depth > limits.maximumDepth || ++state.nodes > limits.maximumNodes) return state.fail("complexity")
         val name = element.localName ?: return state.fail("element")
         if (element.namespaceURI != SvgNamespace || name !in AllowedElements) return state.fail("element")
+        if (name == "style" && !ChromeOriginalUiSvgStylePolicy.accepts(element.textContent)) return state.fail("style")
         val attributes = element.attributes
         for (index in 0 until attributes.length) {
             val attribute = attributes.item(index)
@@ -110,9 +111,11 @@ internal class ChromeOriginalUiSvgValidator(
         var child = element.firstChild
         while (child != null) {
             when (child.nodeType) {
-                Node.ELEMENT_NODE -> if (!visit(child as Element, depth + 1, state)) return false
+                Node.ELEMENT_NODE -> {
+                    if (name == "style" || !visit(child as Element, depth + 1, state)) return false
+                }
                 Node.TEXT_NODE, Node.CDATA_SECTION_NODE -> {
-                    if (name != "title" && name != "desc" && child.nodeValue.orEmpty().isNotBlank()) {
+                    if (name != "title" && name != "desc" && name != "style" && child.nodeValue.orEmpty().isNotBlank()) {
                         return state.fail("text")
                     }
                 }
@@ -217,7 +220,7 @@ internal class ChromeOriginalUiSvgValidator(
             setOf(
                 "svg", "g", "defs", "symbol", "use", "path", "rect", "circle", "ellipse", "line",
                 "polyline", "polygon", "title", "desc", "clipPath", "mask", "linearGradient",
-                "radialGradient", "stop", "marker",
+                "radialGradient", "stop", "marker", "style",
             )
         val GlobalAttributes =
             setOf(
