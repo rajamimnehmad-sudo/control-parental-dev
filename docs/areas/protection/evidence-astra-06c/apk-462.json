@@ -5,8 +5,8 @@
   "package": "com.contentfilter.user.dev",
   "signerSha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
   "localSha256": "831099936c16a86579ea4a0753c4eba1b52c8591c8a9b60d333a348882147096",
-  "installedSha256": null,
-  "installation": "NOT_INSTALLED_ADB_DISCONNECTED",
+  "installedSha256": "831099936c16a86579ea4a0753c4eba1b52c8591c8a9b60d333a348882147096",
+  "installation": "VERIFIED_ON_R58T34V31AE_AFTER_USB_RECOVERY",
   "tests": 427,
   "build": "PASS",
   "lint": "PASS"

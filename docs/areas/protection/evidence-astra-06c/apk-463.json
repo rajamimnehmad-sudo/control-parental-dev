@@ -1,0 +1,14 @@
+{
+  "functionalSha": "7f676f522de07a82b63116fecba8b433c100e7e6",
+  "versionCode": 463,
+  "versionName": "1.0.1-dev",
+  "package": "com.contentfilter.user.dev",
+  "signerSha256": "d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832",
+  "localSha256": "3bb65b78b9ba10e37eb1a47407e06d60743e7f69acb0ceceeda41dcf1f7c41fd",
+  "installedSha256": "3bb65b78b9ba10e37eb1a47407e06d60743e7f69acb0ceceeda41dcf1f7c41fd",
+  "device": "R58T34V31AE",
+  "tests": 429,
+  "build": "PASS",
+  "lint": "PASS",
+  "physical": "IN_PROGRESS"
+}

@@ -1,0 +1,209 @@
+{
+  "note": "Mixed controlled and public workloads; phase intervals overlap; not ON-OFF or paint measurements; low count tails are sample maxima. Partial session before DEV463.",
+  "groups": {
+    "all": {
+      "upstreamHeadersMs": {
+        "count": 64,
+        "p50": 133.958,
+        "p95": 740.456,
+        "p99": 891.607
+      },
+      "bodyAdmissionMs": {
+        "count": 64,
+        "p50": 0.035,
+        "p95": 0.165,
+        "p99": 503.437
+      },
+      "bodyReadMs": {
+        "count": 64,
+        "p50": 6.303,
+        "p95": 266.059,
+        "p99": 323.46
+      },
+      "processingAdmissionMs": {
+        "count": 64,
+        "p50": 0.047,
+        "p95": 1109.92,
+        "p99": 1477.372
+      },
+      "hashMs": {
+        "count": 59,
+        "p50": 1.196,
+        "p95": 21.464,
+        "p99": 46.65
+      },
+      "decodeMs": {
+        "count": 64,
+        "p50": 4.307,
+        "p95": 84.507,
+        "p99": 342.795
+      },
+      "inferenceQueueMs": {
+        "count": 64,
+        "p50": 0.421,
+        "p95": 252.32,
+        "p99": 726.206
+      },
+      "inferenceMs": {
+        "count": 64,
+        "p50": 130.873,
+        "p95": 246.74,
+        "p99": 656.446
+      },
+      "localDecisionMs": {
+        "count": 64,
+        "p50": 230.027,
+        "p95": 729.201,
+        "p99": 941.013
+      },
+      "downstreamWriteMs": {
+        "count": 64,
+        "p50": 1.282,
+        "p95": 49.246,
+        "p99": 59.522
+      },
+      "requestToDeliveryMs": {
+        "count": 64,
+        "p50": 577.005,
+        "p95": 1929.224,
+        "p99": 2390.178
+      }
+    },
+    "cache_hit": {
+      "upstreamHeadersMs": {
+        "count": 15,
+        "p50": 335.781,
+        "p95": 682.129,
+        "p99": 682.129
+      },
+      "bodyAdmissionMs": {
+        "count": 15,
+        "p50": 0.044,
+        "p95": 0.072,
+        "p99": 0.072
+      },
+      "bodyReadMs": {
+        "count": 15,
+        "p50": 7.54,
+        "p95": 30.632,
+        "p99": 30.632
+      },
+      "processingAdmissionMs": {
+        "count": 15,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "hashMs": {
+        "count": 15,
+        "p50": 0.574,
+        "p95": 1.724,
+        "p99": 1.724
+      },
+      "decodeMs": {
+        "count": 15,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "inferenceQueueMs": {
+        "count": 15,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "inferenceMs": {
+        "count": 15,
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "localDecisionMs": {
+        "count": 15,
+        "p50": 0.068,
+        "p95": 2.983,
+        "p99": 2.983
+      },
+      "downstreamWriteMs": {
+        "count": 15,
+        "p50": 1.375,
+        "p95": 9.095,
+        "p99": 9.095
+      },
+      "requestToDeliveryMs": {
+        "count": 15,
+        "p50": 352.092,
+        "p95": 708.511,
+        "p99": 708.511
+      }
+    },
+    "cache_miss": {
+      "upstreamHeadersMs": {
+        "count": 49,
+        "p50": 114.193,
+        "p95": 818.792,
+        "p99": 891.607
+      },
+      "bodyAdmissionMs": {
+        "count": 49,
+        "p50": 0.035,
+        "p95": 0.821,
+        "p99": 503.437
+      },
+      "bodyReadMs": {
+        "count": 49,
+        "p50": 3.362,
+        "p95": 305.104,
+        "p99": 323.46
+      },
+      "processingAdmissionMs": {
+        "count": 49,
+        "p50": 0.092,
+        "p95": 1269.591,
+        "p99": 1477.372
+      },
+      "hashMs": {
+        "count": 44,
+        "p50": 1.383,
+        "p95": 21.464,
+        "p99": 46.65
+      },
+      "decodeMs": {
+        "count": 49,
+        "p50": 14.396,
+        "p95": 87.13,
+        "p99": 342.795
+      },
+      "inferenceQueueMs": {
+        "count": 49,
+        "p50": 130.372,
+        "p95": 419.286,
+        "p99": 726.206
+      },
+      "inferenceMs": {
+        "count": 49,
+        "p50": 138.834,
+        "p95": 247.108,
+        "p99": 656.446
+      },
+      "localDecisionMs": {
+        "count": 49,
+        "p50": 282.019,
+        "p95": 733.624,
+        "p99": 941.013
+      },
+      "downstreamWriteMs": {
+        "count": 49,
+        "p50": 1.26,
+        "p95": 51.596,
+        "p99": 59.522
+      },
+      "requestToDeliveryMs": {
+        "count": 49,
+        "p50": 821.199,
+        "p95": 1973.344,
+        "p99": 2390.178
+      }
+    }
+  }
+}

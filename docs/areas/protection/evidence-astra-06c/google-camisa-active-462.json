@@ -1,0 +1,17 @@
+{
+  "id": 1,
+  "result": {
+    "result": {
+      "type": "object",
+      "value": {
+        "url": "https://www.google.com/sorry/index",
+        "type": "navigate",
+        "ttfb": 488.30000001192093,
+        "dcl": 522.3000000119209,
+        "load": 523.1999999880791,
+        "images": [],
+        "urlQueryOmitted": true
+      }
+    }
+  }
+}

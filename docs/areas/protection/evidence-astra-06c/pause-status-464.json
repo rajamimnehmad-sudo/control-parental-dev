@@ -1,0 +1,13 @@
+{
+  "active": "true",
+  "ready": "true",
+  "protectFailure": "0",
+  "queueRejects": "0",
+  "timeouts": "0",
+  "proxyQueueRejects": "0",
+  "quicAttempts": "0",
+  "directTcpAttempts": "0",
+  "bootstrapResetCount": "3",
+  "chromeSuspended": "false",
+  "failures": "0"
+}
