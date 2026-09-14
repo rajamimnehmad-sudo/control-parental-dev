@@ -14,12 +14,14 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.TrustManagerFactory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
@@ -139,6 +141,32 @@ class ChromePhotosEphemeralTlsTest {
         )
         material.close()
         assertEquals(0, material.cachedLeafCount())
+    }
+
+    @Test
+    fun `expired cached leaf is replaced without rotating the installed session CA`() {
+        val started = Instant.parse("2026-09-14T12:00:00Z")
+        val now = AtomicReference(started)
+        val material =
+            ChromePhotosEphemeralTlsMaterial.create(
+                now = started,
+                clock = now::get,
+            )
+        val ca =
+            CertificateFactory.getInstance("X.509").generateCertificate(
+                ByteArrayInputStream(material.caCertificateDer),
+            ) as X509Certificate
+        val first = material.serverMaterialFor("long-running.example")
+
+        now.set(started.plus(25, java.time.temporal.ChronoUnit.HOURS))
+        val replacement = material.serverMaterialFor("long-running.example")
+
+        ca.checkValidity(java.util.Date.from(started.plus(365, java.time.temporal.ChronoUnit.DAYS)))
+        assertNotSame(first, replacement)
+        assertNotEquals(first.leafCertificate.serialNumber, replacement.leafCertificate.serialNumber)
+        replacement.leafCertificate.checkValidity(java.util.Date.from(now.get()))
+        assertEquals(1, material.cachedLeafCount())
+        material.close()
     }
 
     @Test

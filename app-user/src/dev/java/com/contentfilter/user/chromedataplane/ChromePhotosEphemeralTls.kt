@@ -36,8 +36,7 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
     private val caKeyPair: KeyPair,
     private val caCertificate: X509Certificate,
     private val caName: X500Name,
-    private val notBefore: Date,
-    private val notAfter: Date,
+    private val clock: () -> Instant,
     private val random: SecureRandom,
     private val maximumLeafCertificates: Int,
 ) : AutoCloseable {
@@ -61,7 +60,7 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
     ): ChromePhotosTlsServerMaterial {
         val hostname = normalizeDnsHost(rawHostname)
         val started = System.nanoTime()
-        synchronized(leafCache) { leafCache[hostname] }?.let { cached ->
+        cachedMaterial(hostname)?.let { cached ->
             onTiming(true, (System.nanoTime() - started) / 1_000_000.0, 0.0)
             return cached
         }
@@ -71,7 +70,7 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
         val material =
             synchronized(creationLock) {
                 waited = (System.nanoTime() - started) / 1_000_000.0
-                val cached = synchronized(leafCache) { leafCache[hostname] }
+                val cached = cachedMaterial(hostname)
                 hit = cached != null
                 cached ?: run {
                     val creating = System.nanoTime()
@@ -95,7 +94,24 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
         }
     }
 
+    private fun cachedMaterial(hostname: String): ChromePhotosTlsServerMaterial? {
+        val now = clock()
+        val refreshAt = Date.from(now.plus(LeafRefreshLeadMinutes, ChronoUnit.MINUTES))
+        return synchronized(leafCache) {
+            leafCache[hostname]?.takeIf { cached ->
+                !cached.leafCertificate.notBefore.after(Date.from(now)) &&
+                    cached.leafCertificate.notAfter.after(refreshAt)
+            } ?: run {
+                leafCache.remove(hostname)
+                null
+            }
+        }
+    }
+
     private fun createServerMaterial(hostname: String): ChromePhotosTlsServerMaterial {
+        val now = clock()
+        val notBefore = Date.from(now.minus(ClockSkewMinutes, ChronoUnit.MINUTES))
+        val notAfter = Date.from(now.plus(LeafCertificateLifetimeHours, ChronoUnit.HOURS))
         val leafKeyPair = ecLeafKeyPair(random)
         val extensions = JcaX509ExtensionUtils()
         val leafName = X500Name("CN=$hostname,O=Glosh DEV Lab")
@@ -166,10 +182,11 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
             now: Instant = Instant.now(),
             maximumLeafCertificates: Int = DefaultMaximumLeafCertificates,
             random: SecureRandom = SecureRandom(),
+            clock: () -> Instant = { Instant.now() },
         ): ChromePhotosEphemeralTlsMaterial {
             val caKeyPair = rsaKeyPair(random)
             val notBefore = Date.from(now.minus(ClockSkewMinutes, ChronoUnit.MINUTES))
-            val notAfter = Date.from(now.plus(CertificateLifetimeHours, ChronoUnit.HOURS))
+            val notAfter = Date.from(now.plus(CaCertificateLifetimeDays, ChronoUnit.DAYS))
             val caName = X500Name("CN=Glosh Chrome Photos Ephemeral DEV CA,O=Glosh DEV Lab")
             val extensions = JcaX509ExtensionUtils()
             val caBuilder =
@@ -198,8 +215,7 @@ internal class ChromePhotosEphemeralTlsMaterial private constructor(
                 caKeyPair = caKeyPair,
                 caCertificate = caCertificate,
                 caName = caName,
-                notBefore = notBefore,
-                notAfter = notAfter,
+                clock = clock,
                 random = random,
                 maximumLeafCertificates = maximumLeafCertificates,
             )
@@ -239,7 +255,9 @@ private fun positiveSerial(random: SecureRandom): BigInteger =
 private const val RsaBits = 2048
 private const val SerialBits = 128
 private const val ClockSkewMinutes = 5L
-private const val CertificateLifetimeHours = 12L
+private const val CaCertificateLifetimeDays = 3_650L
+private const val LeafCertificateLifetimeHours = 24L
+private const val LeafRefreshLeadMinutes = 30L
 private const val LeafAlias = "glosh-chrome-photos-leaf"
 private const val SignatureAlgorithm = "SHA256withRSA"
 
