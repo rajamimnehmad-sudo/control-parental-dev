@@ -10,8 +10,10 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import java.io.InterruptedIOException
 import java.net.InetAddress
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLHandshakeException
 import javax.net.ssl.SSLSocket
@@ -145,6 +147,61 @@ class ChromePhotosRealUpstreamTest {
         assertFailsWith<IOException> {
             upstream.execute("example.com", ChromePhotosProxyRequest("GET", "/reset"))
         }
+    }
+
+    @Test
+    fun `idempotent empty request retries one upstream timeout on a fresh connection`() {
+        val attempts = AtomicInteger()
+        val client =
+            OkHttpClient.Builder()
+                .addInterceptor(
+                    Interceptor { chain ->
+                        if (attempts.getAndIncrement() == 0) throw InterruptedIOException("timeout")
+                        Response.Builder()
+                            .request(chain.request())
+                            .protocol(Protocol.HTTP_1_1)
+                            .code(200)
+                            .message("OK")
+                            .body("safe".toResponseBody("text/plain".toMediaType()))
+                            .build()
+                    },
+                ).build()
+        val upstream = ChromePhotosRealUpstream(client = client)
+
+        upstream.execute("example.com", ChromePhotosProxyRequest("GET", "/retry")).use { exchange ->
+            assertEquals(200, exchange.response.statusCode)
+        }
+        assertEquals(2, attempts.get())
+        assertEquals(1, upstream.metrics().idempotentRetries)
+    }
+
+    @Test
+    fun `request with mutation semantics never retries an upstream timeout`() {
+        val attempts = AtomicInteger()
+        val client =
+            OkHttpClient.Builder()
+                .addInterceptor(
+                    Interceptor {
+                        attempts.incrementAndGet()
+                        throw InterruptedIOException("timeout")
+                    },
+                ).build()
+        val upstream = ChromePhotosRealUpstream(client = client)
+
+        assertFailsWith<InterruptedIOException> {
+            upstream.execute(
+                "example.com",
+                ChromePhotosProxyRequest(
+                    method = "POST",
+                    target = "/checkout",
+                    headers = listOf(ChromeHttpHeader("Content-Type", "application/json")),
+                    body = "{}".toByteArray(),
+                    bodyFraming = ChromeHttpBodyFraming.ContentLength,
+                ),
+            )
+        }
+        assertEquals(1, attempts.get())
+        assertEquals(0, upstream.metrics().idempotentRetries)
     }
 
     @Test

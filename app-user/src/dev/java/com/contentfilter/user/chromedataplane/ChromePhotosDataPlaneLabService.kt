@@ -655,6 +655,7 @@ class ChromePhotosDataPlaneLabService : Service() {
                 "proxyP99Ms=${"%.3f".format(Locale.US, metrics.latencyP99Millis)} " +
                 "upstreamSockets=${metrics.upstream.protectedSocketsCreated} " +
                 "protectSuccess=${metrics.upstream.protectSuccess} protectFailure=${metrics.upstream.protectFailure} " +
+                "upstreamIdempotentRetries=${metrics.upstream.idempotentRetries} " +
                 "web11a=${metrics.webSemanticsReport} web11b=${metrics.imageAuthorityReport} " +
                 "modelLoadMs=${"%.3f".format(Locale.US, modelLoadMs)} " +
                 "engineCalls=${decisions.engineCalls} dedupeHits=${decisions.dedupeHits} " +

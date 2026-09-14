@@ -8,11 +8,13 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import okio.BufferedSink
 import java.io.ByteArrayOutputStream
 import java.io.Closeable
 import java.io.IOException
 import java.io.InputStream
+import java.io.InterruptedIOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
@@ -43,6 +45,7 @@ internal data class ChromePhotosUpstreamMetrics(
     val protectedSocketsCreated: Long,
     val protectSuccess: Long,
     val protectFailure: Long,
+    val idempotentRetries: Long = 0L,
 )
 
 internal enum class ChromePhotosUpstreamScheme(
@@ -96,6 +99,8 @@ internal class ChromePhotosRealUpstream(
         ChromeProtectedSocketFactory(VpnController::protectDevUpstreamSocket),
     private val client: OkHttpClient = defaultClient(destinationAuthority, protectedSocketFactory),
 ) : ChromePhotosUpstream {
+    private val idempotentRetries = AtomicLong()
+
     init {
         require(upstreamPort in 1..65_535)
     }
@@ -130,7 +135,7 @@ internal class ChromePhotosRealUpstream(
                     }
                 }
                 .build()
-        val response = client.newCall(upstreamRequest).execute()
+        val response = executeWithBoundedRetry(upstreamRequest, request)
         val body = response.body
         return ChromePhotosUpstreamExchange(
             response =
@@ -147,12 +152,26 @@ internal class ChromePhotosRealUpstream(
         )
     }
 
-    override fun metrics(): ChromePhotosUpstreamMetrics = protectedSocketFactory.metrics()
+    override fun metrics(): ChromePhotosUpstreamMetrics =
+        protectedSocketFactory.metrics().copy(idempotentRetries = idempotentRetries.get())
 
     override fun close() {
         client.dispatcher.cancelAll()
         client.connectionPool.evictAll()
     }
+
+    private fun executeWithBoundedRetry(
+        upstreamRequest: Request,
+        downstreamRequest: ChromePhotosProxyRequest,
+    ): Response =
+        try {
+            client.newCall(upstreamRequest).execute()
+        } catch (error: IOException) {
+            if (!downstreamRequest.canRetryAfterUpstreamTimeout(error)) throw error
+            idempotentRetries.incrementAndGet()
+            client.connectionPool.evictAll()
+            client.newCall(upstreamRequest).execute()
+        }
 
     internal companion object {
         const val HttpsPort = 443
@@ -201,6 +220,12 @@ internal class ChromePhotosRealUpstream(
         ) = buildUrl(ChromePhotosUpstreamScheme.Https, host, target, port)
     }
 }
+
+private fun ChromePhotosProxyRequest.canRetryAfterUpstreamTimeout(error: IOException): Boolean =
+    method in setOf("GET", "HEAD") &&
+        body.isEmpty() &&
+        error is InterruptedIOException &&
+        error.message?.contains("timeout", ignoreCase = true) == true
 
 private fun ChromePhotosUpstreamScheme.defaultPort(): Int =
     when (this) {
