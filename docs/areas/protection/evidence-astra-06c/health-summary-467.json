@@ -1,0 +1,45 @@
+{
+  "versionCode": 467,
+  "functionalSha": "83b9b13abb286c30f23e0937bd53e37b10b65d1a",
+  "device": "R58T34V31AE",
+  "durationSeconds": 2700,
+  "samples": 46,
+  "sameProcess": true,
+  "memAvailableKiB": {
+    "minimum": 575932,
+    "maximum": 829168,
+    "final": 666772
+  },
+  "gloshRssKiB": {
+    "initial": 217772,
+    "maximum": 235320,
+    "final": 155380
+  },
+  "gloshThreads": {
+    "initial": 135,
+    "maximum": 149,
+    "final": 131
+  },
+  "gloshPssKiB": {
+    "initial": 173466,
+    "final": 168323
+  },
+  "chromeMainPssKiB": {
+    "initial": 182017,
+    "final": 181950
+  },
+  "thermalStatuses": [0],
+  "battery": {
+    "powered": false,
+    "initialPercent": 32,
+    "finalPercent": 27,
+    "initialTemperatureTenthsC": 264,
+    "finalTemperatureTenthsC": 262
+  },
+  "crash": false,
+  "anr": false,
+  "oom": false,
+  "lowMemory": false,
+  "proxyFatal": false,
+  "processRestart": false
+}
