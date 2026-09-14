@@ -36,11 +36,12 @@ class ChromePhotoDecisionSessionTest {
 
     @Test
     fun `benchmark config accepts only the bounded DEV matrix`() {
-        assertEquals(256, ChromePhotoDecisionBenchmarkConfig().maximumCacheEntries)
-        assertEquals(1, ChromePhotoDecisionBenchmarkConfig().maximumConcurrentInferences)
+        assertEquals(512, ChromePhotoDecisionBenchmarkConfig().maximumCacheEntries)
+        assertEquals(2, ChromePhotoDecisionBenchmarkConfig().maximumConcurrentInferences)
         assertEquals(2, ChromePhotoDecisionBenchmarkConfig().maximumQueueEntries)
         assertEquals(5_000L, ChromePhotoDecisionBenchmarkConfig().timeoutMillis)
         assertEquals(256, ChromePhotoDecisionBenchmarkConfig(256, 2).maximumCacheEntries)
+        assertEquals(512, ChromePhotoDecisionBenchmarkConfig(512, 2).maximumCacheEntries)
 
         assertFailsWith<IllegalArgumentException> { ChromePhotoDecisionBenchmarkConfig(65, 1) }
         assertFailsWith<IllegalArgumentException> { ChromePhotoDecisionBenchmarkConfig(64, 3) }
@@ -60,6 +61,7 @@ class ChromePhotoDecisionSessionTest {
                 ChromePhotoDecisionBenchmarkConfig(64, 1),
                 ChromePhotoDecisionBenchmarkConfig(256, 1),
                 ChromePhotoDecisionBenchmarkConfig(256, 2),
+                ChromePhotoDecisionBenchmarkConfig(512, 2),
             )
 
         variants.forEach { config ->
