@@ -213,7 +213,7 @@
     {
       "id": "dag-browser",
       "title": "DAG",
-      "context": "PAUSED / RESERVE. Baseline conserva DAG DEV211 de main; trabajo posterior está preservado pero no promovido. Sin owner activo; retomar sólo por decisión explícita.",
+      "context": "PAUSED / RESERVE. Baseline canónica aislada de DAG promovida por decisión explícita del usuario: tag anotado dag-v230-safe-baseline, commit 6a045f1300336b1f033cab7bea2ce3ba25dcd119, APK DEV versionCode 230 / versionName 0.70.32-dev, extensión 2.0.64. GitHub conserva esa baseline fuera de main; main continúa mostrando DEV211 y no se usa como fuente funcional de DAG. R3.1, política dag-36, pesos y umbrales permanecen intactos. Sin owner activo; cualquier cambio futuro debe partir del commit/tag exacto de la baseline y usar un worktree aislado.",
       "tasks": [
         {"id":"dag-local-review","title":"Revisar integración DAG local","detail":"Pendiente sólo si se reactiva DAG.","status":"pending","priority":"important"},
         {"id":"dag-update-section-move","title":"Mover sección de actualización en DAG","detail":"Pendiente.","status":"pending","priority":"normal"},

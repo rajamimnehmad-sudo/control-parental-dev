@@ -1,7 +1,20 @@
 # Registro del candidato vigente de DAG y GloshIA
 
-Fecha: 2026-08-11. Este archivo describe el runtime local candidato; los candidatos
-historicos permanecen en Git y en sus informes de laboratorio.
+Fecha de baseline: 2026-09-14. Este archivo describe el runtime canónico aislado
+de DAG; los candidatos históricos permanecen en Git y en sus informes de laboratorio.
+
+## Baseline canónica
+
+- tag anotado: `dag-v230-safe-baseline`;
+- commit funcional: `6a045f1300336b1f033cab7bea2ce3ba25dcd119`;
+- flavor/paquete: `dev` / `com.contentfilter.dagbrowser.dev`;
+- versión: `versionCode 230`, `versionName 0.70.32-dev`;
+- extensión incorporada: `2.0.64`;
+- la baseline vive en la referencia aislada anterior. `main` conserva un DAG
+  anterior (`DEV211`) y no es la fuente funcional vigente de DAG;
+- los cambios futuros de DAG deben partir del commit o tag exacto de esta
+  baseline, en rama y worktree aislados. Esta promoción no integra ni modifica
+  `main`, no publica un APK y no altera el modelo, pesos, labels o umbrales.
 
 ## Produccion local
 
